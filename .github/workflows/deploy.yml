@@ -107,32 +107,12 @@ jobs:
           RG="${{ vars.AZURE_RESOURCE_GROUP }}"
           APP="${{ env.IMAGE_NAME }}"
           ENV_NAME="${{ env.CONTAINERAPPS_ENV }}"
-          ACR_NAME="${{ vars.ACR_NAME }}"
-          IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
+          # NOTE: this step only ensures the Container App resource exists.
+          # RBAC (AcrPull) is provisioned out-of-band (Terraform / one-time setup).
 
           if [ -z "$RG" ]; then echo "Missing vars.AZURE_RESOURCE_GROUP" >&2; exit 1; fi
           if [ -z "$APP" ]; then echo "Missing env.IMAGE_NAME" >&2; exit 1; fi
           if [ -z "$ENV_NAME" ]; then echo "Missing env.CONTAINERAPPS_ENV" >&2; exit 1; fi
-          if [ -z "$ACR_NAME" ]; then echo "Missing vars.ACR_NAME" >&2; exit 1; fi
-          if [ -z "$IDENTITY_NAME" ]; then echo "Missing vars.AZURE_IDENTITY_NAME" >&2; exit 1; fi
-
-          LOGIN_SERVER=$(az acr show --name "$ACR_NAME" --query loginServer -o tsv)
-          ACR_ID=$(az acr show --name "$ACR_NAME" --query id -o tsv)
-          IDENTITY_ID=$(az identity show -g "$RG" -n "$IDENTITY_NAME" --query id -o tsv)
-          IDENTITY_PRINCIPAL_ID=$(az identity show -g "$RG" -n "$IDENTITY_NAME" --query principalId -o tsv)
-
-          # Ensure the app managed identity can pull from ACR.
-          HAS_ACRPULL=$(az role assignment list \
-            --assignee "$IDENTITY_PRINCIPAL_ID" \
-            --scope "$ACR_ID" \
-            --query "[?roleDefinitionName=='AcrPull'] | length(@)" -o tsv)
-          if [ "$HAS_ACRPULL" = "0" ]; then
-            az role assignment create \
-              --assignee-object-id "$IDENTITY_PRINCIPAL_ID" \
-              --assignee-principal-type ServicePrincipal \
-              --role AcrPull \
-              --scope "$ACR_ID"
-          fi
 
           # Workaround: deploy action uses --replace-env-vars only supported by update.
           # Pre-create the Container App so the action goes through the update path.
@@ -141,12 +121,9 @@ jobs:
               -n "$APP" \
               -g "$RG" \
               --environment "$ENV_NAME" \
-              --image "${{ env.IMAGE }}" \
+              --image "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" \
               --ingress external \
               --target-port 8000 \
-              --registry-server "$LOGIN_SERVER" \
-              --registry-identity "$IDENTITY_ID" \
-              --user-assigned "$IDENTITY_ID" \
               --env-vars PORT=8000
           fi
 
