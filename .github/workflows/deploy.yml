@@ -34,7 +34,7 @@ jobs:
           uv run python -m compileall .
 
       - name: Docker login to ACR
-        if: ${{ secrets.ACR_LOGIN_SERVER != '' && secrets.ACR_USERNAME != '' && secrets.ACR_PASSWORD != '' }}
+        if: ${{ secrets.ACR_LOGIN_SERVER && secrets.ACR_USERNAME && secrets.ACR_PASSWORD }}
         uses: docker/login-action@v3
         with:
           registry: ${{ secrets.ACR_LOGIN_SERVER }}
@@ -42,7 +42,7 @@ jobs:
           password: ${{ secrets.ACR_PASSWORD }}
 
       - name: Azure login (OIDC)
-        if: ${{ secrets.AZURE_CREDENTIALS == '' }}
+        if: ${{ !secrets.AZURE_CREDENTIALS }}
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -50,13 +50,13 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Azure login (service principal json)
-        if: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        if: ${{ secrets.AZURE_CREDENTIALS }}
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Docker login to ACR (via Azure CLI)
-        if: ${{ secrets.ACR_LOGIN_SERVER == '' || secrets.ACR_USERNAME == '' || secrets.ACR_PASSWORD == '' }}
+        if: ${{ !(secrets.ACR_LOGIN_SERVER && secrets.ACR_USERNAME && secrets.ACR_PASSWORD) }}
         run: |
           if [ -z "${{ vars.ACR_NAME }}" ]; then
             echo "Missing vars.ACR_NAME (ACR registry name)." >&2
