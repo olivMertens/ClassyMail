@@ -10,6 +10,7 @@ ENV PATH="/root/.local/bin:${PATH}"
 
 WORKDIR /app
 COPY pyproject.toml uv.lock requirements.txt README.md ./
+COPY classificationg2s ./classificationg2s
 RUN uv sync --frozen --no-dev
 
 COPY . .
