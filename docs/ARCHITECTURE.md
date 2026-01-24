@@ -5,11 +5,11 @@ Pattern : Event-Driven + Container Apps + AI Foundry (Mistral OCR & Phi‑4)
 
 **Flux de données :**
 
-1. **Ingestion :** Le PDF arrive dans le Blob Storage (Container `input`).
-2. **Trigger :** Azure Event Grid détecte le fichier et déclenche l'Azure Function.
-3. **OCR (Extraction) :** La Function envoie le PDF à **Azure AI Document Intelligence** (modèle `prebuilt-read` très rapide) pour extraire le texte brut.
-4. **Intelligence (Agent) :** Le texte est envoyé à l'**Azure AI Agent** (hébergé dans Foundry). L'agent utilise un **System Prompt** strict pour classifier et scorer.
-5. **Stockage :** Le résultat (JSON) est transformé en ligne CSV et ajouté au fichier de résultats dans le Blob Storage (Container `output`).
+1. **Ingestion :** Le PDF arrive dans le Blob Storage (Container `pdf-inputs`).
+2. **Trigger :** Azure Event Grid détecte le fichier et publie un message dans Service Bus.
+3. **OCR (Extraction) :** Le worker (FastAPI) télécharge le PDF et l'envoie au modèle OCR (Mistral) pour obtenir du Markdown.
+4. **Intelligence (Classification) :** Le Markdown est envoyé au modèle LLM (Phi‑4, avec fallback possible) pour produire un JSON strict multi-intents.
+5. **Stockage :** Le résultat (JSON + usage/coût) est stocké dans Cosmos DB (et export CSV possible côté app).
 
 ```mermaid
 flowchart TD
@@ -17,7 +17,7 @@ flowchart TD
         PDF[PDF Email]
     end
     subgraph Storage[Storage]
-        BlobIn[(Blob Storage input)]
+        BlobIn[(Blob Storage: pdf-inputs)]
     end
     subgraph Ingestion[Ingestion]
         EG[Event Grid]
@@ -84,7 +84,7 @@ sequenceDiagram
 
 ### 4. Observabilité & Coûts
 - OpenTelemetry spans custom `gen_ai.*` : pages (Mistral), tokens (Phi‑4).
-- Coûts par email (UI & CSV) : Phi‑4 (0.000107 €/1K input, 0.00043 €/1K output), Mistral OCR (1 €/1K pages), overrides possibles.
+- Coûts par email (UI & CSV) : pricing dépend du tenant/région. Les coûts sont configurables via variables d’environnement et doivent être alignés sur la page officielle Azure.
 
 ### 5. Fine-tuning LoRA (Phi‑4)
 1. Collecte `needs_review=false` dans Cosmos.

@@ -8,6 +8,10 @@ on:
 env:
   IMAGE_NAME: classimail-agent
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -29,30 +33,96 @@ jobs:
           uv run python -m compileall .
 
       - name: Docker login to ACR
+        if: ${{ secrets.ACR_LOGIN_SERVER != '' && secrets.ACR_USERNAME != '' && secrets.ACR_PASSWORD != '' }}
         uses: docker/login-action@v3
         with:
           registry: ${{ secrets.ACR_LOGIN_SERVER }}
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
+      - name: Azure login (OIDC)
+        if: ${{ secrets.AZURE_CREDENTIALS == '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure login (service principal json)
+        if: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Docker login to ACR (via Azure CLI)
+        if: ${{ secrets.ACR_LOGIN_SERVER == '' || secrets.ACR_USERNAME == '' || secrets.ACR_PASSWORD == '' }}
+        run: |
+          if [ -z "${{ vars.ACR_NAME }}" ]; then
+            echo "Missing vars.ACR_NAME (ACR registry name)." >&2
+            exit 1
+          fi
+          az acr login --name "${{ vars.ACR_NAME }}"
+          LOGIN_SERVER=$(az acr show --name "${{ vars.ACR_NAME }}" --query loginServer -o tsv)
+          echo "ACR_LOGIN_SERVER=$LOGIN_SERVER" >> $GITHUB_ENV
+
       - name: Build & push image
         run: |
-          IMAGE=${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          REGISTRY="${{ secrets.ACR_LOGIN_SERVER }}"
+          if [ -z "$REGISTRY" ]; then REGISTRY="$ACR_LOGIN_SERVER"; fi
+          if [ -z "$REGISTRY" ]; then
+            echo "Missing ACR login server. Provide secrets.ACR_LOGIN_SERVER or vars.ACR_NAME." >&2
+            exit 1
+          fi
+          IMAGE=${REGISTRY}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
           docker build -t $IMAGE .
           docker push $IMAGE
 
-      - name: Azure login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Resolve Container Apps environment
+        run: |
+          ENV_NAME="${{ vars.AZURE_CONTAINERAPP_ENV }}"
+          if [ -z "$ENV_NAME" ]; then
+            # Par défaut, aligné sur infra/main.tf (prefix=email-poc -> email-poc-env)
+            ENV_NAME="email-poc-env"
+          fi
+          echo "CONTAINERAPPS_ENV=$ENV_NAME" >> $GITHUB_ENV
 
       - name: Deploy to Azure Container Apps
         uses: azure/container-apps-deploy-action@v2
         with:
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          resourceGroup: ${{ vars.AZURE_RESOURCE_GROUP }}
           containerAppName: ${{ env.IMAGE_NAME }}
+          containerAppEnvironment: ${{ env.CONTAINERAPPS_ENV }}
           imageToDeploy: ${{ env.IMAGE }}
           ingress: external
           targetPort: 8000
+          environmentVariables: >-
+            PORT=8000
+            AZURE_CLIENT_ID=${{ vars.AZURE_APP_CLIENT_ID }}
+            AZURE_SERVICE_BUS_FQDN=${{ vars.AZURE_SERVICE_BUS_FQDN }}
+            AZURE_SERVICE_BUS_QUEUE=${{ vars.AZURE_SERVICE_BUS_QUEUE }}
+            AZURE_STORAGE_ACCOUNT_URL=${{ vars.AZURE_STORAGE_ACCOUNT_URL }}
+            AZURE_STORAGE_CONTAINER=${{ vars.AZURE_STORAGE_CONTAINER }}
+            AZURE_COSMOS_ENDPOINT=${{ vars.AZURE_COSMOS_ENDPOINT }}
+            AZURE_COSMOS_DB=${{ vars.AZURE_COSMOS_DB }}
+            AZURE_COSMOS_CONTAINER=${{ vars.AZURE_COSMOS_CONTAINER }}
+            AZURE_AI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }}
+            MISTRAL_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }}
+            MISTRAL_DEPLOYMENT=${{ vars.MISTRAL_DEPLOYMENT }}
+            MISTRAL_MODE=${{ vars.MISTRAL_MODE }}
+            PHI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }}
+            PHI_DEPLOYMENT=${{ vars.PHI_DEPLOYMENT }}
+
+      - name: Assign managed identity to Container App
+        run: |
+          IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
+          if [ -z "$IDENTITY_NAME" ]; then
+            echo "Missing vars.AZURE_IDENTITY_NAME (ex: email-poc-id)." >&2
+            exit 1
+          fi
+          IDENTITY_ID=$(az identity show -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "$IDENTITY_NAME" --query id -o tsv)
+          az containerapp identity assign \
+            --name "${{ env.IMAGE_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --user-assigned "$IDENTITY_ID"

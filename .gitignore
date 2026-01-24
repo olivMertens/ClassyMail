@@ -1,4 +1,5 @@
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *.pyo
 *.pyd
@@ -29,6 +30,9 @@ data/
 logs/
 outputs/
 
+# Generated dummy PDFs (keep dataset/pdf/.gitkeep tracked)
+dataset/pdf/*.pdf
+
 # Node
 node_modules/
 
@@ -42,3 +46,13 @@ dist/
 
 # Notebooks
 *.ipynb_checkpoints/
+
+# Secrets
+secrets.env
+
+# Terraform (never commit local state/plans)
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/terraform.tfvars
+**/tfplan

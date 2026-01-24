@@ -15,6 +15,7 @@ import json
 import os
 import re
 import uuid
+import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from urllib.parse import urlparse
@@ -63,9 +64,30 @@ PHI_DEPLOYMENT = os.getenv("PHI_DEPLOYMENT", "phi-4")
 AI_API_VERSION = os.getenv("AZURE_AI_API_VERSION", "2024-08-01-preview")
 AI_SCOPE = os.getenv("AZURE_AI_SCOPE", "https://cognitiveservices.azure.com/.default")
 
+# Fallback model (for long contexts / safety net).
+# In Azure OpenAI compatible endpoints, the "model" field is the deployment name.
+PHI_FALLBACK_ENDPOINT = os.getenv("PHI_FALLBACK_ENDPOINT") or PHI_ENDPOINT
+PHI_FALLBACK_DEPLOYMENT = os.getenv("PHI_FALLBACK_DEPLOYMENT", "gpt-4o-mini")
+
+# Anonymization model (used to create fine-tuning datasets without PII).
+ANONYMIZER_ENDPOINT = os.getenv("ANONYMIZER_ENDPOINT") or PHI_ENDPOINT
+ANONYMIZER_DEPLOYMENT = os.getenv("ANONYMIZER_DEPLOYMENT", "gpt-4o")
+ANONYMIZER_API_VERSION = os.getenv("ANONYMIZER_API_VERSION", AI_API_VERSION)
+ANONYMIZER_PROMPT_VERSION = os.getenv("ANONYMIZER_PROMPT_VERSION", "v1")
+ANONYMIZER_MAX_TOKENS = int(os.getenv("ANONYMIZER_MAX_TOKENS", "6000"))
+
+# Context sizing (best-effort). Adjust to match your deployments.
+PHI_PRIMARY_MAX_INPUT_TOKENS = int(os.getenv("PHI_PRIMARY_MAX_INPUT_TOKENS", "8000"))
+PHI_FALLBACK_MAX_INPUT_TOKENS = int(os.getenv("PHI_FALLBACK_MAX_INPUT_TOKENS", "120000"))
+PHI_RESERVED_OUTPUT_TOKENS = int(os.getenv("PHI_RESERVED_OUTPUT_TOKENS", "1000"))
+
 PHI4_COST_PER_1K_INPUT = float(os.getenv("PHI4_COST_PER_1K_INPUT", "0.000107"))
 PHI4_COST_PER_1K_OUTPUT = float(os.getenv("PHI4_COST_PER_1K_OUTPUT", "0.00043"))
 MISTRAL_OCR_COST_PER_1K_PAGES = float(os.getenv("MISTRAL_OCR_COST_PER_1K_PAGES", "1.0"))  # $1 per 1K pages (approx)
+
+# Pricing for fallback model is tenant/region specific. Keep as config (default 0).
+FALLBACK_COST_PER_1K_INPUT = float(os.getenv("FALLBACK_COST_PER_1K_INPUT", "0"))
+FALLBACK_COST_PER_1K_OUTPUT = float(os.getenv("FALLBACK_COST_PER_1K_OUTPUT", "0"))
 
 CONCURRENCY_LIMIT = asyncio.Semaphore(5)
 credential = DefaultAzureCredential(exclude_interactive_browser_credential=True)
@@ -80,6 +102,109 @@ sb_client: ServiceBusClient | None = None
 cosmos_client: CosmosClient | None = None
 cosmos_container = None
 blob_service_client: BlobServiceClient | None = None
+
+
+ANONYMIZER_SYSTEM_PROMPT = """### ROLE ###
+You are an advanced Data Privacy and Anonymization Engine. Your purpose is to sanitize email content formatted in Markdown.
+
+### OBJECTIVE ###
+Rewrite the user's provided email content to remove all Personally Identifiable Information (PII) and sensitive contextual data, while STRICTLY preserving the original Markdown syntax, styling, and structure.
+
+### ANONYMIZATION RULES (PII) ###
+1. **Direct PII:** Replace all names, phone numbers, email addresses, IP addresses, and physical addresses with generic placeholders (e.g., `[Name]`, `[Phone]`, `[Email]`, `[Address]`).
+2. **Contextual PII:** Generalize specific details that could indirectly identify a person or company (e.g., change "The project with Google" to "The project with [Client]"; change "My wife Sarah" to "My spouse").
+3. **Dates:** Generalize specific dates to months or quarters unless the specific date is crucial for generic context (e.g., change "July 12th, 2024" to `[Date]` or "July 2024").
+4. **Numbers:** Mask financial figures or sensitive metrics if they are specific enough to identify the transaction (e.g., "$1,234,550.00" -> `[Amount]`).
+
+### MARKDOWN PRESERVATION RULES ###
+1. **Structure:** Do NOT alter headers (`#`), lists (`-`, `1.`), blockquotes (`>`), or code blocks (```).
+2. **Links:** - Preserve the Markdown link syntax `[text](url)`.
+   - If the *text* contains PII, anonymize it: `[John's Profile]` -> `[[Name]'s Profile]`.
+   - If the *URL* contains PII (e.g., `linkedin.com/in/johndoe`), replace the URL with a safe placeholder like `#` or `http://example.com/profile`.
+   - NEVER remove the link syntax itself.
+3. **Tables:** Keep all table rows and columns intact (`|`). Anonymize the content *inside* the cells, but do not break the alignment.
+
+### OUTPUT FORMAT ###
+Return ONLY the anonymized Markdown text. Do not add conversational filler like "Here is the anonymized version.""".strip()
+
+
+def _basic_pii_scrub(text: str) -> str:
+    """Cheap local scrubbing to reduce obvious PII before LLM anonymization.
+
+    This does NOT guarantee full anonymization; the LLM step is the authoritative pass.
+    """
+    if not text:
+        return text
+
+    # Emails
+    text = re.sub(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", "[Email]", text)
+    # IPv4
+    text = re.sub(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", "[IP]", text)
+    # Phone-ish (very rough)
+    text = re.sub(r"\b(?:\+?\d[\d\s().-]{7,}\d)\b", "[Phone]", text)
+    # IBAN-ish
+    text = re.sub(r"\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b", "[IBAN]", text)
+    return text
+
+
+async def _ensure_cosmos_container():
+    global cosmos_client, cosmos_container
+    if cosmos_container is not None:
+        return
+    if not COSMOS_ENDPOINT:
+        raise RuntimeError("AZURE_COSMOS_ENDPOINT is not set")
+    cosmos_client = CosmosClient(COSMOS_ENDPOINT, credential=credential if not COSMOS_KEY else None, key=COSMOS_KEY)
+    db = await cosmos_client.create_database_if_not_exists(id=COSMOS_DB)
+    cosmos_container = await db.create_container_if_not_exists(id=COSMOS_CONTAINER, partition_key=PartitionKey(path="/id"))
+
+
+async def anonymize_markdown_for_finetune(markdown: str) -> dict:
+    """Anonymize Markdown using a model (default gpt-4o).
+
+    Returns: {"anonymized_markdown": str, "usage": dict|None, "model": str}
+    """
+    if not ANONYMIZER_ENDPOINT:
+        raise RuntimeError("ANONYMIZER_ENDPOINT is not set")
+
+    headers = await auth_headers()
+    user_content = _basic_pii_scrub(markdown or "")
+
+    payload = {
+        "model": ANONYMIZER_DEPLOYMENT,
+        "messages": [
+            {"role": "system", "content": ANONYMIZER_SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ],
+        "temperature": 0,
+        "max_tokens": ANONYMIZER_MAX_TOKENS,
+    }
+
+    url = f"{ANONYMIZER_ENDPOINT}/openai/deployments/{ANONYMIZER_DEPLOYMENT}/chat/completions?api-version={ANONYMIZER_API_VERSION}"
+
+    with tracer.start_as_current_span("anonymize_markdown") as span:
+        span.set_attribute("gen_ai.system", "azure_openai")
+        span.set_attribute("gen_ai.operation", "chat.completions")
+        span.set_attribute("gen_ai.request.model", ANONYMIZER_DEPLOYMENT)
+        span.set_attribute("app.anonymizer.prompt_version", ANONYMIZER_PROMPT_VERSION)
+
+        async with httpx.AsyncClient(timeout=90) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        usage = data.get("usage")
+        if usage:
+            span.set_attribute("gen_ai.usage.input_tokens", usage.get("prompt_tokens", 0))
+            span.set_attribute("gen_ai.usage.output_tokens", usage.get("completion_tokens", 0))
+            span.set_attribute("gen_ai.usage.total_tokens", usage.get("total_tokens", 0))
+
+        return {
+            "anonymized_markdown": content,
+            "usage": usage,
+            "model": ANONYMIZER_DEPLOYMENT,
+            "prompt_version": ANONYMIZER_PROMPT_VERSION,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -115,6 +240,9 @@ class EmailListResponse(BaseModel):
     total: int
     review_required: int
     processed: int
+    finetune_reviewed_ready: int = 0
+    finetune_min_required: int = 50
+    finetune_ready: bool = False
     continuation_token: Optional[str] = None
 
 
@@ -124,6 +252,24 @@ class EmailListResponse(BaseModel):
 @app.on_event("startup")
 async def on_startup():
     global sb_client, cosmos_client, cosmos_container, blob_service_client
+    missing_env: list[str] = []
+    if not SERVICE_BUS_FQDN:
+        missing_env.append("AZURE_SERVICE_BUS_FQDN")
+    if not BLOB_ACCOUNT_URL:
+        missing_env.append("AZURE_STORAGE_ACCOUNT_URL")
+    if not COSMOS_ENDPOINT:
+        missing_env.append("AZURE_COSMOS_ENDPOINT")
+    if not MISTRAL_ENDPOINT:
+        missing_env.append("MISTRAL_ENDPOINT")
+    if not PHI_ENDPOINT:
+        missing_env.append("PHI_ENDPOINT (or AZURE_AI_ENDPOINT)")
+    if missing_env:
+        raise RuntimeError(
+            "Missing required environment variables: "
+            + ", ".join(missing_env)
+            + ". Load secrets.env first (see docs/LOCAL_RUN.md)."
+        )
+
     if not trace.get_tracer_provider() or isinstance(trace.get_tracer_provider(), trace.NoOpTracerProvider):
         provider = TracerProvider(resource=Resource.create({"service.name": "classificationg2s-api"}))
         otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -233,9 +379,16 @@ async def run_classification_pipeline(blob_url: str) -> EmailRecord:
     markdown_trunc = markdown[:30000] if markdown else None
     mistral_usage = ocr_result.get("usage") or {}
     pages = mistral_usage.get("pages_processed") or mistral_usage.get("pages") or estimate_pdf_pages(pdf_bytes)
+    llm_usage = classification_raw.get("usage") if isinstance(classification_raw, dict) else None
+    fallback_used = bool(classification_raw.get("fallback_used")) if isinstance(classification_raw, dict) else False
+    llm_cost = compute_cost_llm(llm_usage, fallback_used=fallback_used)
     usage = {
-        "phi4": classification_raw.get("usage") if isinstance(classification_raw, dict) else None,
-        "phi4_cost_usd": compute_cost_phi4(classification_raw.get("usage") if isinstance(classification_raw, dict) else None),
+        # Backward compatible keys (existing UI/exports expect "phi4")
+        "phi4": llm_usage,
+        "phi4_cost_usd": llm_cost,
+        "phi4_model": classification_raw.get("model") if isinstance(classification_raw, dict) else PHI_DEPLOYMENT,
+        "phi4_fallback_used": fallback_used,
+        "phi4_context_truncated": bool(classification_raw.get("context_truncated")) if isinstance(classification_raw, dict) else False,
         "mistral": {
             "estimated_pages": pages,
             "cost_usd": compute_cost_mistral(pages),
@@ -274,6 +427,37 @@ def compute_cost_phi4(usage: Optional[dict]) -> Optional[float]:
     cin = overrides.get("phi4_input_per_1k", PHI4_COST_PER_1K_INPUT)
     cout = overrides.get("phi4_output_per_1k", PHI4_COST_PER_1K_OUTPUT)
     return (prompt / 1000.0) * cin + (completion / 1000.0) * cout
+
+
+def compute_cost_llm(usage: Optional[dict], fallback_used: bool) -> Optional[float]:
+    if not usage:
+        return None
+    prompt = usage.get("prompt_tokens") or usage.get("input_tokens") or usage.get("inputTokens") or 0
+    completion = usage.get("completion_tokens") or usage.get("output_tokens") or usage.get("outputTokens") or 0
+    overrides = getattr(app.state, "cost_overrides", {}) if hasattr(app, "state") else {}
+    if fallback_used:
+        cin = overrides.get("fallback_input_per_1k", FALLBACK_COST_PER_1K_INPUT)
+        cout = overrides.get("fallback_output_per_1k", FALLBACK_COST_PER_1K_OUTPUT)
+    else:
+        cin = overrides.get("phi4_input_per_1k", PHI4_COST_PER_1K_INPUT)
+        cout = overrides.get("phi4_output_per_1k", PHI4_COST_PER_1K_OUTPUT)
+    return (prompt / 1000.0) * cin + (completion / 1000.0) * cout
+
+
+def estimate_tokens_rough(text: str) -> int:
+    # Best-effort heuristic: ~4 chars per token for Latin scripts.
+    if not text:
+        return 0
+    return max(1, len(text) // 4)
+
+
+def clamp_text_to_token_budget(text: str, max_tokens: int) -> tuple[str, bool]:
+    if not text or max_tokens <= 0:
+        return "", bool(text)
+    max_chars = max_tokens * 4
+    if len(text) <= max_chars:
+        return text, False
+    return text[:max_chars], True
 
 
 def compute_cost_mistral(pages: int) -> float:
@@ -344,7 +528,12 @@ async def ocr_with_mistral(base64_pdf: str) -> dict:
 
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10), retry=retry_if_exception(_retryable_httpx))
-async def classify_with_phi4(text_markdown: str) -> dict:
+async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False) -> dict:
+    if not PHI_ENDPOINT:
+        raise RuntimeError("PHI_ENDPOINT is not set")
+    if not PHI_FALLBACK_ENDPOINT:
+        raise RuntimeError("PHI_FALLBACK_ENDPOINT is not set")
+
     headers = await auth_headers()
     system_prompt = """ 
 Tu es un assistant expert en classification d'emails d'assurance.
@@ -374,28 +563,67 @@ FORMAT DE RÉPONSE ATTENDU (JSON UNIQUEMENT) :
     "global_complexity": "Simple|Complexe"
 }
 """
+
+    system_tokens = estimate_tokens_rough(system_prompt)
+    overhead_tokens = 200
+    user_tokens_est = estimate_tokens_rough(text_markdown or "")
+
+    max_user_primary = max(500, PHI_PRIMARY_MAX_INPUT_TOKENS - PHI_RESERVED_OUTPUT_TOKENS - system_tokens - overhead_tokens)
+    max_user_fallback = max(500, PHI_FALLBACK_MAX_INPUT_TOKENS - PHI_RESERVED_OUTPUT_TOKENS - system_tokens - overhead_tokens)
+
+    use_fallback = force_fallback or (user_tokens_est > max_user_primary)
+    chosen_endpoint = PHI_FALLBACK_ENDPOINT if use_fallback else PHI_ENDPOINT
+    chosen_deployment = PHI_FALLBACK_DEPLOYMENT if use_fallback else PHI_DEPLOYMENT
+    user_budget = max_user_fallback if use_fallback else max_user_primary
+    user_content, truncated = clamp_text_to_token_budget(text_markdown or "", user_budget)
+
     payload = {
-        "model": PHI_DEPLOYMENT,
+        "model": chosen_deployment,
         "response_format": {"type": "json_object"},
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": text_markdown[:30000]},
+            {"role": "user", "content": user_content},
         ],
         "temperature": 0.1,
+        "max_tokens": PHI_RESERVED_OUTPUT_TOKENS,
     }
-    url = f"{PHI_ENDPOINT}/openai/deployments/{PHI_DEPLOYMENT}/chat/completions?api-version={AI_API_VERSION}" 
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
-        content = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
-        usage = data.get("usage", {})
-        span.set_attribute("gen_ai.usage.input_tokens", usage.get("prompt_tokens", 0))
-        span.set_attribute("gen_ai.usage.output_tokens", usage.get("completion_tokens", 0))
-        span.set_attribute("gen_ai.usage.total_tokens", usage.get("total_tokens", 0))
-        payload_dict = json.loads(content)
-        payload_dict["usage"] = usage
-        return payload_dict
+    url = f"{chosen_endpoint}/openai/deployments/{chosen_deployment}/chat/completions?api-version={AI_API_VERSION}"
+
+    with tracer.start_as_current_span("phi4_classify") as span:
+        span.set_attribute("gen_ai.system", "azure_openai")
+        span.set_attribute("gen_ai.operation", "chat.completions")
+        span.set_attribute("gen_ai.request.model", chosen_deployment)
+        span.set_attribute("app.fallback_used", bool(use_fallback))
+        span.set_attribute("app.context_truncated", bool(truncated))
+        span.set_attribute("app.estimated.user_tokens", int(user_tokens_est))
+        span.set_attribute("app.user_budget_tokens", int(user_budget))
+
+        async with httpx.AsyncClient(timeout=60) as client:
+            try:
+                resp = await client.post(url, json=payload, headers=headers)
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as ex:
+                status = ex.response.status_code if ex.response is not None else None
+                body = ex.response.text if ex.response is not None else ""
+                # If the primary fails due to size/context, try once with fallback.
+                if (not use_fallback) and status in (400, 413) and ("context" in body.lower() or "token" in body.lower() or "length" in body.lower()):
+                    return await classify_with_phi4(text_markdown, force_fallback=True)
+                raise
+
+            data = resp.json()
+            content = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+            usage = data.get("usage", {})
+            span.set_attribute("gen_ai.usage.input_tokens", usage.get("prompt_tokens", 0))
+            span.set_attribute("gen_ai.usage.output_tokens", usage.get("completion_tokens", 0))
+            span.set_attribute("gen_ai.usage.total_tokens", usage.get("total_tokens", 0))
+
+            payload_dict = json.loads(content)
+            payload_dict["usage"] = usage
+            payload_dict["model"] = chosen_deployment
+            payload_dict["fallback_used"] = bool(use_fallback)
+            payload_dict["context_truncated"] = bool(truncated)
+            payload_dict["estimated_user_tokens"] = int(user_tokens_est)
+            return payload_dict
 
 
 def process_agent_response(agent_response: dict) -> dict:
@@ -504,7 +732,18 @@ async def list_emails(
     processed_count = await count_by_status("PROCESSED")
     review_count = await count_by_status("REVIEW_REQUIRED")
     total = processed_count + review_count
-    return EmailListResponse(items=items, total=total, review_required=review_count, processed=processed_count, continuation_token=next_token)
+    finetune_min_required = int(os.getenv("FINETUNE_MIN_EXAMPLES", "50"))
+    finetune_reviewed_ready = await count_reviewed_ready_items()
+    return EmailListResponse(
+        items=items,
+        total=total,
+        review_required=review_count,
+        processed=processed_count,
+        finetune_reviewed_ready=finetune_reviewed_ready,
+        finetune_min_required=finetune_min_required,
+        finetune_ready=finetune_reviewed_ready >= finetune_min_required,
+        continuation_token=next_token,
+    )
 
 
 async def count_by_status(status: str) -> int:
@@ -515,16 +754,45 @@ async def count_by_status(status: str) -> int:
     return 0
 
 
+async def count_reviewed_ready_items() -> int:
+    """Count items eligible for fine-tuning export.
+
+    Eligibility rules match the exporter defaults:
+    - PROCESSED
+    - classification.needs_review = false
+    - reviewed = true
+    - detected_intents is non-empty
+    """
+    query = (
+        "SELECT VALUE COUNT(1) FROM c "
+        "WHERE c.status='PROCESSED' "
+        "AND IS_DEFINED(c.classification) "
+        "AND c.classification.needs_review = false "
+        "AND (IS_DEFINED(c.reviewed) AND c.reviewed = true) "
+        "AND IS_DEFINED(c.classification.detected_intents) "
+        "AND ARRAY_LENGTH(c.classification.detected_intents) > 0"
+    )
+    it = cosmos_container.query_items(query, enable_cross_partition_query=True)
+    async for v in it:
+        return v
+    return 0
+
+
 @app.get("/api/stats")
 async def get_stats():
     processed_count = await count_by_status("PROCESSED")
     review_count = await count_by_status("REVIEW_REQUIRED")
     total = processed_count + review_count
+    finetune_min_required = int(os.getenv("FINETUNE_MIN_EXAMPLES", "50"))
+    finetune_reviewed_ready = await count_reviewed_ready_items()
     return {
         "processed": processed_count,
         "review_required": review_count,
         "total": total,
         "progress": (processed_count / total) if total else 0,
+        "finetune_reviewed_ready": finetune_reviewed_ready,
+        "finetune_min_required": finetune_min_required,
+        "finetune_ready": finetune_reviewed_ready >= finetune_min_required,
     }
 
 
@@ -561,25 +829,31 @@ async def patch_email(item_id: str, payload: dict):
                 "detected_intents": intents,
                 "needs_review": False,
             }
+            if payload.get("global_complexity"):
+                item["classification"]["global_complexity"] = payload.get("global_complexity")
             item["status"] = "PROCESSED"
             item["updated_at"] = datetime.now(timezone.utc).isoformat()
+            item["reviewed"] = True
+            item["reviewed_at"] = datetime.now(timezone.utc).isoformat()
         await cosmos_container.upsert_item(item)
         return EmailRecord(**item)
-    @app.post("/api/emails/{item_id}/reprocess")
-    async def reprocess_email(item_id: str):
-        """Re-enqueue a single email for classification."""
-        try:
-            item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
-            blob_url = item.get("file_url")
-            if not blob_url:
-                raise HTTPException(status_code=400, detail="file_url missing")
-            async with sb_client:
-                sender = sb_client.get_queue_sender(queue_name=SERVICE_BUS_QUEUE)
-                async with sender:
-                    await sender.send_messages(ServiceBusMessage(json.dumps({"blob_url": blob_url})))
-            return {"status": "enqueued", "blob_url": blob_url}
-        except Exception as ex:
-            raise HTTPException(status_code=400, detail=str(ex))
+    except Exception as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+
+
+@app.post("/api/emails/{item_id}/reprocess")
+async def reprocess_email(item_id: str):
+    """Re-enqueue a single email for classification."""
+    try:
+        item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
+        blob_url = item.get("file_url")
+        if not blob_url:
+            raise HTTPException(status_code=400, detail="file_url missing")
+        async with sb_client:
+            sender = sb_client.get_queue_sender(queue_name=SERVICE_BUS_QUEUE)
+            async with sender:
+                await sender.send_messages(ServiceBusMessage(json.dumps({"blob_url": blob_url})))
+        return {"status": "enqueued", "blob_url": blob_url}
     except Exception as ex:
         raise HTTPException(status_code=400, detail=str(ex))
 
@@ -633,6 +907,8 @@ async def upload_pdfs(files: list[UploadFile] = File(...)):
 async def export_cosmos_to_csv(path: str = "./data/output.csv"):
     import csv
 
+    await _ensure_cosmos_container()
+
     query = "SELECT c.id, c.file_url, c.status, c.confidence, c.classification, c.markdown FROM c"
     it = cosmos_container.query_items(query, enable_cross_partition_query=True)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -653,6 +929,92 @@ async def export_cosmos_to_csv(path: str = "./data/output.csv"):
                 (item.get("usage") or {}).get("phi4_cost_usd"),
                 (item.get("usage") or {}).get("mistral", {}).get("cost_usd") if isinstance((item.get("usage") or {}).get("mistral"), dict) else None,
             ])
+    return path
+
+
+async def export_cosmos_to_finetune_jsonl(
+    path: str = "./data/fine_tune.jsonl",
+    anonymize: bool = True,
+    include_unreviewed: bool = False,
+    max_examples: Optional[int] = None,
+    taxonomy_version: str = "v1",
+):
+    """Export reviewed examples to JSONL for fine-tuning.
+
+    Pipeline:
+    1) Select PROCESSED + classification.needs_review=false (optionally only reviewed=true)
+    2) Anonymize OCR markdown (LLM anonymizer) to remove PII
+    3) Write chat-style JSONL: system + user(anonymized markdown) + assistant(target JSON)
+    """
+    await _ensure_cosmos_container()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    where = ["c.status = 'PROCESSED'", "IS_DEFINED(c.classification)", "c.classification.needs_review = false"]
+    if not include_unreviewed:
+        where.append("(IS_DEFINED(c.reviewed) AND c.reviewed = true)")
+    query = "SELECT c.id, c.markdown, c.classification, c.updated_at FROM c WHERE " + " AND ".join(where)
+    it = cosmos_container.query_items(query, enable_cross_partition_query=True)
+
+    system_prompt = os.getenv(
+        "FINETUNE_SYSTEM_PROMPT",
+        "You classify insurance emails into intents and output strict JSON only.",
+    )
+
+    written = 0
+    with open(path, "w", encoding="utf-8") as f:
+        async for item in it:
+            if max_examples is not None and written >= max_examples:
+                break
+
+            classification = item.get("classification") or {}
+            intents = classification.get("detected_intents") or []
+            if not intents:
+                # Skip empty labels by default (they often represent missing taxonomy coverage).
+                continue
+
+            raw_markdown = item.get("markdown") or ""
+            anonymization_meta = None
+            user_markdown = raw_markdown
+
+            if anonymize:
+                try:
+                    anon = await anonymize_markdown_for_finetune(raw_markdown)
+                    user_markdown = anon.get("anonymized_markdown") or ""
+                    anonymization_meta = {
+                        "model": anon.get("model"),
+                        "prompt_version": anon.get("prompt_version"),
+                        "usage": anon.get("usage"),
+                    }
+                except Exception as ex:
+                    # If anonymization fails, skip the example (safer than exporting raw PII).
+                    continue
+
+            target = {
+                "detected_intents": intents,
+            }
+            if classification.get("global_complexity"):
+                target["global_complexity"] = classification.get("global_complexity")
+
+            assistant_content = json.dumps(target, ensure_ascii=False)
+            example = {
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_markdown},
+                    {"role": "assistant", "content": assistant_content},
+                ],
+                "metadata": {
+                    "example_id": item.get("id"),
+                    "taxonomy_version": taxonomy_version,
+                    "source": "human_review",
+                    "updated_at": item.get("updated_at"),
+                    "anonymized": bool(anonymize),
+                    "anonymization": anonymization_meta,
+                    "hash": hashlib.sha256((user_markdown + assistant_content).encode("utf-8")).hexdigest(),
+                },
+            }
+            f.write(json.dumps(example, ensure_ascii=False) + "\n")
+            written += 1
+
     return path
 
 
@@ -688,14 +1050,132 @@ async def export_emails_csv():
     return StreamingResponse(row_iter(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=emails.csv"})
 
 
+@app.get("/api/emails/export-finetune-jsonl")
+async def export_emails_finetune_jsonl(
+    anonymize: bool = Query(True),
+    include_unreviewed: bool = Query(False),
+    max_examples: Optional[int] = Query(None, ge=1),
+    taxonomy_version: str = Query("v1"),
+    include_metadata: bool = Query(False),
+    min_required: Optional[int] = Query(None, ge=1),
+):
+    """Stream fine-tuning JSONL (chat format) to the client.
+
+    By default this exports only reviewed examples (reviewed=true) and anonymizes markdown.
+    The dataset is gated by a minimum example threshold to encourage quality.
+    """
+
+    finetune_min_required = min_required or int(os.getenv("FINETUNE_MIN_EXAMPLES", "50"))
+    finetune_reviewed_ready = await count_reviewed_ready_items()
+    if not include_unreviewed and finetune_reviewed_ready < finetune_min_required:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Not enough reviewed examples to export fine-tuning dataset.",
+                "reviewed_ready": finetune_reviewed_ready,
+                "min_required": finetune_min_required,
+            },
+        )
+
+    system_prompt = os.getenv(
+        "FINETUNE_SYSTEM_PROMPT",
+        "You classify insurance emails into intents and output strict JSON only.",
+    )
+
+    async def jsonl_iter():
+        # Emit UTF-8 BOM (required by Foundry fine-tuning dataset validation)
+        yield "\ufeff"
+
+        where = ["c.status = 'PROCESSED'", "IS_DEFINED(c.classification)", "c.classification.needs_review = false"]
+        if not include_unreviewed:
+            where.append("(IS_DEFINED(c.reviewed) AND c.reviewed = true)")
+        query = "SELECT c.id, c.markdown, c.classification, c.updated_at FROM c WHERE " + " AND ".join(where)
+        it = cosmos_container.query_items(query, enable_cross_partition_query=True)
+
+        written = 0
+        async for item in it:
+            if max_examples is not None and written >= max_examples:
+                break
+
+            classification = item.get("classification") or {}
+            intents = classification.get("detected_intents") or []
+            if not intents:
+                continue
+
+            raw_markdown = item.get("markdown") or ""
+            anonymization_meta = None
+            user_markdown = raw_markdown
+
+            if anonymize:
+                try:
+                    anon = await anonymize_markdown_for_finetune(raw_markdown)
+                    user_markdown = anon.get("anonymized_markdown") or ""
+                    anonymization_meta = {
+                        "model": anon.get("model"),
+                        "prompt_version": anon.get("prompt_version"),
+                        "usage": anon.get("usage"),
+                    }
+                except Exception:
+                    # Safer than exporting raw PII
+                    continue
+
+            target = {"detected_intents": intents}
+            if classification.get("global_complexity"):
+                target["global_complexity"] = classification.get("global_complexity")
+
+            assistant_content = json.dumps(target, ensure_ascii=False)
+            example = {
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_markdown},
+                    {"role": "assistant", "content": assistant_content},
+                ]
+            }
+            if include_metadata:
+                example["metadata"] = {
+                    "example_id": item.get("id"),
+                    "taxonomy_version": taxonomy_version,
+                    "source": "human_review",
+                    "updated_at": item.get("updated_at"),
+                    "anonymized": bool(anonymize),
+                    "anonymization": anonymization_meta,
+                    "hash": hashlib.sha256((user_markdown + assistant_content).encode("utf-8")).hexdigest(),
+                }
+
+            yield json.dumps(example, ensure_ascii=False) + "\n"
+            written += 1
+
+    filename = f"fine_tune_{taxonomy_version}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
+    return StreamingResponse(
+        jsonl_iter(),
+        media_type="application/jsonl",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 if __name__ == "__main__":
     # Optional CLI: uvicorn main:app --reload
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--export-csv", help="Export Cosmos data to CSV at path", nargs="?")
+    parser.add_argument("--export-finetune-jsonl", help="Export fine-tuning JSONL at path", nargs="?")
+    parser.add_argument("--no-anonymize", action="store_true", help="Export fine-tuning JSONL without LLM anonymization (NOT recommended)")
+    parser.add_argument("--include-unreviewed", action="store_true", help="Include items without reviewed=true")
+    parser.add_argument("--max-examples", type=int, default=None, help="Limit number of exported examples")
+    parser.add_argument("--taxonomy-version", type=str, default="v1", help="Taxonomy version tag")
     args = parser.parse_args()
     if args.export_csv:
         asyncio.run(export_cosmos_to_csv(args.export_csv))
+    elif args.export_finetune_jsonl:
+        asyncio.run(
+            export_cosmos_to_finetune_jsonl(
+                path=args.export_finetune_jsonl,
+                anonymize=not args.no_anonymize,
+                include_unreviewed=bool(args.include_unreviewed),
+                max_examples=args.max_examples,
+                taxonomy_version=args.taxonomy_version,
+            )
+        )
     else:
         import uvicorn
         uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)), reload=True)

@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars and fill in values
+# subscription_id is optional: if omitted, Terraform uses the current Azure CLI subscription.
+
+# subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# Optional: models availability is tenant/region-dependent
+# enable_model_deployments = false
+
+# Recommended in policy-driven tenants (disables Cosmos local auth + uses Cosmos SQL RBAC)
+# cosmos_use_rbac = true

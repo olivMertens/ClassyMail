@@ -24,6 +24,15 @@
       <div class="flex gap-3 items-center">
         <button @click="toggleLang" class="px-3 py-2 text-sm bg-slate-800 rounded shadow hover:bg-slate-700">{{ lang.toUpperCase() }}</button>
         <button @click="exportCsv" class="px-3 py-2 text-sm bg-sky-600 text-white rounded shadow hover:bg-sky-500">{{ tr('export') }}</button>
+        <button
+          @click="exportFineTuneJsonl"
+          class="px-3 py-2 text-sm rounded shadow"
+          :class="finetune.ready ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-slate-700 text-slate-300 cursor-not-allowed'"
+          :disabled="!finetune.ready"
+          :title="finetune.ready ? tr('finetune_ready') : tr('finetune_not_ready') + ' ' + finetune.reviewed_ready + '/' + finetune.min_required"
+        >
+          {{ tr('export_finetune') }} ({{ finetune.reviewed_ready }}/{{ finetune.min_required }})
+        </button>
         <button @click="openSettings" class="px-3 py-2 text-sm bg-slate-800 rounded shadow hover:bg-slate-700">⚙</button>
         <div class="flex gap-4">
           <div class="bg-slate-800 px-4 py-2 rounded shadow">
@@ -63,7 +72,8 @@
 
     <!-- Search -->
     <div class="mb-4">
-      <input v-model="search" type="text" :placeholder="tr('search')" class="w-full bg-slate-800 rounded px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-sky-500" />
+      <label for="search" class="sr-only">{{ tr('search') }}</label>
+      <input id="search" v-model="search" type="text" placeholder="Search" :placeholder="tr('search')" aria-label="Search" :aria-label="tr('search')" title="Search" :title="tr('search')" class="w-full bg-slate-800 rounded px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-sky-500" />
     </div>
 
     <!-- Grid -->
@@ -121,15 +131,14 @@
               </ul>
             </div>
             <form @submit.prevent="validateEmail" class="mt-auto bg-slate-900/70 p-3 rounded border border-slate-800">
-              <label class="text-sm text-slate-400 mb-2">{{ tr('intents_json') }}</label>
-              <textarea v-model="form.intents_json" rows="6" class="w-full bg-slate-800 rounded px-3 py-2 text-sm mb-3"></textarea>
+              <label for="intents-json" class="text-sm text-slate-400 mb-2">{{ tr('intents_json') }}</label>
+              <textarea id="intents-json" v-model="form.intents_json" rows="6" placeholder="[]" title="Intents JSON" :aria-label="tr('intents_json')" :title="tr('intents_json')" class="w-full bg-slate-800 rounded px-3 py-2 text-sm mb-3"></textarea>
               <button type="submit" class="w-full bg-sky-600 hover:bg-sky-500 text-white rounded py-2">{{ tr('validate') }}</button>
             </form>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
     <!-- Info Modal -->
     <div v-if="showInfo" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
@@ -162,6 +171,24 @@
       </button>
     </div>
 
+    <!-- Settings Modal -->
+    <div v-if="showSettings" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+      <div class="bg-slate-900 rounded-lg p-6 max-w-md w-full shadow border border-slate-700">
+        <h3 class="text-xl font-semibold mb-2">{{ tr('settings') }}</h3>
+        <label class="text-sm text-slate-400">Phi-4 Input (€/1K tokens)</label>
+        <input v-model="settings.phi4_input_per_1k" type="number" step="0.000001" aria-label="Phi-4 Input (€/1K tokens)" title="Phi-4 Input (€/1K tokens)" class="w-full bg-slate-800 rounded px-3 py-2 text-sm mb-3" />
+        <label class="text-sm text-slate-400">Phi-4 Output (€/1K tokens)</label>
+        <input v-model="settings.phi4_output_per_1k" type="number" step="0.000001" aria-label="Phi-4 Output (€/1K tokens)" title="Phi-4 Output (€/1K tokens)" class="w-full bg-slate-800 rounded px-3 py-2 text-sm mb-3" />
+        <label class="text-sm text-slate-400">Mistral OCR (€/1K pages)</label>
+        <input v-model="settings.mistral_per_1k_pages" type="number" step="0.001" aria-label="Mistral OCR (€/1K pages)" title="Mistral OCR (€/1K pages)" class="w-full bg-slate-800 rounded px-3 py-2 text-sm mb-4" />
+        <div class="flex gap-3">
+          <button @click="saveSettings" class="flex-1 bg-sky-600 hover:bg-sky-500 text-white rounded py-2">{{ tr('save') }}</button>
+          <button @click="showSettings=false" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white rounded py-2">{{ tr('cancel') }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const md = window.markdownit({ html: true, linkify: true, breaks: true });
 
@@ -183,6 +210,7 @@
           reprocessing: false,
           uploadQueue: [],
           uploading: false,
+          finetune: { reviewed_ready: 0, min_required: 50, ready: false },
         };
       },
       computed: {
@@ -249,6 +277,10 @@
         exportCsv() {
           window.location = '/api/emails/export';
         },
+        exportFineTuneJsonl() {
+          if (!this.finetune.ready) return;
+          window.location = '/api/emails/export-finetune-jsonl';
+        },
         scoreBadgeClass(score) {
           if (score == null) return 'px-2 py-1 rounded text-xs bg-slate-700 text-slate-200';
           if (score > 0.9) return 'px-2 py-1 rounded text-xs bg-emerald-700 text-emerald-100';
@@ -282,6 +314,9 @@
           this.stats.total = data.total || this.emails.length;
           this.stats.review_required = data.review_required || 0;
           this.stats.processed = data.processed || (this.stats.total - this.stats.review_required);
+          this.finetune.reviewed_ready = data.finetune_reviewed_ready || 0;
+          this.finetune.min_required = data.finetune_min_required || 50;
+          this.finetune.ready = !!data.finetune_ready;
         },
         handleDrop(e) {
           const files = Array.from(e.dataTransfer.files || []).slice(0, 10);
@@ -349,8 +384,7 @@
           this.modalEmail = data;
           await this.fetchEmails();
           this.closeModal();
-        }
-      },
+        },
         async reprocess(id) {
           if (!id) return;
           this.reprocessing = true;
@@ -438,6 +472,9 @@
         validate: "Valider",
         costs: "Coûts",
         export: "Exporter CSV",
+        export_finetune: "Exporter JSONL (fine-tune)",
+        finetune_ready: "Dataset prêt pour l'export",
+        finetune_not_ready: "Pas assez d'exemples validés",
         upload_title: "Upload rapide (5-10 PDF)",
         upload_desc: "Déposez vos PDF pour déclencher le traitement via Event Grid.",
         upload_drop: "Glissez-déposez ou cliquez pour sélectionner des PDF",
@@ -445,10 +482,13 @@
         uploading: "Upload en cours...",
         upload_start: "Uploader & déclencher",
         err_type: "Type invalide (PDF uniquement)",
-        err_size: "Fichier > 10 Mo"
+        err_size: "Fichier > 10 Mo",
         reprocess: "Relancer",
         reprocess_ok: "Traitement relancé",
         reprocess_err: "Erreur lors du relancement",
+        settings: "Paramètres",
+        save: "Enregistrer",
+        cancel: "Annuler",
       },
       en: {
         title: "ClassiMail Agent",
@@ -473,6 +513,9 @@
         validate: "Validate",
         costs: "Costs",
         export: "Export CSV",
+        export_finetune: "Export JSONL (fine-tune)",
+        finetune_ready: "Dataset ready for export",
+        finetune_not_ready: "Not enough reviewed examples",
         upload_title: "Quick upload (5-10 PDFs)",
         upload_desc: "Drop PDFs to trigger processing via Event Grid.",
         upload_drop: "Drag & drop or click to select PDFs",
@@ -480,31 +523,18 @@
         uploading: "Uploading...",
         upload_start: "Upload & trigger",
         err_type: "Invalid type (PDF only)",
-        err_size: "File > 10 MB"
+        err_size: "File > 10 MB",
         reprocess: "Reprocess",
         reprocess_ok: "Processing re-enqueued",
         reprocess_err: "Error while re-enqueuing",
+        settings: "Settings",
+        save: "Save",
+        cancel: "Cancel",
       }
     };
 
     Vue.createApp(App).mount('#app');
   </script>
 
-  <!-- Settings Modal -->
-  <div v-if="showSettings" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-    <div class="bg-slate-900 rounded-lg p-6 max-w-md w-full shadow border border-slate-700">
-      <h3 class="text-xl font-semibold mb-2">{{ tr('settings') }}</h3>
-      <label class="text-sm text-slate-400">Phi-4 Input (€/1K tokens)</label>
-      <input v-model="settings.phi4_input_per_1k" type="number" step="0.000001" class="w-full bg-slate-800 rounded px-3 py-2 text-sm mb-3" />
-      <label class="text-sm text-slate-400">Phi-4 Output (€/1K tokens)</label>
-      <input v-model="settings.phi4_output_per_1k" type="number" step="0.000001" class="w-full bg-slate-800 rounded px-3 py-2 text-sm mb-3" />
-      <label class="text-sm text-slate-400">Mistral OCR (€/1K pages)</label>
-      <input v-model="settings.mistral_per_1k_pages" type="number" step="0.001" class="w-full bg-slate-800 rounded px-3 py-2 text-sm mb-4" />
-      <div class="flex gap-3">
-        <button @click="saveSettings" class="flex-1 bg-sky-600 hover:bg-sky-500 text-white rounded py-2">{{ tr('save') }}</button>
-        <button @click="showSettings=false" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white rounded py-2">{{ tr('cancel') }}</button>
-      </div>
-    </div>
-  </div>
 </body>
 </html>

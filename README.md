@@ -1,24 +1,39 @@
 
 # POC Classification Emails : Azure AI Foundry & Mistral + FastAPI Dashboard
 
-Ce projet implémente un pipeline de classification d'emails à haut volume et faible latence, capable de gérer des pics de charge (10k fichiers simultanés) grâce à une architecture événementielle découplée, avec un backend FastAPI et un frontend SPA (Vue 3 + Tailwind).
-```mermaid
-graph TD
-User() -->|Upload PDF| Blob
-Blob -->|Event Grid| SB[Service Bus]
-SB -->|Worker| API
-API -->|Download %PDF| Storage
-API -->|OCR doc_base64| MistralOCR
-MistralOCR -->|Markdown| API
-API -->|Prompt Multi-Intents| Phi4
-Phi4 -->|JSON multi-intents| API
-API -->|Persist| Cosmos[(Cosmos DB)]
-API -->|Dashboard UI| User
-Cosmos -->|Export JSONL| Foundry[Azure AI Foundry]
-Foundry -->|Fine-Tune LoRA| Phi4Custom[Phi-4-Custom]
-Phi4Custom -->|Deploy| API
-```
+## 📚 Documentation
 
+- [Docs home](docs/INDEX.md)
+- [ARCHITECTURE](docs/ARCHITECTURE.md)
+- [PIPELINE](docs/PIPELINE.md)
+- [TERRAFORM](docs/TERRAFORM.md)
+- [MODELS](docs/MODELS.md)
+- [FINE_TUNING_DATA](docs/FINE_TUNING_DATA.md)
+- [CICD_GITHUB](docs/CICD_GITHUB.md)
+- [CICD_GITLAB](docs/CICD_GITLAB.md)
+- [LOCAL_RUN](docs/LOCAL_RUN.md)
+
+## 🔗 References
+
+- Pricing (Azure AI Foundry models): https://azure.microsoft.com/fr-fr/pricing/details/ai-foundry-models/microsoft/
+- Fine-tuning (Azure AI Foundry / Azure OpenAI): https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python
+- Phi Cookbook (community): https://github.com/microsoft/PhiCookBookfin
+- Running Phi-4 locally (Foundry Local guide): https://techcommunity.microsoft.com/blog/educatordeveloperblog/running-phi-4-locally-with-microsoft-foundry-local-a-step-by-step-guide/4466304
+
+Ce projet implémente un pipeline de classification d'emails à haut volume et faible latence, capable de gérer des pics de charge (10k fichiers simultanés) grâce à une architecture événementielle découplée, avec un backend FastAPI et un frontend SPA (Vue 3 + Tailwind).
+
+```mermaid
+flowchart TD
+    user[User] -->|Upload PDF| blob[(Blob Storage)]
+    blob -->|Event Grid| sbq[Service Bus Queue]
+    sbq -->|Worker| api[FastAPI Worker/API]
+    api -->|Download PDF| blob
+    api -->|OCR (document_base64)| ocr[Mistral OCR]
+    ocr -->|Markdown| api
+    api -->|Classify intents| llm[Phi-4 (primary)\\nFallback: gpt-4o-mini]
+    llm -->|JSON| api
+    api -->|Persist| cosmos[(Cosmos DB)]
+    api -->|Dashboard UI| user
 ```
 
 ## 🚀 Composants Clés
@@ -83,6 +98,50 @@ FORMAT JSON UNIQUEMENT :
 
 ---
 
+## 🧪 Génération de données (POC / Demo)
+
+Pour démontrer le POC (stress OCR + classification + boucle de review/fine-tuning), le repo inclut un générateur de PDFs « email-like » volontairement bruités :
+
+- Script: [scripts/generate_dummy_pdfs.py](scripts/generate_dummy_pdfs.py)
+- Objectif: produire 50–100 emails aléatoires, souvent longs (~300 mots), avec bruit (FR/EN/ES, argot, SMS, typos, forwards, multi-sujets…)
+
+Exemples:
+
+```bash
+python scripts/generate_dummy_pdfs.py --count 75 --target-words 300
+python scripts/generate_dummy_pdfs.py --count 100 --target-words 320 --out dataset/pdf
+```
+
+### Option LLM (Azure OpenAI / Foundry compatible)
+
+Le script peut générer/étendre le contenu via un LLM avant de créer les PDFs.
+
+Variables d'environnement:
+
+- `AZURE_OPENAI_ENDPOINT` (obligatoire)
+- `AZURE_OPENAI_DEPLOYMENT` (optionnel, défaut: `gpt-4o-mini`)
+- `AZURE_OPENAI_API_VERSION` (optionnel, défaut: `2024-10-01-preview`)
+- `AZURE_OPENAI_TIMEOUT` (optionnel)
+
+Exemple PowerShell:
+
+```powershell
+$env:AZURE_OPENAI_ENDPOINT = "https://<resource>.openai.azure.com"
+$env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o-mini"
+# Optionnel (si auth par key)
+$env:AZURE_OPENAI_API_KEY = "<key>"
+```
+
+Authentification (fallback automatique):
+
+- **API key**: définir `AZURE_OPENAI_API_KEY`
+- **Entra ID (recommandé)**: ne pas définir la key, et s'authentifier via `DefaultAzureCredential` (ex: `az login`).
+- Scope configurable via `AZURE_OPENAI_SCOPE` (défaut: `https://cognitiveservices.azure.com/.default`).
+
+```bash
+python scripts/generate_dummy_pdfs.py --count 75 --target-words 300 --use-aoai
+```
+
 ## 🧩 Backend FastAPI
 
 ### Endpoints
@@ -127,9 +186,12 @@ FORMAT JSON UNIQUEMENT :
 
 ### Avec uv
 ```bash
+uv lock
 uv sync
 uv run uvicorn main:app --reload
 ```
+
+Note: Python 3.11/3.12 recommended (Azure SDK support on 3.13 may lag).
 
 ### Avec Poetry
 ```bash
@@ -144,66 +206,33 @@ uvicorn main:app --reload
 ```
 
 ### Remplir `secrets.env` après Terraform
-```
-`AI_ENDPOINT` = output `AI_ENDPOINT`
-`AZURE_SERVICE_BUS_FQDN` = output `SERVICEBUS_NAMESPACE` + `.servicebus.windows.net`
-`AZURE_SERVICE_BUS_QUEUE` = `pdf-processing-queue` (par défaut)
-`AZURE_STORAGE_ACCOUNT_URL` = `https://<storage>.blob.core.windows.net`
-`AZURE_STORAGE_CONTAINER` = `pdf-inputs`
-`AZURE_COSMOS_ENDPOINT` = `https://<cosmos>.documents.azure.com:443/`
-`AZURE_COSMOS_KEY` = clé Cosmos (pour local uniquement)
-`MISTRAL_ENDPOINT` = `AI_ENDPOINT`
-`PHI_ENDPOINT` = `AI_ENDPOINT`
+Les valeurs proviennent des outputs Terraform (voir `terraform output`).
 
-### Déploiement GitLab CI (uv + ACR + ACA)
-`.gitlab-ci.yml`
-```yaml
-stages: [build, deploy]
+```dotenv
+AI_ENDPOINT=https://<aifoundry>.cognitiveservices.azure.com/
+AZURE_SERVICE_BUS_FQDN=<namespace>.servicebus.windows.net
+AZURE_SERVICE_BUS_QUEUE=pdf-processing-queue
+AZURE_STORAGE_ACCOUNT_URL=https://<storage>.blob.core.windows.net/
+AZURE_STORAGE_CONTAINER=pdf-inputs
+AZURE_COSMOS_ENDPOINT=https://<cosmos>.documents.azure.com:443/
+AZURE_COSMOS_DB=emailsdb
+AZURE_COSMOS_CONTAINER=emails
 
-variables:
-    IMAGE_NAME: classimail-agent
-    PYTHON_VERSION: "3.11"
+# If Cosmos RBAC is enabled (recommended), do NOT set AZURE_COSMOS_KEY.
+# AZURE_COSMOS_KEY=
 
-build:
-    stage: build
-    image: python:$PYTHON_VERSION
-    services:
-        - docker:dind
-    variables:
-        DOCKER_DRIVER: overlay2
-    script:
-        - pip install uv
-        - uv sync --frozen
-        - uv run python -m compileall .
-        - docker login $ACR_LOGIN_SERVER -u $ACR_USERNAME -p $ACR_PASSWORD
-        - IMAGE=$ACR_LOGIN_SERVER/$IMAGE_NAME:$CI_COMMIT_SHA
-        - docker build -t $IMAGE .
-        - docker push $IMAGE
-    artifacts:
-        reports:
-            dotenv: build.env
-    after_script:
-        - echo "IMAGE=$IMAGE" >> build.env
-
-deploy:
-    stage: deploy
-    image: mcr.microsoft.com/azure-cli:2.58.0
-    dependencies: [build]
-    script:
-        - az login --service-principal -u $AZ_CLIENT_ID -p $AZ_CLIENT_SECRET --tenant $AZ_TENANT_ID
-        - az account set --subscription $AZ_SUBSCRIPTION_ID
-        - az containerapp update \
-                --name $ACA_NAME \
-                --resource-group $AZ_RESOURCE_GROUP \
-                --image $IMAGE \
-                --min-replicas 1 --max-replicas 5
+MISTRAL_ENDPOINT=$AI_ENDPOINT
+PHI_ENDPOINT=$AI_ENDPOINT
 ```
 
-**Secrets GitLab CI/CD à définir :**
-- `ACR_LOGIN_SERVER`, `ACR_USERNAME`, `ACR_PASSWORD`
-- `AZ_CLIENT_ID`, `AZ_CLIENT_SECRET`, `AZ_TENANT_ID`, `AZ_SUBSCRIPTION_ID`, `AZ_RESOURCE_GROUP`
-- `ACA_NAME`
-```
+### CI/CD
+
+CI/CD setup lives in:
+- GitHub Actions: [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md)
+- GitLab CI: [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md)
+
+See the docs for the full YAML examples, authentication options (OIDC vs secrets), and recommended environment protections.
+
 
 ---
 
@@ -211,10 +240,13 @@ deploy:
 - Ingestion Event Grid → Service Bus → Worker async (`Semaphore(5)`).
 - OCR Mistral (`/v1/ocr` MaaS, `document_base64`), fallback inference `{deployment}:ocr`.
 - Classification Phi‑4 multi-intentions (JSON strict) + `needs_review` (seuil 0.9).
+- Fallback automatique vers un modèle long-contexte (ex: `gpt-4o-mini`) si le markdown OCR dépasse la fenêtre de contexte du modèle principal.
 - Coûts & usage par email (pages, tokens, €), visibles UI + export CSV.
 - Observabilité OpenTelemetry (HTTPx, spans custom `gen_ai.*`).
 - CI/CD GitHub Actions (uv, ACR, Azure Container Apps).
 - Terraform Foundry (Hub + Project + Deployments + RBAC `Cognitive Services User`).
+
+Pour les détails (variables, logique, pricing), voir [docs/MODELS.md](docs/MODELS.md).
 
 ## 📄 Format RFAT (JSON)
 ```json
@@ -269,8 +301,15 @@ MISTRAL_DEPLOYMENT=mistral-ocr-2505
 MISTRAL_MODE=maas
 PHI_ENDPOINT=...
 PHI_DEPLOYMENT=phi-4
+PHI_FALLBACK_ENDPOINT=...
+PHI_FALLBACK_DEPLOYMENT=gpt-4o-mini
+PHI_PRIMARY_MAX_INPUT_TOKENS=8000
+PHI_FALLBACK_MAX_INPUT_TOKENS=120000
+PHI_RESERVED_OUTPUT_TOKENS=1000
 PHI4_COST_PER_1K_INPUT=0.000107
 PHI4_COST_PER_1K_OUTPUT=0.00043
+FALLBACK_COST_PER_1K_INPUT=0
+FALLBACK_COST_PER_1K_OUTPUT=0
 MISTRAL_OCR_COST_PER_1K_PAGES=1.0
 OTEL_EXPORTER_OTLP_ENDPOINT=...
 ```
@@ -286,9 +325,9 @@ uv run --env-file secrets.env uvicorn main:app --reload
 | --- | --- | --- |
 | Identité managée ACA | Storage Account | Storage Blob Data Reader |
 | Identité managée ACA | Service Bus Namespace | Azure Service Bus Data Receiver/Sender |
-| Identité managée ACA | Cosmos DB Account | Cosmos DB Data Contributor |
+| Identité managée ACA | Cosmos DB (SQL) | Cosmos SQL Built-in Data Contributor (RBAC) |
 | Identité managée ACA | AI Foundry (AIServices) | Cognitive Services User |
-| Event Grid Subscription MI | Service Bus Namespace | Azure Service Bus Data Sender |
+| Event Grid | Service Bus Queue | Event delivery via system topic subscription |
 | ACA (pull image) | Azure Container Registry | AcrPull |
 
 
@@ -309,13 +348,20 @@ uv run --env-file secrets.env uvicorn main:app --reload
 | `MISTRAL_DEPLOYMENT` | Nom du déploiement Mistral |
 | `PHI_ENDPOINT` | Endpoint Phi MaaS |
 | `PHI_DEPLOYMENT` | Nom du déploiement Phi |
+| `PHI_FALLBACK_ENDPOINT` | Endpoint du modèle fallback (défaut: `PHI_ENDPOINT`) |
+| `PHI_FALLBACK_DEPLOYMENT` | Déploiement fallback (ex: `gpt-4o-mini`) |
+| `PHI_PRIMARY_MAX_INPUT_TOKENS` | Budget tokens prompt (modèle principal) |
+| `PHI_FALLBACK_MAX_INPUT_TOKENS` | Budget tokens prompt (fallback long-contexte) |
+| `PHI_RESERVED_OUTPUT_TOKENS` | Tokens réservés pour la réponse JSON |
 | `AZURE_AI_KEY` | (Optionnel) Clé API modèle |
 | `AZURE_AI_SCOPE` | Scope token (défaut `https://cognitiveservices.azure.com/.default`) |
 | `AZURE_AI_API_VERSION` | API version (défaut `2024-08-01-preview`) |
+| `FALLBACK_COST_PER_1K_INPUT` | Prix input/1K tokens (fallback) (configurable) |
+| `FALLBACK_COST_PER_1K_OUTPUT` | Prix output/1K tokens (fallback) (configurable) |
 
 > Tous les services utilisent **DefaultAzureCredential** par défaut. Accorder les rôles nécessaires :
 > - Storage: `Storage Blob Data Contributor`
-> - Cosmos: `Cosmos DB Account Reader/Contributor`
+> - Cosmos (RBAC recommandé): rôles data-plane Cosmos SQL (contributor) + pas de clé
 > - Service Bus: `Service Bus Data Receiver/Sender`
 > - AI MaaS: `Cognitive Services User`
 
@@ -369,4 +415,3 @@ curl -X POST http://localhost:8000/webhook/ingest -H "Content-Type: application/
 - `uv.lock`
 - `.gitignore` (Python + FastAPI + data/)
 
-```
