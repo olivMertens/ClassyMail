@@ -34,15 +34,21 @@ jobs:
           uv run python -m compileall .
 
       - name: Docker login to ACR
-        if: ${{ secrets.ACR_LOGIN_SERVER && secrets.ACR_USERNAME && secrets.ACR_PASSWORD }}
+        if: ${{ env.ACR_LOGIN_SERVER != '' && env.ACR_USERNAME != '' && env.ACR_PASSWORD != '' }}
+        env:
+          ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.ACR_LOGIN_SERVER }}
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
+          registry: ${{ env.ACR_LOGIN_SERVER }}
+          username: ${{ env.ACR_USERNAME }}
+          password: ${{ env.ACR_PASSWORD }}
 
       - name: Azure login (OIDC)
-        if: ${{ !secrets.AZURE_CREDENTIALS }}
+        if: ${{ env.AZURE_CREDENTIALS == '' }}
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -50,13 +56,19 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Azure login (service principal json)
-        if: ${{ secrets.AZURE_CREDENTIALS }}
+        if: ${{ env.AZURE_CREDENTIALS != '' }}
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Docker login to ACR (via Azure CLI)
-        if: ${{ !(secrets.ACR_LOGIN_SERVER && secrets.ACR_USERNAME && secrets.ACR_PASSWORD) }}
+        if: ${{ env.ACR_LOGIN_SERVER == '' || env.ACR_USERNAME == '' || env.ACR_PASSWORD == '' }}
+        env:
+          ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
         run: |
           if [ -z "${{ vars.ACR_NAME }}" ]; then
             echo "Missing vars.ACR_NAME (ACR registry name)." >&2
