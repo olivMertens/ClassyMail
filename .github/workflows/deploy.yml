@@ -127,6 +127,38 @@ jobs:
               --env-vars PORT=8000
           fi
 
+      - name: Configure ACR pull (managed identity)
+        run: |
+          set -euo pipefail
+
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          APP="${{ env.IMAGE_NAME }}"
+          IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
+          ACR_NAME="${{ vars.ACR_NAME }}"
+
+          if [ -z "$RG" ]; then echo "Missing vars.AZURE_RESOURCE_GROUP" >&2; exit 1; fi
+          if [ -z "$APP" ]; then echo "Missing env.IMAGE_NAME" >&2; exit 1; fi
+          if [ -z "$IDENTITY_NAME" ]; then echo "Missing vars.AZURE_IDENTITY_NAME" >&2; exit 1; fi
+
+          IDENTITY_ID=$(az identity show -g "$RG" -n "$IDENTITY_NAME" --query id -o tsv)
+
+          REGISTRY="$ACR_LOGIN_SERVER"
+          if [ -z "$REGISTRY" ]; then
+            if [ -z "$ACR_NAME" ]; then echo "Missing vars.ACR_NAME" >&2; exit 1; fi
+            REGISTRY=$(az acr show --name "$ACR_NAME" --query loginServer -o tsv)
+          fi
+
+          az containerapp identity assign \
+            --name "$APP" \
+            --resource-group "$RG" \
+            --user-assigned "$IDENTITY_ID"
+
+          az containerapp registry set \
+            --name "$APP" \
+            --resource-group "$RG" \
+            --server "$REGISTRY" \
+            --identity "$IDENTITY_ID"
+
       - name: Deploy to Azure Container Apps
         uses: azure/container-apps-deploy-action@v2
         with:
