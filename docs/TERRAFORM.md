@@ -45,6 +45,13 @@ Some AzureRM versions cannot reliably infer the subscription from Azure CLI cont
 - Service Bus local auth disabled.
 - Cosmos uses Entra auth (RBAC) by default; no Cosmos key needed.
 
+### Cosmos DB (Native RBAC) note
+
+This project uses Cosmos **SQL data-plane RBAC** (`azurerm_cosmosdb_sql_role_assignment`).
+
+In some tenants, assigning the built-in role at container scope (`/dbs/<db>/colls/<container>`) is not sufficient for metadata reads (you may see `Forbidden` on `readMetadata`).
+We therefore assign **Cosmos DB Built-in Data Contributor** at **database scope** (`/dbs/<db>`), which matches the runtime fix validated in Azure Container Apps.
+
 ## Repo hygiene (what to commit)
 
 Safe to commit from `infra/`:

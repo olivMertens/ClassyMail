@@ -16,6 +16,51 @@ Vue d'ensemble :
 2) Configurer une federated identity credential pour votre repo/environnement GitHub.
 3) Assigner les rôles Azure nécessaires (scope au niveau du RG si possible).
 
+## RBAC (qui a besoin de quoi)
+
+Il y a **2 identités** distinctes dans ce projet :
+
+1) **Service principal GitHub OIDC** (CI/CD) : utilisé par `azure/login@v2` dans GitHub Actions.
+2) **User Assigned Managed Identity** de l'app (runtime) : utilisée par la Container App pour accéder aux services Azure **sans clés**.
+
+### 1) RBAC du service principal GitHub OIDC (CI/CD)
+
+Objectif : build/push l'image et déployer/mettre à jour la Container App.
+
+Recommandation “simple qui marche” (scope = Resource Group) :
+
+- **Contributor** sur le RG (ex: `email-poc-rg`)
+- **AcrPush** sur l'ACR (si l'ACR est dans le même RG, vous pouvez aussi le mettre au niveau RG mais c'est plus large)
+
+Option “least privilege” (plus strict, plus verbeux) :
+
+- **Container Apps Contributor** sur le RG
+- **Managed Identity Operator** sur la User Assigned Managed Identity (pour permettre l'assignation à la Container App)
+- **AcrPush** sur l'ACR
+
+### 2) RBAC de l'identité managée de l'app (runtime)
+
+Objectif : lire/écrire dans Cosmos, Storage, Service Bus, et appeler Azure AI Foundry.
+
+- Storage Account (scope = storage account): **Storage Blob Data Contributor**
+- Service Bus Namespace (scope = namespace): **Azure Service Bus Data Receiver** + **Azure Service Bus Data Sender**
+- Azure AI Foundry account (scope = AI account): **Cognitive Services User**
+- Cosmos DB (data-plane SQL RBAC): **Cosmos DB Built-in Data Contributor** au scope **database** `/dbs/emailsdb` (voir `infra/main.tf`)
+- ACR (si pull via identité managée): **AcrPull** sur l'ACR
+
+## App registration + Federated Credential (GitHub OIDC)
+
+Résumé des champs clés :
+
+- **Issuer**: `https://token.actions.githubusercontent.com`
+- **Audience**: `api://AzureADTokenExchange`
+- **Subject**: dépend de votre setup GitHub.
+  - Recommandé (Environment): `repo:<OWNER>/<REPO>:environment:<ENV_NAME>`
+  - Alternative (branch): `repo:<OWNER>/<REPO>:ref:refs/heads/<BRANCH>`
+
+Créer le federated credential dans Entra ID sur l'app registration utilisée par `azure/login@v2`.
+Référence officielle : https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure-openid-connect
+
 Références :
 
 - Pricing (Azure AI Foundry) : https://azure.microsoft.com/fr-fr/pricing/details/ai-foundry-models/microsoft/

@@ -42,6 +42,7 @@ from azure.storage.blob.aio import BlobClient, BlobServiceClient
 from azure.storage.blob import generate_blob_sas, BlobSasPermissions
 from azure.cosmos.aio import CosmosClient
 from azure.cosmos import PartitionKey
+from azure.core.exceptions import AzureError
 
 # ---------------------------------------------------------------------------
 # Configuration via env vars
@@ -96,6 +97,8 @@ tracer = trace.get_tracer(__name__)
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 app.state.cost_overrides = {}
+
+cosmos_init_lock = asyncio.Lock()
 
 # Globals initialized at startup
 sb_client: ServiceBusClient | None = None
@@ -153,9 +156,23 @@ async def _ensure_cosmos_container():
         return
     if not COSMOS_ENDPOINT:
         raise RuntimeError("AZURE_COSMOS_ENDPOINT is not set")
-    cosmos_client = CosmosClient(COSMOS_ENDPOINT, credential=credential if not COSMOS_KEY else None, key=COSMOS_KEY)
-    db = await cosmos_client.create_database_if_not_exists(id=COSMOS_DB)
-    cosmos_container = await db.create_container_if_not_exists(id=COSMOS_CONTAINER, partition_key=PartitionKey(path="/id"))
+
+    async with cosmos_init_lock:
+        if cosmos_container is not None:
+            return
+
+        if cosmos_client is None:
+            cosmos_client = CosmosClient(
+                COSMOS_ENDPOINT,
+                credential=credential if not COSMOS_KEY else None,
+                key=COSMOS_KEY,
+            )
+
+        db = await cosmos_client.create_database_if_not_exists(id=COSMOS_DB)
+        cosmos_container = await db.create_container_if_not_exists(
+            id=COSMOS_CONTAINER,
+            partition_key=PartitionKey(path="/id"),
+        )
 
 
 async def anonymize_markdown_for_finetune(markdown: str) -> dict:
@@ -281,9 +298,10 @@ async def on_startup():
 
     sb_client = ServiceBusClient(fully_qualified_namespace=SERVICE_BUS_FQDN, credential=credential)
     blob_service_client = BlobServiceClient(account_url=BLOB_ACCOUNT_URL, credential=credential)
+    # Keep startup resilient: don't do network calls to Cosmos here.
+    # Cosmos is initialized lazily on first use and checked via /readyz.
     cosmos_client = CosmosClient(COSMOS_ENDPOINT, credential=credential if not COSMOS_KEY else None, key=COSMOS_KEY)
-    db = await cosmos_client.create_database_if_not_exists(id=COSMOS_DB)
-    cosmos_container = await db.create_container_if_not_exists(id=COSMOS_CONTAINER, partition_key=PartitionKey(path="/id"))
+    cosmos_container = None
     # Start worker
     app.state.worker_task = asyncio.create_task(worker_loop())
 
@@ -298,6 +316,106 @@ async def on_shutdown():
         await cosmos_client.close()
     if blob_service_client:
         await blob_service_client.close()
+
+
+# ---------------------------------------------------------------------------
+# Health / Readiness (Azure Container Apps probes)
+# ---------------------------------------------------------------------------
+@app.get("/healthz")
+async def healthz():
+    """Liveness probe: returns 200 if the process is up."""
+    return {"status": "ok"}
+
+
+@app.get("/health")
+async def health():
+    """Alias for liveness probe (more intuitive name)."""
+    return await healthz()
+
+
+async def _check_credential(timeout_s: float = 3.0) -> None:
+    async def _inner():
+        await credential.get_token(AI_SCOPE)
+
+    await asyncio.wait_for(_inner(), timeout=timeout_s)
+
+
+async def _check_servicebus(timeout_s: float = 3.0) -> None:
+    if not sb_client:
+        raise RuntimeError("Service Bus client not initialized")
+
+    async def _inner():
+        sender = sb_client.get_queue_sender(queue_name=SERVICE_BUS_QUEUE)
+        async with sender:
+            return
+
+    await asyncio.wait_for(_inner(), timeout=timeout_s)
+
+
+async def _check_storage(timeout_s: float = 3.0) -> None:
+    if not blob_service_client:
+        raise RuntimeError("Blob service client not initialized")
+
+    async def _inner():
+        container_client = blob_service_client.get_container_client(BLOB_CONTAINER_INPUT)
+        await container_client.get_container_properties()
+
+    await asyncio.wait_for(_inner(), timeout=timeout_s)
+
+
+async def _check_cosmos(timeout_s: float = 5.0) -> None:
+    async def _inner():
+        await _ensure_cosmos_container()
+
+    await asyncio.wait_for(_inner(), timeout=timeout_s)
+
+
+@app.get("/readyz")
+async def readyz():
+    """Readiness probe: returns 200 only when dependencies are reachable."""
+    failures: dict[str, str] = {}
+
+    # Fast config check (no network)
+    missing_env: list[str] = []
+    if not SERVICE_BUS_FQDN:
+        missing_env.append("AZURE_SERVICE_BUS_FQDN")
+    if not BLOB_ACCOUNT_URL:
+        missing_env.append("AZURE_STORAGE_ACCOUNT_URL")
+    if not COSMOS_ENDPOINT:
+        missing_env.append("AZURE_COSMOS_ENDPOINT")
+    if not MISTRAL_ENDPOINT:
+        missing_env.append("MISTRAL_ENDPOINT")
+    if not PHI_ENDPOINT:
+        missing_env.append("PHI_ENDPOINT (or AZURE_AI_ENDPOINT)")
+    if missing_env:
+        failures["config"] = "Missing env vars: " + ", ".join(missing_env)
+
+    if not failures:
+        checks = {
+            "credential": _check_credential(),
+            "servicebus": _check_servicebus(),
+            "storage": _check_storage(),
+            "cosmos": _check_cosmos(),
+        }
+        results = await asyncio.gather(*checks.values(), return_exceptions=True)
+        for name, result in zip(checks.keys(), results):
+            if isinstance(result, Exception):
+                if isinstance(result, asyncio.TimeoutError):
+                    failures[name] = "timeout"
+                elif isinstance(result, AzureError):
+                    failures[name] = f"azure_error: {type(result).__name__}"
+                else:
+                    failures[name] = f"error: {type(result).__name__}"
+
+    if failures:
+        raise HTTPException(status_code=503, detail={"status": "not_ready", "failures": failures})
+    return {"status": "ready"}
+
+
+@app.get("/ready")
+async def ready():
+    """Alias for readiness probe (more intuitive name)."""
+    return await readyz()
 
 
 # ---------------------------------------------------------------------------
@@ -656,6 +774,7 @@ def process_agent_response(agent_response: dict) -> dict:
 # ---------------------------------------------------------------------------
 async def save_to_cosmos(record: EmailRecord):
     record.updated_at = datetime.now(timezone.utc)
+    await _ensure_cosmos_container()
     await cosmos_container.upsert_item(record.model_dump())
 
 
@@ -706,6 +825,11 @@ async def list_emails(
     search: Optional[str] = Query(None),
     continuation_token: Optional[str] = Query(None),
 ):
+    try:
+        await _ensure_cosmos_container()
+    except Exception:
+        raise HTTPException(status_code=503, detail="Cosmos not ready")
+
     filters = []
     params = {}
     if status != "all":
@@ -780,6 +904,11 @@ async def count_reviewed_ready_items() -> int:
 
 @app.get("/api/stats")
 async def get_stats():
+    try:
+        await _ensure_cosmos_container()
+    except Exception:
+        raise HTTPException(status_code=503, detail="Cosmos not ready")
+
     processed_count = await count_by_status("PROCESSED")
     review_count = await count_by_status("REVIEW_REQUIRED")
     total = processed_count + review_count
@@ -811,6 +940,11 @@ async def set_settings(payload: dict):
 @app.get("/api/emails/{item_id}", response_model=EmailRecord)
 async def get_email(item_id: str):
     try:
+        await _ensure_cosmos_container()
+    except Exception:
+        raise HTTPException(status_code=503, detail="Cosmos not ready")
+
+    try:
         item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
         sas_url = await build_sas_url(item.get("file_url"))
         if sas_url:
@@ -822,6 +956,11 @@ async def get_email(item_id: str):
 
 @app.patch("/api/emails/{item_id}", response_model=EmailRecord)
 async def patch_email(item_id: str, payload: dict):
+    try:
+        await _ensure_cosmos_container()
+    except Exception:
+        raise HTTPException(status_code=503, detail="Cosmos not ready")
+
     try:
         item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
         if intents := payload.get("intents"):
@@ -845,6 +984,11 @@ async def patch_email(item_id: str, payload: dict):
 async def reprocess_email(item_id: str):
     """Re-enqueue a single email for classification."""
     try:
+        try:
+            await _ensure_cosmos_container()
+        except Exception:
+            raise HTTPException(status_code=503, detail="Cosmos not ready")
+
         item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
         blob_url = item.get("file_url")
         if not blob_url:
@@ -1024,6 +1168,11 @@ async def export_emails_csv():
     import csv
     import io
 
+    try:
+        await _ensure_cosmos_container()
+    except Exception:
+        raise HTTPException(status_code=503, detail="Cosmos not ready")
+
     async def row_iter():
         buffer = io.StringIO()
         writer = csv.writer(buffer)
@@ -1066,6 +1215,12 @@ async def export_emails_finetune_jsonl(
     """
 
     finetune_min_required = min_required or int(os.getenv("FINETUNE_MIN_EXAMPLES", "50"))
+
+    try:
+        await _ensure_cosmos_container()
+    except Exception:
+        raise HTTPException(status_code=503, detail="Cosmos not ready")
+
     finetune_reviewed_ready = await count_reviewed_ready_items()
     if not include_unreviewed and finetune_reviewed_ready < finetune_min_required:
         raise HTTPException(

@@ -430,9 +430,34 @@ def write_pdf(text: str, out_path: Path) -> None:
     pdf = FPDF(format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
+    # Use a core font to avoid font substitution warnings.
+    pdf.set_font("Helvetica", size=12)
+
+    def _break_long_tokens(s: str, max_token_len: int = 60) -> str:
+        # FPDF can throw if a single "word" is wider than the cell.
+        # Split very long unbroken sequences into chunks.
+        parts: list[str] = []
+        for token in re.split(r"(\s+)", s):
+            if not token or token.isspace():
+                parts.append(token)
+                continue
+
+            if len(token) <= max_token_len:
+                parts.append(token)
+                continue
+
+            chunks = [token[i : i + max_token_len] for i in range(0, len(token), max_token_len)]
+            parts.append(" ".join(chunks))
+        return "".join(parts)
 
     for line in text.splitlines():
+        # Ensure we always start at the left margin; otherwise remaining width can become 0.
+        try:
+            pdf.set_x(pdf.l_margin)
+        except Exception:
+            pass
+
+        usable_width = float(getattr(pdf, "w", 210)) - float(getattr(pdf, "l_margin", 15)) - float(getattr(pdf, "r_margin", 15))
         # FPDF classic fonts are latin-1; replace problematic chars.
         safe = (
             line.replace("’", "'")
@@ -441,7 +466,16 @@ def write_pdf(text: str, out_path: Path) -> None:
             .encode("latin-1", errors="replace")
             .decode("latin-1")
         )
-        pdf.multi_cell(0, 8, safe)
+        safe = _break_long_tokens(safe)
+        try:
+            pdf.multi_cell(usable_width, 8, safe)
+        except Exception:
+            # Worst-case fallback: add spaces between characters so nothing is "too wide".
+            try:
+                spaced = " ".join(list(safe))
+                pdf.multi_cell(usable_width, 8, spaced)
+            except Exception:
+                pdf.multi_cell(usable_width, 8, "[line omitted: rendering error]")
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pdf.output(str(out_path))
@@ -522,6 +556,13 @@ async def main() -> int:
 
         file_name = f"sample_{i+1:03d}_{seed.category}_{int(time.time())}_{uuid.uuid4().hex[:8]}.pdf"
         write_pdf(full_text, out_dir / file_name)
+
+        # For quick validation: print the generated filename(s)
+        if args.count <= 3:
+            try:
+                print(str((out_dir / file_name).resolve()))
+            except Exception:
+                print(str(out_dir / file_name))
 
     print(f"Generated {args.count} PDFs in {out_dir}")
     return 0

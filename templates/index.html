@@ -68,6 +68,7 @@
       <button @click="setFilter('all')" :class="tabClass('all')">{{ tr('tab_all') }}</button>
       <button @click="setFilter('REVIEW_REQUIRED')" :class="tabClass('REVIEW_REQUIRED')">{{ tr('tab_review') }}</button>
       <button @click="setFilter('PROCESSED')" :class="tabClass('PROCESSED')">{{ tr('tab_processed') }}</button>
+      <button @click="setFilter('ERROR')" :class="tabClass('ERROR')">{{ tr('tab_error') }}</button>
     </div>
 
     <!-- Search -->
@@ -83,6 +84,9 @@
           <div class="text-sm text-slate-400">{{ email.sender || 'Expéditeur inconnu' }}</div>
           <div class="font-semibold text-lg truncate" :title="email.subject">{{ email.subject || 'Sans sujet' }}</div>
           <div class="text-xs text-slate-500">{{ formatDate(email.created_at) }}</div>
+          <div v-if="email.status === 'ERROR' || email.error" class="mt-2 text-xs text-rose-300">
+            {{ tr('error') }}: {{ email.error_stage ? (email.error_stage + ' - ') : '' }}{{ (email.error || '').slice(0, 140) }}
+          </div>
         </div>
         <div class="mt-3 flex items-center justify-between gap-2">
           <span :class="scoreBadgeClass(maxConfidence(email))">{{ tr('score') }} {{ maxConfidence(email)?.toFixed?.(2) ?? 'N/A' }}</span>
@@ -112,6 +116,21 @@
           </div>
           <!-- Right: Markdown & Form -->
           <div class="md:w-1/2 h-1/2 md:h-full overflow-y-auto p-4 flex flex-col bg-slate-950">
+            <div v-if="modalEmail.error" class="mb-4 p-3 rounded border border-rose-700 bg-rose-900/20">
+              <div class="text-rose-300 text-sm font-semibold">{{ tr('error') }}</div>
+              <div class="text-rose-200 text-sm">{{ modalEmail.error_stage ? (modalEmail.error_stage + ': ') : '' }}{{ modalEmail.error }}</div>
+            </div>
+
+            <div v-if="modalEmail.processing_log && modalEmail.processing_log.length" class="mb-4 p-3 rounded border border-slate-800 bg-slate-900/40">
+              <div class="text-slate-300 text-sm font-semibold mb-2">{{ tr('processing_log') }}</div>
+              <ul class="text-xs text-slate-300 space-y-1">
+                <li v-for="(e, idx) in modalEmail.processing_log" :key="idx" class="flex gap-2">
+                  <span class="text-slate-500">{{ (e.ts || '').slice(11, 19) }}</span>
+                  <span class="text-slate-200">{{ e.stage }} / {{ e.event }}</span>
+                  <span class="text-slate-400 truncate" :title="e.detail">{{ e.detail }}</span>
+                </li>
+              </ul>
+            </div>
             <div class="mb-4">
               <div class="text-slate-400 text-sm mb-2">{{ tr('markdown') }}</div>
               <div v-html="renderMarkdown(modalEmail.markdown)" class="prose prose-invert max-w-none"></div>
@@ -398,6 +417,7 @@
             this.reprocessing = false;
           }
         },
+      },
       watch: {
         filter() { this.fetchEmails(); },
         search: { handler() { this.fetchEmails(); }, deep: false }
@@ -460,6 +480,7 @@
         tab_all: "Tout",
         tab_review: "🔴 À Valider",
         tab_processed: "✅ Traités",
+        tab_error: "⚠ Erreurs",
         search: "Rechercher...",
         score: "Score",
         open: "Ouvrir",
@@ -486,6 +507,8 @@
         reprocess: "Relancer",
         reprocess_ok: "Traitement relancé",
         reprocess_err: "Erreur lors du relancement",
+        error: "Erreur",
+        processing_log: "Journal de traitement",
         settings: "Paramètres",
         save: "Enregistrer",
         cancel: "Annuler",
@@ -501,6 +524,7 @@
         tab_all: "All",
         tab_review: "🔴 To Review",
         tab_processed: "✅ Processed",
+        tab_error: "⚠ Errors",
         search: "Search...",
         score: "Score",
         open: "Open",
@@ -527,6 +551,8 @@
         reprocess: "Reprocess",
         reprocess_ok: "Processing re-enqueued",
         reprocess_err: "Error while re-enqueuing",
+        error: "Error",
+        processing_log: "Processing log",
         settings: "Settings",
         save: "Save",
         cancel: "Cancel",

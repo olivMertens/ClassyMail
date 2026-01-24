@@ -230,7 +230,8 @@ resource "azurerm_cosmosdb_sql_role_assignment" "aca_cosmos_sql_contrib" {
   principal_id        = azurerm_user_assigned_identity.app_id.principal_id
   role_definition_id  = "${azurerm_cosmosdb_account.db.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
   # Format attendu par l'API dans ce tenant: un préfixe ARM (subscriptions/.../databaseAccounts/...) + segments data-plane (dbs/.../colls/...).
-  scope = "${azurerm_cosmosdb_account.db.id}/dbs/${azurerm_cosmosdb_sql_database.sql.name}/colls/${azurerm_cosmosdb_sql_container.container.name}"
+  # IMPORTANT: db-scope is required in some tenants for metadata access (readMetadata).
+  scope = "${azurerm_cosmosdb_account.db.id}/dbs/${azurerm_cosmosdb_sql_database.sql.name}"
 }
 
 resource "azurerm_cosmosdb_sql_database" "sql" {

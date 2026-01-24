@@ -108,9 +108,41 @@ Pour démontrer le POC (stress OCR + classification + boucle de review/fine-tuni
 Exemples:
 
 ```bash
+# Dépendance du générateur PDF (uniquement pour ce script)
+pip install fpdf2
+
+# Générer 1 PDF (pratique pour vérifier le nom unique/id) — le script affiche le chemin du fichier
+python scripts/generate_dummy_pdfs.py --count 1 --out dataset/pdf
+
 python scripts/generate_dummy_pdfs.py --count 75 --target-words 300
 python scripts/generate_dummy_pdfs.py --count 100 --target-words 320 --out dataset/pdf
 ```
+
+Notes:
+- Les fichiers sont nommés avec un suffixe unique (timestamp + UUID court), par ex:
+    `sample_001_<categorie>_<timestamp>_<id>.pdf`
+- Quand `--count <= 3`, le script affiche le chemin complet des fichiers générés.
+
+### Simuler un PDF corrompu (end-to-end)
+
+Objectif: vérifier que le pipeline détecte un PDF illisible dès l'étape 1 (download) et que l'UI affiche clairement l'erreur.
+
+Pré-requis:
+- App démarrée (local ou ACA)
+- Variables Storage configurées (`AZURE_STORAGE_ACCOUNT_URL`, `AZURE_STORAGE_CONTAINER`)
+
+Exemples:
+
+```bash
+# Local
+python scripts/simulate_corrupted_pdf.py --base-url http://localhost:8000
+
+# ACA (remplacer l'URL)
+python scripts/simulate_corrupted_pdf.py --base-url https://<your-app>.<region>.azurecontainerapps.io
+```
+
+Résultat attendu:
+- Un item `status=ERROR` apparaît dans l'onglet `⚠ Erreurs`, avec `error_stage=download` + un petit `processing_log`.
 
 ### Option LLM (Azure OpenAI / Foundry compatible)
 
@@ -157,16 +189,18 @@ python scripts/generate_dummy_pdfs.py --count 75 --target-words 300 --use-aoai
 
 ### Worker
 
-- SB + `Semaphore(5)`, `%PDF` check → base64
+- SB + `Semaphore(5)`, validation PDF (header `%PDF`) → base64
 - **Mistral OCR** `document_base64`
 - **Phi-4 multi-intents** JSON
 - `needs_review` via règles (scores, intents count)
 - Cosmos upsert
-- **OCR fail** → DLQ, sinon abandon/retry
+- **PDF corrompu / illisible (stage 1: download)**: l'item est marqué `status=ERROR`, sauvegardé dans Cosmos avec `error_stage=download`, et envoyé en DLQ.
+- **Autres échecs (OCR / classify)**: `status=ERROR` + `error_stage=ocr|classify` (visible dans l'UI), DLQ.
 
 ### Export CSV
 
-- CLI : `python main.py --export-csv data/output.csv`
+- CLI (recommandé): `python -m classificationg2s.cli --export-csv data/output.csv`
+- Export fine-tuning JSONL: `python -m classificationg2s.cli --export-finetune-jsonl data/fine_tune.jsonl`
 - Colonnes : `intents`, `needs_review`, `global_complexity`
 
 ---
@@ -175,10 +209,11 @@ python scripts/generate_dummy_pdfs.py --count 75 --target-words 300 --use-aoai
 
 - Route `/` sert `templates/index.html` (une seule page) :
     - Header stats (total, à valider)
-    - Onglets `Tout`, `🔴 À Valider`, `✅ Traités`
+    - Onglets `Tout`, `🔴 À Valider`, `✅ Traités`, `⚠ Erreurs`
     - Recherche temps réel
     - Grille de cartes (sujet, expéditeur, date, badge score couleur)
     - Modale plein écran : PDF (iframe SAS), markdown rendu, formulaire de correction + bouton valider
+    - En cas d'erreur, la modale affiche `error_stage` + un petit journal de traitement (`processing_log`).
 
 ---
 
@@ -188,8 +223,10 @@ python scripts/generate_dummy_pdfs.py --count 75 --target-words 300 --use-aoai
 ```bash
 uv lock
 uv sync
-uv run uvicorn main:app --reload
+uv run uvicorn classificationg2s.app:app --reload
 ```
+
+Entrypoint historique (si besoin): `uvicorn main:app --reload`
 
 Note: Python 3.11/3.12 recommended (Azure SDK support on 3.13 may lag).
 
