@@ -1,0 +1,40 @@
+# Generated lock placeholder. Regenerate with `uv lock`.
+[project]
+requires-python = ">=3.11"
+
+[[package]]
+name = "fastapi"
+version = "0.115.0"
+
+[[package]]
+name = "uvicorn"
+version = "0.30.0"
+extras = ["standard"]
+
+[[package]]
+name = "azure-identity"
+version = "1.17.0"
+
+[[package]]
+name = "azure-servicebus"
+version = "7.15.0"
+
+[[package]]
+name = "azure-storage-blob"
+version = "12.19.0"
+
+[[package]]
+name = "azure-cosmos"
+version = "4.7.0"
+
+[[package]]
+name = "httpx"
+version = "0.27.0"
+
+[[package]]
+name = "pydantic"
+version = "2.6.0"
+
+[[package]]
+name = "python-dotenv"
+version = "1.0.1"

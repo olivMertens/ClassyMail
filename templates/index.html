@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClassiMail Agent</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+  <link rel="stylesheet" href="/static/css/dropzone.min.css" />
+  <script src="/static/js/vue.global.prod.js"></script>
+  <script src="/static/js/markdown-it.min.js"></script>
+  <script src="/static/js/dropzone.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+  <div id="app" class="max-w-6xl mx-auto p-4">
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+      <div>
+        <div>
+          <h1 class="text-3xl font-bold">{{ tr('title') }}</h1>
+          <p class="text-slate-400">{{ tr('subtitle') }}</p>
+        </div>
+        <button @click="showInfo=true" class="px-3 py-2 text-sm bg-slate-800 rounded shadow hover:bg-slate-700">ℹ</button>
+      </div>
+      <div class="flex gap-3 items-center">
+        <button @click="toggleLang" class="px-3 py-2 text-sm bg-slate-800 rounded shadow hover:bg-slate-700">{{ lang.toUpperCase() }}</button>
+        <button @click="exportCsv" class="px-3 py-2 text-sm bg-sky-600 text-white rounded shadow hover:bg-sky-500">{{ tr('export') }}</button>
+        <button @click="openSettings" class="px-3 py-2 text-sm bg-slate-800 rounded shadow hover:bg-slate-700">⚙</button>
+        <div class="flex gap-4">
+          <div class="bg-slate-800 px-4 py-2 rounded shadow">
+            <div class="text-slate-400 text-sm">{{ tr('total') }}</div>
+            <div class="text-2xl font-semibold">{{ stats.total }}</div>
+          </div>
+          <div class="bg-slate-800 px-4 py-2 rounded shadow">
+            <div class="text-slate-400 text-sm">{{ tr('review') }}</div>
+            <div class="text-2xl font-semibold text-amber-300">{{ stats.review_required }}</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Progress Bar -->
+    <div class="mb-4">
+      <div class="flex justify-between text-xs text-slate-400 mb-1">
+        <span>{{ tr('progress_label') }}</span>
+        <span>{{ progress }}%</span>
+      </div>
+      <div class="w-full bg-slate-800 h-2 rounded">
+        <div class="bg-sky-500 h-2 rounded" :style="{ width: progress + '%' }"></div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-3 mb-4">
+      <button @click="mode='list'; setFilter('all')" :class="modeTabClass('list')">{{ tr('tab_list') }}</button>
+      <button @click="mode='upload'" :class="modeTabClass('upload')">{{ tr('tab_upload') }}</button>
+    </div>
+
+    <div v-if="mode==='list'" class="mb-4 flex gap-3">
+      <button @click="setFilter('all')" :class="tabClass('all')">{{ tr('tab_all') }}</button>
+      <button @click="setFilter('REVIEW_REQUIRED')" :class="tabClass('REVIEW_REQUIRED')">{{ tr('tab_review') }}</button>
+      <button @click="setFilter('PROCESSED')" :class="tabClass('PROCESSED')">{{ tr('tab_processed') }}</button>
+    </div>
+
+    <!-- Search -->
+    <div class="mb-4">
+      <input v-model="search" type="text" :placeholder="tr('search')" class="w-full bg-slate-800 rounded px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-sky-500" />
+    </div>
+
+    <!-- Grid -->
+    <div v-if="mode==='list'" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div v-for="email in filteredEmails" :key="email.id" class="bg-slate-800 rounded p-4 shadow flex flex-col justify-between">
+        <div>
+          <div class="text-sm text-slate-400">{{ email.sender || 'Expéditeur inconnu' }}</div>
+          <div class="font-semibold text-lg truncate" :title="email.subject">{{ email.subject || 'Sans sujet' }}</div>
+          <div class="text-xs text-slate-500">{{ formatDate(email.created_at) }}</div>
+        </div>
+        <div class="mt-3 flex items-center justify-between gap-2">
+          <span :class="scoreBadgeClass(maxConfidence(email))">{{ tr('score') }} {{ maxConfidence(email)?.toFixed?.(2) ?? 'N/A' }}</span>
+          <div class="flex gap-2">
+            <button @click="openModal(email)" class="text-sky-400 hover:text-sky-200 text-sm">{{ tr('open') }}</button>
+            <button @click="reprocess(email.id)" class="text-amber-400 hover:text-amber-200 text-sm" :disabled="reprocessing">{{ tr('reprocess') }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal -->
+    <div v-if="modalEmail" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+      <div class="bg-slate-900 w-full h-full md:w-11/12 md:h-5/6 rounded-lg overflow-hidden flex flex-col">
+        <div class="flex justify-between items-center px-4 py-2 border-b border-slate-700">
+          <h2 class="text-xl font-semibold truncate">{{ modalEmail.subject || modalEmail.id }}</h2>
+          <div class="flex gap-3 items-center">
+            <button @click="reprocess(modalEmail.id)" class="text-amber-400 hover:text-amber-200 text-sm" :disabled="reprocessing">{{ tr('reprocess') }}</button>
+            <button @click="closeModal" class="text-slate-400 hover:text-slate-200">✕</button>
+          </div>
+        </div>
+        <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+          <!-- Left: PDF -->
+          <div class="md:w-1/2 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-slate-800">
+            <iframe v-if="modalEmail.file_url_sas || modalEmail.file_url" :src="modalEmail.file_url_sas || modalEmail.file_url" class="w-full h-full" title="PDF"></iframe>
+            <div v-else class="p-4 text-slate-400 text-sm">{{ tr('no_pdf') }}</div>
+          </div>
+          <!-- Right: Markdown & Form -->
+          <div class="md:w-1/2 h-1/2 md:h-full overflow-y-auto p-4 flex flex-col bg-slate-950">
+            <div class="mb-4">
+              <div class="text-slate-400 text-sm mb-2">{{ tr('markdown') }}</div>
+              <div v-html="renderMarkdown(modalEmail.markdown)" class="prose prose-invert max-w-none"></div>
+            </div>
+            <div class="mb-4" v-if="modalEmail.classification?.detected_intents?.length">
+                          <div class="mb-4" v-if="modalEmail.usage">
+                            <div class="text-slate-400 text-sm mb-2">{{ tr('costs') }}</div>
+                            <div class="text-sm text-slate-300">Phi-4: {{ modalEmail.usage.phi4_cost_usd?.toFixed?.(4) ?? 'N/A' }} USD</div>
+                            <div class="text-sm text-slate-300">Mistral: {{ modalEmail.usage.mistral?.cost_usd?.toFixed?.(4) ?? 'N/A' }} USD</div>
+                          </div>
+              <div class="text-slate-400 text-sm mb-2">{{ tr('intents') }}</div>
+              <ul class="text-sm space-y-1">
+                <li v-for="i in modalEmail.classification.detected_intents" :key="i.intent" class="flex justify-between">
+                  <span>{{ i.intent }}</span>
+                  <span>{{ (i.confidence ?? 0).toFixed(2) }}</span>
+                </li>
+              </ul>
+            </div>
+            <form @submit.prevent="validateEmail" class="mt-auto bg-slate-900/70 p-3 rounded border border-slate-800">
+              <label class="text-sm text-slate-400 mb-2">{{ tr('intents_json') }}</label>
+              <textarea v-model="form.intents_json" rows="6" class="w-full bg-slate-800 rounded px-3 py-2 text-sm mb-3"></textarea>
+              <button type="submit" class="w-full bg-sky-600 hover:bg-sky-500 text-white rounded py-2">{{ tr('validate') }}</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    <!-- Info Modal -->
+    <div v-if="showInfo" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+      <div class="bg-slate-900 rounded-lg p-6 max-w-md w-full shadow border border-slate-700">
+        <h3 class="text-xl font-semibold mb-2">POC - G2S Microsoft (Mars 2026)</h3>
+        <p class="text-slate-300">ClassiMail Agent</p>
+        <p class="text-slate-400 text-sm mt-2">Contact: Olivier Mertens<br/>olmertens@microsoft.com</p>
+        <button @click="showInfo=false" class="mt-4 w-full bg-sky-600 hover:bg-sky-500 text-white rounded py-2">OK</button>
+      </div>
+    </div>
+
+    <!-- Upload Panel -->
+    <div v-if="mode==='upload'" class="mt-4 bg-slate-800 rounded p-4">
+      <h2 class="text-lg font-semibold mb-2">{{ tr('upload_title') }}</h2>
+      <p class="text-sm text-slate-400 mb-4">{{ tr('upload_desc') }}</p>
+      <form id="upload-dropzone" class="border border-dashed border-slate-600 rounded p-6 text-center cursor-pointer hover:border-slate-400 dropzone">
+        <div class="dz-message text-slate-300">
+          <p>{{ tr('upload_drop') }}</p>
+          <p class="text-xs text-slate-500">{{ tr('upload_limit') }}</p>
+        </div>
+      </form>
+      <ul class="mt-4 text-sm space-y-1">
+        <li v-for="f in uploadQueue" :key="f.name" class="flex justify-between">
+          <span>{{ f.name }}</span>
+          <span :class="uploadStatusClass(f.status)">{{ f.status }}</span>
+        </li>
+      </ul>
+      <button @click="submitUpload" :disabled="uploading || !uploadQueue.length" class="mt-4 w-full bg-sky-600 hover:bg-sky-500 text-white rounded py-2">
+        {{ uploading ? tr('uploading') : tr('upload_start') }}
+      </button>
+    </div>
+
+  <script>
+    const md = window.markdownit({ html: true, linkify: true, breaks: true });
+
+    const App = {
+      data() {
+        return {
+          emails: [],
+          stats: { total: 0, review_required: 0 },
+          filter: 'all',
+          mode: 'list',
+          search: '',
+          modalEmail: null,
+          form: { intents_json: '[]' },
+          settings: { phi4_input_per_1k: null, phi4_output_per_1k: null, mistral_per_1k_pages: null },
+          showSettings: false,
+          continuationToken: null,
+          lang: 'fr',
+          showInfo: false,
+          reprocessing: false,
+          uploadQueue: [],
+          uploading: false,
+        };
+      },
+      computed: {
+        filteredEmails() {
+          let list = this.emails;
+          if (this.filter !== 'all') {
+            list = list.filter(e => e.status === this.filter);
+          }
+          if (this.search) {
+            const q = this.search.toLowerCase();
+            list = list.filter(e => {
+              const intents = (e.classification?.detected_intents || []).map(i => i.intent?.toLowerCase() || '').join(' ');
+              return (e.subject || '').toLowerCase().includes(q) || (e.sender || '').toLowerCase().includes(q) || intents.includes(q);
+            });
+          }
+          return list;
+        },
+        progress() {
+          if (!this.stats.total) return 0;
+          return Math.round((this.stats.processed || 0) / this.stats.total * 100);
+        },
+      },
+      methods: {
+        tr(key) {
+          return translations[this.lang][key] || key;
+        },
+        tabClass(tab) {
+          return [
+            'px-3 py-1 rounded-full text-sm font-medium border',
+            this.filter === tab ? 'bg-sky-600 text-white border-sky-500' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+          ];
+        },
+        toggleLang() {
+          this.lang = this.lang === 'fr' ? 'en' : 'fr';
+        },
+        modeTabClass(tab) {
+          return [
+            'px-3 py-1 rounded-full text-sm font-medium border',
+            this.mode === tab ? 'bg-sky-600 text-white border-sky-500' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+          ];
+        },
+                openSettings() {
+                  this.showSettings = true;
+                },
+                async saveSettings() {
+                  const payload = {
+                    phi4_input_per_1k: this.settings.phi4_input_per_1k ? Number(this.settings.phi4_input_per_1k) : undefined,
+                    phi4_output_per_1k: this.settings.phi4_output_per_1k ? Number(this.settings.phi4_output_per_1k) : undefined,
+                    mistral_per_1k_pages: this.settings.mistral_per_1k_pages ? Number(this.settings.mistral_per_1k_pages) : undefined,
+                  };
+                  await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                  localStorage.setItem('classimail-settings', JSON.stringify(payload));
+                  this.showSettings = false;
+                },
+                async loadSettings() {
+                  const fromLocal = localStorage.getItem('classimail-settings');
+                  if (fromLocal) {
+                    this.settings = JSON.parse(fromLocal);
+                  } else {
+                    const res = await fetch('/api/settings');
+                    if (res.ok) this.settings = await res.json();
+                  }
+                },
+        exportCsv() {
+          window.location = '/api/emails/export';
+        },
+        scoreBadgeClass(score) {
+          if (score == null) return 'px-2 py-1 rounded text-xs bg-slate-700 text-slate-200';
+          if (score > 0.9) return 'px-2 py-1 rounded text-xs bg-emerald-700 text-emerald-100';
+          if (score >= 0.7) return 'px-2 py-1 rounded text-xs bg-amber-700 text-amber-100';
+          return 'px-2 py-1 rounded text-xs bg-rose-700 text-rose-100';
+        },
+        maxConfidence(email) {
+          const intents = email.classification?.detected_intents || [];
+          if (!intents.length) return null;
+          return Math.max(...intents.map(i => i.confidence || 0));
+        },
+        setFilter(f) {
+          this.filter = f;
+        },
+        formatDate(d) {
+          if (!d) return '';
+          return new Date(d).toLocaleString('fr-FR');
+        },
+        renderMarkdown(mdText) {
+          return md.render(mdText || '');
+        },
+        async fetchEmails() {
+          const params = new URLSearchParams();
+          params.set('status', this.filter === 'all' ? 'all' : this.filter);
+          params.set('page', 1);
+          params.set('page_size', 50);
+          if (this.search) params.set('search', this.search);
+          const res = await fetch(`/api/emails?${params.toString()}`);
+          const data = await res.json();
+          this.emails = data.items || [];
+          this.stats.total = data.total || this.emails.length;
+          this.stats.review_required = data.review_required || 0;
+          this.stats.processed = data.processed || (this.stats.total - this.stats.review_required);
+        },
+        handleDrop(e) {
+          const files = Array.from(e.dataTransfer.files || []).slice(0, 10);
+          this.uploadQueue = files.map(f => ({ file: f, name: f.name, status: 'pending' }));
+        },
+        handleFileSelect(e) {
+          const files = Array.from(e.target.files || []).slice(0, 10);
+          this.uploadQueue = files.map(f => ({ file: f, name: f.name, status: 'pending' }));
+        },
+        async submitUpload() {
+          if (this.dropzone) {
+            this.dropzone.processQueue();
+            return;
+          }
+          if (!this.uploadQueue.length) return;
+          this.uploading = true;
+          const formData = new FormData();
+          this.uploadQueue.forEach(u => formData.append('files', u.file));
+          await this._postFormData(formData);
+          this.uploading = false;
+        },
+        async _postFormData(formData) {
+          try {
+            const res = await fetch('/api/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            const results = data.results || [];
+            this.uploadQueue = this.uploadQueue.map(u => {
+              const r = results.find(x => x.name === u.name);
+              if (!r) return { ...u, status: 'error' };
+              if (r.status === 'error') {
+                const msg = r.error === 'invalid_type' ? this.tr('err_type') : r.error === 'too_large' ? this.tr('err_size') : 'error';
+                return { ...u, status: msg };
+              }
+              return { ...u, status: '✔ uploaded' };
+            });
+          } catch (e) {
+            this.uploadQueue = this.uploadQueue.map(u => ({ ...u, status: 'error' }));
+          }
+        },
+        uploadStatusClass(status) {
+          if (status?.startsWith('✔')) return 'text-emerald-300';
+          if (status?.includes('type') || status?.includes('size') || status === 'error') return 'text-rose-300';
+          return 'text-slate-300';
+        },
+        async openModal(email) {
+          const res = await fetch(`/api/emails/${email.id}`);
+          const data = await res.json();
+          this.modalEmail = data;
+          this.form.intents_json = JSON.stringify(data.classification?.detected_intents || [], null, 2);
+        },
+        closeModal() {
+          this.modalEmail = null;
+        },
+        async validateEmail() {
+          if (!this.modalEmail) return;
+          let intents = [];
+          try { intents = JSON.parse(this.form.intents_json || '[]'); } catch(e) { alert('JSON invalide'); return; }
+          const payload = { intents };
+          const res = await fetch(`/api/emails/${this.modalEmail.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          this.modalEmail = data;
+          await this.fetchEmails();
+          this.closeModal();
+        }
+      },
+        async reprocess(id) {
+          if (!id) return;
+          this.reprocessing = true;
+          try {
+            const res = await fetch(`/api/emails/${id}/reprocess`, { method: 'POST' });
+            if (!res.ok) throw new Error(await res.text());
+            alert(this.tr('reprocess_ok'));
+          } catch (e) {
+            alert(this.tr('reprocess_err'));
+          } finally {
+            this.reprocessing = false;
+          }
+        },
+      watch: {
+        filter() { this.fetchEmails(); },
+        search: { handler() { this.fetchEmails(); }, deep: false }
+      },
+      mounted() {
+        this.fetchEmails();
+        this.loadSettings();
+        setInterval(() => this.fetchEmails(), 15000);
+        // Initialize Dropzone if available
+        if (window.Dropzone) {
+          Dropzone.autoDiscover = false;
+          try {
+            this.dropzone = new Dropzone('#upload-dropzone', {
+              url: '/api/upload',
+              paramName: 'files',
+              uploadMultiple: true,
+              parallelUploads: 5,
+              maxFiles: 10,
+              maxFilesize: 10, // MB
+              acceptedFiles: '.pdf',
+              autoProcessQueue: false,
+            });
+            this.dropzone.on('addedfile', file => {
+              this.uploadQueue.push({ file, name: file.name, status: 'pending' });
+            });
+            this.dropzone.on('removedfile', file => {
+              this.uploadQueue = this.uploadQueue.filter(f => f.name !== file.name);
+            });
+            this.dropzone.on('successmultiple', (files, response) => {
+              const results = response.results || [];
+              this.uploadQueue = this.uploadQueue.map(u => {
+                const r = results.find(x => x.name === u.name);
+                if (!r) return { ...u, status: 'error' };
+                if (r.status === 'error') {
+                  const msg = r.error === 'invalid_type' ? this.tr('err_type') : r.error === 'too_large' ? this.tr('err_size') : 'error';
+                  return { ...u, status: msg };
+                }
+                return { ...u, status: '✔ uploaded' };
+              });
+            });
+            this.dropzone.on('errormultiple', () => {
+              this.uploadQueue = this.uploadQueue.map(u => ({ ...u, status: 'error' }));
+            });
+          } catch (e) {
+            console.warn('Dropzone init failed', e);
+          }
+        }
+      }
+    };
+
+    const translations = {
+      fr: {
+        title: "ClassiMail Agent",
+        subtitle: "POC G2S Microsoft - Mars 2026",
+        total: "Total",
+        review: "À valider",
+        progress_label: "Emails traités",
+        tab_list: "Tableau",
+        tab_upload: "Upload POC",
+        tab_all: "Tout",
+        tab_review: "🔴 À Valider",
+        tab_processed: "✅ Traités",
+        search: "Rechercher...",
+        score: "Score",
+        open: "Ouvrir",
+        no_pdf: "Pas d'URL PDF disponible",
+        markdown: "Markdown",
+        category: "Catégorie",
+        reason: "Raison",
+        intents: "Intentions",
+        intents_json: "Intentions (JSON)",
+        validate: "Valider",
+        costs: "Coûts",
+        export: "Exporter CSV",
+        upload_title: "Upload rapide (5-10 PDF)",
+        upload_desc: "Déposez vos PDF pour déclencher le traitement via Event Grid.",
+        upload_drop: "Glissez-déposez ou cliquez pour sélectionner des PDF",
+        upload_limit: "Maximum 10 fichiers",
+        uploading: "Upload en cours...",
+        upload_start: "Uploader & déclencher",
+        err_type: "Type invalide (PDF uniquement)",
+        err_size: "Fichier > 10 Mo"
+        reprocess: "Relancer",
+        reprocess_ok: "Traitement relancé",
+        reprocess_err: "Erreur lors du relancement",
+      },
+      en: {
+        title: "ClassiMail Agent",
+        subtitle: "POC G2S Microsoft - March 2026",
+        total: "Total",
+        review: "To review",
+        progress_label: "Processed emails",
+        tab_list: "Dashboard",
+        tab_upload: "Upload POC",
+        tab_all: "All",
+        tab_review: "🔴 To Review",
+        tab_processed: "✅ Processed",
+        search: "Search...",
+        score: "Score",
+        open: "Open",
+        no_pdf: "No PDF URL available",
+        markdown: "Markdown",
+        category: "Category",
+        reason: "Reason",
+        intents: "Intents",
+        intents_json: "Intents (JSON)",
+        validate: "Validate",
+        costs: "Costs",
+        export: "Export CSV",
+        upload_title: "Quick upload (5-10 PDFs)",
+        upload_desc: "Drop PDFs to trigger processing via Event Grid.",
+        upload_drop: "Drag & drop or click to select PDFs",
+        upload_limit: "Maximum 10 files",
+        uploading: "Uploading...",
+        upload_start: "Upload & trigger",
+        err_type: "Invalid type (PDF only)",
+        err_size: "File > 10 MB"
+        reprocess: "Reprocess",
+        reprocess_ok: "Processing re-enqueued",
+        reprocess_err: "Error while re-enqueuing",
+      }
+    };
+
+    Vue.createApp(App).mount('#app');
+  </script>
+
+  <!-- Settings Modal -->
+  <div v-if="showSettings" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+    <div class="bg-slate-900 rounded-lg p-6 max-w-md w-full shadow border border-slate-700">
+      <h3 class="text-xl font-semibold mb-2">{{ tr('settings') }}</h3>
+      <label class="text-sm text-slate-400">Phi-4 Input (€/1K tokens)</label>
+      <input v-model="settings.phi4_input_per_1k" type="number" step="0.000001" class="w-full bg-slate-800 rounded px-3 py-2 text-sm mb-3" />
+      <label class="text-sm text-slate-400">Phi-4 Output (€/1K tokens)</label>
+      <input v-model="settings.phi4_output_per_1k" type="number" step="0.000001" class="w-full bg-slate-800 rounded px-3 py-2 text-sm mb-3" />
+      <label class="text-sm text-slate-400">Mistral OCR (€/1K pages)</label>
+      <input v-model="settings.mistral_per_1k_pages" type="number" step="0.001" class="w-full bg-slate-800 rounded px-3 py-2 text-sm mb-4" />
+      <div class="flex gap-3">
+        <button @click="saveSettings" class="flex-1 bg-sky-600 hover:bg-sky-500 text-white rounded py-2">{{ tr('save') }}</button>
+        <button @click="showSettings=false" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white rounded py-2">{{ tr('cancel') }}</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

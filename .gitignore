@@ -1,0 +1,44 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+.dist-info/
+.env
+.env.*
+.venv/
+venv/
+env/
+.python-version
+pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+# FastAPI / Uvicorn
+*.log
+
+# VSCode / IDE
+.vscode/
+.idea/
+
+# Data & outputs
+data/
+logs/
+outputs/
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Builds
+build/
+dist/
+
+# Notebooks
+*.ipynb_checkpoints/

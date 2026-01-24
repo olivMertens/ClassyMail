@@ -1,0 +1,100 @@
+/* Minimal utility CSS to approximate Tailwind classes used. Replace with full Tailwind build in production. */
+:root {
+  --bg-slate-900: #0f172a;
+  --bg-slate-950: #020617;
+  --bg-slate-800: #1e293b;
+  --text-slate-100: #f1f5f9;
+  --text-slate-200: #e2e8f0;
+  --text-slate-300: #cbd5f5;
+  --text-slate-400: #94a3b8;
+  --text-slate-500: #64748b;
+  --bg-sky-500: #0ea5e9;
+  --bg-sky-600: #0284c7;
+  --bg-emerald-700: #047857;
+  --bg-amber-700: #b45309;
+  --bg-rose-700: #be123c;
+  --bg-emerald-100: #d1fae5;
+  --bg-amber-100: #ffedd5;
+  --bg-rose-100: #ffe4e6;
+}
+body { background: var(--bg-slate-900); color: var(--text-slate-100); font-family: 'Segoe UI', sans-serif; }
+.bg-slate-900 { background: var(--bg-slate-900); }
+.bg-slate-950 { background: var(--bg-slate-950); }
+.bg-slate-800 { background: var(--bg-slate-800); }
+.text-slate-100 { color: var(--text-slate-100); }
+.text-slate-200 { color: var(--text-slate-200); }
+.text-slate-300 { color: var(--text-slate-300); }
+.text-slate-400 { color: var(--text-slate-400); }
+.text-slate-500 { color: var(--text-slate-500); }
+.bg-sky-500 { background: var(--bg-sky-500); }
+.bg-sky-600 { background: var(--bg-sky-600); }
+.bg-emerald-700 { background: var(--bg-emerald-700); }
+.bg-emerald-100 { color: var(--bg-emerald-100); }
+.bg-amber-700 { background: var(--bg-amber-700); }
+.bg-amber-100 { color: var(--bg-amber-100); }
+.bg-rose-700 { background: var(--bg-rose-700); }
+.bg-rose-100 { color: var(--bg-rose-100); }
+.text-emerald-100 { color: var(--bg-emerald-100); }
+.text-amber-100 { color: var(--bg-amber-100); }
+.text-rose-100 { color: var(--bg-rose-100); }
+.text-amber-300 { color: #fcd34d; }
+.bg-slate-700 { background: #334155; }
+.bg-slate-700:hover { background: #475569; }
+.shadow { box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+.rounded { border-radius: 0.5rem; }
+.rounded-full { border-radius: 9999px; }
+.p-4 { padding: 1rem; }
+.p-3 { padding: .75rem; }
+.p-2 { padding: .5rem; }
+.px-2 { padding-left: .5rem; padding-right: .5rem; }
+.px-3 { padding-left: .75rem; padding-right: .75rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.py-1 { padding-top: .25rem; padding-bottom: .25rem; }
+.py-2 { padding-top: .5rem; padding-bottom: .5rem; }
+.py-3 { padding-top: .75rem; padding-bottom: .75rem; }
+.py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+.m-4 { margin: 1rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mb-6 { margin-bottom: 1.5rem; }
+.mt-auto { margin-top: auto; }
+.gap-4 { gap: 1rem; }
+.gap-3 { gap: .75rem; }
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.flex-row { flex-direction: row; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.grid { display: grid; }
+.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 640px) { .sm\:grid-cols-2 { grid-template-columns: repeat(1, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.max-w-6xl { max-width: 72rem; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.min-h-screen { min-height: 100vh; }
+.rounded-lg { border-radius: 0.75rem; }
+.border { border: 1px solid rgba(148, 163, 184, 0.3); }
+.border-slate-700 { border-color: #334155; }
+.border-slate-800 { border-color: #1e293b; }
+.bg-black\/70 { background: rgba(0,0,0,0.7); }
+.text-sm { font-size: 0.875rem; }
+.text-xs { font-size: 0.75rem; }
+.text-lg { font-size: 1.125rem; }
+.text-xl { font-size: 1.25rem; }
+.text-2xl { font-size: 1.5rem; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.overflow-hidden { overflow: hidden; }
+.overflow-y-auto { overflow-y: auto; }
+.hover\:bg-slate-700:hover { background: #334155; }
+.hover\:text-sky-200:hover { color: #bae6fd; }
+.bg-slate-900\/70 { background: rgba(15,23,42,0.7); }
+.prose { line-height: 1.5; }
+.prose-invert { color: var(--text-slate-100); }
+input, textarea { color: var(--text-slate-100); }
+iframe { border: none; }
+button { cursor: pointer; }
