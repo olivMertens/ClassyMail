@@ -2,8 +2,9 @@ name: deploy
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    branches:
+      - main
+  workflow_dispatch: {}
 
 env:
   IMAGE_NAME: classimail-agent
