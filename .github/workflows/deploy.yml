@@ -337,7 +337,9 @@ jobs:
           RG="${{ vars.AZURE_RESOURCE_GROUP }}"
           APP="${{ env.WORKER_APP_NAME }}"
           ENV_NAME="${{ env.CONTAINERAPPS_ENV }}"
+          
           if ! az containerapp show -n "$APP" -g "$RG" >/dev/null 2>&1; then
+            echo "Creating worker app..."
             az containerapp create \
               -n "$APP" \
               -g "$RG" \
@@ -345,6 +347,17 @@ jobs:
               --image "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" \
               --min-replicas 0 \
               --max-replicas 1
+          else
+            echo "Worker app exists. Checking state..."
+            STATE=$(az containerapp show -n "$APP" -g "$RG" --query properties.provisioningState -o tsv)
+            echo "Current ProvisioningState: $STATE"
+            if [ "$STATE" = "Failed" ]; then
+              echo "App is in Failed state. Resetting to public helloworld image to unblock provisioning..."
+              az containerapp update \
+                -n "$APP" \
+                -g "$RG" \
+                --image "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+            fi
           fi
 
       - name: Assign managed identity to Worker Container App
