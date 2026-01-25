@@ -350,7 +350,6 @@ jobs:
               -g "$RG" \
               --environment "$ENV_NAME" \
               --image "$IMAGE" \
-              --ingress disabled \
               --min-replicas 0 \
               --max-replicas 10 \
               --user-assigned "$IDENTITY_ID" \
