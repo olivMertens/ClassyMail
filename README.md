@@ -68,19 +68,29 @@ Selon ton objectif :
 
 Ce projet implémente un pipeline de classification d'emails à haut volume et faible latence, capable de gérer des pics de charge (10k fichiers simultanés) grâce à une architecture événementielle découplée, avec un backend FastAPI et un frontend SPA (Vue 3 + Tailwind).
 
+![Dashboard UI](https://raw.githubusercontent.com/olivMertens/classimail-agent/main/docs/assets/dashboard_preview.png)
+<!-- (Note: add a screenshot to docs/assets if available, otherwise just text description below) -->
+
+The new frontend provides a dark-mode enabled dashboard to:
+- Monitor email processing metrics.
+- Upload/drag-and-drop PDF files directly.
+- Review and correct classifications with a side-by-side PDF viewer and markdown preview.
+- Analyze costs and usage.
+- Configure settings.
+
 ```mermaid
 flowchart TD
-    user[User] -->|Upload PDF| blob[(Blob Storage)]
+    user[User] -->|Upload PDF / Review| ui[SPA (Vue 3 + Tailwind)]
+    ui -->|API calls| api[FastAPI API]
+    api -->|Download PDF| blob[(Blob Storage)]
     blob -->|Event Grid| sbq[Service Bus Queue]
-    sbq -->|Worker| api[FastAPI Worker/API]
-    api -->|Download PDF| blob
+    sbq -->|Worker| api
     api -->|OCR document_base64| ocr[Mistral OCR]
     ocr -->|Markdown| api
     api -->|Classify intents| llm["Phi-4 (primary)<br/>Fallback: gpt-4o-mini"]
     llm -->|JSON| api
     api -->|Persist| cosmos[(Cosmos DB)]
-    api -->|Dashboard UI| user
-```
+
 
 ## 🔧 Installation & Exécution (aperçu)
 
@@ -211,24 +221,40 @@ python scripts/generate_dummy_pdfs.py --count 75 --target-words 300 --use-aoai
 
 ## 💻 Frontend SPA (Vue 3 + Tailwind)
 
-- Route `/` sert `templates/index.html` (une seule page) :
-    - Header stats (total, à valider)
-    - Onglets `Tout`, `🔴 À Valider`, `✅ Traités`, `⚠ Erreurs`
-    - Recherche temps réel
-    - Grille de cartes (sujet, expéditeur, date, badge score couleur)
-    - Modale plein écran : PDF (iframe SAS), markdown rendu, formulaire de correction + bouton valider
-    - En cas d'erreur, la modale affiche `error_stage` + un petit journal de traitement (`processing_log`).
+Le projet inclut une application frontend moderne dans le dossier `frontend/`.
+
+- **Stack** : Vue 3, Vite, Tailwind CSS, Headless UI.
+- **Features** :
+    - Dashboard analytique (KPIs, graphes).
+    - Vue liste avec filtres (statut, recherche full-text, dates).
+    - Vue détail optimisée pour la review (PDF split-screen, Markdown, formulaire JSON).
+    - Upload Drag & Drop.
+    - Dark mode natif.
+- **Build** : `npm run build` génère les assets dans `static/dist/`. FastAPI sert `index.html` comme point d'entrée SPA.
+
+Ancien frontend (legacy) : `templates/index.html` (remplacé).
 
 ---
 
 ## 🔧 Installation & Exécution
 
-### Avec uv
+### Setup Frontend (Dev)
+Pour développer le frontend avec le Hot Module Replacement (HMR) :
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+L'URL locale sera typiquement `http://localhost:5173`. Configurez le proxy Vite ou CORS si nécessaire pour taper sur l'API Python (`http://localhost:8000`).
+
+### Setup Backend (uv)
 ```bash
 uv lock
 uv sync
 uv run uvicorn classificationg2s.app:app --reload
 ```
+Le backend sert le frontend compilé à l'adresse racine `/`.
 
 Entrypoint historique (si besoin): `uvicorn main:app --reload`
 
