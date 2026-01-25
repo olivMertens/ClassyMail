@@ -53,6 +53,11 @@ resource "azurerm_storage_account" "st" {
   account_tier             = "Standard"
   account_replication_type = "LRS"
 
+  # Avoid unintended drift vs existing secured deployments.
+  # NOTE: If you need Container Apps to access Storage over the public internet,
+  # set this to true and ensure your org policies allow it.
+  public_network_access_enabled = false
+
   # Beaucoup d'environnements (policies) interdisent l'accès via clés (Shared Key).
   # On force un mode compatible: OAuth/Entra-only, pas de Shared Key.
   shared_access_key_enabled       = false
@@ -198,6 +203,13 @@ resource "azurerm_role_assignment" "aca_sb_sender" {
   principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
+resource "azurerm_role_assignment" "acr_pull" {
+  count                = var.acr_name != "" ? 1 : 0
+  scope                = data.azurerm_container_registry.acr[0].id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
+}
+
 resource "random_uuid" "cosmos_sql_contrib_assignment" {}
 
 
@@ -209,6 +221,9 @@ resource "azurerm_cosmosdb_account" "db" {
   resource_group_name = azurerm_resource_group.rg.name
   offer_type          = "Standard"
   kind                = "GlobalDocumentDB"
+
+  # Avoid unintended drift vs existing secured deployments.
+  public_network_access_enabled = false
 
   # Beaucoup de tenants désactivent l'auth locale (clé) par policy.
   # On aligne le comportement Terraform avec ce mode; vous pouvez forcer cosmos_use_rbac=false uniquement si vous avez le droit d'activer l'auth locale.
@@ -248,14 +263,36 @@ resource "azurerm_cosmosdb_sql_container" "container" {
   account_name        = azurerm_cosmosdb_account.db.name
   database_name       = azurerm_cosmosdb_sql_database.sql.name
   partition_key_paths = ["/id"]
+
+  # Politique d'indexation: garder l'index sur les champs utiles aux requêtes (status, reviewed, classification.needs_review, _ts)
+  # et désindexer les gros champs rarement filtrés pour réduire les RU (markdown, raw_response, logs, usage).
+  indexing_policy {
+    indexing_mode = "consistent"
+
+    included_path {
+      path = "/*"
+    }
+
+    excluded_path {
+      path = "/markdown/?"
+    }
+
+    excluded_path {
+      path = "/processing_log/?"
+    }
+
+    excluded_path {
+      path = "/usage/?"
+    }
+
+    excluded_path {
+      path = "/classification/raw_response/?"
+    }
+  }
 }
 
 # --- 5. Compute (Container App) ---
-resource "azurerm_container_app_environment" "env" {
-  name                = "${var.prefix}-env"
-  location            = var.location
-  resource_group_name = azurerm_resource_group.rg.name
-}
+# (Container App Environment defined below with Log Analytics)
 
 # Identité Managée pour l'application
 resource "azurerm_user_assigned_identity" "app_id" {
@@ -290,4 +327,281 @@ output "AZURE_COSMOS_CONTAINER" { value = azurerm_cosmosdb_sql_container.contain
 output "AZURE_COSMOS_KEY" {
   value     = var.cosmos_use_rbac ? null : azurerm_cosmosdb_account.db.primary_key
   sensitive = true
+}
+variable "container_image" {
+  type        = string
+  description = "Container image (registry/repo:tag) to deploy to Container Apps (API & worker)."
+  default     = ""
+  validation {
+    condition     = var.container_image != ""
+    error_message = "container_image must be set (e.g., via terraform.tfvars)."
+  }
+}
+
+variable "acr_name" {
+  type        = string
+  description = "Optional: ACR name to grant AcrPull to the managed identity."
+  default     = ""
+}
+
+variable "acr_resource_group" {
+  type        = string
+  description = "Optional: ACR resource group (required if acr_name is set)."
+  default     = ""
+}
+
+data "azurerm_container_registry" "acr" {
+  count               = var.acr_name != "" ? 1 : 0
+  name                = var.acr_name
+  resource_group_name = var.acr_resource_group
+}
+
+# --- Container Apps env and apps ---
+resource "azurerm_log_analytics_workspace" "log" {
+  name                = "${var.prefix}-logs"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+}
+
+# Workspace-based Application Insights (recommended)
+resource "azurerm_application_insights" "appi" {
+  name                = "${var.prefix}-appi"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  application_type    = "web"
+  workspace_id        = azurerm_log_analytics_workspace.log.id
+}
+
+resource "azurerm_container_app_environment" "env" {
+  name                       = "${var.prefix}-env"
+  location                   = var.location
+  resource_group_name        = azurerm_resource_group.rg.name
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.log.id
+}
+
+resource "azurerm_container_app" "api" {
+  name                         = "${var.prefix}-api"
+  resource_group_name          = azurerm_resource_group.rg.name
+  container_app_environment_id = azurerm_container_app_environment.env.id
+  revision_mode                = "Single"
+
+  dynamic "registry" {
+    for_each = var.acr_name != "" ? [1] : []
+    content {
+      server   = data.azurerm_container_registry.acr[0].login_server
+      identity = azurerm_user_assigned_identity.app_id.id
+    }
+  }
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.app_id.id]
+  }
+
+  template {
+    container {
+      name   = "api"
+      image  = var.container_image
+      cpu    = 0.5
+      memory = "1Gi"
+
+      env {
+        name  = "PORT"
+        value = "8000"
+      }
+      env {
+        name  = "AZURE_CLIENT_ID"
+        value = azurerm_user_assigned_identity.app_id.client_id
+      }
+      env {
+        name  = "AZURE_SERVICE_BUS_FQDN"
+        value = "${azurerm_servicebus_namespace.sb.name}.servicebus.windows.net"
+      }
+      env {
+        name  = "AZURE_SERVICE_BUS_QUEUE"
+        value = azurerm_servicebus_queue.q.name
+      }
+      env {
+        name  = "AZURE_STORAGE_ACCOUNT_URL"
+        value = azurerm_storage_account.st.primary_blob_endpoint
+      }
+      env {
+        name  = "AZURE_STORAGE_CONTAINER"
+        value = azurerm_storage_container.pdf_inputs.name
+      }
+      env {
+        name  = "AZURE_COSMOS_ENDPOINT"
+        value = azurerm_cosmosdb_account.db.endpoint
+      }
+      env {
+        name  = "AZURE_COSMOS_DB"
+        value = azurerm_cosmosdb_sql_database.sql.name
+      }
+      env {
+        name  = "AZURE_COSMOS_CONTAINER"
+        value = azurerm_cosmosdb_sql_container.container.name
+      }
+
+      # AI endpoints (Phi uses AZURE_AI_ENDPOINT fallback if PHI_ENDPOINT isn't set)
+      env {
+        name  = "AZURE_AI_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "PHI_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "MISTRAL_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+
+      # Telemetry
+      env {
+        name  = "OTEL_SERVICE_NAME"
+        value = "classificationg2s-api"
+      }
+      env {
+        name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        value = azurerm_application_insights.appi.connection_string
+      }
+
+      liveness_probe {
+        transport     = "HTTP"
+        port          = 8000
+        path          = "/healthz"
+        initial_delay = 3
+      }
+
+      readiness_probe {
+        transport     = "HTTP"
+        port          = 8000
+        path          = "/readyz"
+        initial_delay = 3
+      }
+
+    }
+
+    min_replicas = 1
+    max_replicas = 5
+
+    http_scale_rule {
+      name                = "http"
+      concurrent_requests = 100
+    }
+  }
+
+  ingress {
+    external_enabled = true
+    target_port      = 8000
+    transport        = "auto"
+    traffic_weight {
+      percentage      = 100
+      latest_revision = true
+    }
+  }
+}
+
+resource "azurerm_container_app" "worker" {
+  name                         = "${var.prefix}-worker"
+  resource_group_name          = azurerm_resource_group.rg.name
+  container_app_environment_id = azurerm_container_app_environment.env.id
+  revision_mode                = "Single"
+
+  dynamic "registry" {
+    for_each = var.acr_name != "" ? [1] : []
+    content {
+      server   = data.azurerm_container_registry.acr[0].login_server
+      identity = azurerm_user_assigned_identity.app_id.id
+    }
+  }
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.app_id.id]
+  }
+
+  template {
+    container {
+      name    = "worker"
+      image   = var.container_image
+      cpu     = 0.5
+      memory  = "1Gi"
+      command = ["python", "-m", "classificationg2s.worker_main"]
+
+      env {
+        name  = "ENABLE_WORKER"
+        value = "true"
+      }
+      env {
+        name  = "AZURE_CLIENT_ID"
+        value = azurerm_user_assigned_identity.app_id.client_id
+      }
+      env {
+        name  = "AZURE_SERVICE_BUS_FQDN"
+        value = "${azurerm_servicebus_namespace.sb.name}.servicebus.windows.net"
+      }
+      env {
+        name  = "AZURE_SERVICE_BUS_QUEUE"
+        value = azurerm_servicebus_queue.q.name
+      }
+      env {
+        name  = "AZURE_STORAGE_ACCOUNT_URL"
+        value = azurerm_storage_account.st.primary_blob_endpoint
+      }
+      env {
+        name  = "AZURE_STORAGE_CONTAINER"
+        value = azurerm_storage_container.pdf_inputs.name
+      }
+      env {
+        name  = "AZURE_COSMOS_ENDPOINT"
+        value = azurerm_cosmosdb_account.db.endpoint
+      }
+      env {
+        name  = "AZURE_COSMOS_DB"
+        value = azurerm_cosmosdb_sql_database.sql.name
+      }
+      env {
+        name  = "AZURE_COSMOS_CONTAINER"
+        value = azurerm_cosmosdb_sql_container.container.name
+      }
+
+      env {
+        name  = "AZURE_AI_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "PHI_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "MISTRAL_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+
+      env {
+        name  = "OTEL_SERVICE_NAME"
+        value = "classificationg2s-worker"
+      }
+      env {
+        name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        value = azurerm_application_insights.appi.connection_string
+      }
+    }
+
+    min_replicas = 0
+    max_replicas = 10
+
+    custom_scale_rule {
+      name             = "sb-queue"
+      custom_rule_type = "azure-servicebus"
+      metadata = {
+        queueName    = azurerm_servicebus_queue.q.name
+        namespace    = azurerm_servicebus_namespace.sb.name
+        messageCount = "5"
+      }
+    }
+  }
 }

@@ -3,6 +3,14 @@
 
 # subscription_id = "00000000-0000-0000-0000-000000000000"
 
+# Required: container image for both Container Apps
+# Example:
+# container_image = "myregistry.azurecr.io/classimail-agent:local"
+
+# Optional: if using a private ACR and want Terraform to grant AcrPull to the managed identity
+# acr_name = "myregistry"
+# acr_resource_group = "my-acr-rg"
+
 # Optional: models availability is tenant/region-dependent
 # enable_model_deployments = false
 
