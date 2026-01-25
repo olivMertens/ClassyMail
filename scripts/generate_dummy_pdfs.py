@@ -1,8 +1,8 @@
 """Generate dummy PDFs for dataset testing (hardcore / chaos-mode).
 
 Creates noisy, realistic-looking (but fake) email-like PDFs with mixed language, slang,
-typos, incomplete info, multi-topic confusion, and some PII-like patterns (fake name,
-address, phone, IBAN/BIC). Use ONLY for testing.
+typos, incomplete info, multi-topic confusion, and occasional user details (fake name,
+address, phone). Use ONLY for testing.
 
 By default this generates ~75 PDFs and tries to make bodies long (≈300 words) to
 stress OCR + classification.
@@ -15,7 +15,7 @@ Optional Azure OpenAI generation/expansion:
     set AZURE_OPENAI_ENDPOINT=...
     set AZURE_OPENAI_API_KEY=...
     set AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
-    python scripts/generate_dummy_pdfs.py --count 75 --use-aoai
+    python scripts/generate_dummy_pdfs.py --count 25 --use-aoai --require-aoai
 
 Notes:
 - Requires: fpdf2 (module name: fpdf)
@@ -38,16 +38,38 @@ from pathlib import Path
 from typing import Optional
 
 import httpx
+
 try:
     from fpdf import FPDF
 except ImportError as exc:  # pragma: no cover
     raise SystemExit("Missing dependency: fpdf2 (module 'fpdf'). Install with: pip install fpdf2") from exc
 
 
+def load_env_from_file(path: str = "secrets.env", *, override: bool = False) -> None:
+    """Minimal env loader for KEY=VALUE lines (ignores comments/blank lines)."""
+
+    p = Path(path)
+    if not p.exists():
+        return
+
+    for raw in p.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        if not key:
+            continue
+        if override or key not in os.environ:
+            os.environ[key] = value
+
+
 @dataclass(frozen=True)
 class SeedEmail:
     text: str
     category: str
+
 
 FIRST_NAMES = [
     "Jean",
@@ -106,14 +128,6 @@ CITIES = [
     ("Bordeaux", "33000"),
 ]
 
-INSURERS = [
-    "AssurNova",
-    "SécuriPlus",
-    "Mutuelle Horizon",
-    "G2S Assurance",
-    "Protection France",
-]
-
 SUBJECTS = [
     "Question",
     "Urgent",
@@ -127,57 +141,56 @@ SUBJECTS = [
 ]
 
 
-# --- CHAOS MODE SEEDS ---
-# Format: (content, ground_truth_category)
 SEED_EMAILS: list[SeedEmail] = [
-    # 1) Attestation habitation
     SeedEmail("Hello, I need my home insurance certificate for my landlord. ASAP please.", "habitation"),
-    SeedEmail("Wesh l'équipe, mon proprio me met la pression pour l'attestation appart. Vous pouvez m'envoyer ça ? Cimer.", "habitation"),
+    SeedEmail(
+        "Wesh l'équipe, mon proprio me met la pression pour l'attestation appart. Vous pouvez m'envoyer ça ? Cimer.",
+        "habitation",
+    ),
     SeedEmail("bjr il me fo le papier pr la mizon pour le bailleur mrc", "habitation"),
     SeedEmail("Hola, necesito el certificado de seguro de hogar para mi nuevo piso en Paris.", "habitation"),
     SeedEmail("Je voudrais le paperasse pour la baraque. L'attestation là.", "habitation"),
 
-    # 2) Attestation scolaire
     SeedEmail("Hi, school starts tomorrow. Need insurance proof for my kid.", "scolaire"),
     SeedEmail("slt c pour lecol de mon gamin il veu lassurance", "scolaire"),
     SeedEmail("Yo, faut l'attest pour le p'tit, sinon il peut pas faire la cantine. Envoie ça stp.", "scolaire"),
     SeedEmail("Please send certificate school liability. Urgent.", "scolaire"),
     SeedEmail("Attestation périscolaire + centre aéré demandée.", "scolaire"),
 
-    # 3) Relevé de compte / paiement
     SeedEmail("C'est quoi ce binz ? Vous m'avez prélevé deux fois ! Rendez l'argent !", "releve_compte"),
     SeedEmail("I don't understand the last payment regarding my contract. Please send statement.", "releve_compte"),
     SeedEmail("jcomprend R a vos comptes la, envoyez le relevé detaillé svp", "releve_compte"),
     SeedEmail("Wesh vous m'avez sbeul mon compte ou quoi ? C'est quoi ces 50 balles en moins ?", "releve_compte"),
     SeedEmail("Need invoice for tax purpose. Year 2024.", "releve_compte"),
 
-    # 4) Dommages électriques
     SeedEmail("My TV is dead after the storm. Electrical surge I think.", "domm_elec"),
     SeedEmail("Mon ordi a cramé. Y'a eu un éclair et paf, plus rien. Ça puait le grillé.", "domm_elec"),
     SeedEmail("panne de courant pui surtension frigo HS tou la bouffe a la poubel", "domm_elec"),
     SeedEmail("La playstation ne s'allume plus wesh. C'est à cause de l'orage d'hier soir.", "domm_elec"),
     SeedEmail("Bonjour, suite coupure Enedis, volets roulants bloqués et moteur portail HS.", "domm_elec"),
 
-    # 5) Événements naturels
     SeedEmail("It was raining like crazy and now water is in the basement.", "evt_naturel"),
     SeedEmail("La toiture a pris cher avec le vent. Y'a des tuiles partout dans le jardin.", "evt_naturel"),
     SeedEmail("innondation cave c la cata, envoyez un expert vite", "evt_naturel"),
     SeedEmail("Tempête de ouf hier, mon velux est explosé.", "evt_naturel"),
     SeedEmail("Gros grêlons sur la véranda. Impact visible.", "evt_naturel"),
 
-    # 6) Multi-sujets
-    SeedEmail("Yo, ma télé a grillé (orage) et il me faut l'attestation pour le foot du petit. Tu gères ?", "domm_elec_scolaire"),
-    SeedEmail("Hello, I moved out. Need attestation habitation for new place and please check why I paid 20 euros more this month.", "habitation_releve"),
+    SeedEmail(
+        "Yo, ma télé a grillé (orage) et il me faut l'attestation pour le foot du petit. Tu gères ?",
+        "domm_elec_scolaire",
+    ),
+    SeedEmail(
+        "Hello, I moved out. Need attestation habitation for new place and please check why I paid 20 euros more this month.",
+        "habitation_releve",
+    ),
     SeedEmail("c'est la hess, on a été inondé et en plus mon frigo marche plus. help.", "evt_naturel_domm_elec"),
 
-    # 7) Hors sujet / bruit
     SeedEmail("Vends canapé cuir bon état, venir chercher sur place.", "hors_sujet"),
     SeedEmail("Fwd: Recette Crêpes Chandeleur", "hors_sujet"),
     SeedEmail("Please unsubscribe me from this list.", "hors_sujet"),
     SeedEmail("mdr t'as vu la vidéo du chat ?", "hors_sujet"),
     SeedEmail("kjsdhf kjsdhf ksjdhf", "incompréhensible"),
 
-    # 8) Autres catégories (pièges)
     SeedEmail("Quel est le prix pour assurer une BMW Série 3 ?", "auto"),
     SeedEmail("J'ai mal aux dents, ma mutuelle couvre ça ?", "sante"),
     SeedEmail("Mon fils a cassé la vitre du voisin avec son ballon.", "resp_civile"),
@@ -189,24 +202,9 @@ def _digits(n: int) -> str:
 
 
 def generate_phone_fr() -> str:
-    # French mobile: 06/07 + 8 digits
-    prefix = random.choice(["06", "07"])  # mobile
+    prefix = random.choice(["06", "07"])
     rest = _digits(8)
     return " ".join([prefix, rest[0:2], rest[2:4], rest[4:6], rest[6:8]])
-
-
-def generate_iban_fr() -> str:
-    # Not a formally validated IBAN; good enough for dummy docs.
-    # FR + 2 check digits + 23 BBAN digits
-    return f"FR{_digits(2)} {_digits(4)} {_digits(4)} {_digits(4)} {_digits(4)} {_digits(3)}"
-
-
-def generate_bic() -> str:
-    # 8 or 11 chars; use 8 here.
-    bank = "".join(random.choice(string.ascii_uppercase) for _ in range(4))
-    country = "FR"
-    location = "".join(random.choice(string.ascii_uppercase + string.digits) for _ in range(2))
-    return f"{bank}{country}{location}"
 
 
 def generate_address() -> dict:
@@ -223,20 +221,23 @@ def make_identity() -> dict:
     first = random.choice(FIRST_NAMES)
     last = random.choice(LAST_NAMES)
     addr = generate_address()
-    email = f"{first.lower()}.{last.lower()}@example.fr".replace("é", "e").replace("è", "e").replace("ê", "e").replace("à", "a")
+    email = (
+        f"{first.lower()}.{last.lower()}@example.fr"
+        .replace("é", "e")
+        .replace("è", "e")
+        .replace("ê", "e")
+        .replace("à", "a")
+    )
     return {
         "first": first,
         "last": last,
         "email": email,
         "phone": generate_phone_fr(),
         "address": addr,
-        "iban": generate_iban_fr(),
-        "bic": generate_bic(),
     }
 
 
 def _maybe_broken(s: str) -> str:
-    """Introduce small OCR-like / user-like noise (typos, missing accents, spacing)."""
     if random.random() < 0.25:
         s = s.replace("'", " ")
     if random.random() < 0.20:
@@ -258,11 +259,10 @@ def _noise_blocks(identity: dict) -> list[str]:
 
     blocks.append(
         """
----
-Infos client (à vérifier):
-- Nom / Prénom: {last} {first}
-- Téléphone: {phone}
-- Adresse: {num} {street}, {zip} {city}
+Mes coordonnées (si besoin):
+Nom/Prénom: {first} {last}
+Téléphone: {phone}
+Adresse: {num} {street}, {zip} {city}
 """.strip().format(
             last=identity["last"],
             first=identity["first"],
@@ -274,16 +274,7 @@ Infos client (à vérifier):
         )
     )
 
-    blocks.append(
-        """
-Coordonnées bancaires (RIB/IBAN) (si remboursement):
-IBAN: {iban}
-BIC: {bic}
-""".strip().format(
-            iban=identity["iban"],
-            bic=identity["bic"],
-        )
-    )
+    blocks.append("Pour un éventuel remboursement, je peux fournir un RIB sur demande.")
 
     blocks.append(
         """
@@ -305,16 +296,14 @@ Merci.
     blocks.append(
         """
 PS: je suis joignable entre 12h et 14h. sinon mail.
-PPS: si besoin je renvoie le RIB (mais vous l'avez déjà non?)
+PPS: si besoin je peux vous envoyer mon RIB (sur demande).
 """.strip()
     )
+
     return blocks
 
 
 def build_noisy_email_text(seed: SeedEmail, identity: dict, target_words: int) -> tuple[str, str, str]:
-    """Return (from_line, subject_line, full_body_text)."""
-
-    # Sometimes sender is weird
     sender_local = random.choice(
         [
             f"{identity['first'].lower()}.{identity['last'].lower()}",
@@ -332,23 +321,20 @@ def build_noisy_email_text(seed: SeedEmail, identity: dict, target_words: int) -
     subject_line = f"Subject: {_maybe_broken(subj_prefix)} {random.randint(1, 999)}".strip()
     from_line = f"From: {sender}"
 
-    # Base message body (seed + noise)
-    blocks = [
-        _maybe_broken(seed.text),
-        "",
-        random.choice(_noise_blocks(identity)),
-    ]
+    blocks = [_maybe_broken(seed.text)]
 
-    # Add more random blocks until we reach target words
     extra_blocks = _noise_blocks(identity)
+    if random.random() < 0.55:
+        blocks.extend(["", _maybe_broken(random.choice(extra_blocks))])
+
     random.shuffle(extra_blocks)
     while _word_count("\n\n".join(blocks)) < target_words:
-        blocks.append("")
-        blocks.append(_maybe_broken(random.choice(extra_blocks)))
+        if random.random() < 0.80:
+            blocks.append("")
+            blocks.append(_maybe_broken(random.choice(extra_blocks)))
         if random.random() < 0.35:
             blocks.append(_maybe_broken(seed.text))
 
-    # Add a chaotic signature
     signature = random.choice(
         [
             f"Cdt,\n{identity['first']} {identity['last']}",
@@ -377,8 +363,6 @@ async def aoai_variation(prompt: str, deployment: str) -> Optional[str]:
     if api_key:
         headers["api-key"] = api_key
     else:
-        # Entra ID auth fallback (works for Azure OpenAI / Foundry endpoints that support AAD).
-        # Uses DefaultAzureCredential chain: Managed Identity -> env creds -> Azure CLI -> etc.
         try:
             from azure.identity.aio import DefaultAzureCredential
         except Exception:
@@ -408,8 +392,10 @@ async def aoai_variation(prompt: str, deployment: str) -> Optional[str]:
                     "You generate noisy, realistic email bodies for an insurance classifier dataset. "
                     "Style constraints: mix FR/EN/ES sometimes, slang/typos/SMS abbreviations sometimes, "
                     "may include quoted replies, forwarded markers, and incomplete punctuation. "
-                    "Keep all provided identity/banking lines exactly as-is. "
-                    "Do NOT invent real personal data; only use the fake identity provided in the prompt."
+                    "If identity/contact lines are provided, keep them exactly as-is. "
+                    "Do NOT invent real personal data; only use the fake identity provided in the prompt. "
+                    "Never include full banking coordinates (IBAN/BIC/RIB numbers). If reimbursement is mentioned, "
+                    "use a generic sentence like 'RIB disponible sur demande'."
                 ),
             },
             {"role": "user", "content": prompt},
@@ -429,35 +415,28 @@ def write_pdf(text: str, out_path: Path) -> None:
     pdf = FPDF(format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    # Use a core font to avoid font substitution warnings.
     pdf.set_font("Helvetica", size=12)
 
     def _break_long_tokens(s: str, max_token_len: int = 60) -> str:
-        # FPDF can throw if a single "word" is wider than the cell.
-        # Split very long unbroken sequences into chunks.
         parts: list[str] = []
         for token in re.split(r"(\s+)", s):
             if not token or token.isspace():
                 parts.append(token)
                 continue
-
             if len(token) <= max_token_len:
                 parts.append(token)
                 continue
-
             chunks = [token[i : i + max_token_len] for i in range(0, len(token), max_token_len)]
             parts.append(" ".join(chunks))
         return "".join(parts)
 
     for line in text.splitlines():
-        # Ensure we always start at the left margin; otherwise remaining width can become 0.
         try:
             pdf.set_x(pdf.l_margin)
         except Exception:
             pass
 
         usable_width = float(getattr(pdf, "w", 210)) - float(getattr(pdf, "l_margin", 15)) - float(getattr(pdf, "r_margin", 15))
-        # FPDF classic fonts are latin-1; replace problematic chars.
         safe = (
             line.replace("’", "'")
             .replace("“", '"')
@@ -469,7 +448,6 @@ def write_pdf(text: str, out_path: Path) -> None:
         try:
             pdf.multi_cell(usable_width, 8, safe)
         except Exception:
-            # Worst-case fallback: add spaces between characters so nothing is "too wide".
             try:
                 spaced = " ".join(list(safe))
                 pdf.multi_cell(usable_width, 8, spaced)
@@ -481,6 +459,8 @@ def write_pdf(text: str, out_path: Path) -> None:
 
 
 async def main() -> int:
+    load_env_from_file("secrets.env")
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--count", type=int, default=75, help="Number of PDFs to generate (recommended: 50-100)")
     parser.add_argument("--out", type=str, default="dataset_emails_hardcore", help="Output folder")
@@ -497,17 +477,30 @@ async def main() -> int:
         help="Use Azure OpenAI to generate/expand the noisy email body before PDF creation",
     )
     parser.add_argument(
+        "--require-aoai",
+        action="store_true",
+        help="Fail if AOAI generation is unavailable (ensures output is AOAI-generated when --use-aoai)",
+    )
+    parser.add_argument(
         "--aoai-deployment",
         type=str,
         default=os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini"),
         help="Azure OpenAI deployment name",
     )
+    parser.add_argument(
+        "--env-file",
+        type=str,
+        default="secrets.env",
+        help="Env file to load for AOAI settings (default: secrets.env)",
+    )
     args = parser.parse_args()
+
+    if args.env_file and args.env_file != "secrets.env":
+        load_env_from_file(args.env_file, override=True)
 
     if args.seed is not None:
         random.seed(args.seed)
 
-    # Friendly guardrails (don't hard-fail)
     if args.count < 1:
         raise SystemExit("--count must be >= 1")
     if args.target_words < 30:
@@ -521,7 +514,6 @@ async def main() -> int:
         seed = random.choice(SEED_EMAILS)
         from_line, subject_line, body = build_noisy_email_text(seed, identity, target_words=args.target_words)
 
-        # Meta lines (sometimes weird / missing)
         meta_lines = [
             from_line,
             subject_line if random.random() > 0.05 else "Subject:",
@@ -534,34 +526,36 @@ async def main() -> int:
                 "Generate a single email body for the category implied by the seed. "
                 f"Make it about ~{args.target_words} words. "
                 "Keep this seed intent but increase noise and realism. "
-                "IMPORTANT: Keep the following lines EXACTLY unchanged (copy them verbatim somewhere in the email):\n"
-                f"- Nom: {identity['last']}\n"
-                f"- Prénom: {identity['first']}\n"
+                "Write it like a real customer email (no dataset labels, no bullet list of identity). "
+                "You MAY include some contact info naturally (e.g., in a signature), but it's optional. "
+                "Do NOT include a full street address unless the email explicitly needs it. "
+                "Constraint: do NOT include any full IBAN/BIC/RIB numbers anywhere. If reimbursement is needed, say 'RIB disponible sur demande'.\n\n"
+                "Optional fake identity context (use sparingly and naturally, or not at all):\n"
+                f"- First name: {identity['first']}\n"
+                f"- Last name: {identity['last']}\n"
                 f"- Email: {identity['email']}\n"
-                f"- Téléphone: {identity['phone']}\n"
-                f"- IBAN: {identity['iban']}\n"
-                f"- BIC: {identity['bic']}\n\n"
+                f"- Phone: {identity['phone']}\n\n"
                 "Seed message:\n"
                 f"{seed.text}\n\n"
-                "Draft (you may rewrite/expand, but keep the required lines unchanged):\n"
+                "Draft (you may rewrite/expand):\n"
                 f"{body}"
             )
             variation = await aoai_variation(prompt, deployment=args.aoai_deployment)
             if variation:
                 final_body = variation
+            elif args.require_aoai:
+                raise SystemExit(
+                    "AOAI generation was requested (--use-aoai --require-aoai) but no response was generated. "
+                    "Check AZURE_OPENAI_ENDPOINT/auth (or API key) and network access."
+                )
 
-        # Full text: meta header + body
         full_text = "\n".join(meta_lines) + final_body
 
         file_name = f"sample_{i+1:03d}_{seed.category}_{int(time.time())}_{uuid.uuid4().hex[:8]}.pdf"
         write_pdf(full_text, out_dir / file_name)
 
-        # For quick validation: print the generated filename(s)
         if args.count <= 3:
-            try:
-                print(str((out_dir / file_name).resolve()))
-            except Exception:
-                print(str(out_dir / file_name))
+            print(str(out_dir / file_name))
 
     print(f"Generated {args.count} PDFs in {out_dir}")
     return 0

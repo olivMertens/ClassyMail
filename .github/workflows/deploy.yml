@@ -331,69 +331,37 @@ jobs:
           if [ -z "$ENV_NAME" ]; then ENV_NAME="email-poc-env"; fi
           echo "CONTAINERAPPS_ENV=$ENV_NAME" >> $GITHUB_ENV
 
-      - name: Deploy Worker Container App
+      - name: Ensure Worker Container App exists
         run: |
           set -euo pipefail
           RG="${{ vars.AZURE_RESOURCE_GROUP }}"
           APP="${{ env.WORKER_APP_NAME }}"
           ENV_NAME="${{ env.CONTAINERAPPS_ENV }}"
-          IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
-          IDENTITY_ID=$(az identity show -g "$RG" -n "$IDENTITY_NAME" --query id -o tsv)
-          SB_FQDN="${{ vars.AZURE_SERVICE_BUS_FQDN }}"
-          NAMESPACE=$(echo "$SB_FQDN" | cut -d. -f1)
-          QUEUE="${{ vars.AZURE_SERVICE_BUS_QUEUE }}"
-          IMAGE="${{ needs.build.outputs.image }}"
-
           if ! az containerapp show -n "$APP" -g "$RG" >/dev/null 2>&1; then
             az containerapp create \
               -n "$APP" \
               -g "$RG" \
               --environment "$ENV_NAME" \
-              --image "$IMAGE" \
+              --image "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" \
               --min-replicas 0 \
-              --max-replicas 10 \
-              --user-assigned "$IDENTITY_ID" \
-              --command "python" \
-              --args "-m classificationg2s.worker_main" \
-              --env-vars \
-                ENABLE_WORKER=true \
-                AZURE_CLIENT_ID=${{ vars.AZURE_APP_CLIENT_ID }} \
-                AZURE_SERVICE_BUS_FQDN=${{ vars.AZURE_SERVICE_BUS_FQDN }} \
-                AZURE_SERVICE_BUS_QUEUE=${{ vars.AZURE_SERVICE_BUS_QUEUE }} \
-                AZURE_STORAGE_ACCOUNT_URL=${{ vars.AZURE_STORAGE_ACCOUNT_URL }} \
-                AZURE_STORAGE_CONTAINER=${{ vars.AZURE_STORAGE_CONTAINER }} \
-                AZURE_COSMOS_ENDPOINT=${{ vars.AZURE_COSMOS_ENDPOINT }} \
-                AZURE_COSMOS_DB=${{ vars.AZURE_COSMOS_DB }} \
-                AZURE_COSMOS_CONTAINER=${{ vars.AZURE_COSMOS_CONTAINER }} \
-                AZURE_AI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }} \
-                MISTRAL_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }} \
-                MISTRAL_DEPLOYMENT=${{ vars.MISTRAL_DEPLOYMENT }} \
-                MISTRAL_MODE=${{ vars.MISTRAL_MODE }} \
-                PHI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }} \
-                PHI_DEPLOYMENT=${{ vars.PHI_DEPLOYMENT }}
-          else
-            az containerapp update \
-              -n "$APP" \
-              -g "$RG" \
-              --image "$IMAGE" \
-              --min-replicas 0 \
-              --max-replicas 10 \
-              --user-assigned "$IDENTITY_ID" \
-              --command "python" \
-              --args "-m classificationg2s.worker_main"
-
+              --max-replicas 1
           fi
 
-          az containerapp scale rule set \
-            -n "$APP" \
-            -g "$RG" \
-            --name sb-queue \
-            --custom-scaler-type azure-servicebus \
-            --custom-metadata "queueName=$QUEUE" "namespace=$NAMESPACE" "messageCount=5" \
-            --custom-identity "$IDENTITY_ID"
+      - name: Assign managed identity to Worker Container App
+        run: |
+          set -euo pipefail
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          APP="${{ env.WORKER_APP_NAME }}"
+          IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
+          IDENTITY_ID=$(az identity show -g "$RG" -n "$IDENTITY_NAME" --query id -o tsv)
+          az containerapp identity assign \
+            --name "$APP" \
+            --resource-group "$RG" \
+            --user-assigned "$IDENTITY_ID"
 
       - name: Configure ACR pull (Worker)
         run: |
+          set -euo pipefail
           REGISTRY="${{ secrets.ACR_LOGIN_SERVER }}"
           if [ -z "$REGISTRY" ]; then REGISTRY="$ACR_LOGIN_SERVER"; fi
           if [ -z "$REGISTRY" ]; then
@@ -406,3 +374,55 @@ jobs:
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --server "$REGISTRY" \
             --identity "$IDENTITY_ID"
+
+      - name: Deploy Worker Container App
+        run: |
+          set -euo pipefail
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          APP="${{ env.WORKER_APP_NAME }}"
+          IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
+          IDENTITY_ID=$(az identity show -g "$RG" -n "$IDENTITY_NAME" --query id -o tsv)
+          SB_FQDN="${{ vars.AZURE_SERVICE_BUS_FQDN }}"
+          NAMESPACE=$(echo "$SB_FQDN" | cut -d. -f1)
+          QUEUE="${{ vars.AZURE_SERVICE_BUS_QUEUE }}"
+          IMAGE="${{ needs.build.outputs.image }}"
+
+          if [ -z "$IMAGE" ]; then
+            echo "needs.build.outputs.image is empty; build job did not produce an image tag." >&2
+            exit 1
+          fi
+          echo "Deploying worker image: $IMAGE"
+
+          az containerapp update \
+            -n "$APP" \
+            -g "$RG" \
+            --image "$IMAGE" \
+            --min-replicas 0 \
+            --max-replicas 10 \
+            --user-assigned "$IDENTITY_ID" \
+            --command "python" \
+            --args "-m classificationg2s.worker_main" \
+            --set-env-vars \
+              ENABLE_WORKER=true \
+              AZURE_CLIENT_ID=${{ vars.AZURE_APP_CLIENT_ID }} \
+              AZURE_SERVICE_BUS_FQDN=${{ vars.AZURE_SERVICE_BUS_FQDN }} \
+              AZURE_SERVICE_BUS_QUEUE=${{ vars.AZURE_SERVICE_BUS_QUEUE }} \
+              AZURE_STORAGE_ACCOUNT_URL=${{ vars.AZURE_STORAGE_ACCOUNT_URL }} \
+              AZURE_STORAGE_CONTAINER=${{ vars.AZURE_STORAGE_CONTAINER }} \
+              AZURE_COSMOS_ENDPOINT=${{ vars.AZURE_COSMOS_ENDPOINT }} \
+              AZURE_COSMOS_DB=${{ vars.AZURE_COSMOS_DB }} \
+              AZURE_COSMOS_CONTAINER=${{ vars.AZURE_COSMOS_CONTAINER }} \
+              AZURE_AI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }} \
+              MISTRAL_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }} \
+              MISTRAL_DEPLOYMENT=${{ vars.MISTRAL_DEPLOYMENT }} \
+              MISTRAL_MODE=${{ vars.MISTRAL_MODE }} \
+              PHI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }} \
+              PHI_DEPLOYMENT=${{ vars.PHI_DEPLOYMENT }}
+
+          az containerapp scale rule set \
+            -n "$APP" \
+            -g "$RG" \
+            --name sb-queue \
+            --custom-scaler-type azure-servicebus \
+            --custom-metadata "queueName=$QUEUE" "namespace=$NAMESPACE" "messageCount=5" \
+            --custom-identity "$IDENTITY_ID"
