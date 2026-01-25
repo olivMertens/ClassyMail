@@ -353,7 +353,9 @@ jobs:
               --min-replicas 0 \
               --max-replicas 10 \
               --user-assigned "$IDENTITY_ID" \
-              --command "uv" "run" "python" "-m" "classificationg2s.worker_main" \
+              --command "python" \
+              --args "-m" \
+              --args "classificationg2s.worker_main" \
               --env-vars \
                 ENABLE_WORKER=true \
                 AZURE_CLIENT_ID=${{ vars.AZURE_APP_CLIENT_ID }} \
@@ -378,7 +380,9 @@ jobs:
               --min-replicas 0 \
               --max-replicas 10 \
               --user-assigned "$IDENTITY_ID" \
-              --command "uv" "run" "python" "-m" "classificationg2s.worker_main"
+              --command "python" \
+              --args "-m" \
+              --args "classificationg2s.worker_main"
 
           fi
 
