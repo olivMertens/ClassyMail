@@ -424,8 +424,12 @@ jobs:
             --image "$IMAGE" \
             --min-replicas 0 \
             --max-replicas 10 \
-            --args "-m classificationg2s.worker_main" \
             --command "python" \
+            --args "-m classificationg2s.worker_main" \
+            --scale-rule-name "sb-queue" \
+            --scale-rule-type "azure-servicebus" \
+            --scale-rule-metadata "queueName=$QUEUE" "namespace=$NAMESPACE" "messageCount=5" \
+            --scale-rule-identity "$IDENTITY_ID" \
             --set-env-vars \
               ENABLE_WORKER=true \
               AZURE_CLIENT_ID=${{ vars.AZURE_APP_CLIENT_ID }} \
@@ -442,11 +446,3 @@ jobs:
               MISTRAL_MODE=${{ vars.MISTRAL_MODE }} \
               PHI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }} \
               PHI_DEPLOYMENT=${{ vars.PHI_DEPLOYMENT }}
-
-          az containerapp scale rule set \
-            -n "$APP" \
-            -g "$RG" \
-            --name sb-queue \
-            --scale-rule-type azure-servicebus \
-            --metadata "queueName=$QUEUE" "namespace=$NAMESPACE" "messageCount=5" \
-            --identity "$IDENTITY_ID"
