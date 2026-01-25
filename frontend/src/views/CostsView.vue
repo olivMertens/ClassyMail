@@ -1,6 +1,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const costs = ref(null)
 const loading = ref(false)
 const emailsPerMonth = ref(10000)
@@ -35,7 +37,7 @@ onMounted(() => {
     <div class="md:flex md:items-center md:justify-between">
       <div class="min-w-0 flex-1">
         <h2 class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">
-          Costs Analysis
+          {{ t('costs.title') }}
         </h2>
       </div>
       <div class="mt-4 flex md:ml-4 md:mt-0">
@@ -44,7 +46,7 @@ onMounted(() => {
           class="ml-3 inline-flex items-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
           @click="loadCosts"
         >
-          Recalculate
+          {{ t('costs.recalculate') }}
         </button>
       </div>
     </div>
@@ -53,7 +55,7 @@ onMounted(() => {
     <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
         <div>
-          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Emails / Month Projection</label>
+          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('costs.emails_projection') }}</label>
           <div class="mt-2">
             <input
               v-model.number="emailsPerMonth"
@@ -63,17 +65,17 @@ onMounted(() => {
           </div>
         </div>
         <div>
-          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Pricing Source</label>
+          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('costs.pricing_source') }}</label>
           <div class="mt-2">
             <select
               v-model="pricingSource"
               class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
             >
               <option value="fixed">
-                Fixed Estimate (POC)
+                {{ t('costs.pricing_options.fixed') }}
               </option>
               <option value="retail">
-                Azure Retail Prices API
+                {{ t('costs.pricing_options.retail') }}
               </option>
             </select>
           </div>
@@ -96,7 +98,7 @@ onMounted(() => {
       <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
           <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-            Processed Emails
+            {{ t('costs.processed_emails') }}
           </dt>
           <dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
             {{ costs.counts?.processed ?? 0 }}
@@ -104,7 +106,7 @@ onMounted(() => {
         </div>
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
           <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-            Emails with Usage Data
+            {{ t('costs.emails_usage') }}
           </dt>
           <dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
             {{ costs.counts?.emails_with_usage ?? 0 }}
@@ -112,7 +114,7 @@ onMounted(() => {
         </div>
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
           <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-            Avg AI Cost / Email
+            {{ t('costs.avg_cost') }}
           </dt>
           <dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
             ${{ (costs.avg_usd_per_email?.ai_total ?? 0).toFixed(4) }}
@@ -124,7 +126,7 @@ onMounted(() => {
         <!-- Actual Spend -->
         <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
           <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white mb-4">
-            Actual AI Spend (Repo History)
+            {{ t('costs.actual_spend') }}
           </h3>
           <dl class="divide-y divide-gray-200 dark:divide-gray-700">
             <div class="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
@@ -145,7 +147,7 @@ onMounted(() => {
             </div>
             <div class="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4 font-bold bg-gray-50 dark:bg-gray-700/50 rounded-md px-2">
               <dt class="text-sm text-gray-900 dark:text-white">
-                Total AI
+                {{ t('costs.total_ai') }}
               </dt>
               <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                 ${{ (costs.actual_usd?.ai_total ?? 0).toFixed(4) }}
@@ -157,13 +159,13 @@ onMounted(() => {
         <!-- Projected Spend -->
         <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
           <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white mb-4 flex justify-between">
-            <span>Monthly Projection</span>
+            <span>{{ t('costs.monthly_projection') }}</span>
             <span class="text-xs font-normal text-gray-500">{{ costs.pricing?.source || pricingSource }}</span>
           </h3>
           <dl class="divide-y divide-gray-200 dark:divide-gray-700">
             <div class="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
               <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
-                AI (Variable)
+                {{ t('costs.ai_variable') }}
               </dt>
               <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                 ${{ (costs.projection_monthly_usd?.ai_variable ?? 0).toFixed(2) }}
@@ -171,7 +173,7 @@ onMounted(() => {
             </div>
             <div class="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
               <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
-                Infrastructure (Fixed Est.)
+                {{ t('costs.infra_fixed') }}
               </dt>
               <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                 ${{ (costs.projection_monthly_usd?.fixed ?? 0).toFixed(2) }}
@@ -179,7 +181,7 @@ onMounted(() => {
             </div>
             <div class="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4 font-bold bg-gray-50 dark:bg-gray-700/50 rounded-md px-2">
               <dt class="text-sm text-gray-900 dark:text-white">
-                Total Estimated
+                {{ t('costs.total_estimated') }}
               </dt>
               <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
                 ${{ (costs.projection_monthly_usd?.total ?? 0).toFixed(2) }}
@@ -192,7 +194,7 @@ onMounted(() => {
       <!-- Breakdown -->
       <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
         <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white mb-4">
-          Cost Breakdown Details
+          {{ t('costs.breakdown_title') }}
         </h3>
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-700">
@@ -202,13 +204,13 @@ onMounted(() => {
                   scope="col"
                   class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 dark:text-white sm:pl-0"
                 >
-                  Resource
+                  {{ t('costs.col_resource') }}
                 </th>
                 <th
                   scope="col"
                   class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900 dark:text-white"
                 >
-                  Est. Cost (USD/Month)
+                  {{ t('costs.col_cost') }}
                 </th>
               </tr>
             </thead>

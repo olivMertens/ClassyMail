@@ -153,10 +153,10 @@ const navigation = computed(() => [
         </div>
       </div>
 
-      <!-- Desktop Top Bar extensions (like Dark Mode toggle which is usually in sidebar or header) -->
-      <div class="hidden md:flex justify-end p-4 bg-gray-50 dark:bg-gray-900 absolute top-0 right-0 z-20">
+      <!-- Desktop Top Bar extensions -->
+      <header class="hidden md:flex items-center justify-end h-16 px-8 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <button
-          class="p-2 rounded-full text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
+          class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
           @click="toggleDarkMode"
         >
           <SunIcon
@@ -168,10 +168,10 @@ const navigation = computed(() => [
             class="h-6 w-6"
           />
         </button>
-      </div>
+      </header>
 
       <!-- Main Content Scroller -->
-      <main class="flex-1 overflow-y-auto p-4 md:p-8 pt-16 md:pt-8 scroll-smooth">
+      <main class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
         <div class="max-w-7xl mx-auto">
           <slot />
         </div>

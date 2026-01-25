@@ -38,9 +38,25 @@
         "tab_errors": "Errors"
     },
     "costs": {
-        "title": "Cost Analysis",
-        "total_cost": "Est. Total Cost",
-        "tokens": "Total Tokens",
-        "pages": "Pages Processed"
+        "title": "Costs Analysis",
+        "recalculate": "Recalculate",
+        "emails_projection": "Emails / Month Projection",
+        "pricing_source": "Pricing Source",
+        "pricing_options": {
+            "fixed": "Fixed Estimate (POC)",
+            "retail": "Azure Retail Prices API"
+        },
+        "processed_emails": "Processed Emails",
+        "emails_usage": "Emails with Usage Data",
+        "avg_cost": "Avg AI Cost / Email",
+        "actual_spend": "Actual AI Spend (Repo History)",
+        "total_ai": "Total AI",
+        "monthly_projection": "Monthly Projection",
+        "ai_variable": "AI (Variable)",
+        "infra_fixed": "Infrastructure (Fixed Est.)",
+        "total_estimated": "Total Estimated",
+        "breakdown_title": "Cost Breakdown Details",
+        "col_resource": "Resource",
+        "col_cost": "Est. Cost (USD/Month)"
     }
 }

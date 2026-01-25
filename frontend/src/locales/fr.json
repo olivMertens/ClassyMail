@@ -39,8 +39,24 @@
     },
     "costs": {
         "title": "Analyse des Coûts",
-        "total_cost": "Coût Est. Total",
-        "tokens": "Total Tokens",
-        "pages": "Pages Traitées"
+        "recalculate": "Recalculer",
+        "emails_projection": "Projection Emails / Mois",
+        "pricing_source": "Source de Prix",
+        "pricing_options": {
+            "fixed": "Estimation Fixe (POC)",
+            "retail": "API Prix Azure Retail"
+        },
+        "processed_emails": "Emails Traités",
+        "emails_usage": "Emails avec Données",
+        "avg_cost": "Coût IA Moyen / Email",
+        "actual_spend": "Dépense IA Réelle (Historique)",
+        "total_ai": "Total IA",
+        "monthly_projection": "Projection Mensuelle",
+        "ai_variable": "IA (Variable)",
+        "infra_fixed": "Infrastructure (Est. Fixe)",
+        "total_estimated": "Total Estimé",
+        "breakdown_title": "Détails des Coûts",
+        "col_resource": "Ressource",
+        "col_cost": "Coût Est. (USD/Mois)"
     }
 }
