@@ -222,8 +222,12 @@ resource "azurerm_cosmosdb_account" "db" {
   offer_type          = "Standard"
   kind                = "GlobalDocumentDB"
 
-  # Avoid unintended drift vs existing secured deployments.
-  public_network_access_enabled = false
+  # Enable public access but restrict via firewall/RBAC
+  public_network_access_enabled = true
+
+  # "0.0.0.0" is the magic IP to "Allow access from Azure Datacenters"
+  # This serves as the firewall exception for Container Apps without VNet injection.
+  ip_range_filter = "0.0.0.0"
 
   # Beaucoup de tenants désactivent l'auth locale (clé) par policy.
   # On aligne le comportement Terraform avec ce mode; vous pouvez forcer cosmos_use_rbac=false uniquement si vous avez le droit d'activer l'auth locale.
