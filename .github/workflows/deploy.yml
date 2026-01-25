@@ -424,7 +424,6 @@ jobs:
             --image "$IMAGE" \
             --min-replicas 0 \
             --max-replicas 10 \
-            --user-assigned "$IDENTITY_ID" \
             --command "python" \
             --args "-m classificationg2s.worker_main" \
             --set-env-vars \
