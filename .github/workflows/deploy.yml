@@ -7,8 +7,8 @@ on:
   workflow_dispatch: {}
 
 env:
-  IMAGE_NAME: classimail-agent
-  WORKER_APP_NAME: classimail-agent-worker
+  IMAGE_NAME: email-poc-api
+  WORKER_APP_NAME: email-poc-worker
 
 permissions:
   id-token: write
