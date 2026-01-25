@@ -18,6 +18,4 @@ async def index():
     if dist_index.exists():
         return HTMLResponse(dist_index.read_text(encoding="utf-8"))
 
-    # Fallback to legacy template if build missing
-    path = Path(project_root()) / "templates" / "index.html"
-    return HTMLResponse(path.read_text(encoding="utf-8"))
+    return HTMLResponse("<h1>Frontend not built</h1><p>Please run 'npm run build' in frontend/ directory.</p>", status_code=500)

@@ -58,5 +58,26 @@
         "breakdown_title": "Détails des Coûts",
         "col_resource": "Ressource",
         "col_cost": "Coût Est. (USD/Mois)"
+    },
+    "info": {
+        "title": "POC - G2S Microsoft (Mars 2026)",
+        "subtitle": "ClassiMail Agent",
+        "contact": "Contact",
+        "est_monthly": "Estimation coûts (approx./mois)",
+        "est_email": "Estimation coûts / email",
+        "infra_items": {
+            "service_bus": "Service Bus Standard: ~€9",
+            "cosmos": "Cosmos DB Serverless (light usage): €0–€25",
+            "storage": "Storage (LRS): < €5",
+            "ai_foundry": "AI Foundry S0 (platform): ~€0 (pay-per-use models)",
+            "container_apps": "Container Apps (consumption): €0–€20 (API min=1 replica)"
+        },
+        "email_items": {
+            "ocr": "OCR (Mistral): ~€0.002–€0.01 / page (selon pages)",
+            "classification": "Classification (Phi-4): ~€0.0005–€0.002 / email (selon tokens)",
+            "infra": "Infra (queue/storage): négligeable par email"
+        },
+        "disclaimer": "*Tarifs indicatifs, dépendants de la région et de l'usage réel.",
+        "close": "OK"
     }
 }

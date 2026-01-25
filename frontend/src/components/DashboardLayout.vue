@@ -9,14 +9,17 @@ import {
   Bars3Icon,
   XMarkIcon,
   MoonIcon,
-  SunIcon
+  SunIcon,
+  InformationCircleIcon
 } from '@heroicons/vue/24/outline'
+import InfoModal from './InfoModal.vue'
 
 const props = defineProps(['currentView'])
 const emit = defineEmits(['change-view'])
 const { t } = useI18n()
 
 const sidebarOpen = ref(false)
+const showInfoModal = ref(false)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 
 const toggleDarkMode = () => {
@@ -137,24 +140,39 @@ const navigation = computed(() => [
         </button>
         <div class="flex-1 px-4 flex justify-between items-center">
           <span class="font-bold text-gray-900 dark:text-white">ClassiMail</span>
-          <button
-            class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            @click="toggleDarkMode"
-          >
-            <SunIcon
-              v-if="isDark"
-              class="h-6 w-6"
-            />
-            <MoonIcon
-              v-else
-              class="h-6 w-6"
-            />
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              @click="showInfoModal = true"
+            >
+              <InformationCircleIcon class="h-6 w-6" />
+            </button>
+            <button
+              class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              @click="toggleDarkMode"
+            >
+              <SunIcon
+                v-if="isDark"
+                class="h-6 w-6"
+              />
+              <MoonIcon
+                v-else
+                class="h-6 w-6"
+              />
+            </button>
+          </div>
         </div>
       </div>
 
       <!-- Desktop Top Bar extensions -->
-      <header class="hidden md:flex items-center justify-end h-16 px-8 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <header class="hidden md:flex items-center justify-end h-16 px-8 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 gap-2">
+        <button
+          class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
+          @click="showInfoModal = true"
+          title="Info"
+        >
+          <InformationCircleIcon class="h-6 w-6" />
+        </button>
         <button
           class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
           @click="toggleDarkMode"
@@ -177,5 +195,6 @@ const navigation = computed(() => [
         </div>
       </main>
     </div>
+    <InfoModal :show="showInfoModal" @close="showInfoModal = false" />
   </div>
 </template>
