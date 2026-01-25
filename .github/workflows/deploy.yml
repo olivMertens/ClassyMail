@@ -41,9 +41,15 @@ jobs:
           worker_paths='classificationg2s/services/worker.py|classificationg2s/worker_main.py|classificationg2s/services/pipeline.py|classificationg2s/services/llm_pipeline.py|classificationg2s/services/anonymizer.py|classificationg2s/services/repository.py'
           build_paths='Dockerfile|pyproject.toml|uv.lock|requirements.txt'
 
+          # Build is required for ANY change outside docs/ and README.md
+          # (docs-only commits should not build/push or redeploy Container Apps).
+          docs_only=true
+          if echo "$files" | grep -Evq '^(docs/|README\.md$)'; then docs_only=false; fi
+
           api_changed=false
           worker_changed=false
-          build=false
+          build=true
+          if [ "$docs_only" = "true" ]; then build=false; fi
           if echo "$files" | grep -Eq "$api_paths"; then api_changed=true; build=true; fi
           if echo "$files" | grep -Eq "$worker_paths"; then worker_changed=true; build=true; fi
           if echo "$files" | grep -Eq "$build_paths"; then build=true; fi
@@ -101,6 +107,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: [changes, validate]
+    if: needs.changes.outputs.build == 'true' || github.event_name == 'workflow_dispatch'
     outputs:
       image: ${{ steps.build.outputs.image }}
     steps:
