@@ -227,7 +227,7 @@ resource "azurerm_cosmosdb_account" "db" {
 
   # "0.0.0.0" is the magic IP to "Allow access from Azure Datacenters"
   # This serves as the firewall exception for Container Apps without VNet injection.
-  ip_range_filter = "0.0.0.0"
+  ip_range_filter = ["0.0.0.0"]
 
   # Beaucoup de tenants désactivent l'auth locale (clé) par policy.
   # On aligne le comportement Terraform avec ce mode; vous pouvez forcer cosmos_use_rbac=false uniquement si vous avez le droit d'activer l'auth locale.
