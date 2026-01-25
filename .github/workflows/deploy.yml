@@ -25,7 +25,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          # Needed for reliable change detection on multi-commit pushes.
+          # Using a shallow fetch can omit github.event.before, causing "fatal: bad object".
+          fetch-depth: 0
 
       - name: Detect changes
         id: set
@@ -34,7 +36,18 @@ jobs:
           if [ -z "$base_ref" ] || [ "$base_ref" = "0000000000000000000000000000000000000000" ]; then
             base_ref=HEAD~1
           fi
-          files=$(git diff --name-only $base_ref HEAD)
+          # Ensure base_ref exists locally (push events can include multiple commits; shallow clones may not have base_ref).
+          if ! git cat-file -e "$base_ref^{commit}" 2>/dev/null; then
+            echo "base_ref $base_ref not present locally; fetching..."
+            git fetch --no-tags --prune origin "$base_ref" || true
+          fi
+
+          if git cat-file -e "$base_ref^{commit}" 2>/dev/null; then
+            files=$(git diff --name-only "$base_ref" HEAD)
+          else
+            echo "Warning: base_ref $base_ref still unavailable; falling back to HEAD~1"
+            files=$(git diff --name-only HEAD~1 HEAD)
+          fi
           echo "Changed files:\n$files"
 
           api_paths='classificationg2s/api|templates/|static/|classificationg2s/app.py|classificationg2s/services/azure_clients.py|classificationg2s/services/repository.py'
