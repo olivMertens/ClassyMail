@@ -51,6 +51,29 @@ flowchart TD
 
 Pre-push runs: `ruff check`, `pytest`, `terraform validate` (infra/).
 
+### 🔧 Playwright (CI + local)
+
+- **CI**: la matrice de validation inclut Playwright (voir `.github/workflows/deploy.yml`). Elle démarre l’API localement, installe les deps Node, installe les browsers, puis exécute `npm run test:e2e`.
+- **Local** (scénario identique au CI):
+
+```bash
+uv sync --dev
+uv run uvicorn classificationg2s.app:app --port 8000
+
+npm ci
+npx playwright install --with-deps
+npm run test:e2e
+```
+
+### 📦 Build & ACR (images)
+
+- **Image publique** (ex: `mcr.microsoft.com/azuredocs/containerapps-helloworld:latest`) : **ACR non requis**.
+- **Image privée** : **ACR requis** + renseigner `acr_name` (et `acr_resource_group`) dans `infra/terraform.tfvars` pour que l’identité managée ait le rôle `AcrPull`.
+
+Scripts de build/push:
+- PowerShell: `scripts/build_acr.ps1`
+- Bash: `scripts/build_acr.sh`
+
 
 | Composant | Service Azure | Rôle |
 | :--- | :--- | :--- |

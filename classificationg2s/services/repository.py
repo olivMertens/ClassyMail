@@ -11,8 +11,24 @@ from classificationg2s.services.azure_clients import Clients, get_default_client
 from classificationg2s.services.anonymizer import anonymize_markdown_for_finetune
 
 
+def compute_search_text(markdown: str | None, *, max_chars: int = 8192) -> str | None:
+    if not markdown:
+        return None
+
+    text = markdown
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = text.replace("\t", " ")
+    # Cheap normalization to keep a compact, index-friendly search blob.
+    text = " ".join(text.split())
+    if not text:
+        return None
+    return text[:max_chars]
+
+
 async def save_to_cosmos(record: EmailRecord, clients: Clients | None = None) -> None:
     record.updated_at = datetime.now(timezone.utc)
+    if record.search_text is None:
+        record.search_text = compute_search_text(record.markdown)
     clients = clients or get_default_clients()
     await clients.ensure_cosmos_container()
     await clients.cosmos_container.upsert_item(record.model_dump())

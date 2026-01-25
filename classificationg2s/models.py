@@ -25,6 +25,7 @@ class EmailRecord(BaseModel):
     file_url: str
     status: str
     markdown: Optional[str] = None
+    search_text: Optional[str] = None
     classification: Optional[ClassificationResult] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

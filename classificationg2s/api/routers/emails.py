@@ -19,7 +19,12 @@ from classificationg2s.services.azure_clients import (
     get_clients,
     Clients,
 )
-from classificationg2s.services.repository import count_by_status, count_reviewed_ready_items, export_finetune_jsonl_iter
+from classificationg2s.services.repository import (
+    count_by_status,
+    count_reviewed_ready_items,
+    export_finetune_jsonl_iter,
+    compute_search_text,
+)
 
 
 router = APIRouter(prefix="/api", tags=["emails"])
@@ -42,7 +47,7 @@ async def list_emails(
         filters.append("c.status = @status")
         params["@status"] = status
     if search:
-        filters.append("CONTAINS(c.markdown, @search)")
+        filters.append("IS_DEFINED(c.search_text) AND CONTAINS(c.search_text, @search)")
         params["@search"] = search
 
     where = " AND ".join(filters)
@@ -134,6 +139,9 @@ async def patch_email(item_id: str, payload: dict, cosmos_container=Depends(get_
             item["updated_at"] = datetime.now(timezone.utc).isoformat()
             item["reviewed"] = True
             item["reviewed_at"] = datetime.now(timezone.utc).isoformat()
+
+        if item.get("search_text") is None:
+            item["search_text"] = compute_search_text(item.get("markdown"))
         await cosmos_container.upsert_item(item)
         return EmailRecord(**item)
     except Exception as ex:
