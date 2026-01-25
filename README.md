@@ -14,6 +14,7 @@
 - [CICD_GITHUB](docs/CICD_GITHUB.md)
 - [CICD_GITLAB](docs/CICD_GITLAB.md)
 - [LOCAL_RUN](docs/LOCAL_RUN.md)
+- [DEV_LOCAL_BUILD](docs/DEV_LOCAL_BUILD.md)
 
 ## 🔗 References
 
@@ -30,9 +31,9 @@ flowchart TD
     blob -->|Event Grid| sbq[Service Bus Queue]
     sbq -->|Worker| api[FastAPI Worker/API]
     api -->|Download PDF| blob
-    api -->|OCR (document_base64)| ocr[Mistral OCR]
+    api -->|OCR document_base64| ocr[Mistral OCR]
     ocr -->|Markdown| api
-    api -->|Classify intents| llm[Phi-4 (primary)\\nFallback: gpt-4o-mini]
+    api -->|Classify intents| llm[Phi-4 (primary)\nFallback: gpt-4o-mini]
     llm -->|JSON| api
     api -->|Persist| cosmos[(Cosmos DB)]
     api -->|Dashboard UI| user
@@ -41,7 +42,7 @@ flowchart TD
 ## 🚀 Composants Clés
 ## 👩‍💻 Développeurs
 
-- **Autor:** Olivier Mertens — olmertens@microsoft.com
+- **Author:** Olivier Mertens — olmertens@microsoft.com
 
 ### Hooks & lint
 
