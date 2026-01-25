@@ -337,7 +337,7 @@ jobs:
           RG="${{ vars.AZURE_RESOURCE_GROUP }}"
           APP="${{ env.WORKER_APP_NAME }}"
           ENV_NAME="${{ env.CONTAINERAPPS_ENV }}"
-          
+
           if ! az containerapp show -n "$APP" -g "$RG" >/dev/null 2>&1; then
             echo "Creating worker app..."
             az containerapp create \
