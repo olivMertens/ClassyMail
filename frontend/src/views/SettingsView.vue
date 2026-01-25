@@ -88,12 +88,12 @@ const setLocale = (l) => {
 
 onMounted(() => {
     loadSettings()
-    
+
     // Load persisted appearance config
     const savedDark = localStorage.getItem('classimail-dark')
     isDark.value = savedDark === 'true'
     if (isDark.value) document.documentElement.classList.add('dark')
-    
+
     const savedTheme = localStorage.getItem('classimail-theme')
     if (savedTheme) {
         setTheme(savedTheme)
@@ -123,20 +123,20 @@ onMounted(() => {
         <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
           {{ t('settings.appearance') }}
         </h3>
-        
+
         <div class="mt-6 space-y-6">
           <!-- Language -->
           <div>
             <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('settings.language') }}</label>
             <div class="mt-2 flex items-center space-x-4">
-              <button 
+              <button
                 class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
                 :class="currentLocale === 'en' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
                 @click="setLocale('en')"
               >
                 English
               </button>
-              <button 
+              <button
                 class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
                 :class="currentLocale === 'fr' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
                 @click="setLocale('fr')"
@@ -151,13 +151,13 @@ onMounted(() => {
             <span class="flex-grow flex flex-col">
               <span class="text-sm font-medium text-gray-900 dark:text-white">{{ t('settings.dark_mode') }}</span>
             </span>
-            <button 
-              type="button" 
+            <button
+              type="button"
               class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2"
               :class="isDark ? 'bg-primary-600' : 'bg-gray-200'"
               @click="toggleDarkMode"
             >
-              <span 
+              <span
                 class="pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                 :class="isDark ? 'translate-x-5' : 'translate-x-0'"
               >
@@ -280,4 +280,3 @@ onMounted(() => {
     </div>
   </div>
 </template>
-

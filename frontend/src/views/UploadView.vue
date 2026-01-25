@@ -224,4 +224,3 @@ const uploadFiles = async () => {
     </div>
   </div>
 </template>
-

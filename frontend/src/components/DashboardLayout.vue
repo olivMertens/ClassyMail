@@ -172,7 +172,7 @@ const navigation = computed(() => [
 
       <!-- Main Content Scroller -->
       <main class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
-        <div class="max-w-7xl mx-auto">
+        <div class="mx-auto w-full">
           <slot />
         </div>
       </main>
