@@ -29,15 +29,21 @@ const handleFileSelect = (e) => {
 }
 
 const addFiles = (newFiles) => {
-    const validFiles = newFiles.filter(f => f.type === 'application/pdf').slice(0, 10 - files.value.length)
+    // Filter by type (PDF) and size (max 10MB)
+    const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+
+    const validFiles = newFiles
+        .filter(f => f.type === 'application/pdf')
+        .slice(0, 10 - files.value.length)
 
     validFiles.forEach(f => {
         if (files.value.length < 10) {
+            const isTooLarge = f.size > MAX_SIZE
             files.value.push({
                 file: f,
                 id: Math.random().toString(36).substring(7),
-                status: 'pending', // pending, uploading, success, error
-                message: ''
+                status: isTooLarge ? 'error' : 'pending',
+                message: isTooLarge ? 'File exceeds 10MB limit' : ''
             })
         }
     })
