@@ -424,8 +424,8 @@ jobs:
             --image "$IMAGE" \
             --min-replicas 0 \
             --max-replicas 10 \
-            --command "python" \
             --args "-m classificationg2s.worker_main" \
+            --command "python" \
             --set-env-vars \
               ENABLE_WORKER=true \
               AZURE_CLIENT_ID=${{ vars.AZURE_APP_CLIENT_ID }} \
@@ -447,6 +447,6 @@ jobs:
             -n "$APP" \
             -g "$RG" \
             --name sb-queue \
-            --custom-scaler-type azure-servicebus \
-            --custom-metadata "queueName=$QUEUE" "namespace=$NAMESPACE" "messageCount=5" \
-            --custom-identity "$IDENTITY_ID"
+            --scale-rule-type azure-servicebus \
+            --metadata "queueName=$QUEUE" "namespace=$NAMESPACE" "messageCount=5" \
+            --identity "$IDENTITY_ID"
