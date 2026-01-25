@@ -502,6 +502,12 @@ resource "azurerm_container_app" "api" {
       latest_revision = true
     }
   }
+
+  lifecycle {
+    ignore_changes = [
+      template[0].container[0].image
+    ]
+  }
 }
 
 resource "azurerm_container_app" "worker" {
@@ -529,7 +535,8 @@ resource "azurerm_container_app" "worker" {
       image   = var.container_image
       cpu     = 0.5
       memory  = "1Gi"
-      command = ["python", "-m", "classificationg2s.worker_main"]
+      command = ["python"]
+      args    = ["-m", "classificationg2s.worker_main"]
 
       env {
         name  = "ENABLE_WORKER"
@@ -603,5 +610,11 @@ resource "azurerm_container_app" "worker" {
         messageCount = "5"
       }
     }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      template[0].container[0].image
+    ]
   }
 }

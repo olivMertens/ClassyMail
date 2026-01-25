@@ -405,11 +405,6 @@ jobs:
           set -euo pipefail
           RG="${{ vars.AZURE_RESOURCE_GROUP }}"
           APP="${{ env.WORKER_APP_NAME }}"
-          IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
-          IDENTITY_ID=$(az identity show -g "$RG" -n "$IDENTITY_NAME" --query id -o tsv)
-          SB_FQDN="${{ vars.AZURE_SERVICE_BUS_FQDN }}"
-          NAMESPACE=$(echo "$SB_FQDN" | cut -d. -f1)
-          QUEUE="${{ vars.AZURE_SERVICE_BUS_QUEUE }}"
           IMAGE="${{ needs.build.outputs.image }}"
 
           if [ -z "$IMAGE" ]; then
@@ -418,31 +413,9 @@ jobs:
           fi
           echo "Deploying worker image: $IMAGE"
 
+          # Only update the image tag. Environment variables, identity, and scale rules 
+          # are now managed by Terraform resources in infra/main.tf
           az containerapp update \
             -n "$APP" \
             -g "$RG" \
-            --image "$IMAGE" \
-            --min-replicas 0 \
-            --max-replicas 10 \
-            --command "python" \
-            --args "-m classificationg2s.worker_main" \
-            --scale-rule-name "sb-queue" \
-            --scale-rule-type "azure-servicebus" \
-            --scale-rule-metadata "queueName=$QUEUE" "namespace=$NAMESPACE" "messageCount=5" \
-            --scale-rule-identity "$IDENTITY_ID" \
-            --set-env-vars \
-              ENABLE_WORKER=true \
-              AZURE_CLIENT_ID=${{ vars.AZURE_APP_CLIENT_ID }} \
-              AZURE_SERVICE_BUS_FQDN=${{ vars.AZURE_SERVICE_BUS_FQDN }} \
-              AZURE_SERVICE_BUS_QUEUE=${{ vars.AZURE_SERVICE_BUS_QUEUE }} \
-              AZURE_STORAGE_ACCOUNT_URL=${{ vars.AZURE_STORAGE_ACCOUNT_URL }} \
-              AZURE_STORAGE_CONTAINER=${{ vars.AZURE_STORAGE_CONTAINER }} \
-              AZURE_COSMOS_ENDPOINT=${{ vars.AZURE_COSMOS_ENDPOINT }} \
-              AZURE_COSMOS_DB=${{ vars.AZURE_COSMOS_DB }} \
-              AZURE_COSMOS_CONTAINER=${{ vars.AZURE_COSMOS_CONTAINER }} \
-              AZURE_AI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }} \
-              MISTRAL_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }} \
-              MISTRAL_DEPLOYMENT=${{ vars.MISTRAL_DEPLOYMENT }} \
-              MISTRAL_MODE=${{ vars.MISTRAL_MODE }} \
-              PHI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }} \
-              PHI_DEPLOYMENT=${{ vars.PHI_DEPLOYMENT }}
+            --image "$IMAGE"
