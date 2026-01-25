@@ -22,6 +22,10 @@ RUN addgroup --system app && adduser --system --ingroup app app \
     && chown -R app:app /app
 
 COPY . .
+
+# The repository ships a stub for Vue; fetch the real Vue runtime at build time.
+# Pin the version to keep builds deterministic.
+RUN curl -fsSL https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js -o /app/static/js/vue.global.prod.js
 RUN chown -R app:app /app
 USER app
 
