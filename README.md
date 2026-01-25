@@ -3,6 +3,26 @@
 
 **Author:** Olivier Mertens — olmertens@microsoft.com
 
+## Pourquoi ce POC ?
+
+Ce repo est un **POC “agent + pipeline”** pour traiter des emails/PDFs **à fort volume**, avec un objectif de **latence stable** et de **coûts observables**.
+Il sert à valider rapidement :
+
+- Une architecture **événementielle découplée** (ingestion vs traitement) pour absorber des pics (ex: 10k fichiers).
+- Un workflow de **review humaine** (dashboard) + boucle de **reinforcement / fine-tuning**.
+- Un mode de déploiement cloud **prod-ready** (Terraform + Azure Container Apps) et une exécution locale simple.
+
+## Comment ça marche (vue d’ensemble)
+
+1) **Upload** d’un PDF dans Blob Storage.
+2) **Event Grid** déclenche un message dans **Service Bus** (queue) pour lisser la charge.
+3) Un **worker** consomme la queue, télécharge le PDF et lance :
+    - OCR via **Mistral OCR** → Markdown
+    - Classification via **Phi‑4** (avec fallback possible) → JSON
+4) Le résultat est **persisté dans Cosmos DB** (statut, classification, usage/coûts), puis visible dans le **dashboard**.
+
+Pour les détails (RBAC, variables, exécution, CI/CD) : voir la section Documentation ci-dessous.
+
 ## 📚 Documentation
 
 - [Docs home](docs/INDEX.md)
