@@ -30,7 +30,7 @@ const handleFileSelect = (e) => {
 
 const addFiles = (newFiles) => {
     const validFiles = newFiles.filter(f => f.type === 'application/pdf').slice(0, 10 - files.value.length)
-    
+
     validFiles.forEach(f => {
         if (files.value.length < 10) {
             files.value.push({
@@ -49,27 +49,27 @@ const removeFile = (id) => {
 
 const uploadFiles = async () => {
     if (!files.value.length) return
-    
+
     uploading.value = true
     const pendingFiles = files.value.filter(f => f.status === 'pending' || f.status === 'error')
-    
+
     const formData = new FormData()
     pendingFiles.forEach(f => {
         formData.append('files', f.file)
         f.status = 'uploading'
     })
-    
+
     try {
         const res = await fetch('/api/upload', {
             method: 'POST',
             body: formData
         })
-        
+
         if (!res.ok) throw new Error('Upload failed')
-        
+
         const data = await res.json()
         const results = data.results || []
-        
+
         pendingFiles.forEach(f => {
             const result = results.find(r => r.name === f.file.name)
             if (result) {
@@ -85,7 +85,7 @@ const uploadFiles = async () => {
                 f.message = 'Unknown error'
             }
         })
-        
+
     } catch (e) {
         pendingFiles.forEach(f => {
             f.status = 'error'
@@ -107,8 +107,8 @@ const uploadFiles = async () => {
         <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
           <p>Upload PDF documents (max 10 files) to trigger the classification pipeline.</p>
         </div>
-        
-        <div 
+
+        <div
           class="mt-5 flex justify-center rounded-lg border border-dashed border-gray-900/25 dark:border-gray-600 px-6 py-10 transition-colors"
           :class="[dragActive ? 'bg-primary-50 border-primary-500 dark:bg-gray-700' : 'bg-gray-50 dark:bg-gray-900']"
           @dragover="handleDragOver"
@@ -183,7 +183,7 @@ const uploadFiles = async () => {
               v-else-if="file.status === 'error'"
               class="h-5 w-5 text-red-500 mr-2"
             />
-                    
+
             <span
               v-if="file.message"
               class="text-xs mr-3"
@@ -191,7 +191,7 @@ const uploadFiles = async () => {
             >
               {{ file.message }}
             </span>
-                    
+
             <button
               v-if="file.status !== 'uploading'"
               class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
@@ -203,9 +203,9 @@ const uploadFiles = async () => {
         </li>
       </ul>
       <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 flex justify-end">
-        <button 
-          type="button" 
-          :disabled="uploading || !files.some(f => f.status === 'pending' || f.status === 'error')" 
+        <button
+          type="button"
+          :disabled="uploading || !files.some(f => f.status === 'pending' || f.status === 'error')"
           class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
           @click="uploadFiles"
         >

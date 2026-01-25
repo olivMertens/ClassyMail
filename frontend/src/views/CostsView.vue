@@ -13,7 +13,7 @@ const loadCosts = async () => {
         params.set('emails_per_month', emailsPerMonth.value)
         params.set('pricing_source', pricingSource.value)
         params.set('region', 'swedencentral')
-        
+
         const res = await fetch(`/api/costs/summary?${params.toString()}`)
         if (res.ok) {
             costs.value = await res.json()
@@ -188,7 +188,7 @@ onMounted(() => {
           </dl>
         </div>
       </div>
-        
+
       <!-- Breakdown -->
       <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
         <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white mb-4">

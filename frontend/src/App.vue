@@ -29,10 +29,10 @@ const openEmail = (email) => {
     <UploadView v-else-if="currentView === 'upload'" />
     <CostsView v-else-if="currentView === 'costs'" />
     <SettingsView v-else-if="currentView === 'settings'" />
-     
-    <EmailDetailModal 
-      :email-id="selectedEmailId" 
-      :is-open="isModalOpen" 
+
+    <EmailDetailModal
+      :email-id="selectedEmailId"
+      :is-open="isModalOpen"
       @close="isModalOpen = false"
       @updated="() => {} /* Optional: refetch dashboard */"
     />

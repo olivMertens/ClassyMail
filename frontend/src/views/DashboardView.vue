@@ -1,8 +1,8 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
-import { 
-  MagnifyingGlassIcon, 
-  ChevronLeftIcon, 
+import {
+  MagnifyingGlassIcon,
+  ChevronLeftIcon,
   ChevronRightIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
@@ -36,11 +36,11 @@ const fetchEmails = async () => {
         params.set('page', page.value)
         params.set('page_size', pageSize.value)
         if (search.value) params.set('search', search.value)
-        
+
         const res = await fetch(`/api/emails?${params.toString()}`)
         if (!res.ok) throw new Error('Failed to fetch')
         const data = await res.json()
-        
+
         emails.value = data.items || []
         stats.value = {
             total: data.total || 0,
@@ -88,7 +88,7 @@ const getScoreColor = (email) => {
     const intents = email.classification?.detected_intents || []
     if (!intents.length) return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
     const score = Math.max(...intents.map(i => i.confidence || 0))
-    
+
     if (score >= 0.85) return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
     if (score >= 0.7) return 'bg-lime-100 text-lime-800 dark:bg-lime-900/50 dark:text-lime-300'
     if (score >= 0.5) return 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300'
@@ -160,7 +160,7 @@ const emit = defineEmits(['open-email'])
         <input
           v-model="search"
           type="text"
-          class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white dark:placeholder-gray-500" 
+          class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white dark:placeholder-gray-500"
           placeholder="Search emails..."
         >
       </div>
@@ -183,7 +183,7 @@ const emit = defineEmits(['open-email'])
     >
       <div
         v-for="email in emails"
-        :key="email.id" 
+        :key="email.id"
         class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow flex flex-col h-full"
       >
         <div class="p-5 flex-1">
@@ -216,7 +216,7 @@ const emit = defineEmits(['open-email'])
               <ClockIcon class="h-5 w-5" />
             </span>
           </div>
-             
+
           <h3
             class="text-lg font-medium text-gray-900 dark:text-white truncate mb-1"
             :title="email.subject"
@@ -226,7 +226,7 @@ const emit = defineEmits(['open-email'])
           <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
             {{ email.sender || 'Unknown Sender' }}
           </p>
-             
+
           <div class="text-xs text-gray-400 dark:text-gray-500 mb-2">
             {{ formatDate(email.created_at) }}
           </div>
@@ -238,7 +238,7 @@ const emit = defineEmits(['open-email'])
             {{ email.error }}
           </div>
         </div>
-          
+
         <div class="bg-gray-50 dark:bg-gray-700/50 px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center rounded-b-lg">
           <button
             class="text-sm font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400"

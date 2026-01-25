@@ -33,7 +33,7 @@ const saveSettings = async () => {
             phi4_output_per_1k: settings.value.phi4_output_per_1k ? Number(settings.value.phi4_output_per_1k) : undefined,
             mistral_per_1k_pages: settings.value.mistral_per_1k_pages ? Number(settings.value.mistral_per_1k_pages) : undefined,
         }
-        
+
         await fetch('/api/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -72,7 +72,7 @@ onMounted(() => {
         <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
           <p>Override the default pricing used for cost calculations. Leave blank to use defaults.</p>
         </div>
-        
+
         <form
           class="mt-5 space-y-6"
           @submit.prevent="saveSettings"
@@ -88,7 +88,7 @@ onMounted(() => {
               >
             </div>
           </div>
-             
+
           <div>
             <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Phi-4 Output Cost (€ / 1K tokens)</label>
             <div class="mt-2">
@@ -100,7 +100,7 @@ onMounted(() => {
               >
             </div>
           </div>
-             
+
           <div>
             <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Mistral OCR Cost (€ / 1K pages)</label>
             <div class="mt-2">

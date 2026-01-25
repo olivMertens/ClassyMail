@@ -1,9 +1,9 @@
 <script setup>
 import { ref } from 'vue'
-import { 
-  HomeIcon, 
-  CloudArrowUpIcon, 
-  CurrencyDollarIcon, 
+import {
+  HomeIcon,
+  CloudArrowUpIcon,
+  CurrencyDollarIcon,
   Cog6ToothIcon,
   Bars3Icon,
   XMarkIcon,
@@ -64,7 +64,7 @@ const navigation = [
         <a
           v-for="item in navigation"
           :key="item.name"
-          href="#" 
+          href="#"
           :class="[currentView === item.id ? 'bg-primary-50 text-primary-600 dark:bg-gray-700 dark:text-white' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white', 'group flex items-center px-2 py-2 text-base font-medium rounded-md']"
           @click.prevent="emit('change-view', item.id); sidebarOpen = false"
         >
@@ -90,14 +90,14 @@ const navigation = [
             <a
               v-for="item in navigation"
               :key="item.name"
-              href="#" 
+              href="#"
               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md"
               :class="[currentView === item.id ? 'bg-primary-50 text-primary-600 dark:bg-gray-700 dark:text-white' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white']"
               @click.prevent="emit('change-view', item.id)"
             >
               <component
-                :is="item.icon" 
-                class="mr-3 h-5 w-5 flex-shrink-0" 
+                :is="item.icon"
+                class="mr-3 h-5 w-5 flex-shrink-0"
                 :class="[currentView === item.id ? 'text-primary-600 dark:text-white' : 'text-gray-400 group-hover:text-gray-500 dark:text-gray-400 dark:group-hover:text-gray-300']"
                 aria-hidden="true"
               />
@@ -148,7 +148,7 @@ const navigation = [
           </button>
         </div>
       </div>
-        
+
       <!-- Desktop Top Bar extensions (like Dark Mode toggle which is usually in sidebar or header) -->
       <div class="hidden md:flex justify-end p-4 bg-gray-50 dark:bg-gray-900 absolute top-0 right-0 z-20">
         <button
