@@ -265,6 +265,13 @@
             <label class="text-sm text-slate-400">{{ tr('emails_per_month') }}</label>
             <input v-model.number="emailsPerMonth" type="number" min="0" step="100" class="w-full bg-slate-800 rounded px-3 py-2 text-sm" />
           </div>
+          <div class="flex-1">
+            <label class="text-sm text-slate-400">{{ tr('pricing_source') }}</label>
+            <select v-model="pricingSource" class="w-full bg-slate-800 rounded px-3 py-2 text-sm">
+              <option value="fixed">{{ tr('pricing_fixed') }}</option>
+              <option value="retail">{{ tr('pricing_retail') }}</option>
+            </select>
+          </div>
           <button @click="loadCosts" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded">{{ tr('recalculate') }}</button>
         </div>
 
@@ -280,7 +287,14 @@
             <div class="text-sm text-slate-300">AI (variable): ${{ (costs?.projection_monthly_usd?.ai_variable ?? 0).toFixed(2) }}</div>
             <div class="text-sm text-slate-300">Infra (fixe est.): ${{ (costs?.projection_monthly_usd?.fixed ?? 0).toFixed(2) }}</div>
             <div class="text-sm text-slate-100 font-semibold mt-1">Total: ${{ (costs?.projection_monthly_usd?.total ?? 0).toFixed(2) }}</div>
+            <div class="text-xs text-slate-400 mt-2">
+              {{ tr('pricing_used') }}: {{ costs?.pricing?.source || pricingSource }} / {{ costs?.pricing?.region || 'swedencentral' }}
+            </div>
           </div>
+        </div>
+
+        <div v-if="pricingSource==='retail' && !costs?.pricing?.retail" class="mt-3 text-xs text-amber-300">
+          {{ tr('pricing_retail_warn') }}
         </div>
 
         <div class="mt-4">
@@ -325,6 +339,7 @@
           showCosts: false,
           costs: null,
           emailsPerMonth: 10000,
+          pricingSource: 'fixed',
           continuationToken: null,
           lang: 'fr',
           showInfo: false,
@@ -412,6 +427,8 @@
         async loadCosts() {
           const params = new URLSearchParams();
           params.set('emails_per_month', String(this.emailsPerMonth ?? 0));
+          params.set('pricing_source', String(this.pricingSource || 'fixed'));
+          params.set('region', 'swedencentral');
           const res = await fetch(`/api/costs/summary?${params.toString()}`);
           if (res.ok) {
             this.costs = await res.json();
@@ -654,6 +671,11 @@
         emails_processed: "Traités",
         emails_with_usage: "Avec usage (coûts)",
         avg_ai_cost_email: "Coût AI moyen / email",
+        pricing_source: "Source prix Azure",
+        pricing_fixed: "Estimation fixe (POC)",
+        pricing_retail: "Azure Retail Prices API",
+        pricing_used: "Pricing",
+        pricing_retail_warn: "Azure Retail Prices API indisponible (fallback sur les estimations fixes).",
       },
       en: {
         title: "ClassiMail Agent",
@@ -709,6 +731,11 @@
         emails_processed: "Processed",
         emails_with_usage: "With usage (costs)",
         avg_ai_cost_email: "Avg AI cost / email",
+        pricing_source: "Azure pricing source",
+        pricing_fixed: "Fixed estimate (POC)",
+        pricing_retail: "Azure Retail Prices API",
+        pricing_used: "Pricing",
+        pricing_retail_warn: "Azure Retail Prices API unavailable (falling back to fixed estimates).",
       }
     };
 
