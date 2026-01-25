@@ -18,4 +18,4 @@
 - Exécuter en local : voir [LOCAL_RUN](LOCAL_RUN.md)
 - Scénario de test bout en bout : voir [SCENARIO_E2E](SCENARIO_E2E.md)
 - Build & push sans CI : voir [DEV_LOCAL_BUILD](DEV_LOCAL_BUILD.md)
-- Script de déploiement infra : `infra/deploy.ps1`
+- Script de déploiement infra : voir [infra/deploy.ps1](../infra/deploy.ps1)

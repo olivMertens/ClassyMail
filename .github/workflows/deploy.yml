@@ -381,6 +381,8 @@ jobs:
               --user-assigned "$IDENTITY_ID" \
               --command "uv" "run" "python" "-m" "classificationg2s.worker_main"
 
+          fi
+
           az containerapp scale rule set \
             -n "$APP" \
             -g "$RG" \
