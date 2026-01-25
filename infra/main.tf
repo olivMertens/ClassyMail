@@ -454,8 +454,24 @@ resource "azurerm_container_app" "api" {
         value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
       }
       env {
+        name  = "PHI_DEPLOYMENT"
+        value = "phi-4"
+      }
+      env {
         name  = "MISTRAL_ENDPOINT"
         value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "MISTRAL_DEPLOYMENT"
+        value = "mistral-ocr-2505"
+      }
+      env {
+        name  = "MISTRAL_MODE"
+        value = "maas"
+      }
+      env {
+        name  = "AZURE_AI_API_VERSION"
+        value = "2024-08-01-preview"
       }
 
       # Telemetry
@@ -584,8 +600,24 @@ resource "azurerm_container_app" "worker" {
         value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
       }
       env {
+        name  = "PHI_DEPLOYMENT"
+        value = "phi-4"
+      }
+      env {
         name  = "MISTRAL_ENDPOINT"
         value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "MISTRAL_DEPLOYMENT"
+        value = "mistral-ocr-2505"
+      }
+      env {
+        name  = "MISTRAL_MODE"
+        value = "maas"
+      }
+      env {
+        name  = "AZURE_AI_API_VERSION"
+        value = "2024-08-01-preview"
       }
 
       env {
