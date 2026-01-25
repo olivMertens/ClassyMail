@@ -88,6 +88,15 @@ jobs:
 
       - name: Start API for E2E
         if: ${{ matrix.task == 'playwright' }}
+        env:
+          # Playwright tests mock API calls; we only need the UI server to boot.
+          # Provide placeholder values to satisfy startup config checks.
+          AZURE_SERVICE_BUS_FQDN: example.servicebus.windows.net
+          AZURE_STORAGE_ACCOUNT_URL: https://example.blob.core.windows.net/
+          AZURE_COSMOS_ENDPOINT: https://example.documents.azure.com:443/
+          AZURE_AI_ENDPOINT: https://example.cognitiveservices.azure.com/
+          MISTRAL_ENDPOINT: https://example.cognitiveservices.azure.com/
+          PHI_ENDPOINT: https://example.cognitiveservices.azure.com/
         run: |
           uv run uvicorn classificationg2s.app:app --host 0.0.0.0 --port 8000 &
           npx wait-on http://127.0.0.1:8000/healthz
