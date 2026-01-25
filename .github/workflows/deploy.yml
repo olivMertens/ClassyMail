@@ -279,31 +279,24 @@ jobs:
             --identity "$IDENTITY_ID"
 
       - name: Deploy API to Azure Container Apps
-        uses: azure/container-apps-deploy-action@v2
-        with:
-          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resourceGroup: ${{ vars.AZURE_RESOURCE_GROUP }}
-          containerAppName: ${{ env.IMAGE_NAME }}
-          containerAppEnvironment: ${{ env.CONTAINERAPPS_ENV }}
-          imageToDeploy: ${{ needs.build.outputs.image }}
-          ingress: external
-          targetPort: 8000
-          environmentVariables: >-
-            PORT=8000
-            AZURE_CLIENT_ID=${{ vars.AZURE_APP_CLIENT_ID }}
-            AZURE_SERVICE_BUS_FQDN=${{ vars.AZURE_SERVICE_BUS_FQDN }}
-            AZURE_SERVICE_BUS_QUEUE=${{ vars.AZURE_SERVICE_BUS_QUEUE }}
-            AZURE_STORAGE_ACCOUNT_URL=${{ vars.AZURE_STORAGE_ACCOUNT_URL }}
-            AZURE_STORAGE_CONTAINER=${{ vars.AZURE_STORAGE_CONTAINER }}
-            AZURE_COSMOS_ENDPOINT=${{ vars.AZURE_COSMOS_ENDPOINT }}
-            AZURE_COSMOS_DB=${{ vars.AZURE_COSMOS_DB }}
-            AZURE_COSMOS_CONTAINER=${{ vars.AZURE_COSMOS_CONTAINER }}
-            AZURE_AI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }}
-            MISTRAL_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }}
-            MISTRAL_DEPLOYMENT=${{ vars.MISTRAL_DEPLOYMENT }}
-            MISTRAL_MODE=${{ vars.MISTRAL_MODE }}
-            PHI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }}
-            PHI_DEPLOYMENT=${{ vars.PHI_DEPLOYMENT }}
+        run: |
+          set -euo pipefail
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          APP="${{ env.IMAGE_NAME }}"
+          IMAGE="${{ needs.build.outputs.image }}"
+
+          if [ -z "$IMAGE" ]; then
+            echo "needs.build.outputs.image is empty; build job did not produce an image tag." >&2
+            exit 1
+          fi
+          echo "Deploying API image: $IMAGE"
+
+          # Only update the image tag. Environment variables, identity, and scale rules
+          # are now managed by Terraform resources in infra/main.tf
+          az containerapp update \
+            -n "$APP" \
+            -g "$RG" \
+            --image "$IMAGE"
 
   deploy-worker:
     runs-on: ubuntu-latest
