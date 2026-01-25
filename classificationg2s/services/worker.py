@@ -10,6 +10,39 @@ from classificationg2s.services.repository import save_to_cosmos
 from classificationg2s.models import EmailRecord, OCRFailed
 from classificationg2s.services.azure_clients import blob_id_from_url
 
+
+def _extract_blob_url(payload) -> str | None:
+    """Extract a blob URL from either:
+    - our internal message format: {"blob_url": "https://..."}
+    - Event Grid event(s) delivered to Service Bus (EventGrid schema or CloudEvents)
+    """
+    if isinstance(payload, dict):
+        if payload.get("blob_url"):
+            return payload["blob_url"]
+        # Some producers may already send the Event Grid event as a dict.
+        candidates = [payload]
+    elif isinstance(payload, list):
+        candidates = payload
+    else:
+        return None
+
+    for ev in candidates:
+        if not isinstance(ev, dict):
+            continue
+        # Event Grid schema
+        data = ev.get("data") or {}
+        if isinstance(data, dict):
+            url = data.get("url")
+            if isinstance(url, str) and url.startswith("http"):
+                return url
+        # CloudEvents schema
+        data = ev.get("data") or {}
+        if isinstance(data, dict):
+            url = data.get("url")
+            if isinstance(url, str) and url.startswith("http"):
+                return url
+    return None
+
 async def worker_loop_forever(*, queue_name: str, get_cost_overrides, clients: Clients):
     if not clients.sb_client:
         raise RuntimeError("Service Bus client not initialized")
@@ -35,7 +68,7 @@ async def handle_queue_message(receiver, msg, *, get_cost_overrides, clients: Cl
     except Exception:
         payload = {"blob_url": None, "raw": body_bytes.decode(errors="ignore")}
 
-    blob_url = payload.get("blob_url")
+    blob_url = _extract_blob_url(payload)
     if not blob_url:
         await receiver.dead_letter_message(msg, reason="No blob_url in message")
         return

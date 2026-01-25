@@ -25,16 +25,39 @@ Pour les détails (RBAC, variables, exécution, CI/CD) : voir la section Documen
 
 ## 📚 Documentation
 
-- [Docs home](docs/INDEX.md)
-- [ARCHITECTURE](docs/ARCHITECTURE.md)
-- [PIPELINE](docs/PIPELINE.md)
-- [TERRAFORM](docs/TERRAFORM.md)
-- [MODELS](docs/MODELS.md)
-- [FINE_TUNING_DATA](docs/FINE_TUNING_DATA.md)
-- [CICD_GITHUB](docs/CICD_GITHUB.md)
-- [CICD_GITLAB](docs/CICD_GITLAB.md)
-- [LOCAL_RUN](docs/LOCAL_RUN.md)
-- [DEV_LOCAL_BUILD](docs/DEV_LOCAL_BUILD.md)
+- Docs home (index) : [docs/INDEX.md](docs/INDEX.md)
+
+### Parcours recommandé (à lire dans cet ordre)
+
+Selon ton objectif :
+
+- **Je veux tester le système E2E** (recommandé pour débuter)
+    1. [docs/SCENARIO_E2E.md](docs/SCENARIO_E2E.md) — scénario complet (PDF → Blob → Event Grid → Service Bus → Worker → Cosmos → UI), en local et sur Azure
+    2. [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md) — exécution locale, variables `secrets.env`, upload/trigger
+    3. [docs/TERRAFORM.md](docs/TERRAFORM.md) — provisionner l’infra Azure + récupérer les outputs
+
+- **Je veux comprendre l’architecture** (deep dive)
+    1. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — composants, RBAC, scaling
+    2. [docs/PIPELINE.md](docs/PIPELINE.md) — logique de traitement (OCR → LLM → persistance), formats de messages
+    3. [docs/MODELS.md](docs/MODELS.md) — endpoints, deployments, contraintes tokens, pricing config
+    4. [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md) — boucle de review + export JSONL + fine-tune
+
+- **Je veux builder/déployer**
+    - [docs/DEV_LOCAL_BUILD.md](docs/DEV_LOCAL_BUILD.md) — build/push image, déploiement ACA sans CI
+    - [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) / [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md) — CI/CD
+
+### Référence (liste complète)
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/PIPELINE.md](docs/PIPELINE.md)
+- [docs/TERRAFORM.md](docs/TERRAFORM.md)
+- [docs/MODELS.md](docs/MODELS.md)
+- [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md)
+- [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md)
+- [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md)
+- [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md)
+- [docs/DEV_LOCAL_BUILD.md](docs/DEV_LOCAL_BUILD.md)
+- [docs/SCENARIO_E2E.md](docs/SCENARIO_E2E.md)
 
 ## 🔗 References
 
@@ -65,7 +88,7 @@ Voir [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md) pour toutes les options (uv/poetry/p
 
 ```bash
 uv sync
-uv run uvicorn classificationg2s.app:app --reload
+uv run uvicorn main:app --reload
 ```
 
 CI/CD : [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) | GitLab : [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md)

@@ -6,16 +6,18 @@ This document explains the end-to-end processing pipeline (PDF → OCR → class
 
 ```mermaid
 flowchart TD
-    user[User / Mailbox Export] -->|Upload PDF| blob[(Blob Storage: pdf-inputs)]
+    user[User / Mailbox Export] -->|Upload PDF (UI /api/upload)| api[API (FastAPI + UI)]
+    api -->|Write blob| blob[(Blob Storage: pdf-inputs)]
     blob -->|Event Grid| sb[(Service Bus Queue)]
-    sb -->|Worker consumes| api[FastAPI Worker/API]
-    api -->|Download PDF| blob
-    api -->|OCR: %PDF -> base64| ocr[Mistral OCR]
-    ocr -->|Markdown + usage| api
-    api -->|Classify intents (strict JSON)| llm[Phi-4 (primary)\nFallback: gpt-4o-mini]
-    llm -->|JSON + usage| api
-    api -->|Upsert| cosmos[(Cosmos DB)]
-    api -->|Serve UI + APIs| user
+    sb -->|Worker consumes| worker[Worker (python -m classificationg2s.worker_main)]
+    worker -->|Download PDF| blob
+    worker -->|OCR: %PDF -> base64| ocr[Mistral OCR]
+    ocr -->|Markdown + usage| worker
+    worker -->|Classify intents (strict JSON)| llm[Phi-4 (primary)\nFallback: gpt-4o-mini]
+    llm -->|JSON + usage| worker
+    worker -->|Upsert| cosmos[(Cosmos DB)]
+    api -->|Read + Dashboard| cosmos
+    api -->|Serve UI| user
 ```
 
 ## Sequence (message-driven)
@@ -46,7 +48,9 @@ sequenceDiagram
 ## Assumptions
 
 - PDFs are uploaded into a known container (default: `pdf-inputs`).
-- Event Grid emits an event that can be transformed into a stable `blob_url`.
+- Event Grid emits a `BlobCreated` event. The worker supports either:
+    - our internal message: `{ "blob_url": "https://..." }` (e.g. via `/webhook/ingest`)
+    - raw Event Grid event payload delivered to Service Bus (it extracts `data.url`).
 - Worker can fetch the blob using Entra ID (RBAC), without Shared Key.
 - OCR output is Markdown (can be large), and classification expects a strict JSON result.
 - "Correct" classification is represented as a multi-intent list with confidence + justification.
