@@ -42,11 +42,16 @@ jobs:
             git fetch --no-tags --prune origin "$base_ref" || true
           fi
 
+          files=""
           if git cat-file -e "$base_ref^{commit}" 2>/dev/null; then
-            files=$(git diff --name-only "$base_ref" HEAD)
+            files=$(git diff --name-only "$base_ref" HEAD || true)
           else
             echo "Warning: base_ref $base_ref still unavailable; falling back to HEAD~1"
-            files=$(git diff --name-only HEAD~1 HEAD)
+            files=$(git diff --name-only HEAD~1 HEAD || true)
+          fi
+
+          if [ -z "$files" ]; then
+            echo "Warning: could not compute changed files; defaulting to build=true"
           fi
           echo "Changed files:\n$files"
 
@@ -62,7 +67,7 @@ jobs:
           api_changed=false
           worker_changed=false
           build=true
-          if [ "$docs_only" = "true" ]; then build=false; fi
+          if [ -n "$files" ] && [ "$docs_only" = "true" ]; then build=false; fi
           if echo "$files" | grep -Eq "$api_paths"; then api_changed=true; build=true; fi
           if echo "$files" | grep -Eq "$worker_paths"; then worker_changed=true; build=true; fi
           if echo "$files" | grep -Eq "$build_paths"; then build=true; fi
