@@ -105,7 +105,7 @@ jobs:
         run: uv run pytest
 
       - name: Setup Terraform
-        if: ${{ matrix.task == 'terraform' }}
+        if: ${{ matrix.task == 'terraform' || matrix.task == 'pre-commit' }}
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform validate
