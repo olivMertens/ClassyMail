@@ -20,15 +20,28 @@ $env:IDENTITY_NAME = "<managed-identity-name>"  # si registry avec Managed Ident
 ```
 
 ## 🛠 Build & Push (scripts)
-- PowerShell :
   ```powershell
   scripts/build_acr.ps1 -AcrName $env:ACR_NAME -ImageName $env:IMAGE_NAME -Tag $env:TAG
   ```
-- Bash :
   ```bash
   ./scripts/build_acr.sh -a $ACR_NAME -i $IMAGE_NAME -t $TAG
   ```
 
+## Build & push a container image (without CI)
+
+### UI dependency (Vue runtime)
+
+The UI loads Vue from `static/js/vue.global.prod.js`.
+
+- The repository tracks a small **stub** file for development, which is not sufficient for production.
+- For a working UI, you must provide the real Vue runtime **before building the Docker image**.
+
+If you have internet access:
+
+- Windows (PowerShell): `./scripts/fetch_vue_runtime.ps1`
+- Linux/macOS: `bash ./scripts/fetch_vue_runtime.sh`
+
+If you need a fully offline build, copy a previously downloaded `vue.global.prod.js` into `static/js/vue.global.prod.js` before building.
 ## 🛠 Build & Push (manuel)
 ```bash
 REGISTRY=$(az acr show --name $ACR_NAME --query loginServer -o tsv)

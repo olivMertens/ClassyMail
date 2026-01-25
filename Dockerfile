@@ -23,9 +23,30 @@ RUN addgroup --system app && adduser --system --ingroup app app \
 
 COPY . .
 
-# The repository ships a stub for Vue; fetch the real Vue runtime at build time.
-# Pin the version to keep builds deterministic.
-RUN curl -fsSL https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js -o /app/static/js/vue.global.prod.js
+# Offline-friendly build: Vue must be provided in the build context.
+# The repo tracks a small stub at static/js/vue.global.prod.js; builds should replace it with
+# the real Vue runtime (see scripts/fetch_vue_runtime.*).
+ARG ALLOW_VUE_STUB=0
+RUN python - <<'PY'
+import os
+from pathlib import Path
+
+p = Path('/app/static/js/vue.global.prod.js')
+if not p.exists():
+    raise SystemExit('ERROR: Missing static/js/vue.global.prod.js. Provide the Vue runtime file before building.')
+
+content = p.read_text(encoding='utf-8', errors='ignore')
+is_stub = ('Vue stub loaded' in content) or ('Vue stub:' in content)
+allow = os.environ.get('ALLOW_VUE_STUB', '0').lower() in {'1', 'true', 'yes'}
+
+if is_stub and not allow:
+    raise SystemExit(
+        'ERROR: Vue runtime stub detected in static/js/vue.global.prod.js.\n'
+        'Run scripts/fetch_vue_runtime.sh (Linux/macOS/CI) or scripts/fetch_vue_runtime.ps1 (Windows),\n'
+        'or copy the real vue.global.prod.js into static/js before building.\n'
+        'If you *really* want the stub (dev only), build with --build-arg ALLOW_VUE_STUB=1.'
+    )
+PY
 RUN chown -R app:app /app
 USER app
 
