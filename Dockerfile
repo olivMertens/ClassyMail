@@ -12,7 +12,7 @@ ENV PATH="/root/.local/bin:${PATH}"
 
 WORKDIR /app
 COPY pyproject.toml uv.lock requirements.txt README.md ./
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Use the project virtualenv at runtime (avoid `uv run` resolving deps on startup).
 ENV PATH="/app/.venv/bin:${PATH}"
@@ -22,6 +22,9 @@ RUN addgroup --system app && adduser --system --ingroup app app \
     && chown -R app:app /app
 
 COPY . .
+
+# Install the project itself (source is now present).
+RUN uv sync --frozen --no-dev
 
 # Offline-friendly build: Vue must be provided in the build context.
 # The repo tracks a small stub at static/js/vue.global.prod.js; builds should replace it with
