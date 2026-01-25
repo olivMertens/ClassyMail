@@ -406,7 +406,7 @@ jobs:
           fi
           echo "Deploying worker image: $IMAGE"
 
-          # Only update the image tag. Environment variables, identity, and scale rules 
+          # Only update the image tag. Environment variables, identity, and scale rules
           # are now managed by Terraform resources in infra/main.tf
           az containerapp update \
             -n "$APP" \
