@@ -455,7 +455,7 @@ resource "azurerm_container_app" "api" {
       }
       env {
         name  = "PHI_DEPLOYMENT"
-        value = "phi-4"
+        value = "Phi-4"
       }
       env {
         name  = "MISTRAL_ENDPOINT"
@@ -463,7 +463,7 @@ resource "azurerm_container_app" "api" {
       }
       env {
         name  = "MISTRAL_DEPLOYMENT"
-        value = "mistral-ocr-2505"
+        value = "mistral-document-ai-2505"
       }
       env {
         name  = "MISTRAL_MODE"
@@ -601,7 +601,7 @@ resource "azurerm_container_app" "worker" {
       }
       env {
         name  = "PHI_DEPLOYMENT"
-        value = "phi-4"
+        value = "Phi-4"
       }
       env {
         name  = "MISTRAL_ENDPOINT"
@@ -609,7 +609,7 @@ resource "azurerm_container_app" "worker" {
       }
       env {
         name  = "MISTRAL_DEPLOYMENT"
-        value = "mistral-ocr-2505"
+        value = "mistral-document-ai-2505"
       }
       env {
         name  = "MISTRAL_MODE"
