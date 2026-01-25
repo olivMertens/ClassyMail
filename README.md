@@ -33,7 +33,7 @@ flowchart TD
     api -->|Download PDF| blob
     api -->|OCR document_base64| ocr[Mistral OCR]
     ocr -->|Markdown| api
-    api -->|Classify intents| llm[Phi-4 (primary)\nFallback: gpt-4o-mini]
+    api -->|Classify intents| llm["Phi-4 (primary)<br/>Fallback: gpt-4o-mini"]
     llm -->|JSON| api
     api -->|Persist| cosmos[(Cosmos DB)]
     api -->|Dashboard UI| user
