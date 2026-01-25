@@ -21,7 +21,7 @@ const { t } = useI18n()
                 <XMarkIcon class="h-6 w-6" />
               </button>
             </div>
-            
+
             <div class="mt-4 text-sm text-gray-600 dark:text-gray-300">
               <p class="font-medium text-lg">{{ t('info.subtitle') }}</p>
               <p class="mt-2">
