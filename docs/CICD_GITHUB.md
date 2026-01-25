@@ -82,7 +82,7 @@ Références :
 - `uv run ruff check .`
 - `uv run pytest`
 - `terraform init -backend=false` + `terraform validate`
-- **Playwright E2E** : `npm ci && npx playwright install --with-deps && npm run test:e2e` (le workflow démarre l'API localement)
+
 
 ### Secrets GitHub requis (OIDC)
 

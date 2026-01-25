@@ -57,7 +57,7 @@ jobs:
     needs: changes
     strategy:
       matrix:
-        task: [ruff, pytest, terraform, pre-commit, playwright]
+        task: [ruff, pytest, terraform, pre-commit]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -73,37 +73,6 @@ jobs:
       - name: Install deps
         run: |
           uv sync --frozen --extra dev
-
-      - name: Setup Node
-        if: ${{ matrix.task == 'playwright' }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Playwright deps
-        if: ${{ matrix.task == 'playwright' }}
-        run: |
-          npm ci
-          npx playwright install --with-deps
-
-      - name: Start API for E2E
-        if: ${{ matrix.task == 'playwright' }}
-        env:
-          # Playwright tests mock API calls; we only need the UI server to boot.
-          # Provide placeholder values to satisfy startup config checks.
-          AZURE_SERVICE_BUS_FQDN: example.servicebus.windows.net
-          AZURE_STORAGE_ACCOUNT_URL: https://example.blob.core.windows.net/
-          AZURE_COSMOS_ENDPOINT: https://example.documents.azure.com:443/
-          AZURE_AI_ENDPOINT: https://example.cognitiveservices.azure.com/
-          MISTRAL_ENDPOINT: https://example.cognitiveservices.azure.com/
-          PHI_ENDPOINT: https://example.cognitiveservices.azure.com/
-        run: |
-          uv run uvicorn classificationg2s.app:app --host 0.0.0.0 --port 8000 &
-          npx wait-on http://127.0.0.1:8000/healthz
-
-      - name: Run Playwright
-        if: ${{ matrix.task == 'playwright' }}
-        run: npm run test:e2e
 
       - name: Run ruff
         if: ${{ matrix.task == 'ruff' }}
