@@ -9,6 +9,7 @@ __pycache__/
 .dist-info/
 .env
 .env.*
+.venv-*/
 .venv/
 venv/
 env/
@@ -17,7 +18,7 @@ pytest_cache/
 .coverage
 htmlcov/
 .cache/
-
+/data/*
 # FastAPI / Uvicorn
 *.log
 
