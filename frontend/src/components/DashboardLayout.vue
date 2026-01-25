@@ -1,5 +1,6 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   HomeIcon,
   CloudArrowUpIcon,
@@ -13,6 +14,7 @@ import {
 
 const props = defineProps(['currentView'])
 const emit = defineEmits(['change-view'])
+const { t } = useI18n()
 
 const sidebarOpen = ref(false)
 const isDark = ref(document.documentElement.classList.contains('dark'))
@@ -21,17 +23,19 @@ const toggleDarkMode = () => {
   isDark.value = !isDark.value
   if (isDark.value) {
     document.documentElement.classList.add('dark')
+    localStorage.setItem('classimail-dark', 'true')
   } else {
     document.documentElement.classList.remove('dark')
+    localStorage.setItem('classimail-dark', 'false')
   }
 }
 
-const navigation = [
-  { name: 'Dashboard', id: 'dashboard', icon: HomeIcon },
-  { name: 'Upload', id: 'upload', icon: CloudArrowUpIcon },
-  { name: 'Costs', id: 'costs', icon: CurrencyDollarIcon },
-  { name: 'Settings', id: 'settings', icon: Cog6ToothIcon },
-]
+const navigation = computed(() => [
+  { name: t('nav.dashboard'), id: 'dashboard', icon: HomeIcon },
+  { name: t('nav.upload'), id: 'upload', icon: CloudArrowUpIcon },
+  { name: t('nav.costs'), id: 'costs', icon: CurrencyDollarIcon },
+  { name: t('nav.settings'), id: 'settings', icon: Cog6ToothIcon },
+])
 </script>
 
 <template>

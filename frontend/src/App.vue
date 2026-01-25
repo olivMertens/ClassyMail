@@ -1,11 +1,14 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import DashboardLayout from './components/DashboardLayout.vue'
 import DashboardView from './views/DashboardView.vue'
 import UploadView from './views/UploadView.vue'
 import CostsView from './views/CostsView.vue'
 import SettingsView from './views/SettingsView.vue'
 import EmailDetailModal from './components/EmailDetailModal.vue'
+
+const { locale } = useI18n()
 
 const currentView = ref('dashboard')
 const selectedEmailId = ref(null)
@@ -15,6 +18,28 @@ const openEmail = (email) => {
     selectedEmailId.value = email.id
     isModalOpen.value = true
 }
+
+onMounted(() => {
+    // Restore Theme
+    const savedTheme = localStorage.getItem('classimail-theme')
+    if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme)
+    }
+
+    // Restore Dark Mode
+    const savedDark = localStorage.getItem('classimail-dark')
+    if (savedDark === 'true') {
+        document.documentElement.classList.add('dark')
+    } else if (savedDark === 'false') {
+        document.documentElement.classList.remove('dark')
+    }
+
+    // Restore Locale
+    const savedLocale = localStorage.getItem('classimail-locale')
+    if (savedLocale) {
+        locale.value = savedLocale
+    }
+})
 </script>
 
 <template>

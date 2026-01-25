@@ -1,0 +1,46 @@
+{
+    "nav": {
+        "dashboard": "Dashboard",
+        "upload": "Upload",
+        "costs": "Costs",
+        "settings": "Settings"
+    },
+    "settings": {
+        "title": "Application Settings",
+        "saved": "Saved!",
+        "save": "Save Settings",
+        "saving": "Saving...",
+        "appearance": "Appearance",
+        "theme": "Color Theme",
+        "dark_mode": "Dark Mode",
+        "language": "Language",
+        "costs_title": "Cost Overrides",
+        "costs_desc": "Override the default pricing used for cost calculations. Leave blank to use defaults."
+    },
+    "upload": {
+        "title": "Upload Documents",
+        "subtitle": "Upload PDF documents (max 10 files) to trigger the classification pipeline.",
+        "drop_text": "or drag and drop",
+        "select": "Upload a file",
+        "limits": "PDF up to 10MB",
+        "start": "Start Upload",
+        "uploading": "Uploading..."
+    },
+    "dashboard": {
+        "total": "Total Emails",
+        "to_review": "To Review",
+        "accuracy": "Accuracy (Est.)",
+        "processed": "Processed",
+        "search": "Search emails...",
+        "tab_all": "All",
+        "tab_review": "To Review",
+        "tab_processed": "Processed",
+        "tab_errors": "Errors"
+    },
+    "costs": {
+        "title": "Cost Analysis",
+        "total_cost": "Est. Total Cost",
+        "tokens": "Total Tokens",
+        "pages": "Pages Processed"
+    }
+}

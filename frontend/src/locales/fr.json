@@ -1,0 +1,46 @@
+{
+    "nav": {
+        "dashboard": "Tableau de bord",
+        "upload": "Importer",
+        "costs": "Coûts",
+        "settings": "Paramètres"
+    },
+    "settings": {
+        "title": "Paramètres de l'application",
+        "saved": "Enregistré !",
+        "save": "Enregistrer",
+        "saving": "Enregistrement...",
+        "appearance": "Apparence",
+        "theme": "Thème de couleur",
+        "dark_mode": "Mode Sombre",
+        "language": "Langue",
+        "costs_title": "Surcharge des Coûts",
+        "costs_desc": "Modifier la tarification par défaut pour le calcul des coûts. Laisser vide pour utiliser les défauts."
+    },
+    "upload": {
+        "title": "Importer des documents",
+        "subtitle": "Importer des documents PDF (max 10 fichiers) pour lancer la classification.",
+        "drop_text": "ou glisser-déposer",
+        "select": "Choisir un fichier",
+        "limits": "PDF jusqu'à 10MB",
+        "start": "Lancer l'import",
+        "uploading": "Envoi..."
+    },
+    "dashboard": {
+        "total": "Emails Total",
+        "to_review": "À Valider",
+        "accuracy": "Précision (Est.)",
+        "processed": "Traités",
+        "search": "Rechercher...",
+        "tab_all": "Tout",
+        "tab_review": "À Valider",
+        "tab_processed": "Traités",
+        "tab_errors": "Erreurs"
+    },
+    "costs": {
+        "title": "Analyse des Coûts",
+        "total_cost": "Coût Est. Total",
+        "tokens": "Total Tokens",
+        "pages": "Pages Traitées"
+    }
+}

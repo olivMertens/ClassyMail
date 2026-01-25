@@ -1,10 +1,13 @@
 <script setup>
 import { ref } from 'vue'
 import { CloudArrowUpIcon, DocumentIcon, XMarkIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const dragActive = ref(false)
 const uploading = ref(false)
 const files = ref([])
+
 
 const handleDragOver = (e) => {
     e.preventDefault()
@@ -108,10 +111,10 @@ const uploadFiles = async () => {
     <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
       <div class="px-4 py-5 sm:p-6">
         <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
-          Upload Documents
+          {{ t('upload.title') }}
         </h3>
         <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
-          <p>Upload PDF documents (max 10 files) to trigger the classification pipeline.</p>
+          <p>{{ t('upload.subtitle') }}</p>
         </div>
 
         <div
@@ -131,7 +134,7 @@ const uploadFiles = async () => {
                 for="file-upload"
                 class="relative cursor-pointer rounded-md bg-white dark:bg-gray-800 font-semibold text-primary-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-primary-600 focus-within:ring-offset-2 hover:text-primary-500 px-2"
               >
-                <span>Upload a file</span>
+                <span>{{ t('upload.select') }}</span>
                 <input
                   id="file-upload"
                   name="file-upload"
@@ -143,11 +146,11 @@ const uploadFiles = async () => {
                 >
               </label>
               <p class="pl-1">
-                or drag and drop
+                {{ t('upload.drop_text') }}
               </p>
             </div>
             <p class="text-xs leading-5 text-gray-600 dark:text-gray-400">
-              PDF up to 10MB
+              {{ t('upload.limits') }}
             </p>
           </div>
         </div>
@@ -215,9 +218,10 @@ const uploadFiles = async () => {
           class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
           @click="uploadFiles"
         >
-          {{ uploading ? 'Uploading...' : 'Start Upload' }}
+          {{ uploading ? t('upload.uploading') : t('upload.start') }}
         </button>
       </div>
     </div>
   </div>
 </template>
+
