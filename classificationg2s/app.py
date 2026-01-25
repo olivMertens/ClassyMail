@@ -18,6 +18,7 @@ from classificationg2s.api.routers.settings import router as settings_router
 from classificationg2s.api.routers.upload import router as upload_router
 from classificationg2s.api.routers.emails import router as emails_router
 from classificationg2s.api.routers.webhook import router as webhook_router
+from classificationg2s.api.routers.costs import router as costs_router
 
 
 def create_app() -> FastAPI:
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
     app.include_router(upload_router)
     app.include_router(emails_router)
     app.include_router(webhook_router)
+    app.include_router(costs_router)
 
     @app.on_event("startup")
     async def on_startup():

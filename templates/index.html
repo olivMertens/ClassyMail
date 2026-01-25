@@ -34,6 +34,7 @@
           {{ tr('export_finetune') }} ({{ finetune.reviewed_ready }}/{{ finetune.min_required }})
         </button>
         <button @click="openSettings" class="px-3 py-2 text-sm bg-slate-800 rounded shadow hover:bg-slate-700">⚙</button>
+        <button @click="openCosts" class="px-3 py-2 text-sm bg-slate-800 rounded shadow hover:bg-slate-700">💰</button>
         <div class="flex gap-4">
           <div class="bg-slate-800 px-4 py-2 rounded shadow">
             <div class="text-slate-400 text-sm">{{ tr('total') }}</div>
@@ -235,6 +236,75 @@
         </div>
       </div>
     </div>
+
+    <!-- Costs Modal -->
+    <div v-if="showCosts" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+      <div class="bg-slate-900 rounded-lg p-6 max-w-2xl w-full shadow border border-slate-700">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xl font-semibold">{{ tr('costs_arch') }}</h3>
+          <button @click="showCosts=false" class="text-slate-400 hover:text-slate-200">✕</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+          <div class="bg-slate-800 p-3 rounded">
+            <div class="text-xs text-slate-400">{{ tr('emails_processed') }}</div>
+            <div class="text-lg font-semibold">{{ costs?.counts?.processed ?? 0 }}</div>
+          </div>
+          <div class="bg-slate-800 p-3 rounded">
+            <div class="text-xs text-slate-400">{{ tr('emails_with_usage') }}</div>
+            <div class="text-lg font-semibold">{{ costs?.counts?.emails_with_usage ?? 0 }}</div>
+          </div>
+          <div class="bg-slate-800 p-3 rounded">
+            <div class="text-xs text-slate-400">{{ tr('avg_ai_cost_email') }}</div>
+            <div class="text-lg font-semibold">${{ (costs?.avg_usd_per_email?.ai_total ?? 0).toFixed(4) }}</div>
+          </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row md:items-end gap-3 mb-4">
+          <div class="flex-1">
+            <label class="text-sm text-slate-400">{{ tr('emails_per_month') }}</label>
+            <input v-model.number="emailsPerMonth" type="number" min="0" step="100" class="w-full bg-slate-800 rounded px-3 py-2 text-sm" />
+          </div>
+          <button @click="loadCosts" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded">{{ tr('recalculate') }}</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-slate-800 p-3 rounded">
+            <div class="text-slate-200 font-semibold mb-2">{{ tr('actual_ai_spend') }}</div>
+            <div class="text-sm text-slate-300">Phi-4: ${{ (costs?.actual_usd?.phi4 ?? 0).toFixed(4) }}</div>
+            <div class="text-sm text-slate-300">Mistral OCR: ${{ (costs?.actual_usd?.mistral_ocr ?? 0).toFixed(4) }}</div>
+            <div class="text-sm text-slate-100 font-semibold mt-1">Total AI: ${{ (costs?.actual_usd?.ai_total ?? 0).toFixed(4) }}</div>
+          </div>
+          <div class="bg-slate-800 p-3 rounded">
+            <div class="text-slate-200 font-semibold mb-2">{{ tr('monthly_projection') }}</div>
+            <div class="text-sm text-slate-300">AI (variable): ${{ (costs?.projection_monthly_usd?.ai_variable ?? 0).toFixed(2) }}</div>
+            <div class="text-sm text-slate-300">Infra (fixe est.): ${{ (costs?.projection_monthly_usd?.fixed ?? 0).toFixed(2) }}</div>
+            <div class="text-sm text-slate-100 font-semibold mt-1">Total: ${{ (costs?.projection_monthly_usd?.total ?? 0).toFixed(2) }}</div>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <div class="text-slate-200 font-semibold mb-2">{{ tr('breakdown') }}</div>
+          <div class="bg-slate-800 rounded border border-slate-700 overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-900/60 text-slate-300">
+                <tr>
+                  <th class="text-left px-3 py-2">{{ tr('resource') }}</th>
+                  <th class="text-right px-3 py-2">USD/mois</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, idx) in (costs?.projection_monthly_usd?.breakdown || [])" :key="idx" class="border-t border-slate-700">
+                  <td class="px-3 py-2 text-slate-200">{{ row.resource }}</td>
+                  <td class="px-3 py-2 text-right text-slate-200">${{ (row.usd ?? 0).toFixed(2) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-xs text-slate-500 mt-2" v-if="costs?.notes?.length">{{ costs.notes.join(' ') }}</p>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -252,6 +322,9 @@
           form: { intents_json: '[]' },
           settings: { phi4_input_per_1k: null, phi4_output_per_1k: null, mistral_per_1k_pages: null },
           showSettings: false,
+          showCosts: false,
+          costs: null,
+          emailsPerMonth: 10000,
           continuationToken: null,
           lang: 'fr',
           showInfo: false,
@@ -332,6 +405,18 @@
                     if (res.ok) this.settings = await res.json();
                   }
                 },
+        openCosts() {
+          this.showCosts = true;
+          this.loadCosts();
+        },
+        async loadCosts() {
+          const params = new URLSearchParams();
+          params.set('emails_per_month', String(this.emailsPerMonth ?? 0));
+          const res = await fetch(`/api/costs/summary?${params.toString()}`);
+          if (res.ok) {
+            this.costs = await res.json();
+          }
+        },
         exportCsv() {
           window.location = '/api/emails/export';
         },
@@ -559,6 +644,16 @@
         settings: "Paramètres",
         save: "Enregistrer",
         cancel: "Annuler",
+        costs_arch: "Coûts (architecture)",
+        emails_per_month: "Emails / mois",
+        recalculate: "Recalculer",
+        actual_ai_spend: "Dépense AI (réelle, depuis Cosmos)",
+        monthly_projection: "Estimation mensuelle",
+        breakdown: "Détail par ressource",
+        resource: "Ressource",
+        emails_processed: "Traités",
+        emails_with_usage: "Avec usage (coûts)",
+        avg_ai_cost_email: "Coût AI moyen / email",
       },
       en: {
         title: "ClassiMail Agent",
@@ -604,6 +699,16 @@
         settings: "Settings",
         save: "Save",
         cancel: "Cancel",
+        costs_arch: "Costs (architecture)",
+        emails_per_month: "Emails / month",
+        recalculate: "Recalculate",
+        actual_ai_spend: "AI spend (actual, from Cosmos)",
+        monthly_projection: "Monthly estimate",
+        breakdown: "Per-resource breakdown",
+        resource: "Resource",
+        emails_processed: "Processed",
+        emails_with_usage: "With usage (costs)",
+        avg_ai_cost_email: "Avg AI cost / email",
       }
     };
 

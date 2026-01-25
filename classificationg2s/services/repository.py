@@ -66,6 +66,43 @@ async def count_reviewed_ready_items(clients: Clients | None = None) -> int:
     return 0
 
 
+async def _scalar_query(query: str, *, clients: Clients | None = None, parameters: list[dict] | None = None):
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    it = clients.cosmos_container.query_items(
+        query,
+        parameters=parameters,
+        enable_cross_partition_query=True,
+    )
+    async for v in it:
+        return v
+    return None
+
+
+async def sum_phi4_cost_usd(*, clients: Clients | None = None) -> float:
+    v = await _scalar_query(
+        "SELECT VALUE SUM(c.usage.phi4_cost_usd) FROM c WHERE IS_DEFINED(c.usage) AND IS_DEFINED(c.usage.phi4_cost_usd)",
+        clients=clients,
+    )
+    return float(v or 0.0)
+
+
+async def sum_mistral_cost_usd(*, clients: Clients | None = None) -> float:
+    v = await _scalar_query(
+        "SELECT VALUE SUM(c.usage.mistral.cost_usd) FROM c WHERE IS_DEFINED(c.usage) AND IS_DEFINED(c.usage.mistral) AND IS_DEFINED(c.usage.mistral.cost_usd)",
+        clients=clients,
+    )
+    return float(v or 0.0)
+
+
+async def count_items_with_any_usage_cost(*, clients: Clients | None = None) -> int:
+    v = await _scalar_query(
+        "SELECT VALUE COUNT(1) FROM c WHERE (IS_DEFINED(c.usage.phi4_cost_usd) OR IS_DEFINED(c.usage.mistral.cost_usd))",
+        clients=clients,
+    )
+    return int(v or 0)
+
+
 async def export_finetune_jsonl_iter(
     *,
     clients: Clients | None = None,
