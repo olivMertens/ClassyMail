@@ -72,7 +72,7 @@ jobs:
 
       - name: Install deps
         run: |
-          uv sync --frozen --dev
+          uv sync --frozen --extra dev
 
       - name: Setup Node
         if: ${{ matrix.task == 'playwright' }}
