@@ -39,95 +39,18 @@ flowchart TD
     api -->|Dashboard UI| user
 ```
 
-## 🚀 Composants Clés
-## 👩‍💻 Développeurs
+## 🔧 Installation & Exécution (aperçu)
 
-- **Author:** Olivier Mertens — olmertens@microsoft.com
-
-### Hooks & lint
-
-1. `uv sync --frozen --dev`
-2. `pre-commit install` (installs git hooks for ruff/terraform)
-3. Or set hooks path: `git config core.hooksPath .githooks`
-
-Pre-push runs: `ruff check`, `pytest`, `terraform validate` (infra/).
-
-### 🔧 Playwright (CI + local)
-
-- **CI**: la matrice de validation inclut Playwright (voir `.github/workflows/deploy.yml`). Elle démarre l’API localement, installe les deps Node, installe les browsers, puis exécute `npm run test:e2e`.
-- **Local** (scénario identique au CI):
+Voir [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md) pour toutes les options (uv/poetry/pip) et le chargement de `secrets.env`.
 
 ```bash
-uv sync --dev
-uv run uvicorn classificationg2s.app:app --port 8000
-
-npm ci
-npx playwright install --with-deps
-npm run test:e2e
+uv sync
+uv run uvicorn classificationg2s.app:app --reload
 ```
 
-### 📦 Build & ACR (images)
+CI/CD : [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) | GitLab : [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md)
 
-- **Image publique** (ex: `mcr.microsoft.com/azuredocs/containerapps-helloworld:latest`) : **ACR non requis**.
-- **Image privée** : **ACR requis** + renseigner `acr_name` (et `acr_resource_group`) dans `infra/terraform.tfvars` pour que l’identité managée ait le rôle `AcrPull`.
-
-Scripts de build/push:
-- PowerShell: `scripts/build_acr.ps1`
-- Bash: `scripts/build_acr.sh`
-
-
-| Composant | Service Azure | Rôle |
-| :--- | :--- | :--- |
-| **Ingestion** | Blob Storage | Stockage brut des PDF (froid). |
-| **Buffer** | Service Bus | File d'attente pour lisser la charge (évite les 429 sur l'IA). |
-| **OCR** | **Mistral Document AI** | Extraction structurelle (Markdown) à faible coût (~1$/1k pages). |
-| **Cerveau** | **Phi-4** | Raisonnement et classification des intentions. |
-| **Compute** | Container Apps | Hébergement du code Python (FastAPI) avec auto-scaling KEDA. |
-| **Mémoire** | Cosmos DB | Stockage des résultats JSON et suivi de l'état (Processed/Review). |
-| **Dashboard** | FastAPI + Vue 3 | SPA pour review/validation et recherche. |
-
-## ♻️ Reinforcement Loop & Fine-Tuning Phi-4
-
-### Stratégie Fine-Tuning (20 catégories)
-- **Pertinence** : Oui, le prompt seul ne suffit plus (contexte long, confusions).
-- **Données** : 50–100 exemples/catégorie ⇒ **1000–2000** emails.
-- **Technique** : **LoRA** (30–60 min, low cost).
-- **Workflow** :
-    1. Zero-shot (Phi-4 base)
-    2. Corrections humaines (Dashboard)
-    3. `reviewed:true` dans Cosmos DB
-    4. Export JSONL hebdo vers Foundry
-    5. Fine-tune ⇒ `Phi-4-Custom-v1`
-    6. Déploiement
-- **ROI** : Précision **~85% ➜ >98%**, coût inference ~identique, validation humaine réduite.
-
-### Prompt Multi-Intents (Phi-4)
-```python
-system_prompt = """
-Tu es un assistant expert en classification d'emails d'assurance.
-Ta tâche est d'analyser le contenu de l'email (fourni en markdown) et d'identifier TOUTES les intentions présentes.
-LISTE DES INTENTIONS POSSIBLES :
-1. Attestation habitation
-2. Attestation scolaire
-3. Relevé de compte
-4. Dommages électriques
-5. Événements naturels
-FORMAT JSON UNIQUEMENT :
-{
-    "detected_intents": [
-        {"intent": "...", "confidence": 0.95, "justification": "..."}
-    ],
-    "global_complexity": "Simple|Complexe"
-}
-"""
-```
-
-### Décision `needs_review`
-- Aucune intention ➜ review
-- Confidence < 0.85 ➜ review
-- >3 intentions ➜ review
-
-### Reinforcement Loop
+Tests rapides : voir [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md#lancer-lappli)
 1. **UI** : validation/correction (FastAPI Dashboard)
 2. **Golden Dataset** : `classification.needs_review=false`, `reviewed=true`
 3. **Export Foundry** : JSONL hebdomadaire
@@ -489,4 +412,3 @@ curl -X POST http://localhost:8000/webhook/ingest -H "Content-Type: application/
 - `requirements.txt`
 - `uv.lock`
 - `.gitignore` (Python + FastAPI + data/)
-

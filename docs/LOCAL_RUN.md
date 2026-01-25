@@ -75,35 +75,9 @@ uv run uvicorn main:app --reload
 
 Ouvrir : `http://127.0.0.1:8000/`
 
-## Build & push image (local)
+## Build & push image
 
-### Option A : build distant via ACR (recommandé)
-
-```bash
-export ACR_NAME=<monacr>
-export TAG=local
-scripts/build_acr.sh  # ou ./scripts/build_acr.sh
-```
-
-### Option B : build docker local + push
-
-```bash
-export ACR_NAME=<monacr>
-export TAG=local
-PUSH_METHOD=docker scripts/build_acr.sh
-```
-
-PowerShell :
-
-```powershell
-./scripts/build_acr.ps1 -AcrName <monacr> -Tag local -PushMethod acr
-```
-
-Ensuite, passez l’image à Terraform (`infra/terraform.tfvars`) :
-
-```hcl
-container_image = "<monacr>.azurecr.io/classimail-agent:local"
-```
+Voir [docs/DEV_LOCAL_BUILD.md](DEV_LOCAL_BUILD.md) pour les commandes détaillées (scripts et manuel) et le déploiement ACA sans CI.
 
 ## Notes
 

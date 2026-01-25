@@ -169,22 +169,4 @@ Référence IaC dans GitHub Actions : https://learn.microsoft.com/en-us/devops/d
 
 ## Build local & ACR
 
-Pour tester ou pré-pusher une image depuis votre poste :
-
-```bash
-export ACR_NAME=<monacr>
-export TAG=$(git rev-parse --short HEAD)
-scripts/build_acr.sh   # build remote via az acr build
-```
-
-Ou en PowerShell :
-
-```powershell
-./scripts/build_acr.ps1 -AcrName <monacr> -Tag (git rev-parse --short HEAD)
-```
-
-Ensuite, set `container_image` dans `infra/terraform.tfvars` :
-
-```hcl
-container_image = "<monacr>.azurecr.io/classimail-agent:${TAG}"
-```
+Voir [docs/DEV_LOCAL_BUILD.md](DEV_LOCAL_BUILD.md) pour les scripts et commandes manuelles (build/push ACR, deploy ACA sans CI).

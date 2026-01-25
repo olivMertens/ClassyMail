@@ -82,4 +82,3 @@ exclude = ["main.py"]
 
 [tool.pytest.ini_options]
 addopts = "-p no:xdist"
-

@@ -137,7 +137,7 @@ resource "azapi_resource" "ai_foundry" {
   })
 }
 
-# Note: Le déploiement des modèles (Mistral/Phi) se fait souvent manuellement 
+# Note: Le déploiement des modèles (Mistral/Phi) se fait souvent manuellement
 # ou via azapi_resource car les offres Marketplace changent vite.
 # Ici, nous créons le Hub pour accueillir les modèles.
 

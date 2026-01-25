@@ -653,7 +653,7 @@ async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False
         raise RuntimeError("PHI_FALLBACK_ENDPOINT is not set")
 
     headers = await auth_headers()
-    system_prompt = """ 
+    system_prompt = """
 Tu es un assistant expert en classification d'emails d'assurance.
 Ta tâche est d'analyser le contenu de l'email (fourni en markdown) et d'identifier TOUTES les intentions présentes.
 
