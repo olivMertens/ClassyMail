@@ -1,16 +1,16 @@
 # TERRAFORM
 
-Terraform lives in `infra/`.
+Terraform est dans `infra/`.
 
-This folder provisions the Azure infrastructure used by the app:
+Ce dossier provisionne l’infra Azure de l’app :
 - Storage account + container `pdf-inputs`
-- Event Grid subscription → Service Bus queue
+- Event Grid → Service Bus queue
 - Service Bus namespace + queue
-- Cosmos DB (serverless) + SQL database/container
-- Azure AI Foundry / AI Services account + project
-- Managed identity + RBAC assignments
+- Cosmos DB (serverless) + base/collection SQL
+- Azure AI Foundry / Azure AI Services + projet
+- Identité managée + rôles (RBAC)
 
-## Deploy (Windows)
+## Déploiement (Windows)
 
 ```powershell
 ./infra/deploy.ps1
@@ -22,7 +22,7 @@ The script can optionally target a tenant/subscription:
 ./infra/deploy.ps1 -TenantId <TENANT_ID> -SubscriptionId <SUBSCRIPTION_ID>
 ```
 
-## Deploy (manual)
+## Déploiement (manuel)
 
 ```powershell
 az login
@@ -35,33 +35,39 @@ terraform -chdir=infra plan -var "subscription_id=<SUBSCRIPTION_ID>" -out tfplan
 terraform -chdir=infra apply tfplan
 ```
 
-## Why we still pass subscription_id
+## Pourquoi passer `subscription_id`
 
-Some AzureRM versions cannot reliably infer the subscription from Azure CLI context. The deploy script detects the active subscription (`az account show`) and passes it to Terraform automatically.
+Certaines versions AzureRM n’infèrent pas toujours la subscription depuis Azure CLI. Le script `deploy.ps1` détecte la subscription active (`az account show`) et la passe à Terraform.
 
-## Policy-friendly defaults
+## Defaults compatibles policies
 
-- Storage is OAuth-only (no Shared Key).
-- Service Bus local auth disabled.
-- Cosmos uses Entra auth (RBAC) by default; no Cosmos key needed.
+- Storage en OAuth-only (pas de Shared Key).
+- Service Bus auth locale désactivée.
+- Cosmos en Entra ID (RBAC) par défaut ; pas de clé Cosmos nécessaire.
 
-### Cosmos DB (Native RBAC) note
+### Cosmos DB (RBAC data-plane)
 
-This project uses Cosmos **SQL data-plane RBAC** (`azurerm_cosmosdb_sql_role_assignment`).
+Le projet utilise **Cosmos SQL data-plane RBAC** (`azurerm_cosmosdb_sql_role_assignment`).
 
-In some tenants, assigning the built-in role at container scope (`/dbs/<db>/colls/<container>`) is not sufficient for metadata reads (you may see `Forbidden` on `readMetadata`).
-We therefore assign **Cosmos DB Built-in Data Contributor** at **database scope** (`/dbs/<db>`), which matches the runtime fix validated in Azure Container Apps.
+Sur certains tenants, l’assignation d’un rôle built-in au scope collection (`/dbs/<db>/colls/<container>`) n’est pas suffisante pour lire les métadonnées (`Forbidden` sur `readMetadata`).
+On assigne donc **Cosmos DB Built-in Data Contributor** au scope base (`/dbs/<db>`), conforme au fix validé côté Container Apps.
 
-## Repo hygiene (what to commit)
+## Hygiene repo (ce qu’on commit)
 
-Safe to commit from `infra/`:
+À committer :
 - `main.tf`
 - `.terraform.lock.hcl`
 - `deploy.ps1`
 - `terraform.tfvars.example`
 
-Do NOT commit:
+Ne pas committer :
 - `.terraform/`
 - `terraform.tfstate*`
 - `tfplan`
 - `terraform.tfvars` (real values)
+
+## Images & registries
+
+- `variable "container_image"` **obligatoire** : image publique (*ex*: `mcr.microsoft.com/azuredocs/containerapps-helloworld:latest`) ou privée (*ex*: `<monacr>.azurecr.io/classimail-agent:tag`).
+- ACR **non obligatoire** avec image publique.
+- ACR privé : renseigner `acr_name` (+ `acr_resource_group` si différent) pour que Terraform assigne **AcrPull** à l’identité managée.

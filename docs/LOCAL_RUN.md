@@ -1,35 +1,35 @@
-# LOCAL_RUN
+# Exécution locale
 
-## Prerequisites
+## Prérequis
 
-- Python 3.11 or 3.12 (Azure SDK wheels may not be available for Python 3.13 yet)
-- One of: `uv`, Poetry, or pip
+- Python 3.11 ou 3.12 (certains wheels Azure SDK ne sont pas encore publiés pour 3.13)
+- Outil d'env : `uv` (recommandé), Poetry ou pip
 
-## Install
+## Installation
 
-### Option A: uv (recommended)
+### Option A : uv (recommandé)
 
 ```bash
 uv lock
 uv sync
 ```
 
-If you have multiple Python versions installed and want to be explicit:
+Pour forcer Python 3.12 si plusieurs versions sont installées :
 
 ```bash
 uv lock --python 3.12
 uv sync --python 3.12
 ```
 
-### Option B: pip
+### Option B : pip
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Configure environment
+## Variables d’environnement
 
-Create a local `secrets.env` (NOT committed). Minimal variables:
+Créer un fichier local `secrets.env` (NON committé). Variables minimales :
 
 ```dotenv
 AI_ENDPOINT=https://<your-ai-endpoint>.cognitiveservices.azure.com/
@@ -53,7 +53,7 @@ PHI_DEPLOYMENT=phi-4
 PHI_FALLBACK_DEPLOYMENT=gpt-4o-mini
 ```
 
-Then load it before running:
+Charger dans la session avant de lancer :
 
 ### PowerShell
 
@@ -65,15 +65,45 @@ Get-Content .\secrets.env | ForEach-Object {
 }
 ```
 
-## Run
+## Lancer l’appli
 
-### API + worker in one process
+### API + worker dans un seul process (dev)
 
 ```bash
 uv run uvicorn main:app --reload
 ```
 
-Then open: `http://127.0.0.1:8000/`
+Ouvrir : `http://127.0.0.1:8000/`
+
+## Build & push image (local)
+
+### Option A : build distant via ACR (recommandé)
+
+```bash
+export ACR_NAME=<monacr>
+export TAG=local
+scripts/build_acr.sh  # ou ./scripts/build_acr.sh
+```
+
+### Option B : build docker local + push
+
+```bash
+export ACR_NAME=<monacr>
+export TAG=local
+PUSH_METHOD=docker scripts/build_acr.sh
+```
+
+PowerShell :
+
+```powershell
+./scripts/build_acr.ps1 -AcrName <monacr> -Tag local -PushMethod acr
+```
+
+Ensuite, passez l’image à Terraform (`infra/terraform.tfvars`) :
+
+```hcl
+container_image = "<monacr>.azurecr.io/classimail-agent:local"
+```
 
 ## Notes
 

@@ -127,3 +127,44 @@ sequenceDiagram
 
 **Flux** : identique, avec scaling horizontal >1 instance ACA et KEDA sur SB queue.
 
+
+### 2. Nouveau vs Ancien
+
+**Nouveau (API + Worker séparés sur ACA) :**
+```mermaid
+flowchart LR
+  Client -->|HTTP| API[API Container App]
+  API --> SBQ[Service Bus Queue]
+  SBQ --> Worker[Worker Container App]
+  API --> Cosmos[(Cosmos DB)]
+  Worker --> Cosmos
+  API --> Storage[(Blob Storage)]
+  Worker --> Storage
+  API --> Foundry[Azure AI Foundry]
+  Worker --> Foundry
+```
+- API expose `/healthz` + `/readyz` (alias `/health`, `/ready`).
+- Worker scale avec KEDA (scaler azure-servicebus, identité managée).
+- Même image pour les deux; worker: `python -m classificationg2s.worker_main`.
+
+**Ancien (mono-process):** API + worker dans le même process, scaling couplé et clients globaux vieillissants.
+
+### 4. Nouveau découpage API + Worker (ACA)
+
+```mermaid
+flowchart LR
+  Client -->|HTTP| API[API Container App]
+  API --> SBQ[Service Bus Queue]
+  SBQ --> Worker[Worker Container App]
+  API --> Cosmos[(Cosmos DB)]
+  Worker --> Cosmos
+  API --> Storage[(Blob Storage)]
+  Worker --> Storage
+  API --> Foundry[Azure AI Foundry]
+  Worker --> Foundry
+```
+
+- API expose `/healthz` `/readyz` (alias `/health` `/ready`).
+- Worker scale via KEDA (azure-servicebus, managed identity).
+- Même image pour API/Worker; worker: `python -m classificationg2s.worker_main`.
+- MI `app_id` a les rôles: Storage Blob Data Contributor, Azure Service Bus Data Receiver/Sender, Cosmos DB SQL Data Contributor, Cognitive Services User.

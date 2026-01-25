@@ -1,6 +1,8 @@
 
 # POC Classification Emails : Azure AI Foundry & Mistral + FastAPI Dashboard
 
+**Author:** Olivier Mertens — olmertens@microsoft.com
+
 ## 📚 Documentation
 
 - [Docs home](docs/INDEX.md)
@@ -37,6 +39,18 @@ flowchart TD
 ```
 
 ## 🚀 Composants Clés
+## 👩‍💻 Développeurs
+
+- **Autor:** Olivier Mertens — olmertens@microsoft.com
+
+### Hooks & lint
+
+1. `uv sync --frozen --dev`
+2. `pre-commit install` (installs git hooks for ruff/terraform)
+3. Or set hooks path: `git config core.hooksPath .githooks`
+
+Pre-push runs: `ruff check`, `pytest`, `terraform validate` (infra/).
+
 
 | Composant | Service Azure | Rôle |
 | :--- | :--- | :--- |

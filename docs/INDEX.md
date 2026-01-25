@@ -11,7 +11,7 @@
 - [CICD_GITLAB](CICD_GITLAB.md)
 - [LOCAL_RUN](LOCAL_RUN.md)
 
-## Quick links
+## Liens rapides
 
-- Local run: see [LOCAL_RUN](LOCAL_RUN.md)
-- Infra deploy script: `infra/deploy.ps1`
+- Exécuter en local : voir [LOCAL_RUN](LOCAL_RUN.md)
+- Script de déploiement infra : `infra/deploy.ps1`

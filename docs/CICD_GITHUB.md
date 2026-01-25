@@ -69,13 +69,20 @@ Références :
 
 ## Workflow de déploiement (Container Apps)
 
-Le workflow [deploy.yml](../.github/workflows/deploy.yml) :
+ Le workflow [deploy.yml](../.github/workflows/deploy.yml) :
 
 - build/test (uv + `python -m compileall`)
 - build & push image Docker
 - déploiement sur Azure Container Apps
 - affectation d'une **User Assigned Managed Identity** à la Container App (pour RBAC data-plane, sans clés)
 - injection des variables d'environnement nécessaires
+
+### Étapes de validation
+
+- `uv run ruff check .`
+- `uv run pytest`
+- `terraform init -backend=false` + `terraform validate`
+- **Playwright E2E** : `npm ci && npx playwright install --with-deps && npm run test:e2e` (le workflow démarre l'API localement)
 
 ### Secrets GitHub requis (OIDC)
 
@@ -159,3 +166,25 @@ jobs:
 - Séparer dev/test/prod (subscriptions/environments GitHub).
 
 Référence IaC dans GitHub Actions : https://learn.microsoft.com/en-us/devops/deliver/iac-github-actions
+
+## Build local & ACR
+
+Pour tester ou pré-pusher une image depuis votre poste :
+
+```bash
+export ACR_NAME=<monacr>
+export TAG=$(git rev-parse --short HEAD)
+scripts/build_acr.sh   # build remote via az acr build
+```
+
+Ou en PowerShell :
+
+```powershell
+./scripts/build_acr.ps1 -AcrName <monacr> -Tag (git rev-parse --short HEAD)
+```
+
+Ensuite, set `container_image` dans `infra/terraform.tfvars` :
+
+```hcl
+container_image = "<monacr>.azurecr.io/classimail-agent:${TAG}"
+```
