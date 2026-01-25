@@ -52,6 +52,19 @@ Le projet utilise **Cosmos SQL data-plane RBAC** (`azurerm_cosmosdb_sql_role_ass
 Sur certains tenants, l’assignation d’un rôle built-in au scope collection (`/dbs/<db>/colls/<container>`) n’est pas suffisante pour lire les métadonnées (`Forbidden` sur `readMetadata`).
 On assigne donc **Cosmos DB Built-in Data Contributor** au scope base (`/dbs/<db>`), conforme au fix validé côté Container Apps.
 
+## Rôles Assignés (Identity)
+
+Terraform crée une **User Assigned Managed Identity** (`<prefix>-id`) et lui assigne les rôles suivants sur les ressources créées :
+
+| Ressource | Rôle | Description |
+|-----------|------|-------------|
+| **Storage Account** | `Storage Blob Data Contributor` | Lecture/Ecriture des PDFs dans le container `pdf-inputs`. |
+| **Service Bus** | `Azure Service Bus Data Receiver` | Lecture des messages depuis la queue (Worker). |
+| **Service Bus** | `Azure Service Bus Data Sender` | Envoi (si besoin) ou gestion deadcheck (API/Worker). |
+| **ACR** | `AcrPull` | Pull des images Docker privées (si `acr_name` fourni). |
+| **AI Foundry / Services** | `Cognitive Services User` | Appel des APIs d'inférence (Phi-4, Mistral). |
+| **Cosmos DB** | `Cosmos DB Built-in Data Contributor` | Lecture/Ecriture des résultats de classification (Scope Database). |
+
 ## Hygiene repo (ce qu’on commit)
 
 À committer :
