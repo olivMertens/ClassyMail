@@ -18,17 +18,23 @@ const openEmail = (email) => {
 </script>
 
 <template>
-  <DashboardLayout :currentView="currentView" @change-view="view => currentView = view">
-     <DashboardView v-if="currentView === 'dashboard'" @open-email="openEmail" />
-     <UploadView v-else-if="currentView === 'upload'" />
-     <CostsView v-else-if="currentView === 'costs'" />
-     <SettingsView v-else-if="currentView === 'settings'" />
+  <DashboardLayout
+    :current-view="currentView"
+    @change-view="view => currentView = view"
+  >
+    <DashboardView
+      v-if="currentView === 'dashboard'"
+      @open-email="openEmail"
+    />
+    <UploadView v-else-if="currentView === 'upload'" />
+    <CostsView v-else-if="currentView === 'costs'" />
+    <SettingsView v-else-if="currentView === 'settings'" />
      
-     <EmailDetailModal 
-        :emailId="selectedEmailId" 
-        :isOpen="isModalOpen" 
-        @close="isModalOpen = false"
-        @updated="() => {} /* Optional: refetch dashboard */"
-     />
+    <EmailDetailModal 
+      :email-id="selectedEmailId" 
+      :is-open="isModalOpen" 
+      @close="isModalOpen = false"
+      @updated="() => {} /* Optional: refetch dashboard */"
+    />
   </DashboardLayout>
 </template>

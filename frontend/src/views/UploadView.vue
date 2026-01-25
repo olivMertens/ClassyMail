@@ -101,67 +101,117 @@ const uploadFiles = async () => {
   <div class="max-w-3xl mx-auto space-y-6">
     <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
       <div class="px-4 py-5 sm:p-6">
-        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">Upload Documents</h3>
+        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+          Upload Documents
+        </h3>
         <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
           <p>Upload PDF documents (max 10 files) to trigger the classification pipeline.</p>
         </div>
         
         <div 
-            class="mt-5 flex justify-center rounded-lg border border-dashed border-gray-900/25 dark:border-gray-600 px-6 py-10 transition-colors"
-            :class="[dragActive ? 'bg-primary-50 border-primary-500 dark:bg-gray-700' : 'bg-gray-50 dark:bg-gray-900']"
-            @dragover="handleDragOver"
-            @dragleave="handleDragLeave"
-            @drop="handleDrop"
+          class="mt-5 flex justify-center rounded-lg border border-dashed border-gray-900/25 dark:border-gray-600 px-6 py-10 transition-colors"
+          :class="[dragActive ? 'bg-primary-50 border-primary-500 dark:bg-gray-700' : 'bg-gray-50 dark:bg-gray-900']"
+          @dragover="handleDragOver"
+          @dragleave="handleDragLeave"
+          @drop="handleDrop"
         >
-            <div class="text-center">
-                <CloudArrowUpIcon class="mx-auto h-12 w-12 text-gray-300" aria-hidden="true" />
-                <div class="mt-4 flex text-sm leading-6 text-gray-600 dark:text-gray-400">
-                    <label for="file-upload" class="relative cursor-pointer rounded-md bg-white dark:bg-gray-800 font-semibold text-primary-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-primary-600 focus-within:ring-offset-2 hover:text-primary-500 px-2">
-                        <span>Upload a file</span>
-                        <input id="file-upload" name="file-upload" type="file" class="sr-only" multiple accept=".pdf" @change="handleFileSelect" />
-                    </label>
-                    <p class="pl-1">or drag and drop</p>
-                </div>
-                <p class="text-xs leading-5 text-gray-600 dark:text-gray-400">PDF up to 10MB</p>
+          <div class="text-center">
+            <CloudArrowUpIcon
+              class="mx-auto h-12 w-12 text-gray-300"
+              aria-hidden="true"
+            />
+            <div class="mt-4 flex text-sm leading-6 text-gray-600 dark:text-gray-400">
+              <label
+                for="file-upload"
+                class="relative cursor-pointer rounded-md bg-white dark:bg-gray-800 font-semibold text-primary-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-primary-600 focus-within:ring-offset-2 hover:text-primary-500 px-2"
+              >
+                <span>Upload a file</span>
+                <input
+                  id="file-upload"
+                  name="file-upload"
+                  type="file"
+                  class="sr-only"
+                  multiple
+                  accept=".pdf"
+                  @change="handleFileSelect"
+                >
+              </label>
+              <p class="pl-1">
+                or drag and drop
+              </p>
             </div>
+            <p class="text-xs leading-5 text-gray-600 dark:text-gray-400">
+              PDF up to 10MB
+            </p>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- File List -->
-    <div v-if="files.length" class="bg-white dark:bg-gray-800 shadow sm:rounded-lg overflow-hidden">
-        <ul role="list" class="divide-y divide-gray-200 dark:divide-gray-700">
-            <li v-for="file in files" :key="file.id" class="px-4 py-4 sm:px-6 flex items-center justify-between">
-                <div class="flex items-center truncate">
-                    <DocumentIcon class="h-5 w-5 text-gray-400 flex-shrink-0" />
-                    <span class="ml-2 truncate text-sm font-medium text-gray-900 dark:text-gray-200" :title="file.file.name">{{ file.file.name }}</span>
-                    <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">{{ (file.file.size / 1024 / 1024).toFixed(2) }} MB</span>
-                </div>
-                <div class="flex items-center ml-4">
-                    <div v-if="file.status === 'uploading'" class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600 mr-2"></div>
-                    <CheckCircleIcon v-else-if="file.status === 'success'" class="h-5 w-5 text-green-500 mr-2" />
-                    <ExclamationTriangleIcon v-else-if="file.status === 'error'" class="h-5 w-5 text-red-500 mr-2" />
+    <div
+      v-if="files.length"
+      class="bg-white dark:bg-gray-800 shadow sm:rounded-lg overflow-hidden"
+    >
+      <ul
+        role="list"
+        class="divide-y divide-gray-200 dark:divide-gray-700"
+      >
+        <li
+          v-for="file in files"
+          :key="file.id"
+          class="px-4 py-4 sm:px-6 flex items-center justify-between"
+        >
+          <div class="flex items-center truncate">
+            <DocumentIcon class="h-5 w-5 text-gray-400 flex-shrink-0" />
+            <span
+              class="ml-2 truncate text-sm font-medium text-gray-900 dark:text-gray-200"
+              :title="file.file.name"
+            >{{ file.file.name }}</span>
+            <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">{{ (file.file.size / 1024 / 1024).toFixed(2) }} MB</span>
+          </div>
+          <div class="flex items-center ml-4">
+            <div
+              v-if="file.status === 'uploading'"
+              class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600 mr-2"
+            />
+            <CheckCircleIcon
+              v-else-if="file.status === 'success'"
+              class="h-5 w-5 text-green-500 mr-2"
+            />
+            <ExclamationTriangleIcon
+              v-else-if="file.status === 'error'"
+              class="h-5 w-5 text-red-500 mr-2"
+            />
                     
-                    <span v-if="file.message" class="text-xs mr-3" :class="{'text-red-500': file.status === 'error', 'text-green-500': file.status === 'success'}">
-                        {{ file.message }}
-                    </span>
+            <span
+              v-if="file.message"
+              class="text-xs mr-3"
+              :class="{'text-red-500': file.status === 'error', 'text-green-500': file.status === 'success'}"
+            >
+              {{ file.message }}
+            </span>
                     
-                    <button v-if="file.status !== 'uploading'" @click="removeFile(file.id)" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
-                        <XMarkIcon class="h-5 w-5" />
-                    </button>
-                </div>
-            </li>
-        </ul>
-        <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 flex justify-end">
-             <button 
-                type="button" 
-                @click="uploadFiles" 
-                :disabled="uploading || !files.some(f => f.status === 'pending' || f.status === 'error')"
-                class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
-             >
-                {{ uploading ? 'Uploading...' : 'Start Upload' }}
-             </button>
-        </div>
+            <button
+              v-if="file.status !== 'uploading'"
+              class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+              @click="removeFile(file.id)"
+            >
+              <XMarkIcon class="h-5 w-5" />
+            </button>
+          </div>
+        </li>
+      </ul>
+      <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 flex justify-end">
+        <button 
+          type="button" 
+          :disabled="uploading || !files.some(f => f.status === 'pending' || f.status === 'error')" 
+          class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          @click="uploadFiles"
+        >
+          {{ uploading ? 'Uploading...' : 'Start Upload' }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
