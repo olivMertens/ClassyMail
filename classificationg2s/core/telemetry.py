@@ -14,7 +14,24 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 def init_telemetry(app) -> None:
     # Keep behavior aligned with the previous single-file implementation.
     if not trace.get_tracer_provider() or isinstance(trace.get_tracer_provider(), trace.NoOpTracerProvider):
-        provider = TracerProvider(resource=Resource.create({"service.name": "classificationg2s-api"}))
+        service_name = os.getenv("OTEL_SERVICE_NAME", "classificationg2s-api")
+        provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
+
+        # Preferred for App Insights: set APPLICATIONINSIGHTS_CONNECTION_STRING.
+        appinsights_conn = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
+        if appinsights_conn:
+            try:
+                from azure.monitor.opentelemetry.exporter import AzureMonitorTraceExporter
+            except ImportError:
+                # Exporter is optional (keeps local dev lightweight). If set in Azure, ensure the
+                # dependency is installed in the container image.
+                pass
+            else:
+                provider.add_span_processor(
+                    BatchSpanProcessor(AzureMonitorTraceExporter(connection_string=appinsights_conn))
+                )
+
+        # Fallback: generic OTLP HTTP exporter.
         otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
         if otlp_endpoint:
             provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint)))

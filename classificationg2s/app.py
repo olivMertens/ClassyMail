@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -8,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from classificationg2s.core.paths import project_root
 from classificationg2s.core.telemetry import init_telemetry
 from classificationg2s.core import config
-from classificationg2s.services.azure_clients import init_clients, close_clients
+from classificationg2s.services.azure_clients import Clients, set_default_clients
 from classificationg2s.services.worker import worker_loop_forever
 
 from classificationg2s.api.routers.health import router as health_router
@@ -55,20 +56,28 @@ def create_app() -> FastAPI:
             )
 
         init_telemetry(app)
-        init_clients()
 
-        app.state.worker_task = asyncio.create_task(
-            worker_loop_forever(
-                queue_name=config.SERVICE_BUS_QUEUE,
-                get_cost_overrides=lambda: getattr(app.state, "cost_overrides", {}) or {},
+        clients = Clients()
+        await clients.init()
+        app.state.clients = clients
+        set_default_clients(clients)
+
+        # Run worker inside API only when explicitly enabled (local dev convenience)
+        if os.getenv("ENABLE_WORKER", "false").lower() in {"1", "true", "yes"}:
+            app.state.worker_task = asyncio.create_task(
+                worker_loop_forever(
+                    clients=clients,
+                    queue_name=config.SERVICE_BUS_QUEUE,
+                    get_cost_overrides=lambda: getattr(app.state, "cost_overrides", {}) or {},
+                )
             )
-        )
 
     @app.on_event("shutdown")
     async def on_shutdown():
         if task := getattr(app.state, "worker_task", None):
             task.cancel()
-        await close_clients()
+        if clients := getattr(app.state, "clients", None):
+            await clients.close()
 
     return app
 

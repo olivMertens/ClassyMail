@@ -72,14 +72,20 @@
     </div>
 
     <!-- Search -->
-    <div class="mb-4">
+    <div class="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
       <label for="search" class="sr-only">{{ tr('search') }}</label>
-      <input id="search" v-model="search" type="text" placeholder="Search" :placeholder="tr('search')" aria-label="Search" :aria-label="tr('search')" title="Search" :title="tr('search')" class="w-full bg-slate-800 rounded px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-sky-500" />
+      <input id="search" v-model="search" type="text" :placeholder="tr('search')" class="flex-1 bg-slate-800 rounded px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-sky-500" />
+      <div class="flex items-center gap-2 text-sm text-slate-300">
+        <span>{{ tr('page_size') }}</span>
+        <select v-model.number="pageSize" class="bg-slate-800 rounded px-2 py-1 text-sm">
+          <option v-for="opt in pageSizeOptions" :key="opt" :value="opt">{{ opt }}</option>
+        </select>
+      </div>
     </div>
 
     <!-- Grid -->
     <div v-if="mode==='list'" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <div v-for="email in filteredEmails" :key="email.id" class="bg-slate-800 rounded p-4 shadow flex flex-col justify-between">
+      <div v-for="email in paginatedEmails" :key="email.id" class="bg-slate-800 rounded p-4 shadow flex flex-col justify-between">
         <div>
           <div class="text-sm text-slate-400">{{ email.sender || 'Expéditeur inconnu' }}</div>
           <div class="font-semibold text-lg truncate" :title="email.subject">{{ email.subject || 'Sans sujet' }}</div>
@@ -96,6 +102,12 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <div v-if="mode==='list'" class="flex items-center justify-between mt-4 text-sm text-slate-300">
+      <button @click="prevPage" :disabled="page<=1" class="px-3 py-1 rounded bg-slate-800 disabled:opacity-40">‹</button>
+      <span>{{ page }} / {{ totalPages }}</span>
+      <button @click="nextPage" :disabled="page>=totalPages" class="px-3 py-1 rounded bg-slate-800 disabled:opacity-40">›</button>
     </div>
 
     <!-- Modal -->
@@ -143,7 +155,7 @@
                           </div>
               <div class="text-slate-400 text-sm mb-2">{{ tr('intents') }}</div>
               <ul class="text-sm space-y-1">
-                <li v-for="i in modalEmail.classification.detected_intents" :key="i.intent" class="flex justify-between">
+                <li v-for="i in modalEmail.classification.detected_intents" :key="i.intent" class="flex justify-between items-center" :class="intentConfidenceClass(i.confidence ?? 0)">
                   <span>{{ i.intent }}</span>
                   <span>{{ (i.confidence ?? 0).toFixed(2) }}</span>
                 </li>
@@ -165,6 +177,23 @@
         <h3 class="text-xl font-semibold mb-2">POC - G2S Microsoft (Mars 2026)</h3>
         <p class="text-slate-300">ClassiMail Agent</p>
         <p class="text-slate-400 text-sm mt-2">Contact: Olivier Mertens<br/>olmertens@microsoft.com</p>
+        <div class="mt-4 text-sm text-slate-300 space-y-2">
+          <div class="font-semibold">Estimation coûts (approx./mois)</div>
+          <ul class="list-disc list-inside space-y-1">
+            <li>Service Bus Standard: ~€9</li>
+            <li>Cosmos DB Serverless (light usage): €0–€25</li>
+            <li>Storage (LRS): < €5</li>
+            <li>AI Foundry S0 (platform): ~€0 (pay-per-use models)</li>
+            <li>Container Apps (consumption): €0–€20 (API min=1 replica)</li>
+          </ul>
+          <div class="font-semibold mt-3">Estimation coûts / email</div>
+          <ul class="list-disc list-inside space-y-1">
+            <li>OCR (Mistral): ~€0.002–€0.01 / page (selon pages)</li>
+            <li>Classification (Phi-4): ~€0.0005–€0.002 / email (selon tokens)</li>
+            <li>Infra (queue/storage): négligeable par email</li>
+          </ul>
+          <p class="text-xs text-slate-500">*Tarifs indicatifs, dépendants de la région et de l'usage réel.</p>
+        </div>
         <button @click="showInfo=false" class="mt-4 w-full bg-sky-600 hover:bg-sky-500 text-white rounded py-2">OK</button>
       </div>
     </div>
@@ -230,6 +259,9 @@
           uploadQueue: [],
           uploading: false,
           finetune: { reviewed_ready: 0, min_required: 50, ready: false },
+          page: 1,
+          pageSize: 20,
+          pageSizeOptions: [20,50,100,250],
         };
       },
       computed: {
@@ -246,6 +278,13 @@
             });
           }
           return list;
+        },
+        paginatedEmails() {
+          const start = (this.page - 1) * this.pageSize;
+          return this.filteredEmails.slice(start, start + this.pageSize);
+        },
+        totalPages() {
+          return Math.max(1, Math.ceil(this.filteredEmails.length / this.pageSize));
         },
         progress() {
           if (!this.stats.total) return 0;
@@ -302,9 +341,16 @@
         },
         scoreBadgeClass(score) {
           if (score == null) return 'px-2 py-1 rounded text-xs bg-slate-700 text-slate-200';
-          if (score > 0.9) return 'px-2 py-1 rounded text-xs bg-emerald-700 text-emerald-100';
-          if (score >= 0.7) return 'px-2 py-1 rounded text-xs bg-amber-700 text-amber-100';
+          if (score >= 0.85) return 'px-2 py-1 rounded text-xs bg-emerald-700 text-emerald-100';
+          if (score >= 0.7) return 'px-2 py-1 rounded text-xs bg-lime-700 text-lime-100';
+          if (score >= 0.5) return 'px-2 py-1 rounded text-xs bg-amber-700 text-amber-100';
           return 'px-2 py-1 rounded text-xs bg-rose-700 text-rose-100';
+        },
+        intentConfidenceClass(conf) {
+          if (conf >= 0.85) return 'px-2 py-1 rounded bg-emerald-700/30';
+          if (conf >= 0.7) return 'px-2 py-1 rounded bg-lime-700/30';
+          if (conf >= 0.5) return 'px-2 py-1 rounded bg-amber-700/30';
+          return 'px-2 py-1 rounded bg-rose-700/30';
         },
         maxConfidence(email) {
           const intents = email.classification?.detected_intents || [];
@@ -482,6 +528,7 @@
         tab_processed: "✅ Traités",
         tab_error: "⚠ Erreurs",
         search: "Rechercher...",
+        page_size: "Lignes/page",
         score: "Score",
         open: "Ouvrir",
         no_pdf: "Pas d'URL PDF disponible",
@@ -526,6 +573,7 @@
         tab_processed: "✅ Processed",
         tab_error: "⚠ Errors",
         search: "Search...",
+        page_size: "Rows/page",
         score: "Score",
         open: "Open",
         no_pdf: "No PDF URL available",

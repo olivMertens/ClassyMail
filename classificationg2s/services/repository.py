@@ -6,22 +6,23 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from classificationg2s.core import config
 from classificationg2s.models import EmailRecord
-from classificationg2s.services.azure_clients import ensure_cosmos_container, cosmos_container
+from classificationg2s.services.azure_clients import Clients, get_default_clients
 from classificationg2s.services.anonymizer import anonymize_markdown_for_finetune
 
 
-async def save_to_cosmos(record: EmailRecord) -> None:
+async def save_to_cosmos(record: EmailRecord, clients: Clients | None = None) -> None:
     record.updated_at = datetime.now(timezone.utc)
-    await ensure_cosmos_container()
-    await cosmos_container.upsert_item(record.model_dump())
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    await clients.cosmos_container.upsert_item(record.model_dump())
 
 
-async def count_by_status(status: str) -> int:
-    await ensure_cosmos_container()
+async def count_by_status(status: str, clients: Clients | None = None) -> int:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
     query = "SELECT VALUE COUNT(1) FROM c WHERE c.status=@status"
-    it = cosmos_container.query_items(
+    it = clients.cosmos_container.query_items(
         query,
         parameters=[{"name": "@status", "value": status}],
         enable_cross_partition_query=True,
@@ -31,8 +32,9 @@ async def count_by_status(status: str) -> int:
     return 0
 
 
-async def count_reviewed_ready_items() -> int:
-    await ensure_cosmos_container()
+async def count_reviewed_ready_items(clients: Clients | None = None) -> int:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
     query = (
         "SELECT VALUE COUNT(1) FROM c "
         "WHERE c.status='PROCESSED' "
@@ -42,7 +44,7 @@ async def count_reviewed_ready_items() -> int:
         "AND IS_DEFINED(c.classification.detected_intents) "
         "AND ARRAY_LENGTH(c.classification.detected_intents) > 0"
     )
-    it = cosmos_container.query_items(query, enable_cross_partition_query=True)
+    it = clients.cosmos_container.query_items(query, enable_cross_partition_query=True)
     async for v in it:
         return v
     return 0
@@ -50,6 +52,7 @@ async def count_reviewed_ready_items() -> int:
 
 async def export_finetune_jsonl_iter(
     *,
+    clients: Clients | None = None,
     anonymize: bool,
     include_unreviewed: bool,
     max_examples: Optional[int],
@@ -59,14 +62,15 @@ async def export_finetune_jsonl_iter(
     # Emit UTF-8 BOM (required by Foundry fine-tuning dataset validation)
     yield "\ufeff"
 
-    await ensure_cosmos_container()
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
 
     where = ["c.status = 'PROCESSED'", "IS_DEFINED(c.classification)", "c.classification.needs_review = false"]
     if not include_unreviewed:
         where.append("(IS_DEFINED(c.reviewed) AND c.reviewed = true)")
 
     query = "SELECT c.id, c.markdown, c.classification, c.updated_at FROM c WHERE " + " AND ".join(where)
-    it = cosmos_container.query_items(query, enable_cross_partition_query=True)
+    it = clients.cosmos_container.query_items(query, enable_cross_partition_query=True)
 
     system_prompt = os.getenv(
         "FINETUNE_SYSTEM_PROMPT",
@@ -89,7 +93,7 @@ async def export_finetune_jsonl_iter(
 
         if anonymize:
             try:
-                anon = await anonymize_markdown_for_finetune(raw_markdown)
+                anon = await anonymize_markdown_for_finetune(raw_markdown, clients=clients)
                 user_markdown = anon.get("anonymized_markdown") or ""
                 anonymization_meta = {
                     "model": anon.get("model"),

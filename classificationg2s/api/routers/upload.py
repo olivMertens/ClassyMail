@@ -4,17 +4,17 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile, Depends
 
 from classificationg2s.core import config
-from classificationg2s.services.azure_clients import blob_service_client
+from classificationg2s.services.azure_clients import get_blob_service_client
 
 
 router = APIRouter(prefix="/api", tags=["upload"])
 
 
 @router.post("/upload")
-async def upload_pdfs(files: list[UploadFile] = File(...)):
+async def upload_pdfs(files: list[UploadFile] = File(...), blob_service_client=Depends(get_blob_service_client)):
     if len(files) > 10:
         raise HTTPException(status_code=400, detail="Max 10 fichiers")
 

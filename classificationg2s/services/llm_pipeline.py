@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
 
 import httpx
 from opentelemetry import trace
@@ -10,7 +9,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 from classificationg2s.core import config
 from classificationg2s.models import OCRFailed
-from classificationg2s.services.azure_clients import auth_headers
+from classificationg2s.services.azure_clients import auth_headers, Clients
 
 
 tracer = trace.get_tracer(__name__)
@@ -40,8 +39,8 @@ def clamp_text_to_token_budget(text: str, max_tokens: int) -> tuple[str, bool]:
 
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10), retry=retry_if_exception(retryable_httpx))
-async def ocr_with_mistral(base64_pdf: str) -> dict:
-    headers = await auth_headers()
+async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None) -> dict:
+    headers = await auth_headers(clients=clients)
     payload = {
         "model": config.MISTRAL_DEPLOYMENT,
         "document": {
@@ -79,13 +78,13 @@ async def ocr_with_mistral(base64_pdf: str) -> dict:
 
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10), retry=retry_if_exception(retryable_httpx))
-async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False) -> dict:
+async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False, clients: Clients | None = None) -> dict:
     if not config.PHI_ENDPOINT:
         raise RuntimeError("PHI_ENDPOINT is not set")
     if not config.PHI_FALLBACK_ENDPOINT:
         raise RuntimeError("PHI_FALLBACK_ENDPOINT is not set")
 
-    headers = await auth_headers()
+    headers = await auth_headers(clients=clients)
 
     system_prompt = """ 
 Tu es un assistant expert en classification d'emails d'assurance.

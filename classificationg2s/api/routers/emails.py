@@ -5,14 +5,20 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Depends
 from fastapi.responses import StreamingResponse
 
 from azure.servicebus import ServiceBusMessage
 
 from classificationg2s.core import config
 from classificationg2s.models import EmailListResponse, EmailRecord
-from classificationg2s.services.azure_clients import build_sas_url, cosmos_container, ensure_cosmos_container, sb_client
+from classificationg2s.services.azure_clients import (
+    build_sas_url,
+    get_cosmos_container,
+    get_sb_client,
+    get_clients,
+    Clients,
+)
 from classificationg2s.services.repository import count_by_status, count_reviewed_ready_items, export_finetune_jsonl_iter
 
 
@@ -26,11 +32,9 @@ async def list_emails(
     status: str = Query("all", pattern="^(all|REVIEW_REQUIRED|PROCESSED|ERROR)$"),
     search: Optional[str] = Query(None),
     continuation_token: Optional[str] = Query(None),
+    cosmos_container=Depends(get_cosmos_container),
+    clients: Clients = Depends(get_clients),
 ):
-    try:
-        await ensure_cosmos_container()
-    except Exception:
-        raise HTTPException(status_code=503, detail="Cosmos not ready")
 
     filters = []
     params = {}
@@ -47,24 +51,26 @@ async def list_emails(
         query += f" WHERE {where}"
     query += " ORDER BY c._ts DESC"
 
-    offset = (page - 1) * page_size
-    query += " OFFSET @offset LIMIT @limit"
-    params["@offset"] = offset
-    params["@limit"] = page_size
-
     items_iter = cosmos_container.query_items(
         query,
         parameters=[{"name": k, "value": v} for k, v in params.items()],
         enable_cross_partition_query=True,
     )
-    items = [EmailRecord(**item) async for item in items_iter]
+    pages = items_iter.by_page(continuation_token=continuation_token, max_page_size=page_size)
+    items: list[EmailRecord] = []
+    next_token: str | None = None
+    async for page_items in pages:
+        for item in page_items:
+            items.append(EmailRecord(**item))
+        next_token = pages.continuation_token
+        break
 
-    processed_count = await count_by_status("PROCESSED")
-    review_count = await count_by_status("REVIEW_REQUIRED")
+    processed_count = await count_by_status("PROCESSED", clients=clients)
+    review_count = await count_by_status("REVIEW_REQUIRED", clients=clients)
     total = processed_count + review_count
 
     finetune_min_required = int(os.getenv("FINETUNE_MIN_EXAMPLES", "50"))
-    finetune_reviewed_ready = await count_reviewed_ready_items()
+    finetune_reviewed_ready = await count_reviewed_ready_items(clients=clients)
 
     return EmailListResponse(
         items=items,
@@ -74,23 +80,19 @@ async def list_emails(
         finetune_reviewed_ready=finetune_reviewed_ready,
         finetune_min_required=finetune_min_required,
         finetune_ready=finetune_reviewed_ready >= finetune_min_required,
-        continuation_token=None,
+        continuation_token=next_token,
     )
 
 
 @router.get("/stats")
-async def get_stats():
-    try:
-        await ensure_cosmos_container()
-    except Exception:
-        raise HTTPException(status_code=503, detail="Cosmos not ready")
+async def get_stats(clients: Clients = Depends(get_clients)):
 
-    processed_count = await count_by_status("PROCESSED")
-    review_count = await count_by_status("REVIEW_REQUIRED")
+    processed_count = await count_by_status("PROCESSED", clients=clients)
+    review_count = await count_by_status("REVIEW_REQUIRED", clients=clients)
     total = processed_count + review_count
 
     finetune_min_required = int(os.getenv("FINETUNE_MIN_EXAMPLES", "50"))
-    finetune_reviewed_ready = await count_reviewed_ready_items()
+    finetune_reviewed_ready = await count_reviewed_ready_items(clients=clients)
 
     return {
         "processed": processed_count,
@@ -104,15 +106,11 @@ async def get_stats():
 
 
 @router.get("/emails/{item_id}", response_model=EmailRecord)
-async def get_email(item_id: str):
-    try:
-        await ensure_cosmos_container()
-    except Exception:
-        raise HTTPException(status_code=503, detail="Cosmos not ready")
+async def get_email(item_id: str, cosmos_container=Depends(get_cosmos_container), clients: Clients = Depends(get_clients)):
 
     try:
         item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
-        sas_url = await build_sas_url(item.get("file_url"))
+        sas_url = await build_sas_url(item.get("file_url"), clients=clients)
         if sas_url:
             item["file_url_sas"] = sas_url
         return EmailRecord(**item)
@@ -121,11 +119,7 @@ async def get_email(item_id: str):
 
 
 @router.patch("/emails/{item_id}", response_model=EmailRecord)
-async def patch_email(item_id: str, payload: dict):
-    try:
-        await ensure_cosmos_container()
-    except Exception:
-        raise HTTPException(status_code=503, detail="Cosmos not ready")
+async def patch_email(item_id: str, payload: dict, cosmos_container=Depends(get_cosmos_container)):
 
     try:
         item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
@@ -147,11 +141,7 @@ async def patch_email(item_id: str, payload: dict):
 
 
 @router.post("/emails/{item_id}/reprocess")
-async def reprocess_email(item_id: str):
-    try:
-        await ensure_cosmos_container()
-    except Exception:
-        raise HTTPException(status_code=503, detail="Cosmos not ready")
+async def reprocess_email(item_id: str, cosmos_container=Depends(get_cosmos_container), sb_client=Depends(get_sb_client)):
 
     try:
         item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
@@ -159,10 +149,9 @@ async def reprocess_email(item_id: str):
         if not blob_url:
             raise HTTPException(status_code=400, detail="file_url missing")
 
-        async with sb_client:
-            sender = sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
-            async with sender:
-                await sender.send_messages(ServiceBusMessage(json.dumps({"blob_url": blob_url})))
+        sender = sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
+        async with sender:
+            await sender.send_messages(ServiceBusMessage(json.dumps({"blob_url": blob_url})))
 
         return {"status": "enqueued", "blob_url": blob_url}
     except Exception as ex:
@@ -170,14 +159,9 @@ async def reprocess_email(item_id: str):
 
 
 @router.get("/emails/export")
-async def export_emails_csv():
+async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
     import csv
     import io
-
-    try:
-        await ensure_cosmos_container()
-    except Exception:
-        raise HTTPException(status_code=503, detail="Cosmos not ready")
 
     async def row_iter():
         buffer = io.StringIO()
@@ -194,7 +178,9 @@ async def export_emails_csv():
                 "mistral_cost_usd",
             ]
         )
-        yield buffer.getvalue(); buffer.seek(0); buffer.truncate(0)
+        yield buffer.getvalue()
+        buffer.seek(0)
+        buffer.truncate(0)
 
         query = "SELECT c.id, c.file_url, c.status, c.classification FROM c"
         it = cosmos_container.query_items(query, enable_cross_partition_query=True)
@@ -216,7 +202,9 @@ async def export_emails_csv():
                     else None,
                 ]
             )
-            yield buffer.getvalue(); buffer.seek(0); buffer.truncate(0)
+            yield buffer.getvalue()
+            buffer.seek(0)
+            buffer.truncate(0)
 
     return StreamingResponse(
         row_iter(),

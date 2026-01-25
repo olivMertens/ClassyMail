@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from classificationg2s.models import EmailRecord, ClassificationResult
-from classificationg2s.services.azure_clients import download_blob_as_base64, blob_id_from_url
+from classificationg2s.services.azure_clients import download_blob_as_base64, blob_id_from_url, Clients
 from classificationg2s.services.llm_pipeline import ocr_with_mistral, classify_with_phi4, process_agent_response
 from classificationg2s.services.costing import compute_cost_llm, compute_cost_mistral
 
@@ -16,7 +16,12 @@ def estimate_pdf_pages(pdf_bytes: bytes) -> int:
         return 1
 
 
-async def run_classification_pipeline(blob_url: str, *, cost_overrides: Optional[dict] = None) -> EmailRecord:
+async def run_classification_pipeline(
+    blob_url: str,
+    *,
+    cost_overrides: Optional[dict] = None,
+    clients: Clients | None = None,
+) -> EmailRecord:
     processing_log: list[dict] = []
 
     def log(stage: str, event: str, detail: Optional[str] = None) -> None:
@@ -31,7 +36,7 @@ async def run_classification_pipeline(blob_url: str, *, cost_overrides: Optional
 
     try:
         log("download", "start")
-        pdf_b64, pdf_bytes = await download_blob_as_base64(blob_url, return_bytes=True)
+        pdf_b64, pdf_bytes = await download_blob_as_base64(blob_url, return_bytes=True, clients=clients)
         log("download", "ok")
     except Exception as ex:
         from classificationg2s.models import OCRFailed
@@ -43,7 +48,7 @@ async def run_classification_pipeline(blob_url: str, *, cost_overrides: Optional
 
     try:
         log("ocr", "start")
-        ocr_result = await ocr_with_mistral(pdf_b64)
+        ocr_result = await ocr_with_mistral(pdf_b64, clients=clients)
         log("ocr", "ok")
     except Exception as ex:
         from classificationg2s.models import OCRFailed
@@ -57,7 +62,7 @@ async def run_classification_pipeline(blob_url: str, *, cost_overrides: Optional
 
     try:
         log("classify", "start")
-        classification_raw = await classify_with_phi4(markdown)
+        classification_raw = await classify_with_phi4(markdown, clients=clients)
         log("classify", "ok")
     except Exception as ex:
         from classificationg2s.models import OCRFailed

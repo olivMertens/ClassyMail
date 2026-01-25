@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 
 import httpx
 from opentelemetry import trace
 
 from classificationg2s.core import config
-from classificationg2s.services.azure_clients import auth_headers
+from classificationg2s.services.azure_clients import auth_headers, Clients
 
 
 tracer = trace.get_tracer(__name__)
@@ -35,7 +34,8 @@ Rewrite the user's provided email content to remove all Personally Identifiable 
 3. **Tables:** Keep all table rows and columns intact (`|`). Anonymize the content *inside* the cells, but do not break the alignment.
 
 ### OUTPUT FORMAT ###
-Return ONLY the anonymized Markdown text. Do not add conversational filler like \"Here is the anonymized version.\""".strip()
+Return ONLY the anonymized Markdown text. Do not add conversational filler like "Here is the anonymized version."
+""".strip()
 
 
 def basic_pii_scrub(text: str) -> str:
@@ -49,11 +49,11 @@ def basic_pii_scrub(text: str) -> str:
     return text
 
 
-async def anonymize_markdown_for_finetune(markdown: str) -> dict:
+async def anonymize_markdown_for_finetune(markdown: str, clients: Clients | None = None) -> dict:
     if not config.ANONYMIZER_ENDPOINT:
         raise RuntimeError("ANONYMIZER_ENDPOINT is not set")
 
-    headers = await auth_headers()
+    headers = await auth_headers(clients=clients)
     user_content = basic_pii_scrub(markdown or "")
 
     payload = {
