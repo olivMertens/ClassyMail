@@ -310,14 +310,26 @@ Pour les détails (variables, logique, pricing), voir [docs/MODELS.md](docs/MODE
 }
 ```
 
-## 🛠 Fine-tuning Phi‑4 (LoRA) avec Microsoft Foundry
+## 🛠 Fine-tuning Phi‑4 (LoRA) & GPT‑4o-mini (Azure)
+Voir [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md) pour les détails (anonymisation, format JSONL, split train/validation).
+
 1. **Collecte** : `needs_review=false` (validations humaines) dans Cosmos DB.
-2. **Export JSONL** : `python main.py --export-csv` (adapter exporter JSONL si besoin).
-3. **Foundry** :
-     - Créer Dataset JSONL dans le **Project**.
-     - Lancer Fine-tune LoRA sur `phi-4` (Foundry UI ou CLI) avec dataset (1000–2000 exemples, 50–100/catégorie).
-     - Déployer `phi-4-custom` (endpoint compatible OpenAI Chat).
-4. **Configuration** : mettre `PHI_DEPLOYMENT=phi-4-custom` et `PHI_ENDPOINT` du Foundry Hub.
+2. **Export JSONL** (chat) :
+    - CLI : `uv run python main.py --export-finetune-jsonl ./data/fine_tune_all.jsonl`
+    - HTTP : `GET /api/emails/export-finetune-jsonl`
+3. **Split** : produire **2 fichiers**
+    - `data/training_set.jsonl`
+    - `data/validation_set.jsonl`
+    Exemple (90/10) dans la doc.
+4. **Foundry / Azure AI** :
+    - Créer datasets (train/validation)
+    - Lancer fine-tune (LoRA `phi-4` ou GPT‑4o-mini) via UI/CLI
+    - Déployer `phi-4-custom` ou `gpt-4o-mini-custom` (endpoint OpenAI Chat compatible)
+5. **Configuration** : `PHI_DEPLOYMENT=phi-4-custom` (ou fallback `gpt-4o-mini-custom`), `PHI_ENDPOINT` = endpoint Foundry.
+
+Références :
+- Doc fine-tuning Azure AI Foundry/Azure OpenAI : https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python
+- Tutoriel officiel (GPT-4o-mini, end-to-end) : https://learn.microsoft.com/en-us/azure/ai-foundry/openai/tutorials/fine-tune?view=foundry-classic&tabs=command-line
 
 ## 🧱 Terraform (Foundry)
 - `infra/main.tf` : crée **Foundry** (AIServices), **Project**, **Deployments** (`phi-4`, `mistral-ocr-2505`), **RBAC** `Cognitive Services User` pour l'identité `app_id`.

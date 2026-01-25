@@ -68,11 +68,9 @@ $storageAccountUrl = if ($storageAccountName) {
   Get-FirstOrNull "az storage account show -g '$rg' -n '$storageAccountName' --query primaryEndpoints.blob -o tsv"
 } else { $null }
 
-$storageContainer = if ($storageAccountName) {
-  # Peut nécessiter des droits data-plane. On essaye en auth-mode login, sinon fallback sur la valeur IaC par défaut.
-  $c = Get-FirstOrNull "az storage container list --account-name '$storageAccountName' --auth-mode login --query '[0].name' -o tsv"
-  if ($c) { $c } else { 'pdf-inputs' }
-} else { 'pdf-inputs' }
+# IMPORTANT: Dans beaucoup de tenants, le Storage est privé (pas d'accès data-plane depuis le poste).
+# On n'essaie pas de lister les containers ici (ça peut être lent/bloqué) et on utilise la valeur IaC par défaut.
+$storageContainer = 'pdf-inputs'
 
 $cosmosAccount = Get-FirstOrNull "az cosmosdb list -g '$rg' --query '[0].name' -o tsv"
 $cosmosEndpoint = if ($cosmosAccount) {
@@ -92,6 +90,13 @@ if (-not $aiEndpoint) {
   $aiEndpoint = Get-FirstOrNull "az cognitiveservices account list -g '$rg' --query '[0].properties.endpoint' -o tsv"
 }
 
+# URL publique de l'API (si ingress externe)
+$apiFqdn = Get-FirstOrNull "az containerapp list -g '$rg' --query `"[?contains(name, 'api')].properties.configuration.ingress.fqdn | [0]`" -o tsv"
+if (-not $apiFqdn) {
+  $apiFqdn = Get-FirstOrNull "az containerapp list -g '$rg' --query `"[?properties.configuration.ingress.fqdn!=null].properties.configuration.ingress.fqdn | [0]`" -o tsv"
+}
+$apiBaseUrl = if ($apiFqdn) { "https://$apiFqdn" } else { $null }
+
 # Valeurs par défaut cohérentes avec main.py (peuvent être ajustées localement)
 $aiApiVersion = '2024-08-01-preview'
 $aiScope = 'https://cognitiveservices.azure.com/.default'
@@ -101,6 +106,7 @@ $lines = @(
   '# Généré via scripts/write_secrets_env.ps1',
   '',
   'PORT=8000',
+  "API_BASE_URL=$apiBaseUrl",
   '',
   "# Managed Identity (User Assigned) — clientId de l'identité utilisée par l'app",
   "AZURE_CLIENT_ID=$appClientId",
@@ -128,11 +134,11 @@ $lines = @(
   "PHI_ENDPOINT=$aiEndpoint",
   'PHI_DEPLOYMENT=phi-4',
   '',
-  '# Optionnel: Azure OpenAI (si vous utilisez le générateur LLM dans scripts/generate_dummy_pdfs.py)',
-  '# AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com/',
-  '# AZURE_OPENAI_DEPLOYMENT=<deployment>',
-  '# AZURE_OPENAI_API_VERSION=2024-10-21',
-  '# AZURE_OPENAI_SCOPE=https://cognitiveservices.azure.com/.default',
+  '# Azure OpenAI (utilisé uniquement pour scripts/generate_dummy_pdfs.py si --use-aoai)',
+  "AZURE_OPENAI_ENDPOINT=$aiEndpoint",
+  'AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini',
+  'AZURE_OPENAI_API_VERSION=2024-10-01-preview',
+  'AZURE_OPENAI_SCOPE=https://cognitiveservices.azure.com/.default',
   '# AZURE_OPENAI_API_KEY=__optional__  # si absent, auth Entra ID via DefaultAzureCredential',
   ''
 )

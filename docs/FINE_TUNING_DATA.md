@@ -161,6 +161,59 @@ La plupart des systèmes de fine-tuning attendent du **JSONL** : un objet JSON p
 Référence :
 
 - Doc fine-tuning Azure AI Foundry/Azure OpenAI : https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python
+- Tutoriel officiel (GPT-4o-mini, end-to-end) : https://learn.microsoft.com/en-us/azure/ai-foundry/openai/tutorials/fine-tune?view=foundry-classic&tabs=command-line
+
+## Pourquoi 2 fichiers JSONL (train + validation) ?
+
+Dans Azure AI Foundry / Azure OpenAI, un job de fine-tuning attend typiquement :
+
+- un fichier **training_set.jsonl** (apprentissage)
+- un fichier **validation_set.jsonl** (évaluation pendant l'entraînement)
+
+Le format de chaque ligne reste identique (chat JSONL avec `{"messages": [...]}`), c'est juste la **séparation** des exemples.
+
+Recommandations :
+
+- Split simple : **90/10** (train/validation) ou **95/5** si vous avez peu d'exemples.
+- La validation doit être représentative (toutes les intentions, différentes longueurs OCR, etc.).
+- Garder la validation **figée** (même split) pour comparer les runs.
+
+### Comment produire les 2 fichiers depuis ce repo
+
+1) Exporter un fichier complet (anonymisé + reviewed uniquement) :
+
+- CLI : `uv run python main.py --export-finetune-jsonl ./data/fine_tune_all.jsonl`
+
+ou
+
+- HTTP : `GET /api/emails/export-finetune-jsonl` puis sauvegarder le flux dans `./data/fine_tune_all.jsonl`.
+
+2) Splitter en train/validation (exemple Python reproductible) :
+
+```bash
+uv run python - <<'PY'
+import random
+from pathlib import Path
+
+src = Path('data/fine_tune_all.jsonl')
+train = Path('data/training_set.jsonl')
+val = Path('data/validation_set.jsonl')
+
+lines = src.read_text(encoding='utf-8-sig').splitlines()
+lines = [l for l in lines if l.strip()]
+
+rng = random.Random(42)
+rng.shuffle(lines)
+
+split = int(len(lines) * 0.9)
+train.write_text('\n'.join(lines[:split]) + '\n', encoding='utf-8')
+val.write_text('\n'.join(lines[split:]) + '\n', encoding='utf-8')
+
+print(f'total={len(lines)} train={split} val={len(lines)-split}')
+PY
+```
+
+Ensuite, utilisez `data/training_set.jsonl` et `data/validation_set.jsonl` dans Foundry/Azure OpenAI (upload + job de fine-tune).
 
 ## Confidentialité & anonymisation
 
