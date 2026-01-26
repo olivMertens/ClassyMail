@@ -115,7 +115,7 @@ graph LR
               <h4 class="font-medium text-gray-900 dark:text-white">
                 {{ t('guide.usage.step1_title') }}
               </h4>
-              <p>{{ t('guide.usage.step1_desc') }}</p>
+              <p class="text-gray-600 dark:text-gray-300">{{ t('guide.usage.step1_desc') }}</p>
               <ul class="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
                 <li>{{ t('guide.usage.step1_li1') }}</li>
                 <li>{{ t('guide.usage.step1_li2') }}</li>
@@ -125,7 +125,7 @@ graph LR
               <h4 class="font-medium mt-4 text-gray-900 dark:text-white">
                 {{ t('guide.usage.step2_title') }}
               </h4>
-              <p>{{ t('guide.usage.step2_desc') }}</p>
+              <p class="text-gray-600 dark:text-gray-300">{{ t('guide.usage.step2_desc') }}</p>
               <ul class="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
                 <li>{{ t('guide.usage.step2_li1') }}</li>
                 <li>{{ t('guide.usage.step2_li2') }}</li>
@@ -136,12 +136,12 @@ graph LR
               <h4 class="font-medium text-gray-900 dark:text-white">
                 {{ t('guide.usage.step3_title') }}
               </h4>
-              <p>{{ t('guide.usage.step3_desc') }}</p>
+              <p class="text-gray-600 dark:text-gray-300">{{ t('guide.usage.step3_desc') }}</p>
 
               <h4 class="font-medium mt-4 text-gray-900 dark:text-white">
                 {{ t('guide.usage.step4_title') }}
               </h4>
-              <p>{{ t('guide.usage.step4_desc') }}</p>
+              <p class="text-gray-600 dark:text-gray-300">{{ t('guide.usage.step4_desc') }}</p>
               <ul class="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
                 <li>{{ t('guide.usage.step4_li1') }}</li>
                 <li>{{ t('guide.usage.step4_li2') }}</li>

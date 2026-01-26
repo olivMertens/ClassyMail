@@ -82,7 +82,7 @@ const uploadFiles = async () => {
         pendingFiles.forEach(f => {
             const result = results.find(r => r.name === f.file.name)
             if (result) {
-                if (result.status === 'success') {
+                if (result.status === 'uploaded') {
                     f.status = 'success'
                     f.message = 'Uploaded'
                 } else {

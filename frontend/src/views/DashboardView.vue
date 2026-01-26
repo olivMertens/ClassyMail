@@ -92,8 +92,8 @@ watch(search, () => {
 
 onMounted(() => {
     fetchEmails()
-    // Poll every 15s
-    const poll = setInterval(fetchEmails, 15000)
+    // Poll every 30s
+    const poll = setInterval(fetchEmails, 30000)
     return () => clearInterval(poll)
 })
 
