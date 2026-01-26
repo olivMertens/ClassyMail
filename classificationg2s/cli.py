@@ -67,7 +67,7 @@ async def export_cosmos_to_csv(path: str = "./data/output.csv"):
     await ensure_cosmos_container()
 
     query = "SELECT c.id, c.file_url, c.status, c.confidence, c.classification, c.markdown FROM c"
-    it = cosmos_container.query_items(query, enable_cross_partition_query=True)
+    it = cosmos_container.query_items(query)
 
     out_dir = os.path.dirname(path)
     if out_dir:
@@ -133,7 +133,7 @@ async def export_cosmos_to_finetune_jsonl(
         where.append("(IS_DEFINED(c.reviewed) AND c.reviewed = true)")
 
     query = "SELECT c.id, c.markdown, c.classification, c.updated_at FROM c WHERE " + " AND ".join(where)
-    it = cosmos_container.query_items(query, enable_cross_partition_query=True)
+    it = cosmos_container.query_items(query)
 
     system_prompt = os.getenv(
         "FINETUNE_SYSTEM_PROMPT",

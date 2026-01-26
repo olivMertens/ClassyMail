@@ -131,7 +131,7 @@ async def export_finetune_jsonl_iter(
         where.append("(IS_DEFINED(c.reviewed) AND c.reviewed = true)")
 
     query = "SELECT c.id, c.markdown, c.classification, c.updated_at FROM c WHERE " + " AND ".join(where)
-    it = clients.cosmos_container.query_items(query, enable_cross_partition_query=True)
+    it = clients.cosmos_container.query_items(query)
 
     system_prompt = os.getenv(
         "FINETUNE_SYSTEM_PROMPT",
