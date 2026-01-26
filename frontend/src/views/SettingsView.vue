@@ -1,11 +1,24 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { CheckCircleIcon, MoonIcon, SunIcon, PlusIcon, TrashIcon, PencilSquareIcon, ExclamationTriangleIcon, QuestionMarkCircleIcon } from '@heroicons/vue/24/outline'
+import {
+    CheckCircleIcon,
+    MoonIcon,
+    SunIcon,
+    PlusIcon,
+    TrashIcon,
+    PencilSquareIcon,
+    ExclamationTriangleIcon,
+    SwatchIcon,
+    CpuChipIcon,
+    AdjustmentsHorizontalIcon,
+    QueueListIcon,
+    BanknotesIcon
+} from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 
 const { t, locale } = useI18n()
 
-const activeTab = ref('classification') // classification | general | danger
+const activeTab = ref('classification') // classification | design | processing | finetuning | general
 
 const settings = ref({
     processing_strategy: 'standard',
@@ -35,10 +48,6 @@ const themes = [
     { id: 'indigo', name: 'Indigo', class: 'bg-indigo-600' },
     { id: 'orange', name: 'Orange', class: 'bg-orange-600' }
 ]
-
-const resetConfirm1 = ref(false)
-const resetConfirm2 = ref(false)
-const resetting = ref(false)
 
 const loadSettings = async () => {
     loading.value = true
@@ -79,30 +88,6 @@ const saveSettings = async () => {
         alert('Failed to save settings')
     } finally {
         loading.value = false
-    }
-}
-
-const performReset = async () => {
-    if (!resetConfirm1.value || !resetConfirm2.value) return
-    resetting.value = true
-    try {
-        const res = await fetch('/api/admin/reset', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ confirm_1: true, confirm_2: true })
-        })
-        const data = await res.json()
-        if (res.ok) {
-            alert(`Environment Reset Successful.\nDeleted Blobs: ${data.deleted_blobs}\nDeleted DB Records: ${data.deleted_records}`)
-            resetConfirm1.value = false
-            resetConfirm2.value = false
-        } else {
-            alert(`Reset Failed: ${data.detail || JSON.stringify(data.errors)}`)
-        }
-    } catch (e) {
-        alert('Error connecting to server')
-    } finally {
-        resetting.value = false
     }
 }
 
@@ -198,298 +183,319 @@ onMounted(() => {
     </div>
 
     <!-- Tabs -->
-    <div class="border-b border-gray-200 dark:border-gray-700">
+    <div class="border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
       <nav
         class="-mb-px flex space-x-8"
         aria-label="Tabs"
       >
         <button
-          :class="[activeTab === 'classification' ? 'border-amber-500 text-amber-600 dark:text-amber-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          :class="[activeTab === 'classification' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
           @click="activeTab = 'classification'"
         >
-          Classification Categories
-          <ExclamationTriangleIcon class="h-4 w-4 text-amber-500" />
+          <QueueListIcon class="h-4 w-4" />
+          Categories
         </button>
         <button
-          :class="[activeTab === 'general' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium']"
+          :class="[activeTab === 'design' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          @click="activeTab = 'design'"
+        >
+          <SwatchIcon class="h-4 w-4" />
+          {{ t('settings.appearance') }}
+        </button>
+        <button
+          :class="[activeTab === 'processing' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          @click="activeTab = 'processing'"
+        >
+          <CpuChipIcon class="h-4 w-4" />
+          Processing Strategy
+        </button>
+        <button
+          :class="[activeTab === 'finetuning' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          @click="activeTab = 'finetuning'"
+        >
+          <AdjustmentsHorizontalIcon class="h-4 w-4" />
+          Fine-tuning
+        </button>
+        <button
+          :class="[activeTab === 'general' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
           @click="activeTab = 'general'"
         >
+          <BanknotesIcon class="h-4 w-4" />
           General & Costs
-        </button>
-        <button
-          :class="[activeTab === 'danger' ? 'border-red-500 text-red-600 dark:text-red-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
-          @click="activeTab = 'danger'"
-        >
-          Danger Zone
-          <ExclamationTriangleIcon class="h-4 w-4 text-red-500" />
         </button>
       </nav>
     </div>
 
-    <!-- Classification Categories Tab (Moved First) -->
+    <!-- Design / Appearance Tab -->
     <div
-      v-show="activeTab === 'classification'"
+      v-show="activeTab === 'design'"
       class="bg-white dark:bg-gray-800 shadow sm:rounded-lg"
     >
-      <!-- Appearance Settings -->
-      <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-        <div class="px-4 py-5 sm:p-6">
-          <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
-            {{ t('settings.appearance') }}
-          </h3>
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+          {{ t('settings.appearance') }}
+        </h3>
 
-          <div class="mt-6 space-y-6">
-            <!-- Language -->
-            <div>
-              <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('settings.language') }}</label>
-              <div class="mt-2 flex items-center space-x-4">
-                <button
-                  class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-                  :class="currentLocale === 'en' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
-                  @click="setLocale('en')"
-                >
-                  English
-                </button>
-                <button
-                  class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-                  :class="currentLocale === 'fr' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
-                  @click="setLocale('fr')"
-                >
-                  Français
-                </button>
-              </div>
-            </div>
-
-            <!-- Dark Mode -->
-            <div class="flex items-center justify-between">
-              <span class="flex-grow flex flex-col">
-                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ t('settings.dark_mode') }}</span>
-              </span>
+        <div class="mt-6 space-y-6">
+          <!-- Language -->
+          <div>
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('settings.language') }}</label>
+            <div class="mt-2 flex items-center space-x-4">
               <button
-                type="button"
-                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2"
-                :class="isDark ? 'bg-primary-600' : 'bg-gray-200'"
-                @click="toggleDarkMode"
+                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+                :class="currentLocale === 'en' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
+                @click="setLocale('en')"
+              >
+                English
+              </button>
+              <button
+                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+                :class="currentLocale === 'fr' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
+                @click="setLocale('fr')"
+              >
+                Français
+              </button>
+            </div>
+          </div>
+
+          <!-- Dark Mode -->
+          <div class="flex items-center justify-between">
+            <span class="flex-grow flex flex-col">
+              <span class="text-sm font-medium text-gray-900 dark:text-white">{{ t('settings.dark_mode') }}</span>
+            </span>
+            <button
+              type="button"
+              class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2"
+              :class="isDark ? 'bg-primary-600' : 'bg-gray-200'"
+              @click="toggleDarkMode"
+            >
+              <span
+                class="pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                :class="isDark ? 'translate-x-5' : 'translate-x-0'"
               >
                 <span
-                  class="pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                  :class="isDark ? 'translate-x-5' : 'translate-x-0'"
+                  class="absolute inset-0 flex h-full w-full items-center justify-center transition-opacity"
+                  :class="isDark ? 'opacity-0 duration-100 ease-out' : 'opacity-100 duration-200 ease-in'"
                 >
-                  <span
-                    class="absolute inset-0 flex h-full w-full items-center justify-center transition-opacity"
-                    :class="isDark ? 'opacity-0 duration-100 ease-out' : 'opacity-100 duration-200 ease-in'"
-                  >
-                    <SunIcon class="h-3 w-3 text-gray-400" />
-                  </span>
-                  <span
-                    class="absolute inset-0 flex h-full w-full items-center justify-center transition-opacity"
-                    :class="isDark ? 'opacity-100 duration-200 ease-in' : 'opacity-0 duration-100 ease-out'"
-                  >
-                    <MoonIcon class="h-3 w-3 text-primary-600" />
-                  </span>
+                  <SunIcon class="h-3 w-3 text-gray-400" />
                 </span>
-              </button>
-            </div>
-
-            <!-- Theme -->
-            <div>
-              <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('settings.theme') }}</label>
-              <div class="mt-2 flex items-center space-x-3">
-                <button
-                  v-for="theme in themes"
-                  :key="theme.id"
-                  class="relative h-8 w-8 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800"
-                  :class="[theme.class, currentTheme === theme.id ? 'ring-2 ring-primary-500 ring-offset-2' : '']"
-                  :title="theme.name"
-                  @click="setTheme(theme.id)"
+                <span
+                  class="absolute inset-0 flex h-full w-full items-center justify-center transition-opacity"
+                  :class="isDark ? 'opacity-100 duration-200 ease-in' : 'opacity-0 duration-100 ease-out'"
                 >
-                  <CheckCircleIcon
-                    v-if="currentTheme === theme.id"
-                    class="absolute inset-0 m-auto h-5 w-5 text-white"
-                  />
-                </button>
-              </div>
+                  <MoonIcon class="h-3 w-3 text-primary-600" />
+                </span>
+              </span>
+            </button>
+          </div>
+
+          <!-- Theme -->
+          <div>
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('settings.theme') }}</label>
+            <div class="mt-2 flex items-center space-x-3">
+              <button
+                v-for="theme in themes"
+                :key="theme.id"
+                class="relative h-8 w-8 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800"
+                :class="[theme.class, currentTheme === theme.id ? 'ring-2 ring-primary-500 ring-offset-2' : '']"
+                :title="theme.name"
+                @click="setTheme(theme.id)"
+              >
+                <CheckCircleIcon
+                  v-if="currentTheme === theme.id"
+                  class="absolute inset-0 m-auto h-5 w-5 text-white"
+                />
+              </button>
             </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Fine-tuning Settings -->
-      <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-        <div class="px-4 py-5 sm:p-6">
-          <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
-            Fine-tuning Configuration
-          </h3>
-          <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
-            <p>Configure parameters for Fine-tuning dataset generation.</p>
+    <!-- Processing Strategy Tab -->
+    <div
+      v-show="activeTab === 'processing'"
+      class="bg-white dark:bg-gray-800 shadow sm:rounded-lg"
+    >
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+          Processing Strategy
+        </h3>
+        <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+          <p>Select the AI processing pipeline strategy.</p>
+        </div>
+        <div class="mt-4 space-y-4">
+          <div class="flex items-center">
+            <input
+              id="strategy-standard"
+              v-model="settings.processing_strategy"
+              name="processing_strategy"
+              type="radio"
+              value="standard"
+              class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+            >
+            <label
+              for="strategy-standard"
+              class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
+            >
+              Standard (Text/OCR Optimized - Default)
+            </label>
+            <div class="ml-2 text-xs text-gray-500 max-w-lg">
+              Fast and cost-effective. Uses optimized prompting for standard text extraction and classification. Best for typed documents and clear emails.
+            </div>
           </div>
+          <div class="flex items-center">
+            <input
+              id="strategy-reasoning"
+              v-model="settings.processing_strategy"
+              name="processing_strategy"
+              type="radio"
+              value="reasoning"
+              class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+            >
+            <label
+              for="strategy-reasoning"
+              class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
+            >
+              Reasoning (Deep Reasoning / CoT)
+            </label>
+            <div class="ml-2 text-xs text-gray-500 max-w-lg">
+              Forces a "Chain-of-Thought" (Step-by-step) approach. Instructs the model to analyze context and deduce intents logically before classifying. essential for subtle or complex cases.
+            </div>
+          </div>
+          <div class="flex items-center">
+            <input
+              id="strategy-vision"
+              v-model="settings.processing_strategy"
+              name="processing_strategy"
+              type="radio"
+              value="vision"
+              class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+            >
+            <label
+              for="strategy-vision"
+              class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
+            >
+              Vision (Vision/Image Analysis - Experimental)
+            </label>
+            <div class="ml-2 text-xs text-gray-500 max-w-lg">
+              Integrates visual analysis. Explicitly considers descriptions of non-text elements (photos, diagrams) detected by OCR. Crucial for claims relying on visual evidence (e.g., damage photos).
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-          <div class="mt-4">
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Minimum Samples Required</label>
+    <!-- Fine-tuning Tab -->
+    <div
+      v-show="activeTab === 'finetuning'"
+      class="bg-white dark:bg-gray-800 shadow sm:rounded-lg"
+    >
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+          Fine-tuning Configuration
+        </h3>
+        <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+          <p>Configure parameters for Fine-tuning dataset generation.</p>
+        </div>
+
+        <div class="mt-4">
+          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Minimum Samples Required</label>
+          <div class="mt-2">
+            <input
+              v-model="settings.finetune_min_examples"
+              type="number"
+              min="5"
+              step="1"
+              class="block w-full max-w-xs rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+            >
+            <p class="mt-1 text-xs text-gray-500">
+              Minimum number of reviewed examples required to enable JSONL export. Lowering this allows testing with smaller datasets.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- General & Costs Tab -->
+    <div
+      v-show="activeTab === 'general'"
+      class="bg-white dark:bg-gray-800 shadow sm:rounded-lg"
+    >
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+          {{ t('settings.costs_title') }}
+        </h3>
+        <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+          <p>{{ t('settings.costs_desc') }}</p>
+        </div>
+
+        <form
+          class="mt-5 space-y-6"
+          @submit.prevent="saveSettings"
+        >
+          <div>
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Phi-4 Input Cost (€ / 1K tokens)</label>
             <div class="mt-2">
               <input
-                v-model="settings.finetune_min_examples"
+                v-model="settings.phi4_input_per_1k"
                 type="number"
-                min="5"
-                step="1"
-                class="block w-full max-w-xs rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+                step="0.000001"
+                class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
               >
-              <p class="mt-1 text-xs text-gray-500">
-                Minimum number of reviewed examples required to enable JSONL export. Lowering this allows testing with smaller datasets.
-              </p>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- Processing Strategy -->
-      <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-        <div class="px-4 py-5 sm:p-6">
-          <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
-            Processing Strategy
-          </h3>
-          <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
-            <p>Select the AI processing pipeline strategy.</p>
-          </div>
-          <div class="mt-4 space-y-4">
-            <div class="flex items-center">
+          <div>
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Phi-4 Output Cost (€ / 1K tokens)</label>
+            <div class="mt-2">
               <input
-                id="strategy-standard"
-                v-model="settings.processing_strategy"
-                name="processing_strategy"
-                type="radio"
-                value="standard"
-                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+                v-model="settings.phi4_output_per_1k"
+                type="number"
+                step="0.000001"
+                class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
               >
-              <label
-                for="strategy-standard"
-                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
-              >
-                Standard (Text/OCR Optimized - Default)
-              </label>
-              <div class="ml-2 text-xs text-gray-500 max-w-lg">
-                Fast and cost-effective. Uses optimized prompting for standard text extraction and classification. Best for typed documents and clear emails.
-              </div>
-            </div>
-            <div class="flex items-center">
-              <input
-                id="strategy-reasoning"
-                v-model="settings.processing_strategy"
-                name="processing_strategy"
-                type="radio"
-                value="reasoning"
-                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
-              >
-              <label
-                for="strategy-reasoning"
-                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
-              >
-                Reasoning (Deep Reasoning / CoT)
-              </label>
-              <div class="ml-2 text-xs text-gray-500 max-w-lg">
-                Forces a "Chain-of-Thought" (Step-by-step) approach. Instructs the model to analyze context and deduce intents logically before classifying. essential for subtle or complex cases.
-              </div>
-            </div>
-            <div class="flex items-center">
-              <input
-                id="strategy-vision"
-                v-model="settings.processing_strategy"
-                name="processing_strategy"
-                type="radio"
-                value="vision"
-                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
-              >
-              <label
-                for="strategy-vision"
-                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
-              >
-                Vision (Vision/Image Analysis - Experimental)
-              </label>
-              <div class="ml-2 text-xs text-gray-500 max-w-lg">
-                Integrates visual analysis. Explicitly considers descriptions of non-text elements (photos, diagrams) detected by OCR. Crucial for claims relying on visual evidence (e.g., damage photos).
-              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- Costs Settings -->
-      <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-        <div class="px-4 py-5 sm:p-6">
-          <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
-            {{ t('settings.costs_title') }}
-          </h3>
-          <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
-            <p>{{ t('settings.costs_desc') }}</p>
+          <div>
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Mistral OCR Cost (€ / 1K pages)</label>
+            <div class="mt-2">
+              <input
+                v-model="settings.mistral_per_1k_pages"
+                type="number"
+                step="0.001"
+                class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+              >
+            </div>
           </div>
 
-          <form
-            class="mt-5 space-y-6"
-            @submit.prevent="saveSettings"
-          >
-            <div>
-              <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Phi-4 Input Cost (€ / 1K tokens)</label>
-              <div class="mt-2">
-                <input
-                  v-model="settings.phi4_input_per_1k"
-                  type="number"
-                  step="0.000001"
-                  class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-                >
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Phi-4 Output Cost (€ / 1K tokens)</label>
-              <div class="mt-2">
-                <input
-                  v-model="settings.phi4_output_per_1k"
-                  type="number"
-                  step="0.000001"
-                  class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-                >
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Mistral OCR Cost (€ / 1K pages)</label>
-              <div class="mt-2">
-                <input
-                  v-model="settings.mistral_per_1k_pages"
-                  type="number"
-                  step="0.001"
-                  class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
-                >
-              </div>
-            </div>
-
-            <div class="flex items-center gap-4">
-              <button
-                type="submit"
-                :disabled="loading"
-                class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50"
+          <div class="flex items-center gap-4">
+            <button
+              type="submit"
+              :disabled="loading"
+              class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50"
+            >
+              {{ loading ? t('settings.saving') : t('settings.save') }}
+            </button>
+            <transition
+              enter-active-class="transition ease-out duration-200"
+              enter-from-class="opacity-0 translate-y-1"
+              enter-to-class="opacity-100 translate-y-0"
+              leave-active-class="transition ease-in duration-150"
+              leave-from-class="opacity-100 translate-y-0"
+              leave-to-class="opacity-0 translate-y-1"
+            >
+              <div
+                v-if="saved"
+                class="flex items-center text-green-600 dark:text-green-400 text-sm font-medium"
               >
-                {{ loading ? t('settings.saving') : t('settings.save') }}
-              </button>
-              <transition
-                enter-active-class="transition ease-out duration-200"
-                enter-from-class="opacity-0 translate-y-1"
-                enter-to-class="opacity-100 translate-y-0"
-                leave-active-class="transition ease-in duration-150"
-                leave-from-class="opacity-100 translate-y-0"
-                leave-to-class="opacity-0 translate-y-1"
-              >
-                <div
-                  v-if="saved"
-                  class="flex items-center text-green-600 dark:text-green-400 text-sm font-medium"
-                >
-                  <CheckCircleIcon class="h-5 w-5 mr-1" />
-                  {{ t('settings.saved') }}
-                </div>
-              </transition>
-            </div>
-          </form>
-        </div>
+                <CheckCircleIcon class="h-5 w-5 mr-1" />
+                {{ t('settings.saved') }}
+              </div>
+            </transition>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -523,9 +529,19 @@ onMounted(() => {
           </div>
         </div>
 
-        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
-          Managed Categories
-        </h3>
+        <div class="flex justify-between items-center">
+          <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+            Managed Categories
+          </h3>
+          <button
+            type="button"
+            class="text-sm text-primary-600 hover:text-primary-500"
+            @click="saveSettings"
+          >
+            Save Changes to System
+          </button>
+        </div>
+
         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
           Current active categories extracted by the LLM.
         </p>
@@ -635,89 +651,6 @@ onMounted(() => {
               </button>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Danger Zone Tab -->
-    <div
-      v-show="activeTab === 'danger'"
-      class="bg-white dark:bg-gray-800 shadow sm:rounded-lg border border-red-200 dark:border-red-900"
-    >
-      <div class="px-4 py-5 sm:p-6">
-        <h3 class="text-base font-semibold leading-6 text-red-600 dark:text-red-400 flex items-center gap-2">
-          <ExclamationTriangleIcon class="h-5 w-5" />
-          Atomic Zone - Environment Reset
-        </h3>
-        <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
-          <p>
-            Proceed with extreme caution. This action will permanently delete all data in the current environment.
-          </p>
-        </div>
-
-        <div class="mt-5 bg-red-50 dark:bg-red-900/20 p-4 rounded-md">
-          <h4 class="text-sm font-medium text-red-800 dark:text-red-300">
-            This action will:
-          </h4>
-          <ul class="list-disc list-inside mt-2 text-sm text-red-700 dark:text-red-200">
-            <li>Delete ALL emails and classification records from Database.</li>
-            <li>Delete ALL files (PDFs) from the Input Storage Container.</li>
-            <li>Reset the dashboard state completely.</li>
-          </ul>
-        </div>
-
-        <div class="mt-6 space-y-4">
-          <div class="flex items-start">
-            <div class="flex h-6 items-center">
-              <input
-                id="confirm_1"
-                v-model="resetConfirm1"
-                type="checkbox"
-                class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-600 dark:bg-gray-700 dark:border-gray-600"
-              >
-            </div>
-            <div class="ml-3 text-sm leading-6">
-              <label
-                for="confirm_1"
-                class="font-medium text-gray-900 dark:text-white"
-              >I understand this deletes all data permanently.</label>
-            </div>
-          </div>
-          <div class="flex items-start">
-            <div class="flex h-6 items-center">
-              <input
-                id="confirm_2"
-                v-model="resetConfirm2"
-                type="checkbox"
-                class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-600 dark:bg-gray-700 dark:border-gray-600"
-              >
-            </div>
-            <div class="ml-3 text-sm leading-6">
-              <label
-                for="confirm_2"
-                class="font-medium text-gray-900 dark:text-white"
-              >I confirm I want to reset the environment.</label>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            class="mt-4 inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="!resetConfirm1 || !resetConfirm2 || resetting"
-            @click="performReset"
-          >
-            <TrashIcon
-              v-if="!resetting"
-              class="-ml-0.5 mr-1.5 h-5 w-5"
-              aria-hidden="true"
-            />
-            <ArrowPathIcon
-              v-else
-              class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
-              aria-hidden="true"
-            />
-            {{ resetting ? 'Nuking Environment...' : 'NUKE EVERYTHING' }}
-          </button>
         </div>
       </div>
     </div>
