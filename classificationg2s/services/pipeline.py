@@ -24,7 +24,7 @@ async def run_classification_pipeline(
     clients: Clients | None = None,
 ) -> EmailRecord:
     processing_log: list[dict] = []
-    
+
     # Merge overrides if provided separately (legacy) or extract from settings
     if settings:
         final_overrides = settings.get("cost_overrides", {})

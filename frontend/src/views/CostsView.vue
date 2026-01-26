@@ -199,7 +199,7 @@ onMounted(() => {
         <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
           {{ t('costs.logic_title') }}
         </h3>
-        
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
           <!-- Unit Prices -->
           <div>
@@ -216,25 +216,25 @@ onMounted(() => {
                   </li>
               </ul>
           </div>
-          
+
           <!-- Assumptions -->
           <div>
              <h4 class="font-medium text-gray-700 dark:text-gray-300 mb-2">{{ t('costs.logic_assumptions') }}</h4>
              <ul class="list-disc pl-5 space-y-1 text-gray-600 dark:text-gray-400" v-if="costs.pricing.retail.assumptions">
                  <li>
-                    {{ t('costs.logic_aca_worker') }}: 
-                    {{ costs.pricing.retail.assumptions.aca_worker_seconds_per_email }}s/email 
+                    {{ t('costs.logic_aca_worker') }}:
+                    {{ costs.pricing.retail.assumptions.aca_worker_seconds_per_email }}s/email
                     ({{ costs.pricing.retail.assumptions.aca_worker_vcpu }} vCPU, {{ costs.pricing.retail.assumptions.aca_worker_gib }} GiB)
                  </li>
                  <li>
-                    {{ t('costs.logic_aca_api') }}: 
-                    {{ costs.pricing.retail.assumptions.aca_api_min_replicas }} Rep., 
+                    {{ t('costs.logic_aca_api') }}:
+                    {{ costs.pricing.retail.assumptions.aca_api_min_replicas }} Rep.,
                     {{ costs.pricing.retail.assumptions.aca_api_idle_hours_per_month }}h {{ t('costs.val_idle') }}
                  </li>
              </ul>
           </div>
         </div>
-        
+
         <!-- Formulas -->
         <div class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded text-xs font-mono text-gray-600 dark:text-gray-300 overflow-x-auto" v-if="costs.pricing.retail.assumptions">
             <div><strong>Worker:</strong> (Emails/Mo * {{ costs.pricing.retail.assumptions.aca_worker_seconds_per_email }}s) * ({{ costs.pricing.retail.assumptions.aca_worker_vcpu }} * vCPU_Price + {{ costs.pricing.retail.assumptions.aca_worker_gib }} * GiB_Price)</div>

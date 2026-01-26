@@ -46,7 +46,7 @@ def save_settings(settings: dict):
             if name:
                clean_cats.append({"name": name, "description": desc})
         settings["categories"] = clean_cats
-    
+
     # Sanitize strategy
     if "processing_strategy" in settings:
         if settings["processing_strategy"] not in ("standard", "reasoning", "vision"):

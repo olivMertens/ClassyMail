@@ -30,7 +30,7 @@ const initMermaid = async () => {
 
 onMounted(() => {
     isDark.value = document.documentElement.classList.contains('dark')
-    
+
     // Watch themes
     observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
@@ -44,7 +44,7 @@ onMounted(() => {
         })
     })
     observer.observe(document.documentElement, { attributes: true })
-    
+
     initMermaid()
 })
 
@@ -55,7 +55,7 @@ onUnmounted(() => {
 const diagram = `
 graph LR
     Input[Email Input] --> OCR
-    
+
     subgraph Analysis [OCR & Content Extraction]
         direction TB
         OCR --> Text[Text Layer]
@@ -64,13 +64,13 @@ graph LR
         Text --> Markdown
         Desc --> Markdown
     end
-    
+
     Markdown --> PII[PII Check]
     PII --> Classify[AI Classification]
-    
+
     Classify -->|Confidence > 85%| Auto[Auto Process]
     Classify -->|Confidence < 85%| Review[Human Review]
-    
+
     style Img fill:#ff9,stroke:#333
     style Desc fill:#ff9,stroke:#333
 `

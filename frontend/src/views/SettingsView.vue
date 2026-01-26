@@ -385,7 +385,7 @@ Processing Strategy -->
     <!-- Classification Categories Tab -->
     <div v-show="activeTab === 'classification'" class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
       <div class="px-4 py-5 sm:p-6">
-        
+
         <!-- Warning Banner -->
         <div class="rounded-md bg-amber-50 dark:bg-amber-900/30 p-4 mb-6 border-l-4 border-amber-400 dark:border-amber-500">
             <div class="flex">
@@ -396,8 +396,8 @@ Processing Strategy -->
                     <h3 class="text-sm font-medium text-amber-800 dark:text-amber-200">Critical Configuration</h3>
                     <div class="mt-2 text-sm text-amber-700 dark:text-amber-300">
                         <p>
-                            Modifying categories drastically changes how the AI classifies incoming emails. 
-                            Changes propagate to the System Prompt immediately. 
+                            Modifying categories drastically changes how the AI classifies incoming emails.
+                            Changes propagate to the System Prompt immediately.
                             Descriptions are key for the LLM context.
                         </p>
                     </div>
@@ -465,28 +465,28 @@ Processing Strategy -->
                             <span class="text-xs text-gray-500">{{ (isEditing ? editingCategory : newCategory).description?.length || 0 }}/2000</span>
                         </div>
                         <div class="mt-1">
-                            <textarea 
-                                v-model="(isEditing ? editingCategory : newCategory).description" 
+                            <textarea
+                                v-model="(isEditing ? editingCategory : newCategory).description"
                                 rows="3"
                                 maxlength="2000"
-                                class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600" 
+                                class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600"
                                 placeholder="Describe the criteria for this category..."
                             ></textarea>
                         </div>
                     </div>
                 </div>
                 <div class="mt-4 flex justify-end gap-2">
-                    <button 
-                        v-if="isEditing" 
-                        @click="cancelEdit" 
-                        type="button" 
+                    <button
+                        v-if="isEditing"
+                        @click="cancelEdit"
+                        type="button"
                         class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
                     >
                         Cancel
                     </button>
-                    <button 
-                        @click="isEditing ? saveEdit() : addCategory()" 
-                        type="button" 
+                    <button
+                        @click="isEditing ? saveEdit() : addCategory()"
+                        type="button"
                         class="inline-flex items-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
                     >
                         <component :is="isEditing ? PencilSquareIcon : PlusIcon" class="h-5 w-5 mr-1" aria-hidden="true" />
