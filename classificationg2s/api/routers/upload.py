@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import re
 import uuid
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, Depends
+from azure.core.exceptions import AzureError
 
 from classificationg2s.core import config
 from classificationg2s.services.azure_clients import get_blob_service_client
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["upload"])
 
@@ -53,7 +56,14 @@ async def upload_pdfs(files: list[UploadFile] = File(...), blob_service_client=D
         unique_name = f"{uuid.uuid4()}-{safe_name}"
         blob_name = f"uploads/{today}/{unique_name}"
         blob_client = container_client.get_blob_client(blob_name)
-        await blob_client.upload_blob(f.file, overwrite=True, content_type="application/pdf")
-        results.append({"name": f.filename, "status": status, "blob_url": blob_client.url})
+        try:
+            await blob_client.upload_blob(f.file, overwrite=True, content_type="application/pdf")
+            results.append({"name": f.filename, "status": status, "blob_url": blob_client.url})
+        except AzureError as e:
+            logger.error(f"Azure Storage Upload Failed for {f.filename}: {str(e)}")
+            results.append({"name": f.filename, "status": "error", "error": f"Storage Error: {type(e).__name__}"})
+        except Exception:
+            logger.exception(f"Unexpected error uploading {f.filename}")
+            results.append({"name": f.filename, "status": "error", "error": "Internal Server Error"})
 
     return {"results": results, "count": len([r for r in results if r["status"] == "uploaded"]) }
