@@ -59,7 +59,7 @@ opentelemetry-sdk = "^1.39.0"
 opentelemetry-exporter-otlp-proto-http = "^1.39.0"
 opentelemetry-instrumentation-fastapi = "0.60b0"
 opentelemetry-instrumentation-httpx = "0.60b0"
-aiohttp = "^3.13.3"
+aiohttp = "==3.9.5"
 python-multipart = "^0.0.21"
 fpdf2 = "^2.7.9"
 

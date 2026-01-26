@@ -1,5 +1,10 @@
 import os
 import uvicorn
+from dotenv import load_dotenv
+
+# Load secrets.env environment variables if present (local dev)
+load_dotenv("secrets.env")
+
 from classificationg2s.app import app
 from classificationg2s.cli import main as cli_main
 import sys
