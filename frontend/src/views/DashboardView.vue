@@ -36,7 +36,7 @@ const pageSize = ref(20)
 const loading = ref(false)
 const error = ref(null)
 
-const pageSizeOptions = [20, 50, 100, 250]
+const pageSizeOptions = [20, 50, 100]
 
 const filters = [
   { id: 'all', label: 'All', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
