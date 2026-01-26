@@ -177,8 +177,8 @@ const navigation = computed(() => [
       <header class="hidden md:flex items-center justify-end h-16 px-8 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 gap-2">
         <button
           class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
-          @click="showInfoModal = true"
           title="Info"
+          @click="showInfoModal = true"
         >
           <InformationCircleIcon class="h-6 w-6" />
         </button>
@@ -204,6 +204,9 @@ const navigation = computed(() => [
         </div>
       </main>
     </div>
-    <InfoModal :show="showInfoModal" @close="showInfoModal = false" />
+    <InfoModal
+      :show="showInfoModal"
+      @close="showInfoModal = false"
+    />
   </div>
 </template>

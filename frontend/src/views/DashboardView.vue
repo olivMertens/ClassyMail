@@ -154,76 +154,97 @@ const emit = defineEmits(['open-email'])
     </div>
 
     <!-- Progress Bar -->
-    <div v-if="stats.total > 0" class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
-        <div class="flex justify-between mb-1">
-            <span class="text-sm font-medium text-primary-700 dark:text-primary-400">Pipeline Progress</span>
-            <span class="text-sm font-medium text-primary-700 dark:text-primary-400">{{ progressPercentage }}%</span>
-        </div>
-        <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-            <div class="bg-primary-600 h-2.5 rounded-full transition-all duration-500" :style="{ width: progressPercentage + '%' }"></div>
-        </div>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            {{ stats.processed }} of {{ stats.total }} emails processed.
-            <span v-if="progressPercentage < 100" class="ml-2 animate-pulse text-primary-600">Processing... (Auto-refresh 15s)</span>
-            <span v-else class="ml-2 text-green-600">Complete</span>
-        </p>
+    <div
+      v-if="stats.total > 0"
+      class="bg-white dark:bg-gray-800 shadow rounded-lg p-4"
+    >
+      <div class="flex justify-between mb-1">
+        <span class="text-sm font-medium text-primary-700 dark:text-primary-400">Pipeline Progress</span>
+        <span class="text-sm font-medium text-primary-700 dark:text-primary-400">{{ progressPercentage }}%</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+        <div
+          class="bg-primary-600 h-2.5 rounded-full transition-all duration-500"
+          :style="{ width: progressPercentage + '%' }"
+        />
+      </div>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+        {{ stats.processed }} of {{ stats.total }} emails processed.
+        <span
+          v-if="progressPercentage < 100"
+          class="ml-2 animate-pulse text-primary-600"
+        >Processing... (Auto-refresh 15s)</span>
+        <span
+          v-else
+          class="ml-2 text-green-600"
+        >Complete</span>
+      </p>
     </div>
 
     <!-- Toolbar -->
     <div class="flex flex-col gap-4">
-        <!-- Action Row (Exports) -->
-        <div class="flex justify-end gap-2">
-            <button
-                @click="exportCsv"
-                class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-                <ArrowDownTrayIcon class="-ml-0.5 h-5 w-5 text-gray-400" aria-hidden="true" />
-                Export CSV
-            </button>
-            <button
-                @click="exportJsonl"
-                class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-                <ArrowDownTrayIcon class="-ml-0.5 h-5 w-5 text-gray-400" aria-hidden="true" />
-                JSONL (Fine-tune)
-            </button>
-        </div>
-        <!-- Fine-tuning Advice -->
-        <div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-100 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200 flex flex-col gap-1">
-            <span class="font-semibold">Fine-tuning Best Practices:</span>
-            <ul class="list-disc list-inside ml-1">
-                <li>Aim for at least 50 reviewed examples per category for stability.</li>
-                <li>Ensure examples are diverse and correctly labeled (validation is key).</li>
-                <li>For Phi-4 or GPT-4o-mini, quality > quantity. "Garbage in, garbage out".</li>
-            </ul>
-        </div>
+      <!-- Action Row (Exports) -->
+      <div class="flex justify-end gap-2">
+        <button
+          class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          @click="exportCsv"
+        >
+          <ArrowDownTrayIcon
+            class="-ml-0.5 h-5 w-5 text-gray-400"
+            aria-hidden="true"
+          />
+          Export CSV
+        </button>
+        <button
+          class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          @click="exportJsonl"
+        >
+          <ArrowDownTrayIcon
+            class="-ml-0.5 h-5 w-5 text-gray-400"
+            aria-hidden="true"
+          />
+          JSONL (Fine-tune)
+        </button>
+      </div>
+      <!-- Fine-tuning Advice -->
+      <div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-100 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200 flex flex-col gap-1">
+        <span class="font-semibold">Fine-tuning Best Practices:</span>
+        <ul class="list-disc list-inside ml-1">
+          <li>Aim for at least 50 reviewed examples per category for stability.</li>
+          <li>Ensure examples are diverse and correctly labeled (validation is key).</li>
+          <li>For Phi-4 or GPT-4o-mini, quality > quantity. "Garbage in, garbage out".</li>
+        </ul>
+      </div>
 
-        <div class="flex flex-col sm:flex-row justify-between gap-4">
-            <!-- Tabs -->
-            <div class="flex space-x-2 overflow-x-auto pb-2 sm:pb-0">
-                <button
-                v-for="f in filters"
-                :key="f.id"
-                class="px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors"
-                :class="filter === f.id ? 'ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-900 ' + f.color : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm'"
-                @click="filter = f.id"
-                >
-                {{ f.label }}
-                </button>
-            </div>
-            <!-- Search -->
-            <div class="relative rounded-md shadow-sm max-w-xs w-full">
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <MagnifyingGlassIcon class="h-5 w-5 text-gray-400" aria-hidden="true" />
-                </div>
-                <input
-                v-model="search"
-                type="text"
-                class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white dark:placeholder-gray-500"
-                placeholder="Search emails..."
-                >
-            </div>
+      <div class="flex flex-col sm:flex-row justify-between gap-4">
+        <!-- Tabs -->
+        <div class="flex space-x-2 overflow-x-auto pb-2 sm:pb-0">
+          <button
+            v-for="f in filters"
+            :key="f.id"
+            class="px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors"
+            :class="filter === f.id ? 'ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-900 ' + f.color : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm'"
+            @click="filter = f.id"
+          >
+            {{ f.label }}
+          </button>
         </div>
+        <!-- Search -->
+        <div class="relative rounded-md shadow-sm max-w-xs w-full">
+          <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+            <MagnifyingGlassIcon
+              class="h-5 w-5 text-gray-400"
+              aria-hidden="true"
+            />
+          </div>
+          <input
+            v-model="search"
+            type="text"
+            class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white dark:placeholder-gray-500"
+            placeholder="Search emails..."
+          >
+        </div>
+      </div>
     </div>
 
     <!-- Grid -->
@@ -249,15 +270,18 @@ const emit = defineEmits(['open-email'])
         <div class="p-5 flex-1">
           <div class="flex justify-between items-start mb-2">
             <div class="flex flex-col gap-1">
-                <span
+              <span
                 class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset w-fit"
                 :class="getScoreColor(email)"
-                >
+              >
                 Score {{ getScore(email) }}
-                </span>
-                 <span class="text-xs text-gray-400" v-if="email.processing_time_ms">
-                    {{ Math.round(email.processing_time_ms) }}ms
-                 </span>
+              </span>
+              <span
+                v-if="email.processing_time_ms"
+                class="text-xs text-gray-400"
+              >
+                {{ Math.round(email.processing_time_ms) }}ms
+              </span>
             </div>
             <span
               v-if="email.status === 'ERROR'"
@@ -297,10 +321,17 @@ const emit = defineEmits(['open-email'])
           </div>
 
           <div class="mt-2 space-y-1">
-             <div v-for="intent in email.classification?.detected_intents || []" :key="intent.intent" class="flex justify-between text-xs">
-                <span class="text-gray-600 dark:text-gray-300 truncate pr-2" :title="intent.intent">{{ intent.intent }}</span>
-                <span class="font-mono text-gray-500 dark:text-gray-400">{{ (intent.confidence * 100).toFixed(0) }}%</span>
-             </div>
+            <div
+              v-for="intent in email.classification?.detected_intents || []"
+              :key="intent.intent"
+              class="flex justify-between text-xs"
+            >
+              <span
+                class="text-gray-600 dark:text-gray-300 truncate pr-2"
+                :title="intent.intent"
+              >{{ intent.intent }}</span>
+              <span class="font-mono text-gray-500 dark:text-gray-400">{{ (intent.confidence * 100).toFixed(0) }}%</span>
+            </div>
           </div>
         </div>
 
