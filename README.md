@@ -12,7 +12,7 @@ Il sert à valider rapidement :
 - Une architecture **événementielle découplée** (ingestion vs traitement) pour absorber des pics (ex: 10k fichiers).
 - Un workflow de **review humaine** (dashboard interactif) + boucle de **reinforcement / fine-tuning**.
 - Un mode de déploiement cloud **prod-ready** (Terraform + Azure Container Apps) et une exécution locale simple.
-- **Nouveau (Fév 2026)** : Interface "Dark Mode" native, Danger Zone (Reset complet), et support Azure Retail Prices API.
+- **Nouveau (Fév 2026)** : Interface "Dark Mode" native, Danger Zone (Reset complet), Filtres avancés (Catégorie/Confiance), et "Average Quality" stat.
 
 ## Comment ça marche (vue d’ensemble)
 
@@ -74,11 +74,14 @@ Ce projet implémente un pipeline de classification d'emails à haut volume et f
 <!-- (Note: add a screenshot to docs/assets if available, otherwise just text description below) -->
 
 The new frontend provides a dark-mode enabled dashboard to:
-- Monitor email processing metrics.
+- Monitor email processing metrics (including "Avg. Quality").
 - Upload/drag-and-drop PDF files directly.
+- Filter emails by **Category name** and **Confidence score** (e.g. "< 50%").
+- Export data to **CSV** (direct download) or **JSONL** (for fine-tuning).
 - Review and correct classifications with a side-by-side PDF viewer and markdown preview.
 - Analyze costs and usage.
-- Configure settings.
+- Configure settings (Strategies including "Vision" or "Reasoning", Prices, and Fine-tune thresholds).
+- **Danger Zone**: Reset environment (Blob/Cosmos) for clean demos.
 
 ```mermaid
 flowchart TD

@@ -10,6 +10,7 @@ The Dashboard is the central hub for monitoring progress and managing the email 
 - **Total Emails**: The count of all emails ingested into the system.
 - **To Review**: The number of emails that require human attention (low confidence or explicit "Review needed" flag).
 - **Processed**: The number of emails successfully classified and finalized.
+- **Avg. Quality**: The average confidence score of all processed emails, providing a global view of model performance.
 
 ### Pipeline Progress
 A visual progress bar tracking the completion of the classification task.
@@ -18,12 +19,15 @@ A visual progress bar tracking the completion of the classification task.
 - **Green**: Fully completed.
 
 ### Action Toolbar
-- **Export CSV**: Downloads the full dataset including classification results, costs, and metadata in CSV format.
+- **Export CSV**: Downloads the full dataset including classification results, costs, and metadata in CSV format (Direct Download).
 - **JSONL (Fine-tune)**: Exports the dataset in the specific JSONL format required for Azure OpenAI fine-tuning.
-    - *Best Practice*: Ensure you have at least 50 reviewed examples per category before fine-tuning.
-    - *Tip*: Quality is more important than quantity. Use the validation modal to correct inputs.
-- **Search**: Real-time filtering of emails by subject or sender.
-- **Status Filters**: Toggle between "All", "To Review", "Processed", and "Errors".
+    - *Enabled only*: When sufficient reviewed data is available (default 50, configurable).
+    - *Tip*: Hover over the '?' icon for best practices on fine-tuning.
+- **Combined Filters**:
+    - **Status Tabs**: "All", "To Review", "Processed", "Errors".
+    - **Search**: Real-time filtering by subject or sender.
+    - **Category**: Filter by specific intent name (e.g., "Address Change").
+    - **Confidence**: Filer by confidence range (e.g., "< 50%" for spotting errors, or "100%" for gold-standard examples).
 
 ## Email List View
 Emails are displayed as cards containing:
@@ -48,9 +52,9 @@ This is where human-in-the-loop validation happens.
     - **Multi-Select**: Click to toggle categories. Selected items turn blue.
     - **Custom Categories**: Click "+ Custom" to add a new category tag on the fly.
 - **Correction Reason**: A text box to explain *why* you are changing a category.
-    - *Important*: This text is used by the AI to learn from your corrections.
+    - *Mandatory*: If you change or invalidate a category, you MUST provide a reason. This ensures high-quality data for fine-tuning.
 - **Actions**:
-    - **Mark as Garbage/Invalid**: Flags the email as irrelevant or trash.
+    - **Mark as Garbage/Invalid**: Flags the email as irrelevant or trash (Reason required).
     - **Validate & Save**: Commits the category changes. If you changed the category and provided a reason, this triggers the "Lesson Learned" analysis.
 
 ### 3. History Tab

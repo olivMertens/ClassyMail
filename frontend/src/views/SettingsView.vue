@@ -5,13 +5,14 @@ import { useI18n } from 'vue-i18n'
 
 const { t, locale } = useI18n()
 
-const activeTab = ref('general') // general | classification
+const activeTab = ref('classification') // classification | general | danger
 
 const settings = ref({
     processing_strategy: 'standard',
     phi4_input_per_1k: null,
     phi4_output_per_1k: null,
     mistral_per_1k_pages: null,
+    finetune_min_examples: 50,
     categories: []
 })
 const loading = ref(false)
@@ -34,6 +35,10 @@ const themes = [
     { id: 'indigo', name: 'Indigo', class: 'bg-indigo-600' },
     { id: 'orange', name: 'Orange', class: 'bg-orange-600' }
 ]
+
+const resetConfirm1 = ref(false)
+const resetConfirm2 = ref(false)
+const resetting = ref(false)
 
 const loadSettings = async () => {
     loading.value = true
@@ -58,6 +63,7 @@ const saveSettings = async () => {
             phi4_input_per_1k: settings.value.phi4_input_per_1k ? Number(settings.value.phi4_input_per_1k) : undefined,
             phi4_output_per_1k: settings.value.phi4_output_per_1k ? Number(settings.value.phi4_output_per_1k) : undefined,
             mistral_per_1k_pages: settings.value.mistral_per_1k_pages ? Number(settings.value.mistral_per_1k_pages) : undefined,
+            finetune_min_examples: settings.value.finetune_min_examples ? Number(settings.value.finetune_min_examples) : 50,
             categories: settings.value.categories
         }
 
@@ -73,6 +79,30 @@ const saveSettings = async () => {
         alert('Failed to save settings')
     } finally {
         loading.value = false
+    }
+}
+
+const performReset = async () => {
+    if (!resetConfirm1.value || !resetConfirm2.value) return
+    resetting.value = true
+    try {
+        const res = await fetch('/api/admin/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirm_1: true, confirm_2: true })
+        })
+        const data = await res.json()
+        if (res.ok) {
+            alert(`Environment Reset Successful.\nDeleted Blobs: ${data.deleted_blobs}\nDeleted DB Records: ${data.deleted_records}`)
+            resetConfirm1.value = false
+            resetConfirm2.value = false
+        } else {
+            alert(`Reset Failed: ${data.detail || JSON.stringify(data.errors)}`)
+        }
+    } catch (e) {
+        alert('Error connecting to server')
+    } finally {
+        resetting.value = false
     }
 }
 
@@ -158,7 +188,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="max-w-4xl mx-auto space-y-6">
+  <div class="w-full space-y-6">
     <div class="md:flex md:items-center md:justify-between">
       <div class="min-w-0 flex-1">
         <h2 class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">
@@ -174,25 +204,32 @@ onMounted(() => {
         aria-label="Tabs"
       >
         <button
-          :class="[activeTab === 'general' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium']"
-          @click="activeTab = 'general'"
-        >
-          General & Costs
-        </button>
-        <button
           :class="[activeTab === 'classification' ? 'border-amber-500 text-amber-600 dark:text-amber-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
           @click="activeTab = 'classification'"
         >
           Classification Categories
           <ExclamationTriangleIcon class="h-4 w-4 text-amber-500" />
         </button>
+        <button
+          :class="[activeTab === 'general' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium']"
+          @click="activeTab = 'general'"
+        >
+          General & Costs
+        </button>
+        <button
+          :class="[activeTab === 'danger' ? 'border-red-500 text-red-600 dark:text-red-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          @click="activeTab = 'danger'"
+        >
+          Danger Zone
+          <ExclamationTriangleIcon class="h-4 w-4 text-red-500" />
+        </button>
       </nav>
     </div>
 
-    <!-- General Tab -->
+    <!-- Classification Categories Tab (Moved First) -->
     <div
-      v-show="activeTab === 'general'"
-      class="space-y-6"
+      v-show="activeTab === 'classification'"
+      class="bg-white dark:bg-gray-800 shadow sm:rounded-lg"
     >
       <!-- Appearance Settings -->
       <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
@@ -276,7 +313,36 @@ onMounted(() => {
           </div>
         </div>
       </div>
-      Processing Strategy -->
+
+      <!-- Fine-tuning Settings -->
+      <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+          <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+            Fine-tuning Configuration
+          </h3>
+          <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+            <p>Configure parameters for Fine-tuning dataset generation.</p>
+          </div>
+
+          <div class="mt-4">
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Minimum Samples Required</label>
+            <div class="mt-2">
+              <input
+                v-model="settings.finetune_min_examples"
+                type="number"
+                min="5"
+                step="1"
+                class="block w-full max-w-xs rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+              >
+              <p class="mt-1 text-xs text-gray-500">
+                Minimum number of reviewed examples required to enable JSONL export. Lowering this allows testing with smaller datasets.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Processing Strategy -->
       <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
         <div class="px-4 py-5 sm:p-6">
           <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
@@ -301,11 +367,8 @@ onMounted(() => {
               >
                 Standard (Text/OCR Optimized - Default)
               </label>
-              <div class="ml-2 group relative flex items-center">
-                <QuestionMarkCircleIcon class="h-4 w-4 text-gray-400 hover:text-gray-500 cursor-help" />
-                <div class="absolute left-full ml-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-10 hidden group-hover:block pointer-events-none">
-                  {{ t('settings.strategy_standard_help') }}
-                </div>
+              <div class="ml-2 text-xs text-gray-500 max-w-lg">
+                Fast and cost-effective. Uses optimized prompting for standard text extraction and classification. Best for typed documents and clear emails.
               </div>
             </div>
             <div class="flex items-center">
@@ -323,11 +386,8 @@ onMounted(() => {
               >
                 Reasoning (Deep Reasoning / CoT)
               </label>
-              <div class="ml-2 group relative flex items-center">
-                <QuestionMarkCircleIcon class="h-4 w-4 text-gray-400 hover:text-gray-500 cursor-help" />
-                <div class="absolute left-full ml-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-10 hidden group-hover:block pointer-events-none">
-                  {{ t('settings.strategy_reasoning_help') }}
-                </div>
+              <div class="ml-2 text-xs text-gray-500 max-w-lg">
+                Forces a "Chain-of-Thought" (Step-by-step) approach. Instructs the model to analyze context and deduce intents logically before classifying. essential for subtle or complex cases.
               </div>
             </div>
             <div class="flex items-center">
@@ -345,11 +405,8 @@ onMounted(() => {
               >
                 Vision (Vision/Image Analysis - Experimental)
               </label>
-              <div class="ml-2 group relative flex items-center">
-                <QuestionMarkCircleIcon class="h-4 w-4 text-gray-400 hover:text-gray-500 cursor-help" />
-                <div class="absolute left-full ml-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-10 hidden group-hover:block pointer-events-none">
-                  {{ t('settings.strategy_vision_help') }}
-                </div>
+              <div class="ml-2 text-xs text-gray-500 max-w-lg">
+                Integrates visual analysis. Explicitly considers descriptions of non-text elements (photos, diagrams) detected by OCR. Crucial for claims relying on visual evidence (e.g., damage photos).
               </div>
             </div>
           </div>
@@ -578,6 +635,89 @@ onMounted(() => {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Danger Zone Tab -->
+    <div
+      v-show="activeTab === 'danger'"
+      class="bg-white dark:bg-gray-800 shadow sm:rounded-lg border border-red-200 dark:border-red-900"
+    >
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-base font-semibold leading-6 text-red-600 dark:text-red-400 flex items-center gap-2">
+          <ExclamationTriangleIcon class="h-5 w-5" />
+          Atomic Zone - Environment Reset
+        </h3>
+        <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+          <p>
+            Proceed with extreme caution. This action will permanently delete all data in the current environment.
+          </p>
+        </div>
+
+        <div class="mt-5 bg-red-50 dark:bg-red-900/20 p-4 rounded-md">
+          <h4 class="text-sm font-medium text-red-800 dark:text-red-300">
+            This action will:
+          </h4>
+          <ul class="list-disc list-inside mt-2 text-sm text-red-700 dark:text-red-200">
+            <li>Delete ALL emails and classification records from Database.</li>
+            <li>Delete ALL files (PDFs) from the Input Storage Container.</li>
+            <li>Reset the dashboard state completely.</li>
+          </ul>
+        </div>
+
+        <div class="mt-6 space-y-4">
+          <div class="flex items-start">
+            <div class="flex h-6 items-center">
+              <input
+                id="confirm_1"
+                v-model="resetConfirm1"
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-600 dark:bg-gray-700 dark:border-gray-600"
+              >
+            </div>
+            <div class="ml-3 text-sm leading-6">
+              <label
+                for="confirm_1"
+                class="font-medium text-gray-900 dark:text-white"
+              >I understand this deletes all data permanently.</label>
+            </div>
+          </div>
+          <div class="flex items-start">
+            <div class="flex h-6 items-center">
+              <input
+                id="confirm_2"
+                v-model="resetConfirm2"
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-600 dark:bg-gray-700 dark:border-gray-600"
+              >
+            </div>
+            <div class="ml-3 text-sm leading-6">
+              <label
+                for="confirm_2"
+                class="font-medium text-gray-900 dark:text-white"
+              >I confirm I want to reset the environment.</label>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            class="mt-4 inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="!resetConfirm1 || !resetConfirm2 || resetting"
+            @click="performReset"
+          >
+            <TrashIcon
+              v-if="!resetting"
+              class="-ml-0.5 mr-1.5 h-5 w-5"
+              aria-hidden="true"
+            />
+            <ArrowPathIcon
+              v-else
+              class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
+              aria-hidden="true"
+            />
+            {{ resetting ? 'Nuking Environment...' : 'NUKE EVERYTHING' }}
+          </button>
         </div>
       </div>
     </div>

@@ -3,7 +3,9 @@
         "dashboard": "Dashboard",
         "upload": "Upload",
         "costs": "Costs",
-        "settings": "Settings"
+        "guide": "Guide",
+        "settings": "Settings",
+        "developer": "Developer"
     },
     "settings": {
         "title": "Application Settings",
@@ -119,7 +121,8 @@
             "csv_columns": "Includes: ID, Status, Detected Intents, Confidence Scores, AI Usage Costs (USD), and Processing Time.",
             "jsonl_title": "JSONL Export (Fine-Tuning)",
             "jsonl_desc": "Export a 'Reinforcement Learning' dataset designed for Azure OpenAI / Phi-4 fine-tuning.",
-            "jsonl_format": "Format: JSON Lines (JSONL), compatible with Azure AI Foundry."
+            "jsonl_format": "Format: JSON Lines (JSONL), compatible with Azure AI Foundry.",
+            "jsonl_requirements": "* Requires {n} reviewed examples (configurable in Settings)."
         },
         "usage": {
             "title": "How to Use",
@@ -139,6 +142,16 @@
             "step4_desc": "Customize the behavior of the engine in the Settings tab.",
             "step4_li1": "Categories: Define exact intent names. Changes apply immediately.",
             "step4_li2": "Processing Strategy: Switch between Standard, Reasoning, or Vision modes."
+        },
+        "filters": {
+            "title": "Filtering & Stats",
+            "desc": "The dashboard offers advanced filtering capabilities to help you prioritize your work and analyze performance.",
+            "category_title": "Category Filter",
+            "category_desc": "Isolate emails by specific intent (e.g., 'Address Change'). Useful for targeted reviews or validating a specific intent type.",
+            "confidence_title": "Confidence Filter",
+            "confidence_desc": "Focus on low-confidence items (< 50%) to fix errors, or high-confidence items to spot-check the AI's performance.",
+            "quality_title": "Average Quality",
+            "quality_desc": "The global 'Avg. Quality' card tracks the mean confidence score across all processed emails, providing a global view of model performance."
         },
         "ai": {
             "title": "Global Complexity & Reasoning",

@@ -3,7 +3,9 @@
         "dashboard": "Tableau de bord",
         "upload": "Importer",
         "costs": "Coûts",
-        "settings": "Paramètres"
+        "guide": "Guide",
+        "settings": "Paramètres",
+        "developer": "Développeur"
     },
     "settings": {
         "title": "Paramètres de l'application",
@@ -103,6 +105,18 @@
     "guide": {
         "title": "Documentation de l'Application",
         "subtitle": "Guide d'utilisation de ClassiMail, compréhension des capacités IA et gestion de la confidentialité.",
+        "exports": {
+            "title": "Exports de Données & Fine-Tuning",
+            "desc": "Exportez vos données traitées pour le reporting ou pour entraîner de meilleurs modèles IA.",
+            "csv_title": "Export CSV (Reporting)",
+            "csv_desc": "Téléchargez une liste complète de tous les emails traités avec leur statut, coûts et métadonnées.",
+            "csv_streaming": "Support Streaming : Cet export génère les données à la volée, permettant le téléchargement de très grands jeux de données (10k+ lignes) sans plantage serveur.",
+            "csv_columns": "Inclus : ID, Statut, Intentions Détectées, Scores de Confiance, Coûts d'Usage IA (USD), et Temps de Traitement.",
+            "jsonl_title": "Export JSONL (Fine-Tuning)",
+            "jsonl_desc": "Exportez un jeu de données 'Reinforcement Learning' conçu pour le fine-tuning Azure OpenAI / Phi-4.",
+            "jsonl_format": "Format : JSON Lines (JSONL), compatible avec Azure AI Foundry.",
+            "jsonl_requirements": "* Nécessite {n} exemples validés (configurable dans les Paramètres)."
+        },
         "usage": {
             "title": "Comment utiliser",
             "step1_title": "1. Tableau de bord & Monitoring",
@@ -121,6 +135,16 @@
             "step4_desc": "Personnalisez le comportement du moteur dans l'onglet Paramètres.",
             "step4_li1": "Catégories : Définissez les noms d'intention exacts. Les changements s'appliquent immédiatement.",
             "step4_li2": "Stratégie de Traitement : Basculez entre les modes Standard, Raisonnement ou Vision."
+        },
+        "filters": {
+            "title": "Filtrage & Statistiques",
+            "desc": "Le tableau de bord offre des capacités de filtrage avancées pour vous aider à prioriser votre travail et analyser la performance.",
+            "category_title": "Filtre par Catégorie",
+            "category_desc": "Isolez les emails par intention spécifique (ex: 'Changement d'adresse'). Utile pour des revues ciblées ou valider un type d'intention précis.",
+            "confidence_title": "Filtre de Confiance",
+            "confidence_desc": "Concentrez-vous sur les éléments à faible confiance (< 50%) pour corriger les erreurs, ou à haute confiance pour vérifier la performance de l'IA.",
+            "quality_title": "Qualité Moyenne",
+            "quality_desc": "La carte globale 'Qualité Moy.' suit le score de confiance moyen sur tous les emails traités, donnant une vue haut niveau de la santé du modèle."
         },
         "ai": {
             "title": "Complexité Globale & Raisonnement",

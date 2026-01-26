@@ -65,6 +65,16 @@ async def count_reviewed_ready_items(clients: Clients | None = None) -> int:
     return 0
 
 
+async def get_average_confidence(*, clients: Clients | None = None) -> float:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    query = "SELECT VALUE AVG(i.confidence) FROM c JOIN i IN c.classification.detected_intents WHERE c.status='PROCESSED'"
+    it = clients.cosmos_container.query_items(query)
+    async for v in it:
+        return float(v or 0.0)
+    return 0.0
+
+
 async def _scalar_query(query: str, *, clients: Clients | None = None, parameters: list[dict] | None = None):
     clients = clients or get_default_clients()
     await clients.ensure_cosmos_container()

@@ -57,6 +57,7 @@ class EmailListResponse(BaseModel):
     finetune_min_required: int = 50
     finetune_ready: bool = False
     continuation_token: Optional[str] = None
+    average_confidence: Optional[float] = 0.0
 
 
 class OCRFailed(Exception):

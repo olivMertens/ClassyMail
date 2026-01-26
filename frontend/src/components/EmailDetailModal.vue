@@ -119,8 +119,14 @@ const reprocess = async () => {
 
 const markAsInvalid = async () => {
      if (!confirm("Are you sure you want to mark this email as Invalid/Garbage?")) return;
+
+     if (!correctionReason.value || !correctionReason.value.trim() || correctionReason.value.trim().length < 5) {
+        alert("Please provide a reason or comment for marking this email as Invalid (at least 5 characters).")
+        return
+     }
+
      try {
-        const payload = { status: 'INVALID', reason: correctionReason.value || 'Marked as invalid by user' }
+        const payload = { status: 'INVALID', reason: correctionReason.value }
         const res = await fetch(`/api/emails/${email.value.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -136,20 +142,11 @@ const markAsInvalid = async () => {
 const saveIntents = async () => {
     if (!email.value) return
 
-    // Validation: Require correction reason if categories changed
-    const currentIntents = (email.value.classification?.detected_intents || []).map(i => i.intent).sort()
-    const newSelection = [...selectedCategoryNames.value].sort()
-    const isChanged = JSON.stringify(currentIntents) !== JSON.stringify(newSelection)
-
-    if (isChanged) {
-        if (!correctionReason.value || !correctionReason.value.trim() || correctionReason.value.trim().length < 5) {
-            alert("Please provide a valid reason or comment for changing the classification (at least 5 characters). This is required for reinforcement learning.")
-            return
-        }
-    }
-
-    if (!correctionReason.value && email.value.classification?.needs_review) {
-         if (!confirm("Confirm validation without providing a correction reason?")) return;
+    // Validation: Require correction reason ALWAYS if validating manually
+    // The user requirement is "obligation of a comment for the user" when verifying/reassigning
+    if (!correctionReason.value || !correctionReason.value.trim() || correctionReason.value.trim().length < 5) {
+        alert("Please provide a valid reason or comment for this classification (at least 5 characters). This is required for reinforcement learning.")
+        return
     }
 
     try {

@@ -48,7 +48,8 @@ Il émet un BOM UTF‑8 et, par défaut, anonymise le markdown et impose un mini
 
 Contrôles :
 
-- Minimum d'exemples : env `FINETUNE_MIN_EXAMPLES` (défaut `50`) ou query param `min_required`
+- Minimum d'exemples : env `FINETUNE_MIN_EXAMPLES` (défaut `50`), configurable dans l'interface "Settings".
+- Si le nombre d'exemples "reviewed" est inférieur à ce seuil, l'export HTTP renvoie une erreur 409 (ou désactive le bouton dans l'UI).
 - Paramètres optionnels : `anonymize=true|false`, `max_examples=<n>`, `taxonomy_version=v1`, `include_metadata=true|false`
 
 Options utiles (CLI) :

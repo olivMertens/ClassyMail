@@ -15,7 +15,8 @@ DEFAULT_CATEGORIES = [
 DEFAULT_SETTINGS = {
     "cost_overrides": {},
     "categories": DEFAULT_CATEGORIES,
-    "processing_strategy": "standard"  # standard | reasoning | vision
+    "processing_strategy": "standard",  # standard | reasoning | vision
+    "finetune_min_examples": 50
 }
 
 def load_settings() -> dict:
@@ -30,6 +31,8 @@ def load_settings() -> dict:
             data["cost_overrides"] = {}
         if "processing_strategy" not in data:
             data["processing_strategy"] = "standard"
+        if "finetune_min_examples" not in data:
+            data["finetune_min_examples"] = 50
         return data
     except Exception:
         return DEFAULT_SETTINGS.copy()
@@ -51,6 +54,16 @@ def save_settings(settings: dict):
     if "processing_strategy" in settings:
         if settings["processing_strategy"] not in ("standard", "reasoning", "vision"):
             settings["processing_strategy"] = "standard"
+
+    # Sanitize finetune_min_examples
+    if "finetune_min_examples" in settings:
+        try:
+            val = int(settings["finetune_min_examples"])
+            if val < 5:
+                val = 5
+            settings["finetune_min_examples"] = val
+        except (ValueError, TypeError):
+            settings["finetune_min_examples"] = 50
 
     DATA_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
 

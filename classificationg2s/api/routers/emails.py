@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Optional
@@ -24,9 +25,12 @@ from classificationg2s.services.repository import (
     count_reviewed_ready_items,
     export_finetune_jsonl_iter,
     compute_search_text,
+    get_average_confidence,
 )
 from classificationg2s.services.llm_pipeline import analyze_correction
+from classificationg2s.services.settings_store import load_settings
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["emails"])
 
@@ -37,57 +41,137 @@ async def list_emails(
     page_size: int = Query(20, ge=1, le=100),
     status: str = Query("all", pattern="^(all|REVIEW_REQUIRED|PROCESSED|ERROR)$"),
     search: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    confidence_filter: Optional[str] = Query(None, pattern="^(lt_10|lt_30|lt_50|lt_90|eq_100)$"),
     continuation_token: Optional[str] = Query(None),
     cosmos_container=Depends(get_cosmos_container),
     clients: Clients = Depends(get_clients),
 ):
+    try:
+        filters = []
+        params = {}
+        if status != "all":
+            filters.append("c.status = @status")
+            params["@status"] = status
 
-    filters = []
-    params = {}
-    if status != "all":
-        filters.append("c.status = @status")
-        params["@status"] = status
-    if search:
-        filters.append("IS_DEFINED(c.search_text) AND CONTAINS(c.search_text, @search)")
-        params["@search"] = search
+        # Search filter
+        if search:
+            filters.append("IS_DEFINED(c.search_text) AND CONTAINS(c.search_text, @search)")
+            params["@search"] = search
 
-    where = " AND ".join(filters)
-    query = "SELECT * FROM c"
-    if where:
-        query += f" WHERE {where}"
-    query += " ORDER BY c._ts DESC"
+        # Category/Intent filter
+        # If category is provided, we check if ANY intent matches that category.
+        # If confidence_filter is ALSO provided, we check for that specific category's confidence.
+        if category:
+            params["@category"] = category
 
-    items_iter = cosmos_container.query_items(
-        query,
-        parameters=[{"name": k, "value": v} for k, v in params.items()],
-        enable_cross_partition_query=True,
-    )
-    pages = items_iter.by_page(continuation_token=continuation_token, max_page_size=page_size)
-    items: list[EmailRecord] = []
-    next_token: str | None = None
-    async for page_items in pages:
-        for item in page_items:
-            items.append(EmailRecord(**item))
-        next_token = pages.continuation_token
-        break
+            if confidence_filter:
+                limit = 1.0
+                op = "<"
+                if confidence_filter == "lt_10":
+                    limit = 0.1
+                elif confidence_filter == "lt_30":
+                    limit = 0.3
+                elif confidence_filter == "lt_50":
+                    limit = 0.5
+                elif confidence_filter == "lt_90":
+                    limit = 0.9
+                elif confidence_filter == "eq_100":
+                    limit = 0.99
+                    op = ">="
 
-    processed_count = await count_by_status("PROCESSED", clients=clients)
-    review_count = await count_by_status("REVIEW_REQUIRED", clients=clients)
-    total = processed_count + review_count
+                params["@conf_limit"] = limit
+                # Check for specific intent AND confidence
+                filters.append(f"EXISTS(SELECT VALUE i FROM i IN c.classification.detected_intents WHERE i.intent = @category AND i.confidence {op} @conf_limit)")
+            else:
+                 # Just category existence
+                filters.append("EXISTS(SELECT VALUE i FROM i IN c.classification.detected_intents WHERE i.intent = @category)")
 
-    finetune_min_required = int(os.getenv("FINETUNE_MIN_EXAMPLES", "50"))
-    finetune_reviewed_ready = await count_reviewed_ready_items(clients=clients)
+        # Confidence filter ONLY (no category specific)
+        # Assuming:
+        # "less than X" -> Max confidence of any intent is < X (i.e. NO intent is >= X)
+        # "100%" -> At least one intent is >= 0.99
+        elif confidence_filter:
+            limit = 1.0
+            if confidence_filter == "lt_10":
+                limit = 0.1
+                # "All intents < 0.1" <=> "Not Exists intent >= 0.1"
+                # Also ensure detected_intents exists and has items? Or just 0 items is fine?
+                # Usually we want items that HAVE intents but they are low.
+                params["@conf_limit"] = limit
+                filters.append("IS_DEFINED(c.classification.detected_intents) AND ARRAYS_LENGTH(c.classification.detected_intents) > 0")
+                filters.append("NOT EXISTS(SELECT VALUE i FROM i IN c.classification.detected_intents WHERE i.confidence >= @conf_limit)")
 
-    return EmailListResponse(
-        items=items,
-        total=total,
-        review_required=review_count,
-        processed=processed_count,
-        finetune_reviewed_ready=finetune_reviewed_ready,
-        finetune_min_required=finetune_min_required,
-        finetune_ready=finetune_reviewed_ready >= finetune_min_required,
-        continuation_token=next_token,
-    )
+            elif confidence_filter == "lt_30":
+                limit = 0.3
+                params["@conf_limit"] = limit
+                filters.append("IS_DEFINED(c.classification.detected_intents) AND ARRAYS_LENGTH(c.classification.detected_intents) > 0")
+                filters.append("NOT EXISTS(SELECT VALUE i FROM i IN c.classification.detected_intents WHERE i.confidence >= @conf_limit)")
+
+            elif confidence_filter == "lt_50":
+                limit = 0.5
+                params["@conf_limit"] = limit
+                filters.append("IS_DEFINED(c.classification.detected_intents) AND ARRAYS_LENGTH(c.classification.detected_intents) > 0")
+                filters.append("NOT EXISTS(SELECT VALUE i FROM i IN c.classification.detected_intents WHERE i.confidence >= @conf_limit)")
+
+            elif confidence_filter == "lt_90":
+                limit = 0.9
+                params["@conf_limit"] = limit
+                filters.append("IS_DEFINED(c.classification.detected_intents) AND ARRAYS_LENGTH(c.classification.detected_intents) > 0")
+                filters.append("NOT EXISTS(SELECT VALUE i FROM i IN c.classification.detected_intents WHERE i.confidence >= @conf_limit)")
+
+            elif confidence_filter == "eq_100":
+                limit = 0.99
+                params["@conf_limit"] = limit
+                filters.append("EXISTS(SELECT VALUE i FROM i IN c.classification.detected_intents WHERE i.confidence >= @conf_limit)")
+
+        where = " AND ".join(filters)
+        query = "SELECT * FROM c"
+        if where:
+            query += f" WHERE {where}"
+        query += " ORDER BY c._ts DESC"
+
+        items_iter = cosmos_container.query_items(
+            query,
+            parameters=[{"name": k, "value": v} for k, v in params.items()],
+            enable_cross_partition_query=True,
+        )
+        pages = items_iter.by_page(continuation_token=continuation_token, max_page_size=page_size)
+        items: list[EmailRecord] = []
+        next_token: str | None = None
+        async for page_items in pages:
+            for item in page_items:
+                items.append(EmailRecord(**item))
+            next_token = pages.continuation_token
+            break
+
+        processed_count = await count_by_status("PROCESSED", clients=clients)
+        review_count = await count_by_status("REVIEW_REQUIRED", clients=clients)
+        total = processed_count + review_count
+
+        settings = load_settings()
+        finetune_min_required = settings.get("finetune_min_examples", 50)
+        # Fallback to env if not set in settings (though load_settings defaults to 50)
+        if not finetune_min_required:
+             finetune_min_required = int(os.getenv("FINETUNE_MIN_EXAMPLES", "50"))
+
+        finetune_reviewed_ready = await count_reviewed_ready_items(clients=clients)
+        avg_conf = await get_average_confidence(clients=clients)
+
+        return EmailListResponse(
+            items=items,
+            total=total,
+            review_required=review_count,
+            processed=processed_count,
+            finetune_reviewed_ready=finetune_reviewed_ready,
+            finetune_min_required=finetune_min_required,
+            finetune_ready=finetune_reviewed_ready >= finetune_min_required,
+            continuation_token=next_token,
+            average_confidence=avg_conf,
+        )
+    except Exception as e:
+        logger.error(f"Error listing emails: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @router.get("/stats")
@@ -97,8 +181,13 @@ async def get_stats(clients: Clients = Depends(get_clients)):
     review_count = await count_by_status("REVIEW_REQUIRED", clients=clients)
     total = processed_count + review_count
 
-    finetune_min_required = int(os.getenv("FINETUNE_MIN_EXAMPLES", "50"))
+    settings = load_settings()
+    finetune_min_examples = settings.get("finetune_min_examples", 50)
+    # The frontend expects finetune_min_required
+    finetune_min_required = finetune_min_examples
+
     finetune_reviewed_ready = await count_reviewed_ready_items(clients=clients)
+    avg_conf = await get_average_confidence(clients=clients)
 
     return {
         "processed": processed_count,
@@ -108,6 +197,7 @@ async def get_stats(clients: Clients = Depends(get_clients)):
         "finetune_reviewed_ready": finetune_reviewed_ready,
         "finetune_min_required": finetune_min_required,
         "finetune_ready": finetune_reviewed_ready >= finetune_min_required,
+        "average_confidence": avg_conf
     }
 
 
@@ -281,7 +371,8 @@ async def export_emails_finetune_jsonl(
     min_required: Optional[int] = Query(None, ge=1),
     clients: Clients = Depends(get_clients),
 ):
-    finetune_min_required = min_required or int(os.getenv("FINETUNE_MIN_EXAMPLES", "50"))
+    settings = load_settings()
+    finetune_min_required = min_required or settings.get("finetune_min_examples", 50)
 
     finetune_reviewed_ready = await count_reviewed_ready_items(clients=clients)
     if not include_unreviewed and finetune_reviewed_ready < finetune_min_required:

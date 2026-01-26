@@ -115,7 +115,9 @@ graph LR
               <h4 class="font-medium text-gray-900 dark:text-white">
                 {{ t('guide.usage.step1_title') }}
               </h4>
-              <p class="text-gray-600 dark:text-gray-300">{{ t('guide.usage.step1_desc') }}</p>
+              <p class="text-gray-600 dark:text-gray-300">
+                {{ t('guide.usage.step1_desc') }}
+              </p>
               <ul class="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
                 <li>{{ t('guide.usage.step1_li1') }}</li>
                 <li>{{ t('guide.usage.step1_li2') }}</li>
@@ -125,7 +127,9 @@ graph LR
               <h4 class="font-medium mt-4 text-gray-900 dark:text-white">
                 {{ t('guide.usage.step2_title') }}
               </h4>
-              <p class="text-gray-600 dark:text-gray-300">{{ t('guide.usage.step2_desc') }}</p>
+              <p class="text-gray-600 dark:text-gray-300">
+                {{ t('guide.usage.step2_desc') }}
+              </p>
               <ul class="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
                 <li>{{ t('guide.usage.step2_li1') }}</li>
                 <li>{{ t('guide.usage.step2_li2') }}</li>
@@ -136,12 +140,16 @@ graph LR
               <h4 class="font-medium text-gray-900 dark:text-white">
                 {{ t('guide.usage.step3_title') }}
               </h4>
-              <p class="text-gray-600 dark:text-gray-300">{{ t('guide.usage.step3_desc') }}</p>
+              <p class="text-gray-600 dark:text-gray-300">
+                {{ t('guide.usage.step3_desc') }}
+              </p>
 
               <h4 class="font-medium mt-4 text-gray-900 dark:text-white">
                 {{ t('guide.usage.step4_title') }}
               </h4>
-              <p class="text-gray-600 dark:text-gray-300">{{ t('guide.usage.step4_desc') }}</p>
+              <p class="text-gray-600 dark:text-gray-300">
+                {{ t('guide.usage.step4_desc') }}
+              </p>
               <ul class="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
                 <li>{{ t('guide.usage.step4_li1') }}</li>
                 <li>{{ t('guide.usage.step4_li2') }}</li>
@@ -206,9 +214,12 @@ graph LR
             <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">
               {{ t('guide.exports.jsonl_desc') }}
             </p>
-            <div class="bg-gray-900 text-gray-200 p-2 rounded text-xs font-mono overflow-x-auto whitespace-pre">
+            <div class="bg-gray-900 text-gray-200 p-2 rounded text-xs font-mono overflow-x-auto whitespace-pre mb-2">
               {{ `{"messages": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "{\\"intents\\": [...]}"}]}` }}
             </div>
+            <p class="text-[10px] text-gray-500 italic">
+              * Requires {{ 50 }} reviewed examples (configurable in Settings).
+            </p>
           </div>
         </div>
       </div>
@@ -231,6 +242,43 @@ graph LR
             <span>{{ t('guide.privacy.li2') }}</span>
           </li>
         </ul>
+      </div>
+    </div>
+
+    <!-- Interface & Filters -->
+    <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg px-4 py-5 sm:p-6">
+      <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white flex items-center gap-2">
+        <EyeIcon class="h-5 w-5 text-indigo-500" />
+        {{ t('guide.filters.title') }}
+      </h3>
+      <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+        {{ t('guide.filters.desc') }}
+      </p>
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="border border-gray-200 dark:border-gray-700 rounded p-3">
+          <h5 class="font-medium text-sm text-gray-900 dark:text-white">
+            {{ t('guide.filters.category_title') }}
+          </h5>
+          <p class="text-xs text-gray-500 mt-1">
+            {{ t('guide.filters.category_desc') }}
+          </p>
+        </div>
+        <div class="border border-gray-200 dark:border-gray-700 rounded p-3">
+          <h5 class="font-medium text-sm text-gray-900 dark:text-white">
+            {{ t('guide.filters.confidence_title') }}
+          </h5>
+          <p class="text-xs text-gray-500 mt-1">
+            {{ t('guide.filters.confidence_desc') }}
+          </p>
+        </div>
+        <div class="border border-gray-200 dark:border-gray-700 rounded p-3 bg-indigo-50 dark:bg-indigo-900/10">
+          <h5 class="font-medium text-sm text-gray-900 dark:text-white">
+            {{ t('guide.filters.quality_title') }}
+          </h5>
+          <p class="text-xs text-gray-500 mt-1">
+            {{ t('guide.filters.quality_desc') }}
+          </p>
+        </div>
       </div>
     </div>
 

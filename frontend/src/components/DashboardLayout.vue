@@ -44,9 +44,9 @@ const navigation = computed(() => [
   { name: t('nav.dashboard'), id: 'dashboard', icon: HomeIcon },
   { name: t('nav.upload'), id: 'upload', icon: CloudArrowUpIcon },
   { name: t('nav.costs'), id: 'costs', icon: CurrencyDollarIcon },
-  { name: 'Guide', id: 'docs', icon: BookOpenIcon },
+  { name: t('nav.guide'), id: 'docs', icon: BookOpenIcon },
   { name: t('nav.settings'), id: 'settings', icon: Cog6ToothIcon },
-  { name: 'Developer', id: 'developer', icon: CodeBracketSquareIcon },
+  { name: t('nav.developer'), id: 'developer', icon: CodeBracketSquareIcon },
 ])
 </script>
 
