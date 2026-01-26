@@ -8,7 +8,7 @@ defineProps({
     default: false
   }
 })
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'navigate'])
 const { t } = useI18n()
 </script>
 
@@ -71,9 +71,9 @@ const { t } = useI18n()
                   <p class="text-sm text-gray-500 dark:text-gray-400">
                     {{ t('info.guide_prompt') }}
                     <a
-                      href="/guide"
+                      href="#"
                       class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
-                      @click.prevent="emit('close'); $router.push('/guide')"
+                      @click.prevent="emit('navigate', 'docs')"
                     >
                       {{ t('info.guide_link') }}
                     </a>

@@ -207,6 +207,7 @@ const navigation = computed(() => [
     <InfoModal
       :show="showInfoModal"
       @close="showInfoModal = false"
+      @navigate="(view) => { showInfoModal = false; emit('change-view', view) }"
     />
   </div>
 </template>
