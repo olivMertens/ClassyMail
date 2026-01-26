@@ -15,7 +15,10 @@
         "dark_mode": "Dark Mode",
         "language": "Language",
         "costs_title": "Cost Overrides",
-        "costs_desc": "Override the default pricing used for cost calculations. Leave blank to use defaults."
+        "costs_desc": "Override the default pricing used for cost calculations. Leave blank to use defaults.",
+        "strategy_standard_help": "Fast & Efficient. Best for standard typed text documents and clear emails.",
+        "strategy_reasoning_help": "Deep Analysis. Uses Chain-of-Thought to justify decisions before classifying. Useful for ambiguous cases.",
+        "strategy_vision_help": "Multimodal. Analyzes visual elements (images, layouts) in addition to text. Best for documents with photos or complex structures."
     },
     "upload": {
         "title": "Upload Documents",
@@ -157,5 +160,4 @@
         },
         "flow_title": "Processing Flow"
     }
-
 }

@@ -266,24 +266,29 @@ const emit = defineEmits(['open-email'])
 
     <div
       v-else-if="error"
-      class="rounded-md bg-red-50 dark:bg-red-900/20 p-4"
+      class="rounded-md bg-gray-50 dark:bg-gray-800/50 p-6 border border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center text-center"
     >
-      <div class="flex">
-        <div class="flex-shrink-0">
-          <ExclamationCircleIcon
-            class="h-5 w-5 text-red-400"
-            aria-hidden="true"
-          />
-        </div>
-        <div class="ml-3">
-          <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
-            System Error
-          </h3>
-          <div class="mt-2 text-sm text-red-700 dark:text-red-300">
-            <p>{{ error }}</p>
-          </div>
-        </div>
+      <div class="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30 mb-4">
+        <ExclamationCircleIcon
+          class="h-6 w-6 text-orange-600 dark:text-orange-400"
+          aria-hidden="true"
+        />
       </div>
+      <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
+        Waiting for Data
+      </h3>
+      <p class="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-4">
+        The dashboard cannot retrieve emails. This usually means the database is initializing or empty.
+      </p>
+      <p class="text-xs text-gray-400 font-mono bg-white dark:bg-gray-900 px-3 py-2 rounded border border-gray-200 dark:border-gray-700">
+        {{ error }}
+      </p>
+      <button
+        class="mt-6 inline-flex items-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+        @click="fetchEmails"
+      >
+        Retry Connection
+      </button>
     </div>
 
     <div

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { CheckCircleIcon, MoonIcon, SunIcon, PlusIcon, TrashIcon, PencilSquareIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+import { CheckCircleIcon, MoonIcon, SunIcon, PlusIcon, TrashIcon, PencilSquareIcon, ExclamationTriangleIcon, QuestionMarkCircleIcon } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 
 const { t, locale } = useI18n()
@@ -301,6 +301,12 @@ onMounted(() => {
               >
                 Standard (Text/OCR Optimized - Default)
               </label>
+              <div class="ml-2 group relative flex items-center">
+                <QuestionMarkCircleIcon class="h-4 w-4 text-gray-400 hover:text-gray-500 cursor-help" />
+                <div class="absolute left-full ml-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-10 hidden group-hover:block pointer-events-none">
+                  {{ t('settings.strategy_standard_help') }}
+                </div>
+              </div>
             </div>
             <div class="flex items-center">
               <input
@@ -317,6 +323,12 @@ onMounted(() => {
               >
                 Reasoning (Deep Reasoning / CoT)
               </label>
+              <div class="ml-2 group relative flex items-center">
+                <QuestionMarkCircleIcon class="h-4 w-4 text-gray-400 hover:text-gray-500 cursor-help" />
+                <div class="absolute left-full ml-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-10 hidden group-hover:block pointer-events-none">
+                  {{ t('settings.strategy_reasoning_help') }}
+                </div>
+              </div>
             </div>
             <div class="flex items-center">
               <input
@@ -333,6 +345,12 @@ onMounted(() => {
               >
                 Vision (Vision/Image Analysis - Experimental)
               </label>
+              <div class="ml-2 group relative flex items-center">
+                <QuestionMarkCircleIcon class="h-4 w-4 text-gray-400 hover:text-gray-500 cursor-help" />
+                <div class="absolute left-full ml-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-10 hidden group-hover:block pointer-events-none">
+                  {{ t('settings.strategy_vision_help') }}
+                </div>
+              </div>
             </div>
           </div>
         </div>

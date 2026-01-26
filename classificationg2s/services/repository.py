@@ -41,7 +41,6 @@ async def count_by_status(status: str, clients: Clients | None = None) -> int:
     it = clients.cosmos_container.query_items(
         query,
         parameters=[{"name": "@status", "value": status}],
-        enable_cross_partition_query=True,
     )
     async for v in it:
         return v
@@ -60,7 +59,7 @@ async def count_reviewed_ready_items(clients: Clients | None = None) -> int:
         "AND IS_DEFINED(c.classification.detected_intents) "
         "AND ARRAY_LENGTH(c.classification.detected_intents) > 0"
     )
-    it = clients.cosmos_container.query_items(query, enable_cross_partition_query=True)
+    it = clients.cosmos_container.query_items(query)
     async for v in it:
         return v
     return 0
@@ -72,7 +71,6 @@ async def _scalar_query(query: str, *, clients: Clients | None = None, parameter
     it = clients.cosmos_container.query_items(
         query,
         parameters=parameters,
-        enable_cross_partition_query=True,
     )
     async for v in it:
         return v

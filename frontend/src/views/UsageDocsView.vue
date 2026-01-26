@@ -245,7 +245,7 @@ graph LR
       </p>
       <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="border border-gray-200 dark:border-gray-700 rounded p-3">
-          <h5 class="font-medium text-sm">
+          <h5 class="font-medium text-sm text-gray-900 dark:text-white">
             {{ t('guide.vision.standard_title') }}
           </h5>
           <p class="text-xs text-gray-500 mt-1">
@@ -253,7 +253,7 @@ graph LR
           </p>
         </div>
         <div class="border border-gray-200 dark:border-gray-700 rounded p-3 bg-amber-50 dark:bg-amber-900/10">
-          <h5 class="font-medium text-sm">
+          <h5 class="font-medium text-sm text-gray-900 dark:text-white">
             {{ t('guide.vision.vision_title') }}
           </h5>
           <p class="text-xs text-gray-500 mt-1">

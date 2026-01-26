@@ -99,24 +99,23 @@ onMounted(() => {
 
     <div
       v-else-if="error"
-      class="rounded-md bg-red-50 dark:bg-red-900/20 p-4"
+      class="rounded-md bg-gray-50 dark:bg-gray-800/50 p-8 border border-gray-200 dark:border-gray-700 text-center"
     >
-      <div class="flex">
-        <div class="flex-shrink-0">
-          <ExclamationCircleIcon
-            class="h-5 w-5 text-red-400"
-            aria-hidden="true"
-          />
-        </div>
-        <div class="ml-3">
-          <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
-            System Error
-          </h3>
-          <div class="mt-2 text-sm text-red-700 dark:text-red-300">
-            <p>{{ error }}</p>
-          </div>
-        </div>
+      <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
+        <ExclamationCircleIcon
+          class="h-6 w-6 text-gray-400"
+          aria-hidden="true"
+        />
       </div>
+      <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+        Start Processing to see Costs
+      </h3>
+      <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
+        No cost data is available yet because the database is empty or unreachable. Upload your first document to initialize specific cost tracking.
+      </p>
+      <p class="mt-4 text-xs text-gray-400 font-mono bg-gray-100 dark:bg-gray-900 p-2 rounded inline-block">
+        Debug: {{ error }}
+      </p>
     </div>
 
     <div

@@ -1,11 +1,55 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import mermaid from 'mermaid'
-import { CodeBracketIcon, MapIcon, ServerIcon } from '@heroicons/vue/24/outline'
+import { CodeBracketIcon, MapIcon, ServerIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 
 const currentTab = ref('architecture')
 const isDark = ref(false)
 let observer = null
+
+// Reset Logic
+const showResetModal1 = ref(false)
+const showResetModal2 = ref(false)
+const isResetting = ref(false)
+const resetResult = ref(null)
+
+const confirmResetStep1 = () => {
+    showResetModal1.value = true
+}
+
+const proceedToStep2 = () => {
+    showResetModal1.value = false
+    showResetModal2.value = true
+}
+
+const executeReset = async () => {
+    isResetting.value = true
+    resetResult.value = null
+    try {
+        const res = await fetch('/api/admin/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirm_1: true, confirm_2: true })
+        })
+        const data = await res.json()
+        if (res.ok) {
+            resetResult.value = {
+                type: 'success',
+                message: `Environment Reset Complete. Deleted ${data.deleted_blobs} files and ${data.deleted_records} database records.`
+            }
+        } else {
+            resetResult.value = {
+                type: 'error',
+                message: data.detail || 'Reset failed.'
+            }
+        }
+    } catch (e) {
+        resetResult.value = { type: 'error', message: e.message }
+    } finally {
+        isResetting.value = false
+        showResetModal2.value = false
+    }
+}
 
 const initMermaid = async () => {
     const darkMode = document.documentElement.classList.contains('dark')
@@ -136,11 +180,134 @@ graph TD
           />
           Repository
         </button>
+        <button
+          :class="[currentTab === 'danger' ? 'border-red-500 text-red-600 dark:text-red-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300', 'group inline-flex items-center border-b-2 py-4 px-1 text-sm font-medium']"
+          @click="switchTab('danger')"
+        >
+          <ExclamationTriangleIcon
+            class="-ml-0.5 mr-2 h-5 w-5 text-red-500"
+            aria-hidden="true"
+          />
+          Danger Zone
+        </button>
       </nav>
     </div>
 
     <!-- Content -->
     <div class="py-4">
+      <!-- Danger Zone Tab -->
+      <div
+        v-if="currentTab === 'danger'"
+        class="space-y-6"
+      >
+        <div class="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 p-4">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <ExclamationTriangleIcon
+                class="h-5 w-5 text-red-400"
+                aria-hidden="true"
+              />
+            </div>
+            <div class="ml-3">
+              <p class="text-sm text-red-700 dark:text-red-200">
+                Actions here are destructive and cannot be undone. Proceed with caution.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg px-4 py-5 sm:p-6">
+          <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+            Reset Environment
+          </h3>
+          <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+            <p>
+              This action will delete <strong>ALL</strong> PDF files from Azure Blob Storage and <strong>ALL</strong> email records from Cosmos DB.
+              The system will return to a clean slate.
+            </p>
+          </div>
+          <div class="mt-5">
+            <button
+              type="button"
+              class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+              :disabled="isResetting"
+              @click="confirmResetStep1"
+            >
+              <TrashIcon
+                class="-ml-0.5 mr-2 h-5 w-5"
+                aria-hidden="true"
+              />
+              {{ isResetting ? 'Cleaning...' : 'Delete All Data' }}
+            </button>
+          </div>
+
+          <div
+            v-if="resetResult"
+            :class="[resetResult.type === 'success' ? 'bg-green-50 text-green-800 border-green-200' : 'bg-red-50 text-red-800 border-red-200', 'mt-4 p-4 rounded-md border text-sm']"
+          >
+            {{ resetResult.message }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Modals for Reset -->
+      <div
+        v-if="showResetModal1"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      >
+        <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-xl">
+          <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">
+            Wait! Are you sure?
+          </h3>
+          <p class="text-gray-600 dark:text-gray-300 mb-6">
+            You are about to delete ALL data. The application will lose all history, costs, and processed emails.
+          </p>
+          <div class="flex justify-end gap-3">
+            <button
+              class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+              @click="showResetModal1 = false"
+            >
+              Cancel
+            </button>
+            <button
+              class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              @click="proceedToStep2"
+            >
+              Yes, I understand
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-if="showResetModal2"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      >
+        <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-xl border-2 border-red-500">
+          <h3 class="text-lg font-bold text-red-600 mb-2">
+            Final Confirmation
+          </h3>
+          <p class="text-gray-600 dark:text-gray-300 mb-6 font-bold">
+            This process is IRREVERSIBLE. Are you really, really sure?
+          </p>
+          <div class="flex justify-end gap-3">
+            <button
+              class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+              @click="showResetModal2 = false"
+            >
+              Abort
+            </button>
+            <button
+              class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-bold"
+              @click="executeReset"
+            >
+              DELETE EVERYTHING
+            </button>
+          </div>
+        </div>
+      </div>
+
+
       <!-- Architecture Tab -->
       <div
         v-if="currentTab === 'architecture'"

@@ -15,7 +15,10 @@
         "dark_mode": "Mode Sombre",
         "language": "Langue",
         "costs_title": "Surcharge des Coûts",
-        "costs_desc": "Modifier la tarification par défaut pour le calcul des coûts. Laisser vide pour utiliser les défauts."
+        "costs_desc": "Modifier la tarification par défaut pour le calcul des coûts. Laisser vide pour utiliser les défauts.",
+        "strategy_standard_help": "Rapide & Efficace. Idéal pour les textes dactylographiés standard et emails clairs.",
+        "strategy_reasoning_help": "Analyse Profonde. Utilise le 'Chain-of-Thought' pour justifier avant de classifier. Utile pour les cas ambigus.",
+        "strategy_vision_help": "Multimodal. Analyse les éléments visuels (images, mise en page). Idéal pour les documents avec photos ou structures complexes."
     },
     "upload": {
         "title": "Importer des documents",
@@ -139,5 +142,4 @@
         },
         "flow_title": "Flux de Traitement"
     }
-
 }
