@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import mermaid from 'mermaid'
-import { LinkIcon, CodeBracketIcon, MapIcon, BookOpenIcon, ServerIcon } from '@heroicons/vue/24/outline'
+import { CodeBracketIcon, MapIcon, ServerIcon } from '@heroicons/vue/24/outline'
 
 const currentTab = ref('architecture')
 const isDark = ref(false)

@@ -1,6 +1,6 @@
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { CheckCircleIcon, BookOpenIcon, CpuChipIcon, ShieldCheckIcon, EyeIcon } from '@heroicons/vue/24/outline'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { BookOpenIcon, CpuChipIcon, ShieldCheckIcon, EyeIcon } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 import mermaid from 'mermaid'
 

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { CheckCircleIcon, MoonIcon, SunIcon, PlusIcon, TrashIcon, PencilSquareIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 
@@ -302,7 +302,6 @@ Processing Strategy -->
             </div>
         </div>
 
-        <!-- 
         <!-- Costs Settings -->
         <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
             <div class="px-4 py-5 sm:p-6">

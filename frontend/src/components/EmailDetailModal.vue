@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch } from 'vue'
 import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
 
@@ -277,6 +277,7 @@ const renderMarkdown = (text) => md.render(text || '')
                     </div>
 
                     <div class="prose dark:prose-invert max-w-none text-sm max-h-60 overflow-y-auto border border-gray-100 rounded p-2">
+                        <!-- eslint-disable-next-line vue/no-v-html -->
                         <div v-html="renderMarkdown(email.markdown)" />
                     </div>
 
