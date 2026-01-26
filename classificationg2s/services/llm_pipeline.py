@@ -223,7 +223,7 @@ async def analyze_correction(
     """
     if not config.PHI_ENDPOINT or not reason:
         return None
-        
+
     system_prompt = """
 Tu es un expert en amélioration de classification automatique.
 Un utilisateur humain a corrigé la classification d'un email faite par une IA.
@@ -234,7 +234,7 @@ FORMAT DE SORTIE :
 Une seule phrase ou un court paragraphe expliquant la nuance manquée par l'IA.
 Exemple : "L'IA a manqué l'intention 'Résiliation' car le terme utilisé était 'clôture de compte' dans le contexte d'un décès."
 """
-    
+
     user_content = f"""
 EMAIL :
 {text_markdown[:2000]}... (tronqué)
@@ -272,6 +272,5 @@ Analyse cette correction.
                 return data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
     except Exception:
         pass
-    
-    return None
 
+    return None

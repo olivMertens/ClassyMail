@@ -6,8 +6,8 @@ import { LinkIcon, CodeBracketIcon, MapIcon, BookOpenIcon, ServerIcon } from '@h
 const currentTab = ref('architecture')
 
 const initMermaid = async () => {
-    mermaid.initialize({ 
-        startOnLoad: false, 
+    mermaid.initialize({
+        startOnLoad: false,
         theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
         securityLevel: 'loose'
     })
@@ -41,7 +41,7 @@ graph TD
 
     Client([Client Browser]) -->|HTTPS| FE[Vue Frontend]
     FE -->|API Calls| API[FastAPI Backend]
-    
+
     subgraph Azure Container Apps
         API
         Worker[Background Worker]
@@ -55,7 +55,7 @@ graph TD
     Worker -->|Read File| Blob
     Worker -->|OCR| Mistral[Mistral AI OCR]
     Worker -->|Classify| OPENAI[Azure OpenAI Phi-4]
-    
+
     Mistral -->|Markdown| Worker
     OPENAI -->|JSON Intent| Worker
     Worker -->|Update| Cosmos
@@ -79,21 +79,21 @@ graph TD
     <!-- Tabs -->
     <div class="border-b border-gray-200 dark:border-gray-700">
         <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-            <button 
+            <button
                 @click="switchTab('architecture')"
                 :class="[currentTab === 'architecture' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300', 'group inline-flex items-center border-b-2 py-4 px-1 text-sm font-medium']"
             >
                 <MapIcon class="-ml-0.5 mr-2 h-5 w-5" aria-hidden="true" />
                 Architecture
             </button>
-            <button 
+            <button
                 @click="switchTab('api')"
                 :class="[currentTab === 'api' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300', 'group inline-flex items-center border-b-2 py-4 px-1 text-sm font-medium']"
             >
                 <ServerIcon class="-ml-0.5 mr-2 h-5 w-5" aria-hidden="true" />
                 API Reference (Redoc)
             </button>
-            <button 
+            <button
                 @click="switchTab('repo')"
                 :class="[currentTab === 'repo' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300', 'group inline-flex items-center border-b-2 py-4 px-1 text-sm font-medium']"
             >
@@ -112,7 +112,7 @@ graph TD
                 <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
                     The ClassiMail system leverages Azure Container Apps, Azure AI Services, and Cosmos DB to provide a scalable email classification pipeline.
                 </p>
-                
+
                 <div class="flex justify-center bg-white dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto">
                     <div class="mermaid">
                         {{ diagram }}
@@ -145,9 +145,9 @@ graph TD
                 <p class="text-gray-600 dark:text-gray-300">
                     The source code for this Proof of Concept is hosted on GitHub.
                 </p>
-                <a 
-                    href="https://github.com/olmertens/ClassificationG2S" 
-                    target="_blank" 
+                <a
+                    href="https://github.com/olmertens/ClassificationG2S"
+                    target="_blank"
                     class="inline-flex items-center gap-x-2 rounded-md bg-gray-900 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
                 >
                     <svg class="h-5 w-5 fill-current" viewBox="0 0 24 24" aria-hidden="true">

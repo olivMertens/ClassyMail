@@ -129,10 +129,10 @@ async def patch_email(item_id: str, payload: dict, cosmos_container=Depends(get_
 
     try:
         item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
-        
+
         # Determine status (allow forcing INVALID/IGNORED via payload or default to PROCESSED)
         new_status = payload.get("status", "PROCESSED")
-        
+
         # History tracking
         current_classification = item.get("classification") or {}
         history_entry = {
@@ -143,7 +143,7 @@ async def patch_email(item_id: str, payload: dict, cosmos_container=Depends(get_
             "correction_reason": payload.get("reason"),
             "llm_feedback": None
         }
-        
+
         if intents := payload.get("intents"):
              # Call LLM Analysis if there is a reason and a change
             if payload.get("reason") and item.get("markdown"):
@@ -165,12 +165,12 @@ async def patch_email(item_id: str, payload: dict, cosmos_container=Depends(get_
             }
             if payload.get("global_complexity"):
                 item["classification"]["global_complexity"] = payload.get("global_complexity")
-            
+
             item["status"] = new_status
             item["updated_at"] = datetime.now(timezone.utc).isoformat()
             item["reviewed"] = True
             item["reviewed_at"] = datetime.now(timezone.utc).isoformat()
-            
+
             if reason := payload.get("reason"):
                 item["correction_reason"] = reason
 

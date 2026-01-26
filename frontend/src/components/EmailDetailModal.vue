@@ -45,14 +45,14 @@ const loadEmail = async () => {
     correctionReason.value = ''
     selectedCategoryNames.value = []
     customCategories.value = []
-    
+
     try {
         const res = await fetch(`/api/emails/${props.emailId}`)
         if (res.ok) {
             email.value = await res.json()
             intentsJson.value = JSON.stringify(email.value.classification?.detected_intents || [], null, 2)
             correctionReason.value = email.value.correction_reason || ''
-            
+
             // Populate selection from current intent
             const currentIntents = email.value.classification?.detected_intents || []
             currentIntents.forEach(i => {
@@ -242,7 +242,7 @@ const renderMarkdown = (text) => md.render(text || '')
 
             <!-- Right: Data -->
             <div class="md:w-1/2 h-1/2 md:h-full overflow-y-auto bg-white dark:bg-gray-900 flex flex-col">
-              
+
               <!-- Tabs -->
               <div class="border-b border-gray-200 dark:border-gray-700">
                 <nav class="flex -mb-px" aria-label="Tabs">
@@ -263,7 +263,7 @@ const renderMarkdown = (text) => md.render(text || '')
 
               <!-- Tab Content -->
               <div class="p-6 flex-1">
-                
+
                 <div v-if="loading && !email" class="space-y-4">
                     <div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-8 rounded w-3/4" />
                     <div class="animate-pulse bg-gray-200 dark:bg-gray-700 h-32 rounded" />
@@ -284,8 +284,8 @@ const renderMarkdown = (text) => md.render(text || '')
                     <div>
                         <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Categories</h4>
                         <div class="flex flex-wrap gap-2 mb-3">
-                            <button 
-                                v-for="cat in availableCategories" 
+                            <button
+                                v-for="cat in availableCategories"
                                 :key="cat.name"
                                 @click="toggleCategory(cat.name)"
                                 :class="selectedCategoryNames.includes(cat.name) ? 'bg-primary-100 text-primary-800 ring-primary-500 dark:bg-primary-900 dark:text-primary-200' : 'bg-gray-100 text-gray-700 ring-gray-200 dark:bg-gray-800 dark:text-gray-300'"
@@ -294,8 +294,8 @@ const renderMarkdown = (text) => md.render(text || '')
                                 <CheckIcon v-if="selectedCategoryNames.includes(cat.name)" class="w-4 h-4 mr-1.5" />
                                 {{ cat.name }}
                             </button>
-                            <button 
-                                v-for="cat in customCategories" 
+                            <button
+                                v-for="cat in customCategories"
                                 :key="cat"
                                 @click="toggleCategory(cat)"
                                 :class="selectedCategoryNames.includes(cat) ? 'bg-indigo-100 text-indigo-800 ring-indigo-500 dark:bg-indigo-900 dark:text-indigo-200' : 'bg-gray-100 text-gray-700 ring-gray-200 dark:bg-gray-800 dark:text-gray-300'"
@@ -367,11 +367,11 @@ const renderMarkdown = (text) => md.render(text || '')
                                                         </span>
                                                     </p>
                                                     <p v-else class="italic text-gray-400">No previous intents</p>
-                                                    
+
                                                     <div v-if="entry.correction_reason" class="mt-2 text-xs border-l-2 border-gray-300 pl-2">
                                                         <span class="font-semibold">Reason:</span> {{ entry.correction_reason }}
                                                     </div>
-                                                    
+
                                                     <div v-if="entry.llm_feedback" class="mt-2 text-xs bg-blue-50 dark:bg-blue-900/30 p-2 rounded border border-blue-100 dark:border-blue-800 text-blue-800 dark:text-blue-200">
                                                         <span class="font-bold">🤖 LLM Insight:</span> {{ entry.llm_feedback }}
                                                     </div>
