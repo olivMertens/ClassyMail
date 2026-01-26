@@ -42,12 +42,38 @@ def clamp_text_to_token_budget(text: str, max_tokens: int) -> tuple[str, bool]:
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10), retry=retry_if_exception(retryable_httpx))
 async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None) -> dict:
     headers = await auth_headers(clients=clients)
+
+    # Schema for Mistral Document AI Annotations
+    image_schema = {
+        "type": "object",
+        "properties": {
+            "image_type": {
+                "type": "string",
+                "description": "The type of the image (e.g. photo, chart, diagram, screenshot, signature, logo, icon, noise). Do NOT use 'document' or 'page'."
+            },
+            "description": {
+                "type": "string",
+                "description": "A concise, objective description of the visual content (e.g. 'car with dented bumper', 'water leak on ceiling'). Do NOT describe the text content of the document. Do NOT describe the document itself (e.g. 'a scanned letter'). Only describe distinct visual elements."
+            },
+            "relevance": {
+                "type": "string",
+                "description": "Relevance to an insurance claim (High, Medium, Low, Irrelevant)."
+            }
+        },
+        "required": ["image_type", "description", "relevance"]
+    }
+
     payload = {
         "model": config.MISTRAL_DEPLOYMENT,
         "document": {
             "type": "document_base64",
             "document_base64": base64_pdf,
         },
+        "include_image_base64": False, # We don't need the images back, just the descriptions
+        "bbox_annotation_format": {
+            "type": "json_schema",
+            "json_schema": image_schema
+        }
     }
 
     if config.MISTRAL_MODE.lower() == "maas":
@@ -58,7 +84,7 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None) -> d
     with tracer.start_as_current_span("mistral_ocr") as span:
         span.set_attribute("gen_ai.system", "mistral")
         span.set_attribute("gen_ai.operation", "ocr")
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=90) as client:
             resp = await client.post(url, json=payload, headers=headers)
             try:
                 resp.raise_for_status()
@@ -71,11 +97,31 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None) -> d
             pages = usage_info.get("pages_processed") or usage_info.get("pages") or 0
             span.set_attribute("gen_ai.usage.pages_processed", pages)
             content = data.get("markdown") or data.get("content")
-            if not content and data.get("pages"):
-                content = "\n\n".join([p.get("markdown", "") for p in data.get("pages", [])])
+
+            # Extract images/annotations from pages
+            annotated_images = []
+            if data.get("pages"):
+                # Prefer page-level content concatenation if top-level is empty
+                if not content:
+                    content = "\n\n".join([p.get("markdown", "") for p in data.get("pages", [])])
+
+                # Collect images/annotations from pages
+                for page in data.get("pages", []):
+                    for img in page.get("images", []):
+                        # The annotation fields should be merged into the img object
+                        if img.get("description"):
+                             annotated_images.append({
+                                 "id": img.get("id"),
+                                 "page_index": page.get("index", 0),
+                                 "image_type": img.get("image_type"),
+                                 "description": img.get("description"),
+                                 "relevance": img.get("relevance")
+                             })
+
             if not content:
                 raise OCRFailed("Empty OCR content")
-            return {"markdown": content, "usage": usage_info}
+
+            return {"markdown": content, "usage": usage_info, "images": annotated_images}
 
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10), retry=retry_if_exception(retryable_httpx))

@@ -67,7 +67,27 @@ async def run_classification_pipeline(
         setattr(err, "processing_log", processing_log)
         raise err from ex
 
-    markdown = ocr_result.get("markdown")
+    markdown = ocr_result.get("markdown") or ""
+    mistral_images = ocr_result.get("images", [])
+
+    # Ingest Mistral's own visual descriptions (Annotations)
+    if mistral_images:
+         vision_markdown_lines = ["\n\n## Visual Context (Extracted by OCR)\n"]
+         has_relevant_images = False
+         for idx, img in enumerate(mistral_images):
+             desc = img.get("description")
+             relevance = img.get("relevance", "Unknown")
+
+             # Filter out noise if possible
+             if relevance and relevance.lower() == "irrelevant":
+                 continue
+
+             if desc:
+                 has_relevant_images = True
+                 vision_markdown_lines.append(f"- **Image {idx+1} ({img.get('image_type', 'Unknown')})**: {desc}")
+
+         if has_relevant_images:
+             markdown += "\n" + "\n".join(vision_markdown_lines)
 
     try:
         log("classify", "start")
@@ -101,6 +121,7 @@ async def run_classification_pipeline(
         "mistral": {
             "estimated_pages": pages,
             "cost_usd": compute_cost_mistral(pages, overrides=final_overrides),
+            "annotations_count": len(mistral_images)
         },
     }
 

@@ -130,12 +130,12 @@
             "li2": "Anonymisation : Lors de l'export des données pour le fine-tuning, le système nettoie automatiquement noms, emails et dates via un modèle anonymiseur dédié."
         },
         "vision": {
-            "title": "Vision & Contexte Image",
-            "desc": "Certains emails contiennent un contexte critique dans les images (ex: photos de dommages voiture, notes manuscrites scannées).",
-            "standard_title": "OCR Standard",
-            "standard_desc": "Extrait le texte et décrit les images simples. Le système convertit le visuel en balises texte (ex: '[Image: Logo Entreprise]') pour que l'IA puisse les lire.",
-            "vision_title": "Stratégie Vision",
-            "vision_desc": "Si activé, l'IA reçoit des descriptions détaillées des images (ex: 'Une berline rouge avec pare-chocs avant enfoncé'), crucial pour le traitement des Sinistres."
+            "title": "Smart Vision (Mistral Document AI)",
+            "desc": "Le système exploite l'analyse de mise en page avancée de Mistral pour gérer intelligemment le contenu visuel.",
+            "standard_title": "Traitement Hybride",
+            "standard_desc": "Le pipeline est 'conscient du contenu' : les documents texte subissent un OCR classique. Cependant, si des éléments visuels (photos, schémas) sont détectés *dans* le document, ils sont automatiquement légendés par le modèle Vision.",
+            "vision_title": "Scans vs Images Utiles",
+            "vision_desc": "Le système distingue intelligemment une 'page scannée' (traitée comme source de texte) des 'images porteuses de sens' (ex: photo d'accident). Les descriptions redondantes de la page elle-même sont supprimées."
         },
         "flow_title": "Flux de Traitement"
     }

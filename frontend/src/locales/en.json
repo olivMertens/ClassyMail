@@ -71,12 +71,19 @@
         "item_ops": "Operations Price",
         "val_seconds_mail": "Seconds / Email",
         "val_replicas": "Min Replicas",
-        "val_idle": "Idle Hours"
+        "val_idle": "Idle Hours",
+        "ref_title": "Rules of Thumb (Reference)",
+        "ref_subtitle": "Typical costs for this architecture"
     },
     "info": {
         "title": "POC - G2S Microsoft (March 2026)",
         "subtitle": "ClassiMail Agent",
         "contact": "Contact",
+        "target_title": "Target & Scope",
+        "target_desc": "This Proof of Concept (POC) demonstrates an automated email classification pipeline using Azure AI services. It aims to validate the accuracy of LLMs (Phi-4) for intent detection and the feasibility of a serverless, event-driven architecture.",
+        "resources_title": "Deployed Resources",
+        "guide_prompt": "For detailed instructions and architecture, see the",
+        "guide_link": "Application Guide",
         "est_monthly": "Cost Estimation (approx./month)",
         "est_email": "Cost Estimation / email",
         "infra_items": {
@@ -97,6 +104,17 @@
     "guide": {
         "title": "Application Documentation",
         "subtitle": "Guide to using ClassiMail, understanding its AI capabilities, and managing data privacy.",
+        "exports": {
+            "title": "Data Exports & Fine-Tuning",
+            "desc": "Export your processed data for reporting or for training better AI models.",
+            "csv_title": "CSV Export (Reporting)",
+            "csv_desc": "Download a complete list of all processed emails with their status, costs, and metadata.",
+            "csv_streaming": "Streaming Support: This export generates data on-the-fly, allowing downloads of very large datasets (10k+ rows) without server timeout or crashes.",
+            "csv_columns": "Includes: ID, Status, Detected Intents, Confidence Scores, AI Usage Costs (USD), and Processing Time.",
+            "jsonl_title": "JSONL Export (Fine-Tuning)",
+            "jsonl_desc": "Export a 'Reinforcement Learning' dataset designed for Azure OpenAI / Phi-4 fine-tuning.",
+            "jsonl_format": "Format: JSON Lines (JSONL), compatible with Azure AI Foundry."
+        },
         "usage": {
             "title": "How to Use",
             "step1_title": "1. Dashboard & Monitoring",
@@ -130,12 +148,12 @@
             "li2": "Anonymization: When exporting data for fine-tuning, the system automatically scrubs names, emails, and dates using a dedicated anonymizer model."
         },
         "vision": {
-            "title": "Vision & Image Context",
-            "desc": "Some emails contain critical context inside images (e.g., photos of car damage, scanned handwritten notes).",
-            "standard_title": "Standard OCR",
-            "standard_desc": "Extracts text and describes simple images. The system converts visual content into text tags (e.g., '[Image: Company Logo]') so the AI can read them.",
-            "vision_title": "Vision Strategy",
-            "vision_desc": "If enabled in Settings, the AI receives enhanced detailed descriptions of images (e.g., 'A red sedan with a dented front bumper'), crucial for Claims processing."
+            "title": "Smart Vision (Mistral Document AI)",
+            "desc": "The system leverages Mistral's advanced Layout Analysis to intelligently handle visual content.",
+            "standard_title": "Hybrid Processing",
+            "standard_desc": "The pipeline is 'Content Aware': Text documents are OCR'd normally. However, if visual elements (photos, diagrams) are detected *inside* the document, they are automatically captioned by the Vision model.",
+            "vision_title": "Full Page Scans vs. Images",
+            "vision_desc": "The system intelligently distinguishes between a 'scanned page' (treated as text source) and 'meaningful images' (e.g. car crash photos). Redundant descriptions of the page itself are suppressed."
         },
         "flow_title": "Processing Flow"
     }

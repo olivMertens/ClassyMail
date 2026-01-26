@@ -50,7 +50,14 @@ const { t } = useI18n()
 
               <div class="mt-5 space-y-2">
                 <div class="font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-1 mb-2">
-                  {{ t('info.est_monthly') }}
+                  {{ t('info.target_title') }}
+                </div>
+                <p class="text-gray-600 dark:text-gray-300">
+                  {{ t('info.target_desc') }}
+                </p>
+
+                <div class="font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-1 mb-2 mt-4">
+                  {{ t('info.resources_title') }}
                 </div>
                 <ul class="list-disc list-inside space-y-1 ml-1 text-gray-600 dark:text-gray-300">
                   <li>{{ t('info.infra_items.service_bus') }}</li>
@@ -60,18 +67,18 @@ const { t } = useI18n()
                   <li>{{ t('info.infra_items.container_apps') }}</li>
                 </ul>
 
-                <div class="font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-1 mb-2 mt-4">
-                  {{ t('info.est_email') }}
+                <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('info.guide_prompt') }}
+                    <a
+                      href="/guide"
+                      class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                      @click.prevent="emit('close'); $router.push('/guide')"
+                    >
+                      {{ t('info.guide_link') }}
+                    </a>
+                  </p>
                 </div>
-                <ul class="list-disc list-inside space-y-1 ml-1 text-gray-600 dark:text-gray-300">
-                  <li>{{ t('info.email_items.ocr') }}</li>
-                  <li>{{ t('info.email_items.classification') }}</li>
-                  <li>{{ t('info.email_items.infra') }}</li>
-                </ul>
-
-                <p class="text-xs text-gray-500 dark:text-gray-400 italic mt-4">
-                  {{ t('info.disclaimer') }}
-                </p>
               </div>
             </div>
           </div>

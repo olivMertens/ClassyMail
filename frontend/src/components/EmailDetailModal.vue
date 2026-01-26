@@ -135,6 +135,19 @@ const markAsInvalid = async () => {
 
 const saveIntents = async () => {
     if (!email.value) return
+
+    // Validation: Require correction reason if categories changed
+    const currentIntents = (email.value.classification?.detected_intents || []).map(i => i.intent).sort()
+    const newSelection = [...selectedCategoryNames.value].sort()
+    const isChanged = JSON.stringify(currentIntents) !== JSON.stringify(newSelection)
+
+    if (isChanged) {
+        if (!correctionReason.value || !correctionReason.value.trim() || correctionReason.value.trim().length < 5) {
+            alert("Please provide a valid reason or comment for changing the classification (at least 5 characters). This is required for reinforcement learning.")
+            return
+        }
+    }
+
     if (!correctionReason.value && email.value.classification?.needs_review) {
          if (!confirm("Confirm validation without providing a correction reason?")) return;
     }

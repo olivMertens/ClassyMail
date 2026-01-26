@@ -283,6 +283,35 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- Static Reference Rates (Moved from Info) -->
+      <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white mb-4">
+          {{ t('costs.ref_title') }} <span class="text-xs font-normal text-gray-500">({{ t('costs.ref_subtitle') }})</span>
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+          <div>
+            <h4 class="font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {{ t('info.est_email') }}
+            </h4>
+            <ul class="list-disc pl-5 space-y-1 text-gray-600 dark:text-gray-400">
+              <li>{{ t('info.email_items.ocr') }}</li>
+              <li>{{ t('info.email_items.classification') }}</li>
+              <li>{{ t('info.email_items.infra') }}</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {{ t('info.est_monthly') }}
+            </h4>
+            <ul class="list-disc pl-5 space-y-1 text-gray-600 dark:text-gray-400">
+              <li>{{ t('info.infra_items.service_bus') }}</li>
+              <li>{{ t('info.infra_items.cosmos') }}</li>
+              <li>{{ t('info.infra_items.storage') }}</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
       <!-- Breakdown -->
       <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
         <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white mb-4">

@@ -72,7 +72,7 @@ graph LR
     Classify -->|Confidence < 85%| Review[Human Review]
 
     style Img fill:#ff9,stroke:#333
-    style Desc fill:#ff9,stroke:#333
+    style Desc fill:#f9f,stroke:#333
 `
 
 </script>
@@ -176,6 +176,41 @@ graph LR
             <span>{{ t('guide.ai.li3') }}</span>
           </li>
         </ul>
+      </div>
+
+      <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg px-4 py-5 sm:p-6">
+        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white flex items-center gap-2">
+          <BookOpenIcon class="h-5 w-5 text-teal-500" />
+          {{ t('guide.exports.title') }}
+        </h3>
+        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          {{ t('guide.exports.desc') }}
+        </p>
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="border border-gray-200 dark:border-gray-700 rounded p-4">
+            <h4 class="font-medium text-sm text-gray-900 dark:text-white mb-2">
+              {{ t('guide.exports.csv_title') }}
+            </h4>
+            <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">
+              {{ t('guide.exports.csv_desc') }}
+            </p>
+            <ul class="list-disc list-inside text-xs text-gray-500 dark:text-gray-400 space-y-1">
+              <li>{{ t('guide.exports.csv_streaming') }}</li>
+              <li>{{ t('guide.exports.csv_columns') }}</li>
+            </ul>
+          </div>
+          <div class="border border-gray-200 dark:border-gray-700 rounded p-4 bg-teal-50 dark:bg-teal-900/10">
+            <h4 class="font-medium text-sm text-gray-900 dark:text-white mb-2">
+              {{ t('guide.exports.jsonl_title') }}
+            </h4>
+            <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">
+              {{ t('guide.exports.jsonl_desc') }}
+            </p>
+            <div class="bg-gray-900 text-gray-200 p-2 rounded text-xs font-mono overflow-x-auto whitespace-pre">
+              {{ `{"messages": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "{\\"intents\\": [...]}"}]}` }}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg px-4 py-5 sm:p-6">
