@@ -10,11 +10,17 @@ import {
   XMarkIcon,
   MoonIcon,
   SunIcon,
-  InformationCircleIcon
+  InformationCircleIcon,
+  CodeBracketSquareIcon
 } from '@heroicons/vue/24/outline'
 import InfoModal from './InfoModal.vue'
 
-const props = defineProps(['currentView'])
+defineProps({
+  currentView: {
+    type: String,
+    required: true
+  }
+})
 const emit = defineEmits(['change-view'])
 const { t } = useI18n()
 
@@ -38,6 +44,7 @@ const navigation = computed(() => [
   { name: t('nav.upload'), id: 'upload', icon: CloudArrowUpIcon },
   { name: t('nav.costs'), id: 'costs', icon: CurrencyDollarIcon },
   { name: t('nav.settings'), id: 'settings', icon: Cog6ToothIcon },
+  { name: 'Developer', id: 'developer', icon: CodeBracketSquareIcon },
 ])
 </script>
 

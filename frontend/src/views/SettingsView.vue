@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { CheckCircleIcon, MoonIcon, SunIcon } from '@heroicons/vue/24/outline'
+import { CheckCircleIcon, MoonIcon, SunIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 
 const { t, locale } = useI18n()
@@ -8,10 +8,14 @@ const { t, locale } = useI18n()
 const settings = ref({
     phi4_input_per_1k: null,
     phi4_output_per_1k: null,
-    mistral_per_1k_pages: null
+    mistral_per_1k_pages: null,
+    categories: []
 })
 const loading = ref(false)
 const saved = ref(false)
+
+// Category Form
+const newCategory = ref({ name: '', description: '' })
 
 // Appearance state
 const isDark = ref(false)
@@ -47,6 +51,7 @@ const saveSettings = async () => {
             phi4_input_per_1k: settings.value.phi4_input_per_1k ? Number(settings.value.phi4_input_per_1k) : undefined,
             phi4_output_per_1k: settings.value.phi4_output_per_1k ? Number(settings.value.phi4_output_per_1k) : undefined,
             mistral_per_1k_pages: settings.value.mistral_per_1k_pages ? Number(settings.value.mistral_per_1k_pages) : undefined,
+            categories: settings.value.categories
         }
 
         await fetch('/api/settings', {
@@ -62,6 +67,18 @@ const saveSettings = async () => {
     } finally {
         loading.value = false
     }
+}
+
+const addCategory = () => {
+    if (newCategory.value.name) {
+        if (!settings.value.categories) settings.value.categories = []
+        settings.value.categories.push({ ...newCategory.value })
+        newCategory.value = { name: '', description: '' }
+    }
+}
+
+const removeCategory = (index) => {
+    settings.value.categories.splice(index, 1)
 }
 
 const toggleDarkMode = () => {
@@ -199,6 +216,67 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+
+    <!-- Classification Categories -->
+    <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+          Classification Categories (LLM)
+        </h3>
+        <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+          <p>Define the categories available for the LLM to classify emails. These are injected into the system prompt.</p>
+        </div>
+
+        <div class="mt-5">
+            <div class="flow-root">
+                <ul role="list" class="-my-5 divide-y divide-gray-200 dark:divide-gray-700">
+                    <li v-for="(cat, idx) in settings.categories" :key="idx" class="py-4">
+                        <div class="flex items-center space-x-4">
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ cat.name }}</p>
+                                <p class="truncate text-sm text-gray-500 dark:text-gray-400">{{ cat.description }}</p>
+                            </div>
+                            <div>
+                                <button
+                                    @click="removeCategory(idx)"
+                                    type="button"
+                                    class="inline-flex rounded-md bg-white dark:bg-gray-800 px-2.5 py-1.5 text-sm font-semibold text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                >
+                                    <TrashIcon class="h-5 w-5 text-gray-400 hover:text-red-500" />
+                                </button>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="mt-6 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-md">
+                <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Add Category</h4>
+                <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
+                    <div class="sm:col-span-3">
+                        <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Name</label>
+                        <div class="mt-1">
+                            <input v-model="newCategory.name" type="text" class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600" placeholder="e.g. Contract Cancellation">
+                        </div>
+                    </div>
+                    <div class="sm:col-span-3">
+                        <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Description (for LLM context)</label>
+                        <div class="mt-1">
+                            <input v-model="newCategory.description" type="text" class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600" placeholder="Optional context...">
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4 flex justify-end">
+                    <button @click="addCategory" type="button" class="inline-flex items-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
+                        <PlusIcon class="h-5 w-5 mr-1" aria-hidden="true" />
+                        Add
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+  </div>
 
 
     <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">

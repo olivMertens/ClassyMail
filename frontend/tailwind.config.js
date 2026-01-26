@@ -9,7 +9,7 @@ export default {
     extend: {
       colors: {
         primary: {
-          "50":  "var(--color-primary-50)",
+          "50": "var(--color-primary-50)",
           "100": "var(--color-primary-100)",
           "200": "var(--color-primary-200)",
           "300": "var(--color-primary-300)",

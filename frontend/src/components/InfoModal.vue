@@ -2,7 +2,12 @@
 import { useI18n } from 'vue-i18n'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 
-defineProps(['show'])
+defineProps({
+  show: {
+    type: Boolean,
+    default: false
+  }
+})
 const emit = defineEmits(['close'])
 const { t } = useI18n()
 </script>
