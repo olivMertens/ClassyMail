@@ -61,6 +61,26 @@ async def worker_loop_forever(*, queue_name: str, get_cost_overrides, clients: C
             await asyncio.sleep(2)
 
 
+import time
+
+class ProcessingTimer:
+    def __init__(self):
+        self.start_time = None
+        self.end_time = None
+
+    def __enter__(self):
+        self.start_time = time.perf_counter()
+        return self
+
+    def __exit__(self, *args):
+        self.end_time = time.perf_counter()
+
+    @property
+    def duration_ms(self) -> float:
+        if self.start_time and self.end_time:
+            return (self.end_time - self.start_time) * 1000.0
+        return 0.0
+
 async def handle_queue_message(receiver, msg, *, get_cost_overrides, clients: Clients):
     body_bytes = b"".join([b for b in msg.body])
     try:
@@ -74,7 +94,10 @@ async def handle_queue_message(receiver, msg, *, get_cost_overrides, clients: Cl
         return
 
     try:
-        result = await run_classification_pipeline(blob_url, cost_overrides=get_cost_overrides(), clients=clients)
+        with ProcessingTimer() as timer:
+            result = await run_classification_pipeline(blob_url, cost_overrides=get_cost_overrides(), clients=clients)
+
+        result.processing_time_ms = timer.duration_ms
         await save_to_cosmos(result)
         await receiver.complete_message(msg)
     except OCRFailed as ex:

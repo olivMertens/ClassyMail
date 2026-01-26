@@ -33,6 +33,9 @@ class EmailRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     file_url: str
     status: str
+    subject: Optional[str] = None
+    sender: Optional[str] = None
+    processing_time_ms: Optional[float] = None
     markdown: Optional[str] = None
     search_text: Optional[str] = None
     classification: Optional[ClassificationResult] = None

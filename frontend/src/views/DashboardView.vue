@@ -248,12 +248,17 @@ const emit = defineEmits(['open-email'])
       >
         <div class="p-5 flex-1">
           <div class="flex justify-between items-start mb-2">
-            <span
-              class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset"
-              :class="getScoreColor(email)"
-            >
-              Score {{ getScore(email) }}
-            </span>
+            <div class="flex flex-col gap-1">
+                <span
+                class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset w-fit"
+                :class="getScoreColor(email)"
+                >
+                Score {{ getScore(email) }}
+                </span>
+                 <span class="text-xs text-gray-400" v-if="email.processing_time_ms">
+                    {{ Math.round(email.processing_time_ms) }}ms
+                 </span>
+            </div>
             <span
               v-if="email.status === 'ERROR'"
               class="text-red-500"
@@ -291,11 +296,11 @@ const emit = defineEmits(['open-email'])
             {{ formatDate(email.created_at) }}
           </div>
 
-          <div
-            v-if="email.error"
-            class="mt-2 text-xs text-red-600 dark:text-red-400 line-clamp-2"
-          >
-            {{ email.error }}
+          <div class="mt-2 space-y-1">
+             <div v-for="intent in email.classification?.detected_intents || []" :key="intent.intent" class="flex justify-between text-xs">
+                <span class="text-gray-600 dark:text-gray-300 truncate pr-2" :title="intent.intent">{{ intent.intent }}</span>
+                <span class="font-mono text-gray-500 dark:text-gray-400">{{ (intent.confidence * 100).toFixed(0) }}%</span>
+             </div>
           </div>
         </div>
 

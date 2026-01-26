@@ -1,14 +1,17 @@
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import mermaid from 'mermaid'
 import { LinkIcon, CodeBracketIcon, MapIcon, BookOpenIcon, ServerIcon } from '@heroicons/vue/24/outline'
 
 const currentTab = ref('architecture')
+const isDark = ref(false)
+let observer = null
 
 const initMermaid = async () => {
+    const darkMode = document.documentElement.classList.contains('dark')
     mermaid.initialize({
         startOnLoad: false,
-        theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
+        theme: darkMode ? 'dark' : 'default',
         securityLevel: 'loose'
     })
     await nextTick()
@@ -18,9 +21,30 @@ const initMermaid = async () => {
 }
 
 onMounted(() => {
+    // Initial theme check
+    isDark.value = document.documentElement.classList.contains('dark')
+
+    // Watch for theme changes
+    observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.attributeName === 'class') {
+                isDark.value = document.documentElement.classList.contains('dark')
+            }
+        })
+    })
+    observer.observe(document.documentElement, { attributes: true })
+
     if (currentTab.value === 'architecture') {
         initMermaid()
     }
+})
+
+onUnmounted(() => {
+    if (observer) observer.disconnect()
+})
+
+const redocUrl = computed(() => {
+    return `/docs/redoc-custom?theme=${isDark.value ? 'dark' : 'light'}`
 })
 
 const switchTab = (tab) => {
@@ -133,9 +157,14 @@ graph TD
         </div>
 
         <!-- API Tab -->
-        <div v-if="currentTab === 'api'" class="bg-white shadow sm:rounded-lg overflow-hidden h-[800px]">
+        <div v-if="currentTab === 'api'" class="bg-white shadow sm:rounded-lg overflow-hidden h-[800px] relative">
+             <div class="absolute top-2 right-2 z-10">
+                <a :href="redocUrl" target="_blank" class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                    Open in New Tab &nearr;
+                </a>
+             </div>
              <!-- Using standard /redoc endpoint -->
-             <iframe src="/redoc" class="w-full h-full border-0"></iframe>
+             <iframe :src="redocUrl" class="w-full h-full border-0"></iframe>
         </div>
 
         <!-- Repo Tab -->

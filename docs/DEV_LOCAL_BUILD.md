@@ -82,6 +82,15 @@ uv run uvicorn classificationg2s.app:app --port 8000
 ```
 
 ## ✅ Lint & Tests
+
+Configuration du hook de pré-commit (à faire une fois) :
+```bash
+uv run pre-commit install
+```
+
+Cela lancera les validations (ruff check + format) sur chaque `git commit`.
+
+Lancer manuellement :
 ```bash
 uv run pre-commit run --all-files
 uv run ruff check .

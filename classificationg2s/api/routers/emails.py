@@ -228,6 +228,9 @@ async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
                 "global_complexity",
                 "phi4_cost_usd",
                 "mistral_cost_usd",
+                "subject",
+                "sender",
+                "processing_time_ms"
             ]
         )
         yield buffer.getvalue()
@@ -252,6 +255,9 @@ async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
                     (item.get("usage") or {}).get("mistral", {}).get("cost_usd")
                     if isinstance((item.get("usage") or {}).get("mistral"), dict)
                     else None,
+                    item.get("subject"),
+                    item.get("sender"),
+                    item.get("processing_time_ms")
                 ]
             )
             yield buffer.getvalue()

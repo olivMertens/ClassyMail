@@ -95,14 +95,19 @@ async def run_classification_pipeline(
         },
     }
 
+    # Extract metadata from JSON response if present
+    response_data = processed.get("raw_response", {})
+
     return EmailRecord(
         id=blob_id_from_url(blob_url),
         file_url=blob_url,
         markdown=markdown_trunc,
+        subject=response_data.get("subject"),
+        sender=response_data.get("sender"),
         classification=ClassificationResult(
             **{
                 "detected_intents": processed.get("intents", []),
-                "global_complexity": processed.get("raw_response", {}).get("global_complexity")
+                "global_complexity": response_data.get("global_complexity")
                 if processed.get("raw_response")
                 else None,
                 "needs_review": processed.get("needs_review", False),
