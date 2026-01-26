@@ -79,7 +79,7 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None) -> d
 
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10), retry=retry_if_exception(retryable_httpx))
-async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False, clients: Clients | None = None) -> dict:
+async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False, strategy: str = "standard", clients: Clients | None = None) -> dict:
     if not config.PHI_ENDPOINT:
         raise RuntimeError("PHI_ENDPOINT is not set")
     if not config.PHI_FALLBACK_ENDPOINT:
@@ -89,8 +89,14 @@ async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False
 
     categories_text = get_categories_prompt_text()
 
+    extra_instructions = ""
+    if strategy == "reasoning":
+        extra_instructions = "\nIMPORTANT : Adopte une approche 'Step-by-step'. Analyse d'abord le contexte, puis déduis les intentions. Sois très précis sur la justification."
+    elif strategy == "vision":
+        extra_instructions = "\nNOTE : Le document peut contenir des descriptions d'images. Prends en compte le contexte visuel décrit."
+
     system_prompt = f"""
-Tu es un assistant expert en classification d'emails d'assurance.
+Tu es un assistant expert en classification d'emails d'assurance.{extra_instructions}
 Ta tâche est d'analyser le contenu de l'email (fourni en markdown) et d'identifier "
 - TOUTES les intentions présentes.
 - Le sujet principal (Subject).

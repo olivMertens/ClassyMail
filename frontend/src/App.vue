@@ -7,6 +7,7 @@ import UploadView from './views/UploadView.vue'
 import CostsView from './views/CostsView.vue'
 import SettingsView from './views/SettingsView.vue'
 import DeveloperDocsView from './views/DeveloperDocsView.vue'
+import UsageDocsView from './views/UsageDocsView.vue'
 import EmailDetailModal from './components/EmailDetailModal.vue'
 
 const { locale } = useI18n()
@@ -56,6 +57,7 @@ onMounted(() => {
     <CostsView v-else-if="currentView === 'costs'" />
     <SettingsView v-else-if="currentView === 'settings'" />
     <DeveloperDocsView v-else-if="currentView === 'developer'" />
+    <UsageDocsView v-else-if="currentView === 'docs'" />
 
     <EmailDetailModal
       :email-id="selectedEmailId"

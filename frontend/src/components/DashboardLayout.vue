@@ -11,7 +11,8 @@ import {
   MoonIcon,
   SunIcon,
   InformationCircleIcon,
-  CodeBracketSquareIcon
+  CodeBracketSquareIcon,
+  BookOpenIcon
 } from '@heroicons/vue/24/outline'
 import InfoModal from './InfoModal.vue'
 
@@ -43,6 +44,7 @@ const navigation = computed(() => [
   { name: t('nav.dashboard'), id: 'dashboard', icon: HomeIcon },
   { name: t('nav.upload'), id: 'upload', icon: CloudArrowUpIcon },
   { name: t('nav.costs'), id: 'costs', icon: CurrencyDollarIcon },
+  { name: 'Guide', id: 'docs', icon: BookOpenIcon },
   { name: t('nav.settings'), id: 'settings', icon: Cog6ToothIcon },
   { name: 'Developer', id: 'developer', icon: CodeBracketSquareIcon },
 ])

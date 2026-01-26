@@ -8,6 +8,7 @@ const { t, locale } = useI18n()
 const activeTab = ref('general') // general | classification
 
 const settings = ref({
+    processing_strategy: 'standard',
     phi4_input_per_1k: null,
     phi4_output_per_1k: null,
     mistral_per_1k_pages: null,
@@ -53,6 +54,7 @@ const saveSettings = async () => {
     saved.value = false
     try {
         const payload = {
+            processing_strategy: settings.value.processing_strategy,
             phi4_input_per_1k: settings.value.phi4_input_per_1k ? Number(settings.value.phi4_input_per_1k) : undefined,
             phi4_output_per_1k: settings.value.phi4_output_per_1k ? Number(settings.value.phi4_output_per_1k) : undefined,
             mistral_per_1k_pages: settings.value.mistral_per_1k_pages ? Number(settings.value.mistral_per_1k_pages) : undefined,
@@ -268,7 +270,39 @@ onMounted(() => {
                 </div>
             </div>
         </div>
+Processing Strategy -->
+        <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+                    Processing Strategy
+                </h3>
+                <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+                    <p>Select the AI processing pipeline strategy.</p>
+                </div>
+                <div class="mt-4 space-y-4">
+                    <div class="flex items-center">
+                        <input id="strategy-standard" name="processing_strategy" type="radio" value="standard" v-model="settings.processing_strategy" class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
+                        <label for="strategy-standard" class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
+                            Standard (Text/OCR Optimized - Default)
+                        </label>
+                    </div>
+                    <div class="flex items-center">
+                        <input id="strategy-reasoning" name="processing_strategy" type="radio" value="reasoning" v-model="settings.processing_strategy" class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
+                        <label for="strategy-reasoning" class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
+                            Reasoning (Deep Reasoning / CoT)
+                        </label>
+                    </div>
+                    <div class="flex items-center">
+                        <input id="strategy-vision" name="processing_strategy" type="radio" value="vision" v-model="settings.processing_strategy" class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
+                        <label for="strategy-vision" class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
+                            Vision (Vision/Image Analysis - Experimental)
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <!-- 
         <!-- Costs Settings -->
         <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
             <div class="px-4 py-5 sm:p-6">

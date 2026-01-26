@@ -11,6 +11,7 @@ from classificationg2s.core.telemetry import init_telemetry
 from classificationg2s.core import config
 from classificationg2s.services.azure_clients import Clients, set_default_clients
 from classificationg2s.services.worker import worker_loop_forever
+from classificationg2s.services.settings_store import load_settings
 
 from classificationg2s.api.routers.health import router as health_router
 from classificationg2s.api.routers.ui import router as ui_router
@@ -73,7 +74,7 @@ def create_app() -> FastAPI:
                 worker_loop_forever(
                     clients=clients,
                     queue_name=config.SERVICE_BUS_QUEUE,
-                    get_cost_overrides=lambda: getattr(app.state, "cost_overrides", {}) or {},
+                    get_settings=load_settings,
                 )
             )
 

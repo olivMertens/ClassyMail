@@ -19,10 +19,19 @@ def estimate_pdf_pages(pdf_bytes: bytes) -> int:
 async def run_classification_pipeline(
     blob_url: str,
     *,
-    cost_overrides: Optional[dict] = None,
+    settings: Optional[dict] = None,
+    cost_overrides: Optional[dict] = None, # Legacy support
     clients: Clients | None = None,
 ) -> EmailRecord:
     processing_log: list[dict] = []
+    
+    # Merge overrides if provided separately (legacy) or extract from settings
+    if settings:
+        final_overrides = settings.get("cost_overrides", {})
+        strategy = settings.get("processing_strategy", "standard")
+    else:
+        final_overrides = cost_overrides or {}
+        strategy = "standard"
 
     def log(stage: str, event: str, detail: Optional[str] = None) -> None:
         processing_log.append(
@@ -62,7 +71,7 @@ async def run_classification_pipeline(
 
     try:
         log("classify", "start")
-        classification_raw = await classify_with_phi4(markdown, clients=clients)
+        classification_raw = await classify_with_phi4(markdown, strategy=strategy, clients=clients)
         log("classify", "ok")
     except Exception as ex:
         from classificationg2s.models import OCRFailed
@@ -81,7 +90,7 @@ async def run_classification_pipeline(
 
     llm_usage = classification_raw.get("usage") if isinstance(classification_raw, dict) else None
     fallback_used = bool(classification_raw.get("fallback_used")) if isinstance(classification_raw, dict) else False
-    llm_cost = compute_cost_llm(llm_usage, fallback_used=fallback_used, overrides=cost_overrides)
+    llm_cost = compute_cost_llm(llm_usage, fallback_used=fallback_used, overrides=final_overrides)
 
     usage = {
         "phi4": llm_usage,
@@ -91,7 +100,7 @@ async def run_classification_pipeline(
         "phi4_context_truncated": bool(classification_raw.get("context_truncated")) if isinstance(classification_raw, dict) else False,
         "mistral": {
             "estimated_pages": pages,
-            "cost_usd": compute_cost_mistral(pages, overrides=cost_overrides),
+            "cost_usd": compute_cost_mistral(pages, overrides=final_overrides),
         },
     }
 

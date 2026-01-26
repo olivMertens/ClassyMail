@@ -79,5 +79,51 @@
         },
         "disclaimer": "*Tarifs indicatifs, dépendants de la région et de l'usage réel.",
         "close": "OK"
+    },
+    "guide": {
+        "title": "Documentation de l'Application",
+        "subtitle": "Guide d'utilisation de ClassiMail, compréhension des capacités IA et gestion de la confidentialité.",
+        "usage": {
+            "title": "Comment utiliser",
+            "step1_title": "1. Tableau de bord & Monitoring",
+            "step1_desc": "Le tableau de bord principal offre une vue en temps réel des emails entrants.",
+            "step1_li1": "Codes Statut : Vert (Traité), Ambre (À valider), Rouge (Erreur).",
+            "step1_li2": "Scoring : Scores de confiance (0-100%) indiquant la certitude de l'IA.",
+            "step1_li3": "Indicateurs : Recherchez les badges Données Sensibles ou Images.",
+            "step2_title": "2. Processus de Validation",
+            "step2_desc": "Cliquez sur 'Ouvrir Détails' sur un email pour entrer en mode révision.",
+            "step2_li1": "Voir le PDF original et le Markdown extrait côte à côte.",
+            "step2_li2": "Voir la section Analyse IA pour le raisonnement.",
+            "step2_li3": "Corrigez les catégories si l'IA se trompe. Fournissez une raison pour aider le Fine-Tuning futur.",
+            "step3_title": "3. Importation",
+            "step3_desc": "Utilisez l'onglet Importer pour ingérer manuellement des fichiers PDF pour tester. En production, les fichiers arrivent automatiquement via Email/Blob Storage.",
+            "step4_title": "4. Paramètres & Configuration",
+            "step4_desc": "Personnalisez le comportement du moteur dans l'onglet Paramètres.",
+            "step4_li1": "Catégories : Définissez les noms d'intention exacts. Les changements s'appliquent immédiatement.",
+            "step4_li2": "Stratégie de Traitement : Basculez entre les modes Standard, Raisonnement ou Vision."
+        },
+        "ai": {
+            "title": "Complexité Globale & Raisonnement",
+            "desc": "Le système détermine la complexité basée sur :",
+            "li1": "Multi-Intention : Emails demandant plusieurs actions distinctes (ex: 'Changer adresse ET envoyer relevé').",
+            "li2": "Ambiguïté : Formulation vague nécessitant une inférence ou contexte des pièces jointes.",
+            "li3": "Stratégie : Utiliser la stratégie 'Raisonnement' (Paramètres) force l'IA à produire une justification avant de classifier, améliorant la précision sur les cas complexes."
+        },
+        "privacy": {
+            "title": "Confidentialité & Sécurité des Données (PII)",
+            "desc": "Gestion des Informations Personnelles Identifiables (PII) :",
+            "li1": "Détection : L'IA signale les emails contenant des données sensibles (Numéros sécu, détails financiers, info santé).",
+            "li2": "Anonymisation : Lors de l'export des données pour le fine-tuning, le système nettoie automatiquement noms, emails et dates via un modèle anonymiseur dédié."
+        },
+        "vision": {
+            "title": "Vision & Contexte Image",
+            "desc": "Certains emails contiennent un contexte critique dans les images (ex: photos de dommages voiture, notes manuscrites scannées).",
+            "standard_title": "OCR Standard",
+            "standard_desc": "Extrait le texte et décrit les images simples (ex: '[Image: Logo Entreprise]'). Rapide et économique.",
+            "vision_title": "Stratégie Vision",
+            "vision_desc": "Si activé dans les Paramètres, l'IA est instruite de porter une attention plus profonde aux éléments visuels décrits dans la mise en page du document, utile pour le traitement des 'Sinistres'."
+        },
+        "flow_title": "Flux de Traitement"
     }
+
 }

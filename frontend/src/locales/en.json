@@ -79,5 +79,51 @@
         },
         "disclaimer": "*Indicative rates, dependent on region and actual usage.",
         "close": "Close"
+    },
+    "guide": {
+        "title": "Application Documentation",
+        "subtitle": "Guide to using ClassiMail, understanding its AI capabilities, and managing data privacy.",
+        "usage": {
+            "title": "How to Use",
+            "step1_title": "1. Dashboard & Monitoring",
+            "step1_desc": "The main dashboard provides a real-time view of incoming emails.",
+            "step1_li1": "Status Codes: Green (Processed), Amber (Review Required), Red (Error).",
+            "step1_li2": "Scoring: Confidence scores (0-100%) indicate how certain the AI is.",
+            "step1_li3": "Indicators: Look for badges indicating Sensitive Data or Images.",
+            "step2_title": "2. Review Process",
+            "step2_desc": "Click 'Open Details' on any email to enter the review mode.",
+            "step2_li1": "View the original PDF and the extracted Markdown side-by-side.",
+            "step2_li2": "See the AI Analysis section for reasoning.",
+            "step2_li3": "Correct categories if the AI is wrong. Provide a reason to help future Fine-Tuning.",
+            "step3_title": "3. Uploading",
+            "step3_desc": "Use the Upload tab to manually ingest PDF files for testing. In production, files arrive automatically via Email/Blob Storage.",
+            "step4_title": "4. Settings & Configuration",
+            "step4_desc": "Customize the behavior of the engine in the Settings tab.",
+            "step4_li1": "Categories: Define exact intent names. Changes apply immediately.",
+            "step4_li2": "Processing Strategy: Switch between Standard, Reasoning, or Vision modes."
+        },
+        "ai": {
+            "title": "Global Complexity & Reasoning",
+            "desc": "The system determines complexity based on:",
+            "li1": "Multi-Intent: Emails requesting multiple distinct actions (e.g., 'Change address AND send statement').",
+            "li2": "Ambiguity: Vague wording requiring inference or context from attachments.",
+            "li3": "Strategy: Using the 'Reasoning' strategy (Settings) forces the AI to output a justification before classifying, improving accuracy on complex cases."
+        },
+        "privacy": {
+            "title": "Privacy & Data Safety (PII)",
+            "desc": "Personal Identifiable Information (PII) handling:",
+            "li1": "Detection: The AI flags emails containing sensitive data (Social Security Numbers, Finance details, Health info).",
+            "li2": "Anonymization: When exporting data for fine-tuning, the system automatically scrubs names, emails, and dates using a dedicated anonymizer model."
+        },
+        "vision": {
+            "title": "Vision & Image Context",
+            "desc": "Some emails contain critical context inside images (e.g., photos of car damage, scanned handwritten notes).",
+            "standard_title": "Standard OCR",
+            "standard_desc": "Extracts text and describes simple images (e.g. '[Image: Company Logo]'). Fast and cheap.",
+            "vision_title": "Vision Strategy",
+            "vision_desc": "If enabled in Settings, the AI is instructed to pay deeper attention to visual elements described in the document layout, useful for 'Claims' processing."
+        },
+        "flow_title": "Processing Flow"
     }
+
 }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from datetime import datetime, timezone
 
 from classificationg2s.services.azure_clients import Clients
@@ -43,7 +44,7 @@ def _extract_blob_url(payload) -> str | None:
                 return url
     return None
 
-async def worker_loop_forever(*, queue_name: str, get_cost_overrides, clients: Clients):
+async def worker_loop_forever(*, queue_name: str, get_settings, clients: Clients):
     if not clients.sb_client:
         raise RuntimeError("Service Bus client not initialized")
 
@@ -53,15 +54,13 @@ async def worker_loop_forever(*, queue_name: str, get_cost_overrides, clients: C
             async with clients.sb_client.get_queue_receiver(queue_name=queue_name, max_wait_time=5) as receiver:
                 async for msg in receiver:
                     async with concurrency:
-                        await handle_queue_message(receiver, msg, get_cost_overrides=get_cost_overrides, clients=clients)
+                        await handle_queue_message(receiver, msg, get_settings=get_settings, clients=clients)
         except asyncio.CancelledError:
             break
         except Exception as ex:
             print(f"[worker] Error: {ex}")
             await asyncio.sleep(2)
 
-
-import time
 
 class ProcessingTimer:
     def __init__(self):
@@ -81,7 +80,7 @@ class ProcessingTimer:
             return (self.end_time - self.start_time) * 1000.0
         return 0.0
 
-async def handle_queue_message(receiver, msg, *, get_cost_overrides, clients: Clients):
+async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients):
     body_bytes = b"".join([b for b in msg.body])
     try:
         payload = json.loads(body_bytes.decode())
@@ -95,7 +94,7 @@ async def handle_queue_message(receiver, msg, *, get_cost_overrides, clients: Cl
 
     try:
         with ProcessingTimer() as timer:
-            result = await run_classification_pipeline(blob_url, cost_overrides=get_cost_overrides(), clients=clients)
+            result = await run_classification_pipeline(blob_url, settings=get_settings(), clients=clients)
 
         result.processing_time_ms = timer.duration_ms
         await save_to_cosmos(result)

@@ -14,7 +14,8 @@ DEFAULT_CATEGORIES = [
 
 DEFAULT_SETTINGS = {
     "cost_overrides": {},
-    "categories": DEFAULT_CATEGORIES
+    "categories": DEFAULT_CATEGORIES,
+    "processing_strategy": "standard"  # standard | reasoning | vision
 }
 
 def load_settings() -> dict:
@@ -27,6 +28,8 @@ def load_settings() -> dict:
             data["categories"] = DEFAULT_CATEGORIES
         if "cost_overrides" not in data:
             data["cost_overrides"] = {}
+        if "processing_strategy" not in data:
+            data["processing_strategy"] = "standard"
         return data
     except Exception:
         return DEFAULT_SETTINGS.copy()
@@ -43,6 +46,11 @@ def save_settings(settings: dict):
             if name:
                clean_cats.append({"name": name, "description": desc})
         settings["categories"] = clean_cats
+    
+    # Sanitize strategy
+    if "processing_strategy" in settings:
+        if settings["processing_strategy"] not in ("standard", "reasoning", "vision"):
+            settings["processing_strategy"] = "standard"
 
     DATA_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
 
