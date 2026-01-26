@@ -119,9 +119,9 @@
             "title": "Vision & Image Context",
             "desc": "Some emails contain critical context inside images (e.g., photos of car damage, scanned handwritten notes).",
             "standard_title": "Standard OCR",
-            "standard_desc": "Extracts text and describes simple images (e.g. '[Image: Company Logo]'). Fast and cheap.",
+            "standard_desc": "Extracts text and describes simple images. The system converts visual content into text tags (e.g., '[Image: Company Logo]') so the AI can read them.",
             "vision_title": "Vision Strategy",
-            "vision_desc": "If enabled in Settings, the AI is instructed to pay deeper attention to visual elements described in the document layout, useful for 'Claims' processing."
+            "vision_desc": "If enabled in Settings, the AI receives enhanced detailed descriptions of images (e.g., 'A red sedan with a dented front bumper'), crucial for Claims processing."
         },
         "flow_title": "Processing Flow"
     }

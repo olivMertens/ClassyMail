@@ -54,21 +54,27 @@ onUnmounted(() => {
 
 const diagram = `
 graph LR
-    Email[Email Input] --> OCR{OCR Analysis}
-    OCR -->|Text| PII[PII Check]
-    OCR -->|Images| Vision[Vision Check]
+    Input[Email Input] --> OCR
     
-    PII -->|Safe| Classify[Classification AI]
-    Vision -->|Context| Classify
+    subgraph Analysis [OCR & Content Extraction]
+        direction TB
+        OCR --> Text[Text Layer]
+        OCR --> Img[Image Layer]
+        Img -->|Image-to-Text| Desc["[Image: Dented Bumper]"]
+        Text --> Markdown
+        Desc --> Markdown
+    end
+    
+    Markdown --> PII[PII Check]
+    PII --> Classify[AI Classification]
     
     Classify -->|Confidence > 85%| Auto[Auto Process]
     Classify -->|Confidence < 85%| Review[Human Review]
-    Classify -->|Ambiguous| Review
     
-    style Email fill:#f9f,stroke:#333,stroke-width:2px
-    style Auto fill:#9f9,stroke:#333
-    style Review fill:#ff9,stroke:#333
+    style Img fill:#ff9,stroke:#333
+    style Desc fill:#ff9,stroke:#333
 `
+
 </script>
 
 <template>
