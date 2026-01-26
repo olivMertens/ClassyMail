@@ -112,7 +112,7 @@ graph LR
         <div class="mt-4 prose dark:prose-invert text-sm max-w-none">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <h4 class="font-medium">
+              <h4 class="font-medium text-gray-900 dark:text-white">
                 {{ t('guide.usage.step1_title') }}
               </h4>
               <p>{{ t('guide.usage.step1_desc') }}</p>
@@ -122,7 +122,7 @@ graph LR
                 <li>{{ t('guide.usage.step1_li3') }}</li>
               </ul>
 
-              <h4 class="font-medium mt-4">
+              <h4 class="font-medium mt-4 text-gray-900 dark:text-white">
                 {{ t('guide.usage.step2_title') }}
               </h4>
               <p>{{ t('guide.usage.step2_desc') }}</p>
@@ -133,12 +133,12 @@ graph LR
               </ul>
             </div>
             <div>
-              <h4 class="font-medium">
+              <h4 class="font-medium text-gray-900 dark:text-white">
                 {{ t('guide.usage.step3_title') }}
               </h4>
               <p>{{ t('guide.usage.step3_desc') }}</p>
 
-              <h4 class="font-medium mt-4">
+              <h4 class="font-medium mt-4 text-gray-900 dark:text-white">
                 {{ t('guide.usage.step4_title') }}
               </h4>
               <p>{{ t('guide.usage.step4_desc') }}</p>

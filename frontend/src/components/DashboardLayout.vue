@@ -129,7 +129,7 @@ const navigation = computed(() => [
                 Microsoft G2S POC
               </p>
               <p class="text-xs font-medium text-gray-400 dark:text-gray-500">
-                Mars 2026
+                Février 2026
               </p>
             </div>
           </div>
