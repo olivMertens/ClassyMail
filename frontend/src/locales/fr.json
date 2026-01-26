@@ -57,7 +57,21 @@
         "total_estimated": "Total Estimé",
         "breakdown_title": "Détails des Coûts",
         "col_resource": "Ressource",
-        "col_cost": "Coût Est. (USD/Mois)"
+        "col_cost": "Coût Est. (USD/Mois)",
+        "logic_title": "Logique de Calcul (Azure Retail Prices)",
+        "logic_unit_prices": "Prix Unitaires (Région : {region})",
+        "logic_assumptions": "Hypothèses / Dimensionnement",
+        "logic_formula": "Formule de Coût (Mensuel)",
+        "logic_aca_worker": "ACA Worker",
+        "logic_aca_api": "ACA API",
+        "logic_sb": "Service Bus",
+        "item_vcpu": "Prix vCPU",
+        "item_gib": "Prix GiB",
+        "item_req": "Prix Requête",
+        "item_ops": "Prix Opérations",
+        "val_seconds_mail": "Secondes / Email",
+        "val_replicas": "Réplicas Min",
+        "val_idle": "Heures d'Inactivité"
     },
     "info": {
         "title": "POC - G2S Microsoft (Mars 2026)",
