@@ -20,6 +20,15 @@ class ClassificationResult(BaseModel):
     raw_response: Optional[dict] = None
 
 
+class HistoryEntry(BaseModel):
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    previous_intents: List[ClassificationIntent] = []
+    previous_status: Optional[str] = None
+    updated_by: Optional[str] = "user"
+    correction_reason: Optional[str] = None
+    llm_feedback: Optional[str] = None
+
+
 class EmailRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     file_url: str
@@ -27,6 +36,7 @@ class EmailRecord(BaseModel):
     markdown: Optional[str] = None
     search_text: Optional[str] = None
     classification: Optional[ClassificationResult] = None
+    classification_history: List[HistoryEntry] = []
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     error: Optional[str] = None

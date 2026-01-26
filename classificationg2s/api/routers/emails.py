@@ -25,6 +25,7 @@ from classificationg2s.services.repository import (
     export_finetune_jsonl_iter,
     compute_search_text,
 )
+from classificationg2s.services.llm_pipeline import analyze_correction
 
 
 router = APIRouter(prefix="/api", tags=["emails"])
@@ -124,21 +125,64 @@ async def get_email(item_id: str, cosmos_container=Depends(get_cosmos_container)
 
 
 @router.patch("/emails/{item_id}", response_model=EmailRecord)
-async def patch_email(item_id: str, payload: dict, cosmos_container=Depends(get_cosmos_container)):
+async def patch_email(item_id: str, payload: dict, cosmos_container=Depends(get_cosmos_container), clients: Clients = Depends(get_clients)):
 
     try:
         item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
+        
+        # Determine status (allow forcing INVALID/IGNORED via payload or default to PROCESSED)
+        new_status = payload.get("status", "PROCESSED")
+        
+        # History tracking
+        current_classification = item.get("classification") or {}
+        history_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "previous_intents": current_classification.get("detected_intents", []),
+            "previous_status": item.get("status"),
+            "updated_by": "user",
+            "correction_reason": payload.get("reason"),
+            "llm_feedback": None
+        }
+        
         if intents := payload.get("intents"):
+             # Call LLM Analysis if there is a reason and a change
+            if payload.get("reason") and item.get("markdown"):
+                 try:
+                     insight = await analyze_correction(
+                         text_markdown=item.get("markdown"),
+                         old_intents=current_classification.get("detected_intents", []),
+                         new_intents=intents,
+                         reason=payload.get("reason"),
+                         clients=clients
+                     )
+                     history_entry["llm_feedback"] = insight
+                 except Exception:
+                     pass # Don't block save on analysis failure
+
             item["classification"] = {
                 "detected_intents": intents,
                 "needs_review": False,
             }
             if payload.get("global_complexity"):
                 item["classification"]["global_complexity"] = payload.get("global_complexity")
-            item["status"] = "PROCESSED"
+            
+            item["status"] = new_status
             item["updated_at"] = datetime.now(timezone.utc).isoformat()
             item["reviewed"] = True
             item["reviewed_at"] = datetime.now(timezone.utc).isoformat()
+            
+            if reason := payload.get("reason"):
+                item["correction_reason"] = reason
+
+        elif new_status == "INVALID":
+             item["status"] = "INVALID"
+             item["reviewed"] = True
+             item["reviewed_at"] = datetime.now(timezone.utc).isoformat()
+
+        # Update History
+        if "classification_history" not in item:
+            item["classification_history"] = []
+        item["classification_history"].append(history_entry)
 
         if item.get("search_text") is None:
             item["search_text"] = compute_search_text(item.get("markdown"))
@@ -229,10 +273,11 @@ async def export_emails_finetune_jsonl(
     taxonomy_version: str = Query("v1"),
     include_metadata: bool = Query(False),
     min_required: Optional[int] = Query(None, ge=1),
+    clients: Clients = Depends(get_clients),
 ):
     finetune_min_required = min_required or int(os.getenv("FINETUNE_MIN_EXAMPLES", "50"))
 
-    finetune_reviewed_ready = await count_reviewed_ready_items()
+    finetune_reviewed_ready = await count_reviewed_ready_items(clients=clients)
     if not include_unreviewed and finetune_reviewed_ready < finetune_min_required:
         raise HTTPException(
             status_code=409,
@@ -246,6 +291,7 @@ async def export_emails_finetune_jsonl(
     filename = f"fine_tune_{taxonomy_version}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
     return StreamingResponse(
         export_finetune_jsonl_iter(
+            clients=clients,
             anonymize=anonymize,
             include_unreviewed=include_unreviewed,
             max_examples=max_examples,

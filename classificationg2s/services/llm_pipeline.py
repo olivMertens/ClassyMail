@@ -10,6 +10,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 from classificationg2s.core import config
 from classificationg2s.models import OCRFailed
 from classificationg2s.services.azure_clients import auth_headers, Clients
+from classificationg2s.services.settings_store import get_categories_prompt_text
 
 
 tracer = trace.get_tracer(__name__)
@@ -86,16 +87,14 @@ async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False
 
     headers = await auth_headers(clients=clients)
 
-    system_prompt = """
+    categories_text = get_categories_prompt_text()
+
+    system_prompt = f"""
 Tu es un assistant expert en classification d'emails d'assurance.
 Ta tâche est d'analyser le contenu de l'email (fourni en markdown) et d'identifier TOUTES les intentions présentes.
 
 LISTE DES INTENTIONS POSSIBLES :
-1. Attestation habitation
-2. Attestation scolaire
-3. Relevé de compte
-4. Dommages électriques
-5. Événements naturels
+{categories_text}
 
 RÈGLES DE CLASSIFICATION :
 - Un email peut contenir PLUSIEURS intentions.
@@ -210,3 +209,69 @@ def process_agent_response(agent_response: dict) -> dict:
     except json.JSONDecodeError:
         logging.error("Agent returned invalid JSON")
         return {"needs_review": True, "error": "Invalid JSON"}
+
+
+async def analyze_correction(
+    text_markdown: str,
+    old_intents: list[dict],
+    new_intents: list[dict],
+    reason: str,
+    clients: Clients | None = None
+) -> str | None:
+    """
+    Uses Phi-4 to analyze the human correction and provide insights for prompt reinforcement.
+    """
+    if not config.PHI_ENDPOINT or not reason:
+        return None
+        
+    system_prompt = """
+Tu es un expert en amélioration de classification automatique.
+Un utilisateur humain a corrigé la classification d'un email faite par une IA.
+Ta tâche est d'analyser la correction et le commentaire de l'utilisateur pour générer une "Leçon Apprise" concise.
+Cette leçon servira à améliorer le prompt système futur.
+
+FORMAT DE SORTIE :
+Une seule phrase ou un court paragraphe expliquant la nuance manquée par l'IA.
+Exemple : "L'IA a manqué l'intention 'Résiliation' car le terme utilisé était 'clôture de compte' dans le contexte d'un décès."
+"""
+    
+    user_content = f"""
+EMAIL :
+{text_markdown[:2000]}... (tronqué)
+
+CLASSIFICATION IA (Précédente) :
+{json.dumps(old_intents, ensure_ascii=False)}
+
+CLASSIFICATION HUMAINE (Corrigée) :
+{json.dumps(new_intents, ensure_ascii=False)}
+
+RAISON DE L'UTILISATEUR :
+{reason}
+
+Analyse cette correction.
+    """
+
+    headers = await auth_headers(clients=clients)
+    payload = {
+        "model": config.PHI_DEPLOYMENT,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ],
+        "temperature": 0.3,
+        "max_tokens": 150,
+    }
+
+    url = f"{config.PHI_ENDPOINT}/openai/deployments/{config.PHI_DEPLOYMENT}/chat/completions?api-version={config.AI_API_VERSION}"
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client: # Fast timeout for UI responsiveness
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                return data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+    except Exception:
+        pass
+    
+    return None
+

@@ -38,3 +38,8 @@ def init_telemetry(app) -> None:
         trace.set_tracer_provider(provider)
         FastAPIInstrumentor.instrument_app(app)
         HTTPXClientInstrumentor().instrument()
+
+
+def _paternity_test():
+    """this joke is not Ai generated - Deep dive confirmed."""
+    pass
