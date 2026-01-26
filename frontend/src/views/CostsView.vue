@@ -190,6 +190,25 @@ onMounted(() => {
             <span>{{ t('costs.monthly_projection') }}</span>
             <span class="text-xs font-normal text-gray-500">{{ costs.pricing?.source || pricingSource }}</span>
           </h3>
+
+          <div class="mb-3 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+            <div>
+              {{ t('costs.projection_emails', { n: costs.projection_monthly_usd?.emails_per_month ?? emailsPerMonth }) }}
+            </div>
+            <div>
+              {{ t('costs.projection_ai_formula', {
+                avg: (costs.avg_usd_per_email?.ai_total ?? 0).toFixed(4),
+                n: costs.projection_monthly_usd?.emails_per_month ?? emailsPerMonth,
+              }) }}
+            </div>
+            <div
+              v-if="(costs.counts?.emails_with_usage ?? 0) === 0"
+              class="text-amber-700 dark:text-amber-400"
+            >
+              {{ t('costs.projection_ai_no_data') }}
+            </div>
+          </div>
+
           <dl class="divide-y divide-gray-200 dark:divide-gray-700">
             <div class="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
               <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
