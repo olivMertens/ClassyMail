@@ -2,6 +2,7 @@
 # POC Classification Emails : Azure AI Foundry & Mistral + FastAPI Dashboard
 
 **Author:** Olivier Mertens — olmertens@microsoft.com
+**Update:** Février 2026 (POC Refonte UI & Infra)
 
 ## Pourquoi ce POC ?
 
@@ -9,8 +10,9 @@ Ce repo est un **POC “agent + pipeline”** pour traiter des emails/PDFs **à 
 Il sert à valider rapidement :
 
 - Une architecture **événementielle découplée** (ingestion vs traitement) pour absorber des pics (ex: 10k fichiers).
-- Un workflow de **review humaine** (dashboard) + boucle de **reinforcement / fine-tuning**.
+- Un workflow de **review humaine** (dashboard interactif) + boucle de **reinforcement / fine-tuning**.
 - Un mode de déploiement cloud **prod-ready** (Terraform + Azure Container Apps) et une exécution locale simple.
+- **Nouveau (Fév 2026)** : Interface "Dark Mode" native, Danger Zone (Reset complet), et support Azure Retail Prices API.
 
 ## Comment ça marche (vue d’ensemble)
 

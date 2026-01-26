@@ -196,3 +196,30 @@ Voir [docs/DEV_LOCAL_BUILD.md](DEV_LOCAL_BUILD.md) pour les commandes détaillé
 
 - The app uses `DefaultAzureCredential` / Entra ID. For local dev, `az login` is typically the easiest path.
 - If you don’t have Azure resources yet, run Terraform first (see `docs/TERRAFORM.md`).
+
+## Troubleshooting
+
+### "Upload Failed: 500 Internal Server Error"
+
+Si vous rencontrez une erreur 500 lors de l'upload (via UI ou API), vérifiez les logs (ACA Logs ou output local).
+Une cause fréquente est le **pare-feu du compte de stockage (Storage Account)** qui bloque les connexions.
+
+- **Symptôme** : `AzureError: Public access is not permitted on this storage account.` ou `AuthorizationPermissionMismatch`.
+- **Cause** : Si `public_network_access_enabled = false` dans Terraform, l'application (ACA ou locale) ne peut pas joindre le Blob Storage sauf via Private Endpoint (non configuré par défaut dans ce POC).
+- **Solution** : Dans `infra/main.tf`, assurez-vous de définir :
+  ```hcl
+  resource "azurerm_storage_account" "st" {
+      # ...
+      public_network_access_enabled = true
+      # ...
+  }
+  ```
+- **Note** : Même avec l'accès public réseau, l'accès aux données reste protégé par RBAC (`Storage Blob Data Contributor`).
+
+### "System Error" (Cosmos DB)
+
+Si vous voyez une erreur concernant `enable_cross_partition_query` :
+- **Cause** : Version récente du SDK Python Cosmos DB qui ne supporte plus cet argument déprécié.
+- **Solution** : Mettre à jour le code backend (déjà corrigé dans la branche `main` récente).
+
+```

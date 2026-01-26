@@ -66,3 +66,19 @@ Access via the "Developer" link in the navigation bar.
 - **API Reference**: Interactive Redoc interface for the Backend API.
 - **Architecture**: Dynamic Mermaid diagram showing the system component flow.
 - **Repository**: Process & Codebase links.
+
+## Settings & Danger Zone
+
+The application settings allow customization of the classification engine and environment management.
+
+### Settings Tab
+- **Dark Mode**: Toggle the application theme.
+- **Cost Overrides**: Adjust the unit prices used for cost estimation (Useful for "What-If" analysis).
+- **Processing Strategy**: Switch between "Standard" (Fast), "Reasoning" (CoT), or "Vision" modes.
+
+### Developer Tab (Danger Zone)
+This restricted area allows administrators to reset the environment for testing.
+- **Delete All Data**: Completely wipes the database and storage.
+    - **Actions Performed**: Deletes all items in Cosmos DB container, deletes all blobs in `pdf-inputs`.
+    - **Safety**: Requires two confirmations to proceed.
+    - **Use Case**: Cleaning up after a POC session or before a new demo run.
