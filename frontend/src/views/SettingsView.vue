@@ -12,13 +12,14 @@ import {
     CpuChipIcon,
     AdjustmentsHorizontalIcon,
     QueueListIcon,
-    BanknotesIcon
+    BanknotesIcon,
+    ArrowPathIcon
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 
 const { t, locale } = useI18n()
 
-const activeTab = ref('classification') // classification | design | processing | finetuning | general
+const activeTab = ref('classification') // classification | design | processing | finetuning | general | danger
 
 const settings = ref({
     processing_strategy: 'standard',
@@ -30,6 +31,45 @@ const settings = ref({
 })
 const loading = ref(false)
 const saved = ref(false)
+
+// Reset State
+const resetConfirm1 = ref(false)
+const resetConfirm2 = ref(false)
+const resetting = ref(false)
+
+const performReset = async () => {
+    if (!resetConfirm1.value || !resetConfirm2.value) return
+    if (!confirm('FINAL WARNING: This is irreversible. Proceed?')) return
+
+    resetting.value = true
+    try {
+        const res = await fetch('/api/admin/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                confirm_1: resetConfirm1.value,
+                confirm_2: resetConfirm2.value
+            })
+        })
+
+        if (res.ok) {
+            const data = await res.json()
+            alert(`Environment Reset Successful.\nDeleted Blobs: ${data.deleted_blobs}\nDeleted Records: ${data.deleted_records}`)
+            // Reset local state
+            resetConfirm1.value = false
+            resetConfirm2.value = false
+            // Reload page to reflect empty state
+            window.location.reload()
+        } else {
+            const err = await res.json()
+            alert(`Reset Failed: ${err.detail || 'Unknown error'}`)
+        }
+    } catch (e) {
+        alert(`Reset Error: ${e.message}`)
+    } finally {
+        resetting.value = false
+    }
+}
 
 // Category Form
 const newCategory = ref({ name: '', description: '' })
@@ -222,6 +262,13 @@ onMounted(() => {
         >
           <BanknotesIcon class="h-4 w-4" />
           General & Costs
+        </button>
+        <button
+          :class="[activeTab === 'danger' ? 'border-red-500 text-red-600 dark:text-red-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          @click="activeTab = 'danger'"
+        >
+          Danger Zone
+          <ExclamationTriangleIcon class="h-4 w-4 text-red-500" />
         </button>
       </nav>
     </div>
@@ -651,6 +698,90 @@ onMounted(() => {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Danger Zone Tab -->
+    <div
+      v-show="activeTab === 'danger'"
+      class="bg-white dark:bg-gray-800 shadow sm:rounded-lg border border-red-200 dark:border-red-900"
+    >
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-base font-semibold leading-6 text-red-600 dark:text-red-400 flex items-center gap-2">
+          <ExclamationTriangleIcon class="h-5 w-5" />
+          Atomic Zone - Environment Reset
+        </h3>
+        <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+          <p>
+            Proceed with extreme caution. This action will permanently delete all data in the current environment.
+          </p>
+        </div>
+
+        <div class="mt-5 bg-red-50 dark:bg-red-900/20 p-4 rounded-md">
+          <h4 class="text-sm font-medium text-red-800 dark:text-red-300">
+            This action will:
+          </h4>
+          <ul class="list-disc list-inside mt-2 text-sm text-red-700 dark:text-red-200">
+            <li>Delete ALL emails and classification records from Database.</li>
+            <li>Delete ALL files (PDFs) from the Input Storage Container.</li>
+            <li>Reset the dashboard state completely.</li>
+            <li><strong>Preserve</strong> application settings (Categories, Costs, etc).</li>
+          </ul>
+        </div>
+
+        <div class="mt-6 space-y-4">
+          <div class="flex items-start">
+            <div class="flex h-6 items-center">
+              <input
+                id="confirm_1"
+                v-model="resetConfirm1"
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-600 dark:bg-gray-700 dark:border-gray-600"
+              >
+            </div>
+            <div class="ml-3 text-sm leading-6">
+              <label
+                for="confirm_1"
+                class="font-medium text-gray-900 dark:text-white"
+              >I understand this deletes all data permanently.</label>
+            </div>
+          </div>
+          <div class="flex items-start">
+            <div class="flex h-6 items-center">
+              <input
+                id="confirm_2"
+                v-model="resetConfirm2"
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-600 dark:bg-gray-700 dark:border-gray-600"
+              >
+            </div>
+            <div class="ml-3 text-sm leading-6">
+              <label
+                for="confirm_2"
+                class="font-medium text-gray-900 dark:text-white"
+              >I confirm I want to reset the environment.</label>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            class="mt-4 inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="!resetConfirm1 || !resetConfirm2 || resetting"
+            @click="performReset"
+          >
+            <TrashIcon
+              v-if="!resetting"
+              class="-ml-0.5 mr-1.5 h-5 w-5"
+              aria-hidden="true"
+            />
+            <ArrowPathIcon
+              v-else
+              class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
+              aria-hidden="true"
+            />
+            {{ resetting ? 'Nuking Environment...' : 'NUKE EVERYTHING' }}
+          </button>
         </div>
       </div>
     </div>
