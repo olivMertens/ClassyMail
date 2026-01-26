@@ -134,7 +134,6 @@ async def list_emails(
         items_iter = cosmos_container.query_items(
             query,
             parameters=[{"name": k, "value": v} for k, v in params.items()],
-            enable_cross_partition_query=True,
             max_item_count=page_size,
         )
         pages = items_iter.by_page(continuation_token=continuation_token)
@@ -329,7 +328,7 @@ async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
         buffer.truncate(0)
 
         query = "SELECT c.id, c.file_url, c.status, c.classification FROM c"
-        it = cosmos_container.query_items(query, enable_cross_partition_query=True)
+        it = cosmos_container.query_items(query)
         async for item in it:
             classification = item.get("classification") or {}
             intents = classification.get("detected_intents") or []
