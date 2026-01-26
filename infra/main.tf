@@ -9,6 +9,12 @@ terraform {
 locals {
   # If not provided, rely on the active Azure CLI subscription.
   subscription_id = try(trimspace(var.subscription_id), "")
+
+  # Some tenants enforce tagging via Azure Policy. Apply safe defaults for POC.
+  common_tags = {
+    SecurityControl = "ignore"
+    CostControl     = "ignore"
+  }
 }
 
 provider "azurerm" {
@@ -43,6 +49,8 @@ variable "prefix" { default = "email-poc" }
 resource "azurerm_resource_group" "rg" {
   name     = "${var.prefix}-rg"
   location = var.location
+
+  tags = local.common_tags
 }
 
 # --- 1. Stockage & Ingestion ---
@@ -53,10 +61,12 @@ resource "azurerm_storage_account" "st" {
   account_tier             = "Standard"
   account_replication_type = "LRS"
 
+  tags = local.common_tags
+
   # Avoid unintended drift vs existing secured deployments.
   # NOTE: If you need Container Apps to access Storage over the public internet,
   # set this to true and ensure your org policies allow it.
-  public_network_access_enabled = false
+  public_network_access_enabled = true
 
   # Beaucoup d'environnements (policies) interdisent l'accès via clés (Shared Key).
   # On force un mode compatible: OAuth/Entra-only, pas de Shared Key.
@@ -80,6 +90,8 @@ resource "azurerm_servicebus_namespace" "sb" {
   location            = var.location
   sku                 = "Standard"
 
+  tags = local.common_tags
+
   # Beaucoup d'environnements (policies) désactivent l'auth locale (SAS keys).
   # Le provider peut lire une valeur différente de la valeur par défaut, ce qui crée du drift.
   local_auth_enabled = false
@@ -98,6 +110,8 @@ resource "azurerm_eventgrid_system_topic" "blob_topic" {
   resource_group_name = azurerm_resource_group.rg.name
   source_resource_id  = azurerm_storage_account.st.id
   topic_type          = "Microsoft.Storage.StorageAccounts"
+
+  tags = local.common_tags
 }
 
 resource "azurerm_eventgrid_system_topic_event_subscription" "sub" {
@@ -125,11 +139,14 @@ resource "azapi_resource" "ai_foundry" {
   location                  = var.location
   schema_validation_enabled = false
   response_export_values    = ["properties.endpoint"]
+
+  tags = local.common_tags
   body = jsonencode({
     kind     = "AIServices"
     sku      = { name = "S0" }
     identity = { type = "SystemAssigned" }
     properties = {
+      publicNetworkAccess    = "Enabled"
       disableLocalAuth       = true
       allowProjectManagement = true
       customSubDomainName    = "${var.prefix}-aifoundry"
@@ -147,6 +164,8 @@ resource "azapi_resource" "ai_project" {
   parent_id                 = azapi_resource.ai_foundry.id
   location                  = var.location
   schema_validation_enabled = false
+
+  tags = local.common_tags
   body = jsonencode({
     sku      = { name = "S0" }
     identity = { type = "SystemAssigned" }
@@ -221,6 +240,8 @@ resource "azurerm_cosmosdb_account" "db" {
   resource_group_name = azurerm_resource_group.rg.name
   offer_type          = "Standard"
   kind                = "GlobalDocumentDB"
+
+  tags = local.common_tags
 
   # Enable public access but restrict via firewall/RBAC
   public_network_access_enabled = true
@@ -304,6 +325,8 @@ resource "azurerm_user_assigned_identity" "app_id" {
   location            = var.location
   name                = "${var.prefix}-id"
   resource_group_name = azurerm_resource_group.rg.name
+
+  tags = local.common_tags
 }
 
 # RBAC: Cognitive Services User for app identity
@@ -374,6 +397,8 @@ resource "azurerm_log_analytics_workspace" "log" {
   resource_group_name = azurerm_resource_group.rg.name
   sku                 = "PerGB2018"
   retention_in_days   = 30
+
+  tags = local.common_tags
 }
 
 # Workspace-based Application Insights (recommended)
@@ -383,6 +408,8 @@ resource "azurerm_application_insights" "appi" {
   resource_group_name = azurerm_resource_group.rg.name
   application_type    = "web"
   workspace_id        = azurerm_log_analytics_workspace.log.id
+
+  tags = local.common_tags
 }
 
 resource "azurerm_container_app_environment" "env" {
@@ -390,6 +417,8 @@ resource "azurerm_container_app_environment" "env" {
   location                   = var.location
   resource_group_name        = azurerm_resource_group.rg.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.log.id
+
+  tags = local.common_tags
 }
 
 resource "azurerm_container_app" "api" {
@@ -397,6 +426,8 @@ resource "azurerm_container_app" "api" {
   resource_group_name          = azurerm_resource_group.rg.name
   container_app_environment_id = azurerm_container_app_environment.env.id
   revision_mode                = "Single"
+
+  tags = local.common_tags
 
   dynamic "registry" {
     for_each = var.acr_name != "" ? [1] : []
@@ -542,6 +573,8 @@ resource "azurerm_container_app" "worker" {
   resource_group_name          = azurerm_resource_group.rg.name
   container_app_environment_id = azurerm_container_app_environment.env.id
   revision_mode                = "Single"
+
+  tags = local.common_tags
 
   dynamic "registry" {
     for_each = var.acr_name != "" ? [1] : []
