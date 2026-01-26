@@ -15,7 +15,7 @@ async def main():
         await worker_loop_forever(
             clients=clients,
             queue_name=config.SERVICE_BUS_QUEUE,
-            get_cost_overrides=lambda: {},
+            get_settings=lambda: {},
         )
     finally:
         await clients.close()
