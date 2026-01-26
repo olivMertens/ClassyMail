@@ -135,8 +135,9 @@ async def list_emails(
             query,
             parameters=[{"name": k, "value": v} for k, v in params.items()],
             enable_cross_partition_query=True,
+            max_item_count=page_size,
         )
-        pages = items_iter.by_page(continuation_token=continuation_token, max_page_size=page_size)
+        pages = items_iter.by_page(continuation_token=continuation_token)
         items: list[EmailRecord] = []
         next_token: str | None = None
         async for page_items in pages:
