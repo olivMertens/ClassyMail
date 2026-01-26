@@ -28,6 +28,7 @@ htmlcov/
 
 # Data & outputs
 data/
+data/*
 logs/
 outputs/
 

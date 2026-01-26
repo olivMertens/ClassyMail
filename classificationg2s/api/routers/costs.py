@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 
 from classificationg2s.services.azure_clients import Clients, get_clients
 from classificationg2s.services.azure_retail_prices import get_retail_unit_prices
@@ -35,14 +35,22 @@ async def costs_summary(
     region: str = Query("swedencentral"),
     clients: Clients = Depends(get_clients),
 ) -> dict[str, Any]:
-    processed_count = await count_by_status("PROCESSED", clients=clients)
-    review_count = await count_by_status("REVIEW_REQUIRED", clients=clients)
-    error_count = await count_by_status("ERROR", clients=clients)
+    try:
+        processed_count = await count_by_status("PROCESSED", clients=clients)
+        review_count = await count_by_status("REVIEW_REQUIRED", clients=clients)
+        error_count = await count_by_status("ERROR", clients=clients)
 
-    phi4_usd = await sum_phi4_cost_usd(clients=clients)
-    mistral_usd = await sum_mistral_cost_usd(clients=clients)
+        phi4_usd = await sum_phi4_cost_usd(clients=clients)
+        mistral_usd = await sum_mistral_cost_usd(clients=clients)
 
-    emails_with_usage = await count_items_with_any_usage_cost(clients=clients)
+        emails_with_usage = await count_items_with_any_usage_cost(clients=clients)
+    except Exception as e:
+        # If database is unreachable or empty (init issue), return 503 so UI knows.
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database unavailable: {str(e)}. Ensure Cosmos DB is provisioned and identity has permissions.",
+        )
+
     ai_total_usd = (phi4_usd or 0.0) + (mistral_usd or 0.0)
 
     avg_ai_usd_per_email = (ai_total_usd / emails_with_usage) if emails_with_usage else 0.0

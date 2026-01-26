@@ -118,8 +118,16 @@ async def get_blob_service_client(clients: Clients = Depends(get_clients)) -> Bl
 
 
 async def get_cosmos_container(clients: Clients = Depends(get_clients)):
-    await clients.ensure_cosmos_container()
-    return clients.cosmos_container
+    try:
+        await clients.ensure_cosmos_container()
+        return clients.cosmos_container
+    except Exception as e:
+        if HTTPException:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Database unavailable: {str(e)}. Ensure Cosmos DB is provisioned and identity has 'Cosmos DB Built-in Data Contributor' role.",
+            )
+        raise
 
 
 def get_concurrency_limit(clients: Clients = Depends(get_clients)) -> asyncio.Semaphore:

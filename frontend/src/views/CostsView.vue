@@ -1,15 +1,18 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ExclamationCircleIcon } from '@heroicons/vue/24/outline'
 
 const { t } = useI18n()
 const costs = ref(null)
 const loading = ref(false)
+const error = ref(null)
 const emailsPerMonth = ref(10000)
 const pricingSource = ref('fixed')
 
 const loadCosts = async () => {
     loading.value = true
+    error.value = null
     try {
         const params = new URLSearchParams()
         params.set('emails_per_month', emailsPerMonth.value)
@@ -19,9 +22,13 @@ const loadCosts = async () => {
         const res = await fetch(`/api/costs/summary?${params.toString()}`)
         if (res.ok) {
             costs.value = await res.json()
+        } else {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.detail || `Server Error: ${res.status}`)
         }
     } catch (e) {
         console.error(e)
+        error.value = e.message
     } finally {
         loading.value = false
     }
@@ -88,6 +95,28 @@ onMounted(() => {
       class="text-center py-12"
     >
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto" />
+    </div>
+
+    <div
+      v-else-if="error"
+      class="rounded-md bg-red-50 dark:bg-red-900/20 p-4"
+    >
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <ExclamationCircleIcon
+            class="h-5 w-5 text-red-400"
+            aria-hidden="true"
+          />
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
+            System Error
+          </h3>
+          <div class="mt-2 text-sm text-red-700 dark:text-red-300">
+            <p>{{ error }}</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div

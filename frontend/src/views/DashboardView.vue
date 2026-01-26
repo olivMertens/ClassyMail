@@ -24,6 +24,7 @@ const search = ref('')
 const page = ref(1)
 const pageSize = ref(20)
 const loading = ref(false)
+const error = ref(null)
 
 const pageSizeOptions = [20, 50, 100, 250]
 
@@ -44,6 +45,7 @@ const exportJsonl = () => {
 
 const fetchEmails = async () => {
     loading.value = true
+    error.value = null
     try {
         const params = new URLSearchParams()
         params.set('status', filter.value === 'all' ? 'all' : filter.value)
@@ -52,7 +54,10 @@ const fetchEmails = async () => {
         if (search.value) params.set('search', search.value)
 
         const res = await fetch(`/api/emails?${params.toString()}`)
-        if (!res.ok) throw new Error('Failed to fetch')
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.detail || `Server Error: ${res.status}`)
+        }
         const data = await res.json()
 
         emails.value = data.items || []
@@ -63,6 +68,7 @@ const fetchEmails = async () => {
         }
     } catch (e) {
         console.error(e)
+        error.value = e.message
     } finally {
         loading.value = false
     }
@@ -255,6 +261,41 @@ const emit = defineEmits(['open-email'])
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto" />
       <p class="mt-4 text-gray-500 dark:text-gray-400">
         Loading emails...
+      </p>
+    </div>
+
+    <div
+      v-else-if="error"
+      class="rounded-md bg-red-50 dark:bg-red-900/20 p-4"
+    >
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <ExclamationCircleIcon
+            class="h-5 w-5 text-red-400"
+            aria-hidden="true"
+          />
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
+            System Error
+          </h3>
+          <div class="mt-2 text-sm text-red-700 dark:text-red-300">
+            <p>{{ error }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-else-if="!emails.length"
+      class="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg"
+    >
+      <ArrowDownTrayIcon class="mx-auto h-12 w-12 text-gray-400" />
+      <h3 class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
+        No emails found
+      </h3>
+      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        Upload PDF documents to start the classification pipeline (ensure Cloud Storage is connected).
       </p>
     </div>
 
