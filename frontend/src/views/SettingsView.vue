@@ -46,6 +46,7 @@ const saved = ref(false)
 const resetConfirm1 = ref(false)
 const resetConfirm2 = ref(false)
 const resetting = ref(false)
+const purgingDlq = ref(false)
 
 // --- Category Management & Sanitization ---
 
@@ -183,6 +184,28 @@ const performReset = async () => {
         alert(`Reset Error: ${e.message}`)
     } finally {
         resetting.value = false
+    }
+}
+
+const performDlqPurge = async () => {
+    if (!confirm('Are you sure you want to purge the Service Bus Dead Letter Queue? This cannot be undone.')) return
+
+    purgingDlq.value = true
+    try {
+        const res = await fetch('/api/admin/purge-dlq', {
+            method: 'POST',
+        })
+        if (res.ok) {
+            const data = await res.json()
+            alert(`Purge Successful.\nDeleted Messages: ${data.deleted_dlq}`)
+        } else {
+            const err = await res.json()
+            alert(`Purge Failed: ${err.detail || 'Unknown error'}`)
+        }
+    } catch (e) {
+        alert(`Purge Error: ${e.message}`)
+    } finally {
+        purgingDlq.value = false
     }
 }
 
@@ -858,6 +881,35 @@ onMounted(() => {
             />
             {{ resetting ? 'Nuking Environment...' : 'NUKE EVERYTHING' }}
           </button>
+        </div>
+
+        <div class="mt-8 border-t border-red-200 dark:border-red-900 pt-6">
+          <h4 class="text-sm font-medium text-gray-900 dark:text-white">
+            Maintenance Operations
+          </h4>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Specific maintenance tasks that do not reset the entire environment.
+          </p>
+          <div class="mt-4">
+            <button
+              type="button"
+              class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-600 shadow-sm ring-1 ring-inset ring-red-300 hover:bg-red-50 dark:bg-gray-800 dark:text-red-400 dark:ring-red-900 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="purgingDlq"
+              @click="performDlqPurge"
+            >
+              <TrashIcon
+                v-if="!purgingDlq"
+                class="-ml-0.5 mr-1.5 h-5 w-5"
+                aria-hidden="true"
+              />
+              <ArrowPathIcon
+                v-else
+                class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
+                aria-hidden="true"
+              />
+              {{ purgingDlq ? 'Purging DLQ...' : 'Purge Dead-letter Queue Only' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>

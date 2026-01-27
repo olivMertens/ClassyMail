@@ -294,6 +294,39 @@ async def reset_environment(
     }
 
 
+@router.post("/purge-dlq", status_code=status.HTTP_200_OK)
+async def purge_dlq(clients: Clients = Depends(get_clients)):
+    """
+    Purges just the Dead Letter Queue (Service Bus).
+    """
+    deleted_dlq = 0
+
+    try:
+        # Use short timeout to drain
+        if clients.sb_client:
+            receiver = clients.sb_client.get_queue_receiver(
+                queue_name=config.SERVICE_BUS_QUEUE,
+                sub_queue=ServiceBusSubQueue.DEAD_LETTER,
+                prefetch_count=50,
+            )
+            async with receiver:
+                while True:
+                    messages = await receiver.receive_messages(max_message_count=50, max_wait_time=2)
+                    if not messages:
+                        break
+                    for msg in messages:
+                        await receiver.complete_message(msg)
+                        deleted_dlq += 1
+    except Exception as e:
+        logger.error(f"Failed to purge DLQ: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to purge DLQ: {str(e)}")
+
+    return {
+        "status": "success",
+        "deleted_dlq": deleted_dlq
+    }
+
+
 @router.get("/deadletter", response_model=DeadLetterSummary)
 async def deadletter_summary(clients: Clients = Depends(get_clients)):
     """Peek the dead-letter queue and return a summary for admin UI."""
