@@ -898,8 +898,8 @@ const emit = defineEmits(['open-email'])
     <div class="fixed bottom-4 right-4 z-50 flex flex-col items-end pointer-events-none">
       <div
         v-if="chatOpen"
-        class="mb-4 w-96 bg-white dark:bg-gray-900 shadow-xl rounded-lg border border-gray-200 dark:border-gray-700 pointer-events-auto flex flex-col overflow-hidden"
-        style="max-height: 80vh;"
+        class="mb-4 w-[32rem] bg-white dark:bg-gray-900 shadow-xl rounded-lg border border-gray-200 dark:border-gray-700 pointer-events-auto flex flex-col overflow-hidden"
+        style="max-height: 85vh;"
       >
         <!-- Header -->
         <div class="bg-primary-600 px-4 py-3 flex justify-between items-center text-white">

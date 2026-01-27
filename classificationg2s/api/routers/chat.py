@@ -4,7 +4,7 @@ from classificationg2s.services.azure_clients import Clients, get_clients
 from classificationg2s.services.chat_agent import agent as chat_agent
 import logging
 
-router = APIRouter(prefix="/api/chat", tags=["chat"])
+router = APIRouter(tags=["chat"])
 logger = logging.getLogger("classimail.chat")
 
 
@@ -17,7 +17,7 @@ class ChatResponse(BaseModel):
     content: str
 
 
-@router.post("/", response_model=ChatResponse)
+@router.post("/api/chat", response_model=ChatResponse)
 async def chat_completion(
     req: ChatRequest,
     clients: Clients = Depends(get_clients),

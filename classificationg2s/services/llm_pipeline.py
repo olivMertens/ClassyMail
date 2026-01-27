@@ -42,13 +42,13 @@ def clamp_text_to_token_budget(text: str, max_tokens: int) -> tuple[str, bool]:
 
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10), retry=retry_if_exception(retryable_httpx))
-async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None) -> dict:
+async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None, include_images: bool = False) -> dict:
     headers = await auth_headers(clients=clients)
 
-    # Mistral Document AI uses a specific API format (NOT standard chat completions)
-    # Reference: https://devblogs.microsoft.com/foundry/whats-new-in-azure-ai-foundry-august-2025/
-    # The endpoint is: POST {endpoint}/models/{deployment}/chat/completions
-    # Payload format: {"model": "...", "document": {"type": "document_url", "document_url": "data:..."}}
+    # Mistral Document AI API format (validated from official Azure notebook)
+    # Reference: https://github.com/retkowsky/Azure-AIGEN-demos/blob/main/Mistral%20Document%20AI/Mistral%20Document%20AI%20with%20Azure%20AI%20Foundry.ipynb
+    # Endpoint: {endpoint}/providers/mistral/azure/ocr
+    # Payload: {"model": "...", "document": {...}, "include_image_base64": "true" (optional)}
 
     payload = {
         "model": config.MISTRAL_DEPLOYMENT,
@@ -58,11 +58,15 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None) -> d
         }
     }
 
+    # Option to extract images from PDF (useful for PDFs with charts, diagrams, etc.)
+    if include_images:
+        payload["include_image_base64"] = "true"
+
     if not config.MISTRAL_ENDPOINT:
         raise RuntimeError("MISTRAL_ENDPOINT not configured.")
 
-    # Mistral Document AI specific endpoint (no API version query param)
-    url = f"{config.MISTRAL_ENDPOINT.rstrip('/')}/models/{config.MISTRAL_DEPLOYMENT}/chat/completions"
+    # Mistral Document AI endpoint: /providers/mistral/azure/ocr (NOT /chat/completions)
+    url = f"{config.MISTRAL_ENDPOINT.rstrip('/')}/providers/mistral/azure/ocr"
 
     logger.info(f"[metrics] OCR Request: {url} model={config.MISTRAL_DEPLOYMENT}")
 

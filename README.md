@@ -4,7 +4,7 @@
 **Author:** Olivier Mertens — olmertens@microsoft.com
 **Update:** Février 2026 (POC Refonte UI & Infra)
 
-> **⚠️ Important Update (Jan 2026):** Fixed Mistral Document AI endpoint to use correct API format (`/models/{deployment}/chat/completions`).
+> **⚠️ Important Update (Jan 2026):** Fixed Mistral Document AI endpoint to use correct API format (`/providers/mistral/azure/ocr`).
 > This is NOT the standard OpenAI Chat Completions API. See [docs/MODELS.md](docs/MODELS.md) for details.
 
 ## Pourquoi ce POC ?
