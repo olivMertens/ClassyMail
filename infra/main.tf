@@ -687,10 +687,6 @@ resource "azurerm_container_app" "worker" {
         value = "mistral-document-ai-2505"
       }
       env {
-        name  = "MISTRAL_MODE"
-        value = "maas"
-      }
-      env {
         name  = "AZURE_AI_API_VERSION"
         value = "2024-08-01-preview"
       }

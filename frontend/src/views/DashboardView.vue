@@ -706,6 +706,12 @@ const emit = defineEmits(['open-email'])
 
         <div class="mt-2 space-y-1">
           <div
+            v-if="!(email.classification?.detected_intents || []).length"
+            class="text-xs text-gray-400 dark:text-gray-500 italic"
+          >
+            Aucune catégorie détectée
+          </div>
+          <div
             v-for="intent in email.classification?.detected_intents || []"
             :key="intent.intent"
             class="flex justify-between text-xs"

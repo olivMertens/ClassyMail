@@ -199,8 +199,8 @@ LISTE DES INTENTIONS POSSIBLES :
 {categories_text}
 
 RÈGLES DE CLASSIFICATION :
-- Un email peut contenir PLUSIEURS intentions.
-- Si aucune intention ne correspond, retourne une liste vide.
+- Un email peut contenir UNE SEULE intention OU PLUSIEURS intentions.
+- Si aucune intention ne correspond, retourne une liste vide (detected_intents: []).
 - Assigne un score de confiance (0.0 à 1.0) pour CHAQUE intention détectée.
 
 FORMAT DE RÉPONSE ATTENDU (JSON UNIQUEMENT) :

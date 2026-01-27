@@ -17,7 +17,6 @@ COSMOS_CONTAINER = os.getenv("AZURE_COSMOS_CONTAINER", "emails")
 
 # AI endpoints
 MISTRAL_ENDPOINT = os.getenv("MISTRAL_ENDPOINT")  # https://...azure.net
-MISTRAL_MODE = os.getenv("MISTRAL_MODE", "maas")  # maas|inference
 MISTRAL_DEPLOYMENT = os.getenv("MISTRAL_DEPLOYMENT", "mistral-document-ai-2505")
 PHI_ENDPOINT = os.getenv("PHI_ENDPOINT") or os.getenv("AZURE_AI_ENDPOINT")
 PHI_DEPLOYMENT = os.getenv("PHI_DEPLOYMENT", "phi-4")
