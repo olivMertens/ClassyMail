@@ -325,6 +325,7 @@ async def diagnostics(clients: Clients = Depends(get_clients)):
         "cosmos_endpoint": config.COSMOS_ENDPOINT,
         "cosmos_db": config.COSMOS_DB,
         "cosmos_container": config.COSMOS_CONTAINER,
+        "cosmos_query_max_limit": getattr(config, "COSMOS_QUERY_MAX_LIMIT", None),
         "ai_endpoint": config.MISTRAL_ENDPOINT or config.PHI_ENDPOINT,
         "mistral_deployment": config.MISTRAL_DEPLOYMENT,
         "phi_deployment": config.PHI_DEPLOYMENT,
