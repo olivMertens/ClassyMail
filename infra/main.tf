@@ -94,7 +94,8 @@ resource "azurerm_servicebus_namespace" "sb" {
 
   # Beaucoup d'environnements (policies) désactivent l'auth locale (SAS keys).
   # Le provider peut lire une valeur différente de la valeur par défaut, ce qui crée du drift.
-  local_auth_enabled = false
+  # Pour Event Grid, l'authentification locale est requise pour envoyer des messages à Service Bus.
+  local_auth_enabled = true
 }
 
 resource "azurerm_servicebus_queue" "q" {

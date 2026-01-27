@@ -119,6 +119,8 @@ async def export_finetune_jsonl_iter(
     max_examples: Optional[int],
     taxonomy_version: str,
     include_metadata: bool,
+    split_mode: str = "all",
+    test_ratio: float = 0.2
 ):
     # Emit UTF-8 BOM (required by Foundry fine-tuning dataset validation)
     yield "\ufeff"
@@ -148,6 +150,23 @@ async def export_finetune_jsonl_iter(
         if not intents:
             continue
 
+        # Split logic: use a stable hash of the ID to determine if it's train or test
+        item_id = item.get("id") or ""
+        # Create a deterministic float 0.0-1.0 from the ID
+        h = int(hashlib.sha256(item_id.encode("utf-8")).hexdigest(), 16)
+        # Normalize to 0-1
+        normalized_hash = (h % 1000) / 1000.0
+
+        if split_mode == "train":
+            if normalized_hash < test_ratio:
+                # This item belongs to "test" bucket (0 to 0.2), so skip it for "train"
+                continue
+        elif split_mode == "test":
+             if normalized_hash >= test_ratio:
+                 # This item belongs to "train" bucket (0.2 to 1.0), so skip it for "test"
+                 continue
+
+        # Proceed with generation
         raw_markdown = item.get("markdown") or ""
         anonymization_meta = None
         user_markdown = raw_markdown

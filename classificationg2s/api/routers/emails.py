@@ -369,6 +369,8 @@ async def export_emails_finetune_jsonl(
     taxonomy_version: str = Query("v1"),
     include_metadata: bool = Query(False),
     min_required: Optional[int] = Query(None, ge=1),
+    split: str = Query("all", pattern="^(all|train|test)$"),
+    test_split_ratio: float = Query(0.2, ge=0.0, le=1.0),
     clients: Clients = Depends(get_clients),
 ):
     settings = load_settings()
@@ -385,7 +387,7 @@ async def export_emails_finetune_jsonl(
             },
         )
 
-    filename = f"fine_tune_{taxonomy_version}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
+    filename = f"fine_tune_{split}_{taxonomy_version}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
     return StreamingResponse(
         export_finetune_jsonl_iter(
             clients=clients,
@@ -394,6 +396,8 @@ async def export_emails_finetune_jsonl(
             max_examples=max_examples,
             taxonomy_version=taxonomy_version,
             include_metadata=include_metadata,
+            split_mode=split,
+            test_ratio=test_split_ratio
         ),
         media_type="application/jsonl",
         headers={"Content-Disposition": f"attachment; filename={filename}"},

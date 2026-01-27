@@ -8,7 +8,8 @@ import {
   ExclamationCircleIcon,
   ClockIcon,
   ArrowDownTrayIcon,
-  QuestionMarkCircleIcon
+  QuestionMarkCircleIcon,
+  ArrowPathIcon
 } from '@heroicons/vue/24/outline'
 
 defineProps({
@@ -35,6 +36,7 @@ const page = ref(1)
 const pageSize = ref(20)
 const loading = ref(false)
 const error = ref(null)
+const reprocessingId = ref(null)
 
 const pageSizeOptions = [20, 50, 100]
 
@@ -83,8 +85,25 @@ const exportCsv = () => {
     downloadFile('/api/emails/export', 'emails.csv')
 }
 
-const exportJsonl = () => {
-    downloadFile('/api/emails/export-finetune-jsonl?anonymize=true')
+const exportJsonl = (split = 'all') => {
+    downloadFile(`/api/emails/export-finetune-jsonl?anonymize=true&split=${split}`)
+}
+
+const reprocessEmail = async (email) => {
+    if (confirm('Are you sure you want to reprocess this email? It will be re-queued.')) {
+        try {
+            reprocessingId.value = email.id
+            const res = await fetch(`/api/emails/${email.id}/reprocess`, { method: 'POST' })
+            if (!res.ok) throw new Error('Failed to reprocess')
+            // Optimistic update
+            email.status = 'PENDING'
+            alert('Email re-queued successfully')
+        } catch (e) {
+            alert(e.message)
+        } finally {
+            reprocessingId.value = null
+        }
+    }
 }
 
 const fetchEmails = async () => {
@@ -234,150 +253,173 @@ const emit = defineEmits(['open-email'])
         :style="{ width: progressPercentage + '%' }"
       />
     </div>
-    <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
-      {{ stats.processed }} of {{ stats.total }} emails processed.
-      <span
-        v-if="progressPercentage < 100"
-        class="ml-2 animate-pulse text-primary-600"
-      >Processing... (Auto-refresh 15s)</span>
-      <span
-        v-else
-        class="ml-2 text-green-600"
-      >
-        Complete
-      </span>
-    </p>
+    <div class="flex flex-col sm:flex-row justify-between items-end gap-4 mt-2">
+      <p class="text-xs text-gray-500 dark:text-gray-400">
+        {{ stats.processed }} of {{ stats.total }} emails processed.
+        <span
+          v-if="progressPercentage < 100"
+          class="ml-2 animate-pulse text-primary-600"
+        >Processing... (Auto-refresh 15s)</span>
+        <span
+          v-else
+          class="ml-2 text-green-600"
+        >Complete</span>
+      </p>
 
-    <div class="flex items-center gap-2 mt-4">
-      <button
-        class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        :disabled="stats.total === 0"
-        @click="exportCsv"
-      >
-        <ArrowDownTrayIcon
-          class="-ml-0.5 h-5 w-5 text-gray-400"
-          aria-hidden="true"
-        />
-        Export CSV
-      </button>
-      <div class="relative flex items-center">
+      <div class="flex flex-wrap gap-2">
         <button
           class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="!stats.finetune_ready"
-          :title="!stats.finetune_ready ? 'Insufficient data for fine-tuning' : ''"
-          @click="exportJsonl"
+          @click="exportCsv"
         >
           <ArrowDownTrayIcon
             class="-ml-0.5 h-5 w-5 text-gray-400"
             aria-hidden="true"
           />
-          JSONL (Fine-tune)
+          Export CSV
         </button>
-        <div class="ml-2 relative">
-          <QuestionMarkCircleIcon
-            class="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help"
-            @mouseenter="showFinetuneHelp = true"
-            @mouseleave="showFinetuneHelp = false"
+
+        <button
+          class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="!stats.finetune_ready"
+          @click="exportJsonl('train')"
+        >
+          <ArrowDownTrayIcon
+            class="-ml-0.5 h-5 w-5 text-gray-400"
+            aria-hidden="true"
           />
-          <div
-            v-if="showFinetuneHelp"
-            class="absolute bottom-full right-0 mb-2 w-72 bg-white dark:bg-gray-800 p-3 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 text-xs"
+          JSONL (Train)
+        </button>
+        <button
+          class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="!stats.finetune_ready"
+          @click="exportJsonl('test')"
+        >
+          <ArrowDownTrayIcon
+            class="-ml-0.5 h-5 w-5 text-gray-400"
+            aria-hidden="true"
+          />
+          JSONL (Test)
+        </button>
+
+        <div class="relative flex items-center">
+          <button
+            class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="!stats.finetune_ready"
+            :title="!stats.finetune_ready ? 'Insufficient data for fine-tuning' : ''"
+            @click="exportJsonl('all')"
           >
-            <span class="font-semibold text-gray-900 dark:text-white block mb-2">Fine-tuning Best Practices:</span>
-            <ul class="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
-              <li>Aim for at least 50 reviewed examples per category for stability.</li>
-              <li>Ensure examples are diverse and correctly labeled (validation is key).</li>
-              <li>For Phi-4 or GPT-4o-mini, quality > quantity. "Garbage in, garbage out".</li>
-            </ul>
+            <ArrowDownTrayIcon
+              class="-ml-0.5 h-5 w-5 text-gray-400"
+              aria-hidden="true"
+            />
+            JSONL (All)
+          </button>
+          <div class="ml-2 relative">
+            <QuestionMarkCircleIcon
+              class="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help"
+              @mouseenter="showFinetuneHelp = true"
+              @mouseleave="showFinetuneHelp = false"
+            />
+            <div
+              v-if="showFinetuneHelp"
+              class="absolute bottom-full right-0 mb-2 w-72 bg-white dark:bg-gray-800 p-3 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 text-xs"
+            >
+              <span class="font-semibold text-gray-900 dark:text-white block mb-2">Fine-tuning Best Practices:</span>
+              <ul class="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
+                <li>Aim for at least 50 reviewed examples per category for stability.</li>
+                <li>Ensure examples are diverse and correctly labeled (validation is key).</li>
+                <li>For Phi-4 or GPT-4o-mini, quality > quantity. "Garbage in, garbage out".</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
     </div>
-    <!-- Fine-tuning Advice -->
-    <div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-100 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200 flex flex-col gap-1">
-      <span class="font-semibold">Fine-tuning Best Practices:</span>
-      <ul class="list-disc list-inside ml-1">
-        <li>Aim for at least 50 reviewed examples per category for stability.</li>
-        <li>Ensure examples are diverse and correctly labeled (validation is key).</li>
-        <li>For Phi-4 or GPT-4o-mini, quality > quantity. "Garbage in, garbage out".</li>
-      </ul>
-    </div>
+  </div>
+  <!-- Fine-tuning Advice -->
+  <div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-100 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200 flex flex-col gap-1">
+    <span class="font-semibold">Fine-tuning Best Practices:</span>
+    <ul class="list-disc list-inside ml-1">
+      <li>Aim for at least 50 reviewed examples per category for stability.</li>
+      <li>Ensure examples are diverse and correctly labeled (validation is key).</li>
+      <li>For Phi-4 or GPT-4o-mini, quality > quantity. "Garbage in, garbage out".</li>
+    </ul>
+  </div>
 
-    <div class="flex flex-col sm:flex-row justify-between gap-4">
-      <!-- Tabs -->
-      <div class="flex space-x-2 overflow-x-auto pb-2 sm:pb-0">
-        <button
-          v-for="f in filters"
-          :key="f.id"
-          class="px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors"
-          :class="filter === f.id ? 'ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-900 ' + f.color : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm'"
-          @click="filter = f.id"
-        >
-          {{ f.label }}
-        </button>
-      </div>
-      <!-- Search -->
-      <div class="relative rounded-md shadow-sm max-w-xs w-full">
-        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-          <MagnifyingGlassIcon
-            class="h-5 w-5 text-gray-400"
-            aria-hidden="true"
-          />
-        </div>
-        <input
-          v-model="search"
-          type="text"
-          class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white dark:placeholder-gray-500"
-          placeholder="Search emails..."
-        >
-      </div>
+  <div class="flex flex-col sm:flex-row justify-between gap-4">
+    <!-- Tabs -->
+    <div class="flex space-x-2 overflow-x-auto pb-2 sm:pb-0">
+      <button
+        v-for="f in filters"
+        :key="f.id"
+        class="px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors"
+        :class="filter === f.id ? 'ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-900 ' + f.color : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm'"
+        @click="filter = f.id"
+      >
+        {{ f.label }}
+      </button>
     </div>
+    <!-- Search -->
+    <div class="relative rounded-md shadow-sm max-w-xs w-full">
+      <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+        <MagnifyingGlassIcon
+          class="h-5 w-5 text-gray-400"
+          aria-hidden="true"
+        />
+      </div>
+      <input
+        v-model="search"
+        type="text"
+        class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white dark:placeholder-gray-500"
+        placeholder="Search emails..."
+      >
+    </div>
+  </div>
 
-    <!-- Filters Row 2 -->
-    <div class="flex flex-col sm:flex-row gap-4">
-      <div class="flex-1">
-        <label
-          for="category-filter"
-          class="sr-only"
-        >Category</label>
-        <input
-          id="category-filter"
-          v-model="categoryFilter"
-          type="text"
-          placeholder="Filter by Category Name..."
-          class="block w-full rounded-md border-0 py-1.5 pl-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white dark:placeholder-gray-500"
-        >
-      </div>
-      <div class="w-full sm:w-48">
-        <label
-          for="confidence-filter"
-          class="sr-only"
-        >Confidence</label>
-        <select
-          id="confidence-filter"
-          v-model="confidenceFilter"
-          class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white"
-        >
-          <option value="">
-            Any Confidence
-          </option>
-          <option value="lt_10">
-            &lt; 10% (Very Low)
-          </option>
-          <option value="lt_30">
-            &lt; 30%
-          </option>
-          <option value="lt_50">
-            &lt; 50%
-          </option>
-          <option value="lt_90">
-            &lt; 90%
-          </option>
-          <option value="eq_100">
-            100% (High)
-          </option>
-        </select>
-      </div>
+  <!-- Filters Row 2 -->
+  <div class="flex flex-col sm:flex-row gap-4">
+    <div class="flex-1">
+      <label
+        for="category-filter"
+        class="sr-only"
+      >Category</label>
+      <input
+        id="category-filter"
+        v-model="categoryFilter"
+        type="text"
+        placeholder="Filter by Category Name..."
+        class="block w-full rounded-md border-0 py-1.5 pl-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white dark:placeholder-gray-500"
+      >
+    </div>
+    <div class="w-full sm:w-48">
+      <label
+        for="confidence-filter"
+        class="sr-only"
+      >Confidence</label>
+      <select
+        id="confidence-filter"
+        v-model="confidenceFilter"
+        class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white"
+      >
+        <option value="">
+          Any Confidence
+        </option>
+        <option value="lt_10">
+          &lt; 10% (Very Low)
+        </option>
+        <option value="lt_30">
+          &lt; 30%
+        </option>
+        <option value="lt_50">
+          &lt; 50%
+        </option>
+        <option value="lt_90">
+          &lt; 90%
+        </option>
+        <option value="eq_100">
+          100% (High)
+        </option>
+      </select>
     </div>
   </div>
 
@@ -490,10 +532,6 @@ const emit = defineEmits(['open-email'])
           {{ email.sender || 'Unknown Sender' }}
         </p>
 
-        <div class="text-xs text-gray-400 dark:text-gray-500 mb-2">
-          {{ formatDate(email.created_at) }}
-        </div>
-
         <div class="mt-2 space-y-1">
           <div
             v-for="intent in email.classification?.detected_intents || []"
@@ -516,7 +554,17 @@ const emit = defineEmits(['open-email'])
         >
           Open Details
         </button>
-        <!-- Reprocess button could go here -->
+        <button
+          class="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 flex items-center gap-1"
+          :disabled="reprocessingId === email.id"
+          @click="reprocessEmail(email)"
+        >
+          <ArrowPathIcon
+            class="h-4 w-4"
+            :class="{'animate-spin': reprocessingId === email.id}"
+          />
+          Reprocess
+        </button>
       </div>
     </div>
   </div>
