@@ -1,3 +1,4 @@
+import json
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
@@ -11,64 +12,76 @@ async def custom_redoc(theme: str = "light"):
     """
     redoc_js_url = "https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"
 
-    # Theme configuration for dark mode (Tailwind-ish colors)
-    theme_config = "{}"
-    if theme == "dark":
-        # Values match typical tailwind gray-800/900 palette
-        bg_color = "#1f2937"  # gray-800
-        theme_config = """{
-            "theme": {
-                "colors": {
-                    "primary": {
-                        "main": "#3b82f6"
-                    },
-                    "text": {
-                        "primary": "#f3f4f6",
-                        "secondary": "#9ca3af"
-                    },
-                    "http": {
-                        "get": "#22c55e",
-                        "post": "#eab308",
-                        "put": "#a855f7",
-                        "delete": "#ef4444"
-                    }
-                },
-                "typography": {
-                    "fontFamily": "Inter, system-ui, sans-serif",
-                    "headings": {
-                        "fontFamily": "Inter, system-ui, sans-serif"
-                    }
-                },
-                "sidebar": {
-                    "backgroundColor": "#1f2937",
-                    "textColor": "#f3f4f6",
-                    "arrow": {
-                        "color": "#9ca3af"
-                    }
-                },
-                "rightPanel": {
-                    "backgroundColor": "#111827",
-                    "textColor": "#f3f4f6",
-                    "servers": {
-                        "overlay": {
-                            "backgroundColor": "#1f2937",
-                            "textColor": "#f3f4f6"
-                        },
-                        "url": {
-                            "backgroundColor": "#374151"
-                        }
-                    }
-                },
-                "codeBlock": {
-                    "backgroundColor": "#111827"
-                }
+    # Theme configuration
+    # See Redoc theme docs: https://redocly.com/docs/api-reference-docs/configuration/theme/
+    options = {
+        "scrollYOffset": 50,
+        "hideDownloadButton": True
+    }
 
+    bg_color = "#ffffff"
+
+    if theme == "dark":
+        bg_color = "#1f2937"  # tailwind gray-800
+        options["theme"] = {
+            "colors": {
+                "primary": {
+                    "main": "#60a5fa"  # blue-400 (lighter for dark mode)
+                },
+                "text": {
+                    "primary": "#f3f4f6",  # gray-100
+                    "secondary": "#d1d5db" # gray-300
+                },
+                "http": {
+                    "get": "#4ade80",    # green-400
+                    "post": "#facc15",   # yellow-400
+                    "put": "#c084fc",    # purple-400
+                    "delete": "#f87171"  # red-400
+                }
+            },
+            "typography": {
+                "fontFamily": "Inter, system-ui, sans-serif",
+                "headings": {
+                    "fontFamily": "Inter, system-ui, sans-serif",
+                    "fontWeight": "600",
+                    "color": "#f9fafb" # gray-50
+                },
+                "code": {
+                    "fontFamily": "Menlo, Monaco, Consolas, monospace",
+                    "color": "#e5e7eb", # gray-200
+                    "backgroundColor": "#111827" # gray-900
+                }
+            },
+            "sidebar": {
+                "backgroundColor": "#1f2937", # gray-800
+                "textColor": "#f3f4f6",       # gray-100
+                "arrow": {
+                    "color": "#9ca3af"        # gray-400
+                },
+                "activeAnchor": {
+                    "backgroundColor": "#111827", # gray-900
+                    "textColor": "#60a5fa"        # blue-400
+                }
+            },
+            "rightPanel": {
+                "backgroundColor": "#111827", # gray-900
+                "textColor": "#f3f4f6",
+                "servers": {
+                    "overlay": {
+                        "backgroundColor": "#1f2937",
+                        "textColor": "#f3f4f6"
+                    },
+                    "url": {
+                        "backgroundColor": "#374151"
+                    }
+                }
+            },
+            "codeBlock": {
+                "backgroundColor": "#030712" # gray-950 (deeper black)
             }
-        }"""
-    else:
-        bg_color = "#ffffff"
-        # Default light theme is fine, but we can explicit some defaults if needed
-        # Leaving {} uses Redoc defaults
+        }
+
+    json_options = json.dumps(options)
 
     html = f"""
     <!DOCTYPE html>
@@ -87,8 +100,15 @@ async def custom_redoc(theme: str = "light"):
     </style>
     </head>
     <body>
-    <redoc spec-url="/openapi.json" theme='{theme_config}'></redoc>
+    <div id="redoc-container"></div>
     <script src="{redoc_js_url}"> </script>
+    <script>
+        Redoc.init(
+            "/openapi.json",
+            {json_options},
+            document.getElementById("redoc-container")
+        );
+    </script>
     </body>
     </html>
     """
