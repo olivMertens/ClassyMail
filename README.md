@@ -63,10 +63,26 @@ Selon ton objectif :
 
 ## 🔗 References
 
+- **Mistral Document AI Catalog:** https://ai.azure.com/catalog/models/mistral-document-ai-2505
 - Pricing (Azure AI Foundry models): https://azure.microsoft.com/fr-fr/pricing/details/ai-foundry-models/microsoft/
 - Fine-tuning (Azure AI Foundry / Azure OpenAI): https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python
 - Phi Cookbook (community): https://github.com/microsoft/PhiCookBookfin
 - Running Phi-4 locally (Foundry Local guide): https://techcommunity.microsoft.com/blog/educatordeveloperblog/running-phi-4-locally-with-microsoft-foundry-local-a-step-by-step-guide/4466304
+
+## ⚠️ Mistral Document AI Limitations
+
+**Document Size Limits:**
+- **Maximum file size:** 30 MB
+- **Maximum pages (OCR):** 30 pages
+- **Maximum pages (Annotations):** 8 pages
+- **Supported formats:** PDF, PPTX, DOCX, PNG, JPEG/JPG, AVIF
+
+**Important Notes:**
+- Pure OCR processes efficiently and quickly
+- Annotation processes can be slower and may result in timeouts
+- Content safety is applied for annotations only, not enforced for OCR outputs
+
+For more details, see [docs/MODELS.md](docs/MODELS.md).
 
 Ce projet implémente un pipeline de classification d'emails à haut volume et faible latence, capable de gérer des pics de charge (10k fichiers simultanés) grâce à une architecture événementielle découplée, avec un backend FastAPI et un frontend SPA (Vue 3 + Tailwind).
 

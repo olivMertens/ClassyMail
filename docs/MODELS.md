@@ -5,6 +5,21 @@ This repo uses a 2-step AI pipeline:
 1) OCR: Mistral Document AI → Markdown
 2) Classification: LLM → strict JSON multi-intents
 
+## Mistral Document AI Limitations
+
+**Document Size Limits:**
+- **Maximum file size:** 30 MB
+- **Maximum pages (OCR):** 30 pages
+- **Maximum pages (Annotations):** 8 pages
+- **Supported formats:** PDF, PPTX, DOCX, PNG, JPEG/JPG, AVIF
+
+**Important Notes:**
+- Pure OCR processes efficiently and quickly
+- Annotation processes can be slower and may result in timeouts
+- Content safety is applied for annotations only, not enforced for OCR outputs
+
+**Reference:** [Mistral Document AI on Azure AI Foundry](https://ai.azure.com/catalog/models/mistral-document-ai-2505)
+
 ## Why fallback is needed
 
 Some PDFs produce very large OCR markdown. If the markdown (prompt) exceeds the primary model’s context window, the API may fail or the model may truncate important parts.
