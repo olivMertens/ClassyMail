@@ -8,7 +8,7 @@ This repo uses a 2-step AI pipeline:
 ## Mistral Document AI OCR
 
 **API Endpoint:**
-- Uses Azure AI Foundry serverless endpoint: `/providers/mistral/azure/ocr`
+- Uses Azure AI Foundry serverless endpoint (full URL in `MISTRAL_ENDPOINT`)
 - **NOT** standard OpenAI Chat Completions API
 - Payload format: `{"model": "...", "document": {"type": "document_url", "document_url": "data:application/pdf;base64,..."}}`
 - Response format: `{"pages": [{"markdown": "...", "images": [...]}, ...]}`

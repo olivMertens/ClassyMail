@@ -45,9 +45,9 @@ def clamp_text_to_token_budget(text: str, max_tokens: int) -> tuple[str, bool]:
 async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None, include_images: bool = False) -> dict:
     headers = await auth_headers(clients=clients)
 
-    # Mistral Document AI API format (validated from official Azure notebook)
+    # Mistral Document AI API format (Microsoft Foundry)
     # Reference: https://github.com/retkowsky/Azure-AIGEN-demos/blob/main/Mistral%20Document%20AI/Mistral%20Document%20AI%20with%20Azure%20AI%20Foundry.ipynb
-    # Endpoint: {endpoint}/providers/mistral/azure/ocr
+    # MISTRAL_ENDPOINT contains the full URL (e.g., https://xxx.cognitiveservices.azure.com)
     # Payload: {"model": "...", "document": {...}, "include_image_base64": "true" (optional)}
 
     payload = {
@@ -65,8 +65,9 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None, incl
     if not config.MISTRAL_ENDPOINT:
         raise RuntimeError("MISTRAL_ENDPOINT not configured.")
 
-    # Mistral Document AI endpoint: /providers/mistral/azure/ocr (NOT /chat/completions)
-    url = f"{config.MISTRAL_ENDPOINT.rstrip('/')}/providers/mistral/azure/ocr"
+    # Mistral Document AI endpoint (Microsoft Foundry)
+    # MISTRAL_ENDPOINT already contains the full URL (e.g., https://email-poc-aifoundry.cognitiveservices.azure.com)
+    url = config.MISTRAL_ENDPOINT.rstrip('/')
 
     logger.info(f"[metrics] OCR Request: {url} model={config.MISTRAL_DEPLOYMENT}")
 
