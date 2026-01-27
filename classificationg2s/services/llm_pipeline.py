@@ -84,7 +84,16 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None, incl
                 span.set_status(Status(StatusCode.ERROR))
                 span.record_exception(ex)
                 raise
-            data = resp.json()
+
+            # Parse JSON response with error handling
+            try:
+                data = resp.json()
+            except json.JSONDecodeError as ex:
+                response_text = resp.text[:500]  # First 500 chars
+                logger.error(f"[metrics] OCR JSON Parse Error: {ex} | Response: {response_text}")
+                span.set_status(Status(StatusCode.ERROR))
+                span.record_exception(ex)
+                raise OCRFailed(f"stage=ocr: Invalid JSON response from Mistral: {ex}")
 
             # Mistral Document AI returns: {"pages": [{"markdown": "...", "images": [...]}]}
             pages = data.get("pages", [])

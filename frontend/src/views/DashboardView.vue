@@ -50,6 +50,7 @@ const chatQuery = ref('')
 const chatLoading = ref(false)
 const chatError = ref(null)
 const chatResponse = ref(null)
+const viewMode = ref('cards') // 'cards' or 'table'
 
 const pageSizeOptions = [20, 50, 100]
 
@@ -141,14 +142,18 @@ const fetchEmails = async () => {
         const data = await res.json()
 
         emails.value = data.items || []
+        // Update stats from API response - these are global counts, not filtered
         stats.value = {
             total: data.total || 0,
             review_required: data.review_required || 0,
-            processed: data.processed || ((data.total||0) - (data.review_required||0)),
+            processed: data.processed || 0,
             finetune_ready: data.finetune_ready || false,
             average_confidence: data.average_confidence || 0,
             finetune_min_required: data.finetune_min_required || 50
         }
+
+        // Log for debugging stats mismatch
+        console.log('[Dashboard] Stats:', stats.value, '| Items:', emails.value.length)
     } catch (e) {
         console.error(e)
         error.value = e.message
@@ -593,6 +598,33 @@ const emit = defineEmits(['open-email'])
         </option>
       </select>
     </div>
+    <!-- View Mode Toggle -->
+    <div class="flex rounded-md shadow-sm">
+      <button
+        type="button"
+        :class="[
+          'px-4 py-2 text-sm font-medium rounded-l-md',
+          viewMode === 'cards'
+            ? 'bg-primary-600 text-white'
+            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 ring-1 ring-inset ring-gray-300 dark:ring-gray-700'
+        ]"
+        @click="viewMode = 'cards'"
+      >
+        Cards
+      </button>
+      <button
+        type="button"
+        :class="[
+          'px-4 py-2 text-sm font-medium rounded-r-md border-l',
+          viewMode === 'table'
+            ? 'bg-primary-600 text-white border-primary-500'
+            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 ring-1 ring-inset ring-gray-300 dark:ring-gray-700 border-gray-300 dark:border-gray-700'
+        ]"
+        @click="viewMode = 'table'"
+      >
+        Table
+      </button>
+    </div>
   </div>
 
   <!-- Grid -->
@@ -646,8 +678,9 @@ const emit = defineEmits(['open-email'])
     </p>
   </div>
 
+  <!-- Cards View -->
   <div
-    v-else
+    v-else-if="viewMode === 'cards'"
     class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
   >
     <div
@@ -889,6 +922,114 @@ const emit = defineEmits(['open-email'])
         </tbody>
       </table>
     </div>
+  </div>
+
+  <!-- Table View -->
+  <div
+    v-else-if="viewMode === 'table'"
+    class="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
+  >
+    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+      <thead class="bg-gray-50 dark:bg-gray-900">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            Subject / Sender
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            Category
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            Status
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            Date
+          </th>
+          <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            Actions
+          </th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+        <tr
+          v-for="email in emails"
+          :key="email.id"
+          :class="[
+            'hover:bg-gray-50 dark:hover:bg-gray-700',
+            email.test_mode ? 'bg-amber-50 dark:bg-amber-950/20' : ''
+          ]"
+        >
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="flex items-center gap-2">
+              <div
+                v-if="email.test_mode"
+                class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 rounded"
+              >
+                TEST
+              </div>
+              <div>
+                <div class="text-sm font-medium text-gray-900 dark:text-white">
+                  {{ email.subject || 'No Subject' }}
+                </div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ email.sender || 'Unknown Sender' }}
+                </div>
+              </div>
+            </div>
+          </td>
+          <td class="px-6 py-4">
+            <div
+              v-if="email.classification?.detected_intents?.length"
+              class="flex flex-wrap gap-1"
+            >
+              <span
+                v-for="(intent, idx) in email.classification.detected_intents.slice(0, 2)"
+                :key="idx"
+                class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
+              >
+                {{ intent.intent }} ({{ Math.round(intent.confidence * 100) }}%)
+              </span>
+              <span
+                v-if="email.classification.detected_intents.length > 2"
+                class="text-xs text-gray-500 dark:text-gray-400"
+              >
+                +{{ email.classification.detected_intents.length - 2 }} more
+              </span>
+            </div>
+            <span
+              v-else
+              class="text-sm text-gray-400 dark:text-gray-500"
+            >
+              None
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <span
+              :class="[
+                'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+                email.status === 'PROCESSED'
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                  : email.status === 'REVIEW_REQUIRED'
+                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300'
+                    : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+              ]"
+            >
+              {{ email.status === 'REVIEW_REQUIRED' ? 'To Review' : email.status === 'PROCESSED' ? 'Processed' : 'Error' }}
+            </span>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+            {{ email.updated_at ? new Date(email.updated_at).toLocaleString() : '—' }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <button
+              class="text-primary-600 dark:text-primary-400 hover:text-primary-900 dark:hover:text-primary-300"
+              @click="selectedEmail = email"
+            >
+              View
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
   <!-- Pagination -->
