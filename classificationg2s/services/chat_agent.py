@@ -51,6 +51,16 @@ class ChatAgent:
         else:
             credential = DefaultAzureCredential()
 
+        # Fix for Foundry Project endpoints:
+        # If user provides a Project Management Endpoint (ended with /api/projects/...),
+        # allow ChatCompletionsClient specifically if we rewrite it to /models or /openai
+        # However, Azure AI Inference SDK expects the standard <resource>.services.ai.azure.com/models endpoint.
+        # Auto-fix common misconfiguration from user copy-paste of Project URL.
+        if "/api/projects/" in endpoint:
+            new_endpoint = endpoint.split("/api/projects/")[0] + "/models"
+            logger.info(f"Detected Project Endpoint. Auto-correcting for Inference SDK: {endpoint} -> {new_endpoint}")
+            endpoint = new_endpoint
+
         self._client = ChatCompletionsClient(
             endpoint=endpoint,
             credential=credential,

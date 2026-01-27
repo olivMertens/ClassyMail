@@ -269,10 +269,21 @@ async def readiness_checks(
 
         await asyncio.wait_for(_inner(), timeout=timeout_s)
 
+    async def _check_storage_public(timeout_s: float = 3.0) -> None:
+        async def _inner():
+            # Anonymous check to verify Public Access (Container level)
+            from azure.storage.blob.aio import ContainerClient
+            url = f"{config.BLOB_ACCOUNT_URL}/{config.BLOB_CONTAINER_INPUT}".replace("//", "/").replace("https:/", "https://")
+            async with ContainerClient.from_container_url(url) as cc:
+                await cc.get_container_properties()
+
+        await asyncio.wait_for(_inner(), timeout=timeout_s)
+
     checks = {
         "credential": _check_credential(),
         "servicebus": _check_servicebus(),
         "storage": _check_storage(),
+        "storage_public": _check_storage_public(),
         "cosmos": _check_cosmos(),
         "ai": _check_ai(),
     }

@@ -101,12 +101,12 @@ const runDeepHealthCheck = async () => {
     } else {
       const data = await res.json()
       debugResults.value = {
-        status: 'not_ready',
-        failures: data.detail?.failures || { error: 'Unknown State' }
+        ok: false,
+        readiness: data.detail?.readiness || { error: 'Unknown State' }
       }
     }
   } catch (e) {
-    debugResults.value = { status: 'error', failures: { network: e.message } }
+    debugResults.value = { ok: false, readiness: { network: e.message } }
   } finally {
     debugLoading.value = false
   }
@@ -304,13 +304,13 @@ graph TD
           >
             <!-- Items -->
             <div
-              v-for="service in ['credential', 'servicebus', 'storage', 'cosmos']"
+              v-for="service in ['credential', 'servicebus', 'storage', 'storage_public', 'cosmos', 'ai']"
               :key="service"
               class="relative flex items-center space-x-3 rounded-lg border border-gray-300 dark:border-gray-700 px-6 py-5 shadow-sm focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-2 hover:border-gray-400 dark:hover:border-gray-500"
             >
               <div class="flex-shrink-0">
                 <CheckCircleIcon
-                  v-if="!debugResults.failures[service]"
+                  v-if="!debugResults.readiness[service]"
                   class="h-8 w-8 text-green-500"
                 />
                 <XCircleIcon
@@ -324,10 +324,10 @@ graph TD
                   aria-hidden="true"
                 />
                 <p class="text-sm font-medium text-gray-900 dark:text-white capitalize">
-                  {{ service }} Connection
+                  {{ service.replace('_', ' ') }} Connection
                 </p>
                 <p class="truncate text-sm text-gray-500 dark:text-gray-400">
-                  {{ debugResults.failures[service] ? `Error: ${debugResults.failures[service]}` : 'Connected & Authenticated' }}
+                  {{ debugResults.readiness[service] ? `Error: ${debugResults.readiness[service]}` : 'Connected & Authenticated' }}
                 </p>
               </div>
             </div>

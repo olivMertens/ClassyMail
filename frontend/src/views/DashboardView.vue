@@ -11,7 +11,10 @@ import {
   QuestionMarkCircleIcon,
   ArrowPathIcon,
   ChatBubbleLeftRightIcon,
-  XMarkIcon
+  XMarkIcon,
+  EyeIcon,
+  TableCellsIcon,
+  Squares2X2Icon
 } from '@heroicons/vue/24/outline'
 
 defineProps({
@@ -599,29 +602,31 @@ const emit = defineEmits(['open-email'])
       </select>
     </div>
     <!-- View Mode Toggle -->
-    <div class="flex rounded-md shadow-sm">
+    <div class="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
       <button
         type="button"
         :class="[
-          'px-4 py-2 text-sm font-medium rounded-l-md',
+          'flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all',
           viewMode === 'cards'
-            ? 'bg-primary-600 text-white'
-            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 ring-1 ring-inset ring-gray-300 dark:ring-gray-700'
+            ? 'bg-white dark:bg-gray-600 text-primary-600 dark:text-primary-300 shadow-sm'
+            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
         ]"
         @click="viewMode = 'cards'"
       >
+        <Squares2X2Icon class="h-4 w-4" />
         Cards
       </button>
       <button
         type="button"
         :class="[
-          'px-4 py-2 text-sm font-medium rounded-r-md border-l',
+          'flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all',
           viewMode === 'table'
-            ? 'bg-primary-600 text-white border-primary-500'
-            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 ring-1 ring-inset ring-gray-300 dark:ring-gray-700 border-gray-300 dark:border-gray-700'
+            ? 'bg-white dark:bg-gray-600 text-primary-600 dark:text-primary-300 shadow-sm'
+            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
         ]"
         @click="viewMode = 'table'"
       >
+        <TableCellsIcon class="h-4 w-4" />
         Table
       </button>
     </div>
@@ -1021,9 +1026,10 @@ const emit = defineEmits(['open-email'])
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
             <button
-              class="text-primary-600 dark:text-primary-400 hover:text-primary-900 dark:hover:text-primary-300"
-              @click="selectedEmail = email"
+              class="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:text-primary-900 dark:hover:text-primary-300"
+              @click="emit('open-email', email)"
             >
+              <EyeIcon class="h-4 w-4" />
               View
             </button>
           </td>
