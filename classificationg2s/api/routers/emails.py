@@ -140,7 +140,7 @@ async def list_emails(
         items: list[EmailRecord] = []
         next_token: str | None = None
         async for page_items in pages:
-            for item in page_items:
+            async for item in page_items:
                 items.append(EmailRecord(**item))
             next_token = pages.continuation_token
             break
