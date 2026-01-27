@@ -5,7 +5,14 @@ This repo uses a 2-step AI pipeline:
 1) OCR: Mistral Document AI → Markdown
 2) Classification: LLM → strict JSON multi-intents
 
-## Mistral Document AI Limitations
+## Mistral Document AI OCR
+
+**API Endpoint:**
+- Uses Azure AI Foundry serverless endpoint: `/models/{deployment}/chat/completions`
+- **NOT** standard OpenAI Chat Completions API
+- Payload format: `{"model": "...", "document": {"type": "document_url", "document_url": "data:application/pdf;base64,..."}}`
+- Response format: `{"pages": [{"markdown": "...", "images": [...]}, ...]}`
+- **Reference:** [Microsoft Foundry Blog](https://devblogs.microsoft.com/foundry/whats-new-in-azure-ai-foundry-august-2025/)
 
 **Document Size Limits:**
 - **Maximum file size:** 30 MB
