@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 
 import httpx
 from opentelemetry import trace
@@ -12,6 +13,7 @@ from classificationg2s.models import OCRFailed
 from classificationg2s.services.azure_clients import auth_headers, Clients
 from classificationg2s.services.settings_store import get_categories_prompt_text
 
+logger = logging.getLogger(__name__)
 
 tracer = trace.get_tracer(__name__)
 
@@ -84,6 +86,8 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None) -> d
     else:
         url = f"{config.MISTRAL_ENDPOINT.rstrip('/')}/models/{config.MISTRAL_DEPLOYMENT}:ocr"
 
+    logger.info(f"[metrics] OCR Request: {url} mode={config.MISTRAL_MODE}")
+
     with tracer.start_as_current_span("mistral_ocr") as span:
         span.set_attribute("gen_ai.system", "mistral")
         span.set_attribute("gen_ai.operation", "ocr")
@@ -92,12 +96,16 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None) -> d
             try:
                 resp.raise_for_status()
             except httpx.HTTPStatusError as ex:
+                logger.error(f"[metrics] OCR Failed: {ex.response.status_code} - {ex.response.text}")
                 span.set_status(Status(StatusCode.ERROR))
                 span.record_exception(ex)
                 raise
             data = resp.json()
             usage_info = data.get("usage_info") or {}
             pages = usage_info.get("pages_processed") or usage_info.get("pages") or 0
+
+            logger.info(f"[metrics] OCR Success: {pages} pages processed")
+
             span.set_attribute("gen_ai.usage.pages_processed", pages)
             content = data.get("markdown") or data.get("content")
 
@@ -206,6 +214,9 @@ FORMAT DE RÉPONSE ATTENDU (JSON UNIQUEMENT) :
 
     url = f"{chosen_endpoint}/openai/deployments/{chosen_deployment}/chat/completions?api-version={config.AI_API_VERSION}"
 
+    logger.info(f"[metrics] Classify Request: {chosen_deployment} strategy={strategy} fallback={use_fallback}")
+    logger.info(f"[metrics] Token Estimate: system={system_tokens} user={user_tokens_est} truncated={truncated}")
+
     with tracer.start_as_current_span("phi4_classify") as span:
         span.set_attribute("gen_ai.system", "azure_openai")
         span.set_attribute("gen_ai.operation", "chat.completions")
@@ -222,17 +233,26 @@ FORMAT DE RÉPONSE ATTENDU (JSON UNIQUEMENT) :
             except httpx.HTTPStatusError as ex:
                 status = ex.response.status_code if ex.response is not None else None
                 body = ex.response.text if ex.response is not None else ""
+
+                logger.error(f"[metrics] Classify Failed: {status} - {body}")
+
                 if (
                     (not use_fallback)
                     and status in (400, 413)
                     and ("context" in body.lower() or "token" in body.lower() or "length" in body.lower())
                 ):
+                    logger.warning("[metrics] Token limit reached! Retrying with fallback model.")
                     return await classify_with_phi4(text_markdown, force_fallback=True)
                 raise
 
             data = resp.json()
             content = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
             usage = data.get("usage", {})
+
+            logger.info(f"[metrics] Classify Success: {usage.get('total_tokens', 0)} tokens used")
+            # Log the first 100 chars of content just to see if it looks like JSON
+            logger.info(f"[metrics] Response preview: {content[:100]}...")
+
             span.set_attribute("gen_ai.usage.input_tokens", usage.get("prompt_tokens", 0))
             span.set_attribute("gen_ai.usage.output_tokens", usage.get("completion_tokens", 0))
             span.set_attribute("gen_ai.usage.total_tokens", usage.get("total_tokens", 0))
