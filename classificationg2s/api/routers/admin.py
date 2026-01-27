@@ -23,7 +23,10 @@ async def simulate_flow(clients: Clients = Depends(get_clients)):
     Returns the item_id (blob path) to track via /api/emails/{id}.
     """
     try:
+        logger.info("[SIMULATION] Starting simulation flow")
+
         # 1. Generate Dummy PDF
+        logger.info("[SIMULATION] Step 1: Generating dummy PDF")
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("helvetica", size=12)
@@ -33,34 +36,67 @@ async def simulate_flow(clients: Clients = Depends(get_clients)):
         pdf.cell(text="Reference: SIM-12345", new_x="LMARGIN", new_y="NEXT")
 
         pdf_bytes = pdf.output() # Returns bytearray in recent fpdf2
+        logger.info(f"[SIMULATION] Generated PDF: {len(pdf_bytes)} bytes")
 
-        # 2. Upload to Blob Storage
+        # 2. Upload to Blob Storage (use dated folder structure like upload.py)
+        logger.info("[SIMULATION] Step 2: Uploading to Blob Storage")
         container_client = clients.blob_service_client.get_container_client(config.BLOB_CONTAINER_INPUT)
-        # Use a flat filename to avoid encoding issues with slashes in API IDs
-        filename = f"simulation_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.pdf"
-        blob_client = container_client.get_blob_client(filename)
+
+        # Use dated folder structure to match upload.py behavior
+        now = datetime.now(timezone.utc)
+        today = now.strftime("%Y/%m/%d")
+        filename = f"simulation_{now.strftime('%Y%m%d_%H%M%S')}.pdf"
+        blob_name = f"uploads/{today}/{filename}"
+
+        logger.info(f"[SIMULATION] Blob path: {blob_name}")
+        blob_client = container_client.get_blob_client(blob_name)
 
         await blob_client.upload_blob(bytes(pdf_bytes), overwrite=True)
+        blob_url = blob_client.url
+        logger.info(f"[SIMULATION] Upload complete: {blob_url}")
 
-        # 3. Construct ID and Return
-        # Use centralized logic to ensure consistency with worker (sanitized ID)
-        item_id = blob_id_from_url(blob_client.url)
+        # 3. Construct ID and Create PENDING record (like upload.py)
+        item_id = blob_id_from_url(blob_url)
+        logger.info(f"[SIMULATION] Generated item_id: {item_id}")
 
-        # 4. Trigger Worker Manually (since Event Grid might not be local)
+        # Create PENDING record for immediate UI feedback
+        logger.info("[SIMULATION] Step 3: Creating PENDING record in Cosmos DB")
+        try:
+            await clients.ensure_cosmos_container()
+            pending_start = datetime.now(timezone.utc).isoformat()
+            pending_doc = {
+                "id": item_id,
+                "file_url": blob_url,
+                "status": "PENDING",
+                "subject": "Simulation Test (Processing...)",
+                "created_at": pending_start,
+                "updated_at": pending_start,
+                "markdown": None,
+                "classification": None,
+                "processing_log": [{"ts": pending_start, "stage": "simulation", "event": "pending_manual_trigger"}]
+            }
+            await clients.cosmos_container.upsert_item(pending_doc)
+            logger.info(f"[SIMULATION] PENDING record created: {item_id}")
+        except Exception as e:
+            logger.error(f"[SIMULATION] Failed to create pending record: {e}")
+
+        # 4. Trigger Worker Manually
+        logger.info("[SIMULATION] Step 4: Sending message to Service Bus")
         sender = clients.sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
         async with sender:
-            # Matches worker/_extract_blob_url expectation
-            message_payload = {"blob_url": blob_client.url}
+            message_payload = {"blob_url": blob_url}
             await sender.send_messages(ServiceBusMessage(json.dumps(message_payload)))
+            logger.info(f"[SIMULATION] Message sent to queue: {config.SERVICE_BUS_QUEUE}")
 
+        logger.info(f"[SIMULATION] ✓ Flow complete. Track with item_id: {item_id}")
         return {
             "status": "uploaded_and_queued",
             "item_id": item_id,
-            "blob_url": blob_client.url
+            "blob_url": blob_url
         }
 
     except Exception as e:
-        logger.error(f"Simulation failed: {e}")
+        logger.error(f"[SIMULATION] ✗ Simulation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/debug/connectivity")

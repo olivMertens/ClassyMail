@@ -25,6 +25,8 @@ async def run_classification_pipeline(
 ) -> EmailRecord:
     processing_log: list[dict] = []
 
+    print(f"[pipeline] -> Starting pipeline for: {blob_url}")
+
     # Merge overrides if provided separately (legacy) or extract from settings
     if settings:
         final_overrides = settings.get("cost_overrides", {})
@@ -34,19 +36,19 @@ async def run_classification_pipeline(
         strategy = "standard"
 
     def log(stage: str, event: str, detail: Optional[str] = None) -> None:
-        processing_log.append(
-            {
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "stage": stage,
-                "event": event,
-                "detail": detail,
-            }
-        )
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "stage": stage,
+            "event": event,
+            "detail": detail,
+        }
+        processing_log.append(entry)
+        print(f"[pipeline] [{stage}] {event}" + (f": {detail}" if detail else ""))
 
     try:
         log("download", "start")
         pdf_b64, pdf_bytes = await download_blob_as_base64(blob_url, return_bytes=True, clients=clients)
-        log("download", "ok")
+        log("download", "ok", f"{len(pdf_bytes)} bytes")
     except Exception as ex:
         from classificationg2s.models import OCRFailed
 

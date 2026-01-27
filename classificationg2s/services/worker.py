@@ -89,15 +89,22 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
 
     blob_url = _extract_blob_url(payload)
     if not blob_url:
+        print("[worker] ✗ No blob_url found in message, sending to DLQ")
         await receiver.dead_letter_message(msg, reason="No blob_url in message")
         return
 
+    print(f"[worker] → Processing message for blob: {blob_url}")
+
     try:
         with ProcessingTimer() as timer:
+            print(f"[worker] Starting classification pipeline for {blob_url}")
             result = await run_classification_pipeline(blob_url, settings=get_settings(), clients=clients)
+            print(f"[worker] Pipeline completed in {timer.duration_ms:.0f}ms")
 
         result.processing_time_ms = timer.duration_ms
+        print(f"[worker] Saving result to Cosmos DB (ID: {result.id})")
         await save_to_cosmos(result)
+        print(f"[worker] ✓ Processing complete for {result.id}")
         await receiver.complete_message(msg)
     except OCRFailed as ex:
         # Persist a visible ERROR record so the UI can show stage-1 failures (corrupted PDF, download errors, etc.)
