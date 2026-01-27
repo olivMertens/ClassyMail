@@ -34,6 +34,11 @@ const settings = ref({
     finetune_min_examples: 50,
     categories: []
 })
+const defaults = ref({
+    phi4_input_per_1k: null,
+    phi4_output_per_1k: null,
+    mistral_per_1k_pages: null
+})
 const loading = ref(false)
 const saved = ref(false)
 
@@ -99,9 +104,21 @@ const removeCategory = (index) => {
 
 // --- API Calls ---
 
+const loadDefaults = async () => {
+    try {
+        const res = await fetch('/api/settings/defaults')
+        if (res.ok) {
+            defaults.value = await res.json()
+        }
+    } catch (e) {
+        console.error(e)
+    }
+}
+
 const loadSettings = async () => {
     loading.value = true
     try {
+        await loadDefaults()
         const res = await fetch('/api/settings')
         if (res.ok) {
             settings.value = await res.json()
@@ -490,6 +507,7 @@ onMounted(() => {
             <div class="mt-2">
               <input
                 v-model="settings.phi4_input_per_1k"
+                :placeholder="defaults.phi4_input_per_1k ?? ''"
                 type="number"
                 step="0.000001"
                 class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
@@ -502,6 +520,7 @@ onMounted(() => {
             <div class="mt-2">
               <input
                 v-model="settings.phi4_output_per_1k"
+                :placeholder="defaults.phi4_output_per_1k ?? ''"
                 type="number"
                 step="0.000001"
                 class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
@@ -514,6 +533,7 @@ onMounted(() => {
             <div class="mt-2">
               <input
                 v-model="settings.mistral_per_1k_pages"
+                :placeholder="defaults.mistral_per_1k_pages ?? ''"
                 type="number"
                 step="0.001"
                 class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
