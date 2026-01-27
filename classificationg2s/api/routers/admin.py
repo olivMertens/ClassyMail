@@ -77,24 +77,62 @@ class LowConfidenceResponse(BaseModel):
 @router.post("/debug/simulate-flow")
 async def simulate_flow(clients: Clients = Depends(get_clients)):
     """
-    Simulates a complete flow by creating and uploading a dummy PDF.
+    Simulates a complete flow by creating and uploading a realistic French insurance email PDF.
     Returns the item_id (blob path) to track via /api/emails/{id}.
     """
     try:
-        logger.info("[SIMULATION] Starting simulation flow")
+        logger.info("[SIMULATION] Starting E2E simulation flow with realistic email")
 
-        # 1. Generate Dummy PDF
-        logger.info("[SIMULATION] Step 1: Generating dummy PDF")
+        # 1. Generate Realistic Email PDF
+        logger.info("[SIMULATION] Step 1: Generating realistic French insurance email PDF")
+        import random
+
+        # Pick random category and template
+        EMAIL_TEMPLATES = {
+            "Attestation habitation": [
+                ("Demande d'attestation d'assurance habitation", "Marie Dubois",
+                 "Je souhaiterais recevoir une attestation d'assurance habitation pour mon logement situé au 15 rue des Fleurs, 75001 Paris. Cette attestation est nécessaire pour la signature de mon contrat de location prévu le 15 février prochain."),
+            ],
+            "Résiliation": [
+                ("Demande de résiliation de contrat", "Sophie Laurent",
+                 "Je souhaite résilier mon contrat d'assurance habitation n° HAB-12345 à compter du 31 mars 2026. Je déménage à l'étranger pour raisons professionnelles."),
+            ],
+            "Sinistre dégât des eaux": [
+                ("Déclaration sinistre dégât des eaux", "Claire Rousseau",
+                 "Je déclare un sinistre dégât des eaux survenu le 25 janvier 2026 dans mon appartement. L'eau provient de l'étage supérieur et a endommagé mon salon et ma chambre. Contrat : HAB-54321."),
+            ],
+        }
+
+        category = random.choice(list(EMAIL_TEMPLATES.keys()))
+        subject, sender, body = random.choice(EMAIL_TEMPLATES[category])
+
         pdf = FPDF()
         pdf.add_page()
-        pdf.set_font("helvetica", size=12)
-        pdf.cell(text=f"Simulation Request - {datetime.now(timezone.utc)}", new_x="LMARGIN", new_y="NEXT")
-        pdf.cell(text="Subject: Test Invoice for Simulation", new_x="LMARGIN", new_y="NEXT")
-        pdf.cell(text="This is a generated PDF to verify the end-to-End flow.", new_x="LMARGIN", new_y="NEXT")
-        pdf.cell(text="Reference: SIM-12345", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(200, 10, txt="EMAIL", ln=True, align="C")
+        pdf.ln(5)
+
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(30, 10, txt="From:", ln=False)
+        pdf.set_font("Arial", "", 10)
+        pdf.cell(170, 10, txt=sender, ln=True)
+
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(30, 10, txt="Subject:", ln=False)
+        pdf.set_font("Arial", "", 10)
+        pdf.multi_cell(170, 10, txt=subject)
+
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(30, 10, txt="Date:", ln=False)
+        pdf.set_font("Arial", "", 10)
+        pdf.cell(170, 10, txt=datetime.now().strftime("%d/%m/%Y %H:%M"), ln=True)
+
+        pdf.ln(10)
+        pdf.set_font("Arial", "", 11)
+        pdf.multi_cell(0, 6, txt=body)
 
         pdf_bytes = pdf.output() # Returns bytearray in recent fpdf2
-        logger.info(f"[SIMULATION] Generated PDF: {len(pdf_bytes)} bytes")
+        logger.info(f"[SIMULATION] Generated realistic PDF: {len(pdf_bytes)} bytes, Category: {category}")
 
         # 2. Upload to Blob Storage (use dated folder structure like upload.py)
         logger.info("[SIMULATION] Step 2: Uploading to Blob Storage")
@@ -126,12 +164,14 @@ async def simulate_flow(clients: Clients = Depends(get_clients)):
                 "id": item_id,
                 "file_url": blob_url,
                 "status": "PENDING",
-                "subject": "Simulation Test (Processing...)",
+                "subject": f"[TEST] {subject}",
                 "created_at": pending_start,
                 "updated_at": pending_start,
                 "markdown": None,
                 "classification": None,
-                "processing_log": [{"ts": pending_start, "stage": "simulation", "event": "pending_manual_trigger"}]
+                "test_mode": True,
+                "expected_category": category,
+                "processing_log": [{"ts": pending_start, "stage": "simulation", "event": "e2e_test_email"}]
             }
             await clients.cosmos_container.upsert_item(pending_doc)
             logger.info(f"[SIMULATION] PENDING record created: {item_id}")
@@ -150,7 +190,10 @@ async def simulate_flow(clients: Clients = Depends(get_clients)):
         return {
             "status": "uploaded_and_queued",
             "item_id": item_id,
-            "blob_url": blob_url
+            "blob_url": blob_url,
+            "test_mode": True,
+            "expected_category": category,
+            "generated_subject": subject
         }
 
     except Exception as e:

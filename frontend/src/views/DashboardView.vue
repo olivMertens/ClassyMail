@@ -653,9 +653,41 @@ const emit = defineEmits(['open-email'])
     <div
       v-for="email in emails"
       :key="email.id"
-      class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow flex flex-col h-full"
+      :class="[
+        'rounded-lg shadow-sm border hover:shadow-md transition-shadow flex flex-col h-full',
+        email.test_mode
+          ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700'
+          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+      ]"
     >
       <div class="p-5 flex-1">
+        <!-- Test Mode Badge -->
+        <div
+          v-if="email.test_mode"
+          class="mb-2"
+        >
+          <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 rounded">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              class="w-3 h-3"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M8.5 3.528v4.644c0 .729-.29 1.428-.805 1.944l-1.217 1.216a8.75 8.75 0 013.55.621l.502.201a7.25 7.25 0 004.178.365l-2.403-2.403a2.75 2.75 0 01-.805-1.944V3.528a40.205 40.205 0 00-3 0zm4.5.084l.19.015a.75.75 0 10.12-1.495 41.364 41.364 0 00-6.62 0 .75.75 0 00.12 1.495L7 3.612v4.56c0 .331-.132.649-.366.883L2.6 13.09c-1.496 1.496-.817 4.15 1.403 4.475C5.961 17.852 7.963 18 10 18s4.039-.148 5.997-.436c2.22-.325 2.9-2.979 1.403-4.475l-4.034-4.034A1.25 1.25 0 0113 9.172V3.612z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            TEST E2E
+          </span>
+          <span
+            v-if="email.expected_category"
+            class="ml-2 text-xs text-amber-700 dark:text-amber-400"
+          >
+            Expected: {{ email.expected_category }}
+          </span>
+        </div>
         <div class="flex justify-between items-start mb-2">
           <div class="flex flex-col gap-1">
             <span
