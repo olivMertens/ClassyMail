@@ -105,6 +105,7 @@ Ajouter (ou laisser les valeurs par défaut) pour l’assistant IA :
 CHAT_ENDPOINT=... # optionnel, défaut PHI_ENDPOINT
 CHAT_DEPLOYMENT=gpt-5.2-chat
 CHAT_API_VERSION=2024-08-01-preview
+COSMOS_QUERY_MAX_LIMIT=20
 ```
 
 ## 📌 Références

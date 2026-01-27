@@ -45,6 +45,9 @@ CHAT_ENDPOINT = os.getenv("CHAT_ENDPOINT") or PHI_ENDPOINT
 CHAT_DEPLOYMENT = os.getenv("CHAT_DEPLOYMENT", "gpt-5.2-chat")
 CHAT_API_VERSION = os.getenv("CHAT_API_VERSION", AI_API_VERSION)
 
+# Cosmos query guardrail
+COSMOS_QUERY_MAX_LIMIT = int(os.getenv("COSMOS_QUERY_MAX_LIMIT", "20"))
+
 # Context sizing (best-effort). Adjust to match your deployments.
 PHI_PRIMARY_MAX_INPUT_TOKENS = int(os.getenv("PHI_PRIMARY_MAX_INPUT_TOKENS", "8000"))
 PHI_FALLBACK_MAX_INPUT_TOKENS = int(os.getenv("PHI_FALLBACK_MAX_INPUT_TOKENS", "120000"))

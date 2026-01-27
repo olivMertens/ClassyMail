@@ -449,6 +449,7 @@ Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#3-sécurité--accés-rbac) pour
 | `CHAT_ENDPOINT` | Endpoint du modèle de chat (défaut: `PHI_ENDPOINT`) |
 | `CHAT_DEPLOYMENT` | Déploiement du modèle de chat (défaut: `gpt-5.2-chat`) |
 | `CHAT_API_VERSION` | Version API du modèle de chat (défaut: `2024-08-01-preview`) |
+| `COSMOS_QUERY_MAX_LIMIT` | Limite max résultats par requête Cosmos (défaut: `20`) |
 | `FALLBACK_COST_PER_1K_INPUT` | Prix input/1K tokens (fallback) (configurable) |
 | `FALLBACK_COST_PER_1K_OUTPUT` | Prix output/1K tokens (fallback) (configurable) |
 

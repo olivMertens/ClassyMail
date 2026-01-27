@@ -336,7 +336,7 @@ async def diagnostics(clients: Clients = Depends(get_clients)):
 async def search_emails(q: str, limit: int = 5, clients: Clients = Depends(get_clients)):
     if not q or len(q.strip()) < 2:
         raise HTTPException(status_code=400, detail="Query too short")
-    limit = min(max(limit, 1), 20)
+    limit = min(max(limit, 1), config.COSMOS_QUERY_MAX_LIMIT)
 
     items = await search_email_records(q, limit=limit, clients=clients)
     return SearchResponse(items=items)
@@ -344,7 +344,7 @@ async def search_emails(q: str, limit: int = 5, clients: Clients = Depends(get_c
 
 @router.get("/errors/latest", response_model=ErrorsResponse)
 async def latest_errors(limit: int = 5, clients: Clients = Depends(get_clients)):
-    limit = min(max(limit, 1), 50)
+    limit = min(max(limit, 1), config.COSMOS_QUERY_MAX_LIMIT)
     items = await get_latest_errors(limit=limit, clients=clients)
     return ErrorsResponse(items=items)
 
@@ -357,13 +357,13 @@ async def stats_summary(clients: Clients = Depends(get_clients)):
 
 @router.get("/intents/top", response_model=IntentsResponse)
 async def top_intents(limit: int = 5, clients: Clients = Depends(get_clients)):
-    limit = min(max(limit, 1), 50)
+    limit = min(max(limit, 1), config.COSMOS_QUERY_MAX_LIMIT)
     items = await get_top_intents(limit=limit, clients=clients)
     return IntentsResponse(items=items)
 
 
 @router.get("/low-confidence", response_model=LowConfidenceResponse)
 async def low_confidence(limit: int = 5, intent: str | None = None, clients: Clients = Depends(get_clients)):
-    limit = min(max(limit, 1), 50)
+    limit = min(max(limit, 1), config.COSMOS_QUERY_MAX_LIMIT)
     items = await get_low_confidence_items(limit=limit, intent=intent, clients=clients)
     return LowConfidenceResponse(items=items)

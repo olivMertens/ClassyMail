@@ -72,6 +72,7 @@ Terraform crée une **User Assigned Managed Identity** (`<prefix>-id`) et lui as
   - `CHAT_DEPLOYMENT` = `gpt-5.2-chat`
   - `CHAT_API_VERSION` = `2024-08-01-preview`
 - **Worker** n’en a pas besoin.
+- **Optionnel:** `COSMOS_QUERY_MAX_LIMIT` (limiter les résultats / requête, défaut `20`).
 
 ## Hygiene repo (ce qu’on commit)
 

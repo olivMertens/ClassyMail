@@ -9,6 +9,7 @@ from typing import Optional
 from classificationg2s.models import EmailRecord
 from classificationg2s.services.azure_clients import Clients, get_default_clients
 from classificationg2s.services.anonymizer import anonymize_markdown_for_finetune
+from classificationg2s.core import config
 
 
 def compute_search_text(markdown: str | None, *, max_chars: int = 8192) -> str | None:
@@ -23,6 +24,15 @@ def compute_search_text(markdown: str | None, *, max_chars: int = 8192) -> str |
     if not text:
         return None
     return text[:max_chars]
+
+
+def _bound_limit(limit: int) -> int:
+    return min(max(limit, 1), config.COSMOS_QUERY_MAX_LIMIT)
+
+
+def _query(container, query: str, parameters: list[dict] | None = None, max_items: int | None = None):
+    # Cosmos SDK supports max_item_count to limit page size, reducing RU burn when ORDER BY + no partition key.
+    return container.query_items(query, parameters=parameters, max_item_count=max_items)
 
 
 async def save_to_cosmos(record: EmailRecord, clients: Clients | None = None) -> None:
@@ -213,6 +223,7 @@ async def export_finetune_jsonl_iter(
 async def search_email_records(q: str, limit: int = 5, clients: Clients | None = None) -> list[dict]:
     clients = clients or get_default_clients()
     await clients.ensure_cosmos_container()
+    limit = _bound_limit(limit)
     query = (
         "SELECT c.id, c.status, c.file_url, c.subject, c.error, c.updated_at FROM c "
         "WHERE CONTAINS(c.id, @q) OR (IS_DEFINED(c.subject) AND CONTAINS(c.subject, @q)) "
@@ -222,7 +233,7 @@ async def search_email_records(q: str, limit: int = 5, clients: Clients | None =
         {"name": "@q", "value": q},
         {"name": "@limit", "value": limit},
     ]
-    items = [x async for x in clients.cosmos_container.query_items(query, parameters=params)]
+    items = [x async for x in _query(clients.cosmos_container, query, parameters=params, max_items=limit)]
     return items
 
 
@@ -240,6 +251,7 @@ async def get_email_by_id(item_id: str, clients: Clients | None = None) -> dict 
 async def search_email_by_text(q: str, limit: int = 5, clients: Clients | None = None) -> list[dict]:
     clients = clients or get_default_clients()
     await clients.ensure_cosmos_container()
+    limit = _bound_limit(limit)
     query = (
         "SELECT c.id, c.status, c.file_url, c.subject, c.error, c.updated_at FROM c "
         "WHERE IS_DEFINED(c.search_text) AND CONTAINS(c.search_text, @q) "
@@ -249,19 +261,20 @@ async def search_email_by_text(q: str, limit: int = 5, clients: Clients | None =
         {"name": "@q", "value": q},
         {"name": "@limit", "value": limit},
     ]
-    items = [x async for x in clients.cosmos_container.query_items(query, parameters=params)]
+    items = [x async for x in _query(clients.cosmos_container, query, parameters=params, max_items=limit)]
     return items
 
 
 async def get_latest_errors(limit: int = 5, clients: Clients | None = None) -> list[dict]:
     clients = clients or get_default_clients()
     await clients.ensure_cosmos_container()
+    limit = _bound_limit(limit)
     query = (
         "SELECT c.id, c.subject, c.error, c.updated_at FROM c "
         "WHERE c.status='ERROR' ORDER BY c._ts DESC OFFSET 0 LIMIT @limit"
     )
     params = [{"name": "@limit", "value": limit}]
-    items = [x async for x in clients.cosmos_container.query_items(query, parameters=params)]
+    items = [x async for x in _query(clients.cosmos_container, query, parameters=params, max_items=limit)]
     return items
 
 
@@ -288,6 +301,7 @@ async def get_stats_summary(clients: Clients | None = None) -> dict:
 async def get_top_intents(limit: int = 5, clients: Clients | None = None) -> list[dict]:
     clients = clients or get_default_clients()
     await clients.ensure_cosmos_container()
+    limit = _bound_limit(limit)
     query = (
         "SELECT i.intent as intent, COUNT(1) as doc_count "
         "FROM c JOIN i IN c.classification.detected_intents "
@@ -295,14 +309,14 @@ async def get_top_intents(limit: int = 5, clients: Clients | None = None) -> lis
         "GROUP BY i.intent ORDER BY doc_count DESC OFFSET 0 LIMIT @limit"
     )
     params = [{"name": "@limit", "value": limit}]
-    items = [x async for x in clients.cosmos_container.query_items(query, parameters=params)]
+    items = [x async for x in _query(clients.cosmos_container, query, parameters=params, max_items=limit)]
     return items
 
 
 async def get_low_confidence_items(limit: int = 5, intent: str | None = None, clients: Clients | None = None) -> list[dict]:
     clients = clients or get_default_clients()
     await clients.ensure_cosmos_container()
-    limit = min(max(limit, 1), 100)
+    limit = _bound_limit(limit)
     if intent:
         query = (
             "SELECT c.id, c.status, c.subject, c.updated_at, "
@@ -328,5 +342,5 @@ async def get_low_confidence_items(limit: int = 5, intent: str | None = None, cl
         params = [
             {"name": "@limit", "value": limit},
         ]
-    items = [x async for x in clients.cosmos_container.query_items(query, parameters=params)]
+    items = [x async for x in _query(clients.cosmos_container, query, parameters=params, max_items=limit)]
     return items
