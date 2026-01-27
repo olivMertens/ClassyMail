@@ -238,98 +238,128 @@ const emit = defineEmits(['open-email'])
     </dl>
   </div>
 
-  <!-- Progress Bar -->
-  <div
-    v-if="stats.total > 0"
-    class="bg-white dark:bg-gray-800 shadow rounded-lg p-4"
-  >
-    <div class="flex justify-between mb-1">
-      <span class="text-sm font-medium text-primary-700 dark:text-primary-400">Pipeline Progress</span>
-      <span class="text-sm font-medium text-primary-700 dark:text-primary-400">{{ progressPercentage }}%</span>
+  <!-- Progress Bar & Actions -->
+  <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
+    <!-- Progress Bar (Only show if data exists) -->
+    <div
+      v-if="stats.total > 0"
+      class="mb-4"
+    >
+      <div class="flex justify-between mb-1">
+        <span class="text-sm font-medium text-primary-700 dark:text-primary-400">Pipeline Progress</span>
+        <span class="text-sm font-medium text-primary-700 dark:text-primary-400">{{ progressPercentage }}%</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+        <div
+          class="bg-primary-600 h-2.5 rounded-full transition-all duration-500"
+          :style="{ width: progressPercentage + '%' }"
+        />
+      </div>
     </div>
-    <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-      <div
-        class="bg-primary-600 h-2.5 rounded-full transition-all duration-500"
-        :style="{ width: progressPercentage + '%' }"
-      />
+    <div
+      v-else
+      class="mb-4 text-sm text-gray-500 text-center italic"
+    >
+      No data available yet.
     </div>
-    <div class="flex flex-col sm:flex-row justify-between items-end gap-4 mt-2">
+
+    <!-- Actions Row -->
+    <div class="flex flex-col sm:flex-row justify-between items-end gap-4 mt-2 border-t pt-4 dark:border-gray-700">
       <p class="text-xs text-gray-500 dark:text-gray-400">
         {{ stats.processed }} of {{ stats.total }} emails processed.
         <span
-          v-if="progressPercentage < 100"
+          v-if="stats.total > 0 && progressPercentage < 100"
           class="ml-2 animate-pulse text-primary-600"
         >Processing... (Auto-refresh 15s)</span>
         <span
-          v-else
+          v-else-if="stats.total > 0"
           class="ml-2 text-green-600"
         >Complete</span>
       </p>
 
-      <div class="flex flex-wrap gap-2">
-        <button
-          class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          @click="exportCsv"
-        >
-          <ArrowDownTrayIcon
-            class="-ml-0.5 h-5 w-5 text-gray-400"
-            aria-hidden="true"
-          />
-          Export CSV
-        </button>
-
-        <button
-          class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="!stats.finetune_ready"
-          @click="exportJsonl('train')"
-        >
-          <ArrowDownTrayIcon
-            class="-ml-0.5 h-5 w-5 text-gray-400"
-            aria-hidden="true"
-          />
-          JSONL (Train)
-        </button>
-        <button
-          class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="!stats.finetune_ready"
-          @click="exportJsonl('test')"
-        >
-          <ArrowDownTrayIcon
-            class="-ml-0.5 h-5 w-5 text-gray-400"
-            aria-hidden="true"
-          />
-          JSONL (Test)
-        </button>
-
-        <div class="relative flex items-center">
+      <div class="flex flex-wrap gap-2 items-center">
+        <!-- Export CSV -->
+        <div class="relative flex items-center group">
           <button
             class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="!stats.finetune_ready"
-            :title="!stats.finetune_ready ? 'Insufficient data for fine-tuning' : ''"
-            @click="exportJsonl('all')"
+            :disabled="stats.total === 0"
+            @click="exportCsv"
           >
             <ArrowDownTrayIcon
               class="-ml-0.5 h-5 w-5 text-gray-400"
               aria-hidden="true"
             />
-            JSONL (All)
+            Export CSV
           </button>
-          <div class="ml-2 relative">
-            <QuestionMarkCircleIcon
-              class="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help"
-              @mouseenter="showFinetuneHelp = true"
-              @mouseleave="showFinetuneHelp = false"
+          <QuestionMarkCircleIcon
+            v-if="stats.total === 0"
+            class="ml-1 h-5 w-5 text-gray-300 cursor-help"
+            title="Disabled: No emails available to export."
+          />
+        </div>
+
+        <!-- JSONL Buttons -->
+        <div class="relative flex items-center gap-2 border-l pl-2 ml-2 dark:border-gray-700">
+          <button
+            class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="!stats.finetune_ready"
+            @click="exportJsonl('train')"
+          >
+            <ArrowDownTrayIcon
+              class="-ml-0.5 h-5 w-5 text-gray-400"
+              aria-hidden="true"
             />
-            <div
-              v-if="showFinetuneHelp"
-              class="absolute bottom-full right-0 mb-2 w-72 bg-white dark:bg-gray-800 p-3 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 text-xs"
+            JSONL (Train)
+          </button>
+          <button
+            class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="!stats.finetune_ready"
+            @click="exportJsonl('test')"
+          >
+            <ArrowDownTrayIcon
+              class="-ml-0.5 h-5 w-5 text-gray-400"
+              aria-hidden="true"
+            />
+            JSONL (Test)
+          </button>
+
+          <div class="relative flex items-center">
+            <button
+              class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="!stats.finetune_ready"
+              @click="exportJsonl('all')"
             >
-              <span class="font-semibold text-gray-900 dark:text-white block mb-2">Fine-tuning Best Practices:</span>
-              <ul class="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
-                <li>Aim for at least 50 reviewed examples per category for stability.</li>
-                <li>Ensure examples are diverse and correctly labeled (validation is key).</li>
-                <li>For Phi-4 or GPT-4o-mini, quality > quantity. "Garbage in, garbage out".</li>
-              </ul>
+              <ArrowDownTrayIcon
+                class="-ml-0.5 h-5 w-5 text-gray-400"
+                aria-hidden="true"
+              />
+              JSONL (All)
+            </button>
+            <div class="ml-2 relative group">
+              <QuestionMarkCircleIcon
+                class="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help"
+                :class="{'text-amber-500': !stats.finetune_ready}"
+              />
+              <!-- Tooltip on Hover -->
+              <div
+                class="absolute bottom-full right-0 mb-2 w-72 bg-white dark:bg-gray-800 p-3 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 text-xs hidden group-hover:block"
+              >
+                <div
+                  v-if="!stats.finetune_ready"
+                  class="mb-2 pb-2 border-b border-gray-100 dark:border-gray-700 text-amber-600 dark:text-amber-400 font-bold"
+                >
+                  Action Disabled:
+                  <span class="font-normal text-gray-600 dark:text-gray-300 block mt-1">
+                    You need at least 50 reviewed emails to generate a fine-tuning dataset.
+                  </span>
+                </div>
+                <span class="font-semibold text-gray-900 dark:text-white block mb-2">Fine-tuning Best Practices:</span>
+                <ul class="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
+                  <li>Aim for at least 50 reviewed examples per category for stability.</li>
+                  <li>Ensure examples are diverse and correctly labeled (validation is key).</li>
+                  <li>For Phi-4 or GPT-4o-mini, quality > quantity. "Garbage in, garbage out".</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
