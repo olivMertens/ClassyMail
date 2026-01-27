@@ -135,6 +135,11 @@ def get_concurrency_limit(clients: Clients = Depends(get_clients)) -> asyncio.Se
 
 
 async def auth_headers(clients: Clients | None = None) -> dict:
+    # Consistency with ChatAgent: Use API Key if configured (e.g. invalid managed identity context)
+    api_key = getattr(config, "AI_API_KEY", None)
+    if api_key:
+        return {"api-key": api_key}
+
     clients = clients or get_default_clients()
     token = await clients.credential.get_token(config.AI_SCOPE)
     return {"Authorization": f"Bearer {token.token}"}

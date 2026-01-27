@@ -76,6 +76,9 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None) -> d
         }
     }
 
+    if not config.MISTRAL_ENDPOINT:
+        raise RuntimeError("MISTRAL_ENDPOINT not configured.")
+
     if config.MISTRAL_MODE.lower() == "maas":
         url = f"{config.MISTRAL_ENDPOINT.rstrip('/')}/v1/ocr"
     else:
