@@ -26,6 +26,7 @@ const stats = ref({
     processed: 0,
     finetune_ready: false,
     average_confidence: 0,
+    finetune_min_required: 50
 })
 const showFinetuneHelp = ref(false)
 const filter = ref('all')
@@ -131,7 +132,8 @@ const fetchEmails = async () => {
             review_required: data.review_required || 0,
             processed: data.processed || ((data.total||0) - (data.review_required||0)),
             finetune_ready: data.finetune_ready || false,
-            average_confidence: data.average_confidence || 0
+            average_confidence: data.average_confidence || 0,
+            finetune_min_required: data.finetune_min_required || 50
         }
     } catch (e) {
         console.error(e)
@@ -350,12 +352,12 @@ const emit = defineEmits(['open-email'])
                 >
                   Action Disabled:
                   <span class="font-normal text-gray-600 dark:text-gray-300 block mt-1">
-                    You need at least 50 reviewed emails to generate a fine-tuning dataset.
+                    You need at least {{ stats.finetune_min_required }} reviewed emails to generate a fine-tuning dataset.
                   </span>
                 </div>
                 <span class="font-semibold text-gray-900 dark:text-white block mb-2">Fine-tuning Best Practices:</span>
                 <ul class="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
-                  <li>Aim for at least 50 reviewed examples per category for stability.</li>
+                  <li>Aim for at least {{ stats.finetune_min_required }} reviewed examples per category for stability.</li>
                   <li>Ensure examples are diverse and correctly labeled (validation is key).</li>
                   <li>For Phi-4 or GPT-4o-mini, quality > quantity. "Garbage in, garbage out".</li>
                 </ul>
@@ -370,7 +372,7 @@ const emit = defineEmits(['open-email'])
   <div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-100 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200 flex flex-col gap-1">
     <span class="font-semibold">Fine-tuning Best Practices:</span>
     <ul class="list-disc list-inside ml-1">
-      <li>Aim for at least 50 reviewed examples per category for stability.</li>
+      <li>Aim for at least {{ stats.finetune_min_required }} reviewed examples per category for stability.</li>
       <li>Ensure examples are diverse and correctly labeled (validation is key).</li>
       <li>For Phi-4 or GPT-4o-mini, quality > quantity. "Garbage in, garbage out".</li>
     </ul>
