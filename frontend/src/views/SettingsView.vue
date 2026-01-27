@@ -13,13 +13,15 @@ import {
     AdjustmentsHorizontalIcon,
     QueueListIcon,
     BanknotesIcon,
-    ArrowPathIcon
+    ArrowPathIcon,
+    QuestionMarkCircleIcon
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 
 const { t, locale } = useI18n()
 
 const activeTab = ref('classification') // classification | design | processing | finetuning | general | danger
+const showStrategyHelp = ref(false)
 
 const settings = ref({
     processing_strategy: 'standard',
@@ -365,8 +367,15 @@ onMounted(() => {
       class="bg-white dark:bg-gray-800 shadow sm:rounded-lg"
     >
       <div class="px-4 py-5 sm:p-6">
-        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white flex items-center gap-2">
           Processing Strategy
+          <button
+            class="text-gray-400 hover:text-primary-500 transition-colors"
+            title="How these strategies work"
+            @click="showStrategyHelp = true"
+          >
+            <QuestionMarkCircleIcon class="h-5 w-5" />
+          </button>
         </h3>
         <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
           <p>Select the AI processing pipeline strategy.</p>
@@ -782,6 +791,89 @@ onMounted(() => {
             />
             {{ resetting ? 'Nuking Environment...' : 'NUKE EVERYTHING' }}
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Strategy Help Modal -->
+    <div
+      v-if="showStrategyHelp"
+      class="fixed inset-0 z-50 overflow-y-auto"
+      aria-labelledby="modal-title"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div
+          class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+          aria-hidden="true"
+          @click="showStrategyHelp = false"
+        />
+        <span
+          class="hidden sm:inline-block sm:align-middle sm:h-screen"
+          aria-hidden="true"
+        >&#8203;</span>
+        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-gray-200 dark:border-gray-700">
+          <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <h3
+              id="modal-title"
+              class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4"
+            >
+              Processing Strategies Explained
+            </h3>
+            <div class="space-y-6 text-sm">
+              <!-- Standard -->
+              <div class="border-l-4 border-indigo-500 pl-4">
+                <h4 class="font-bold text-gray-900 dark:text-white text-base">
+                  Standard (Default)
+                </h4>
+                <p class="text-gray-500 dark:text-gray-400 mt-1">
+                  Fast and optimized for standard text extraction. Uses zero-shot prompting optimized for cost.
+                </p>
+                <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
+                  <span class="text-indigo-600 dark:text-indigo-400 font-bold">How it works:</span> Passes OCR text directly to the model.<br>
+                  <span class="text-indigo-600 dark:text-indigo-400 font-bold">Example:</span> A clearly typed PDF claiming an "Address Change". The model identifies keywords and classifies instantly.
+                </div>
+              </div>
+
+              <!-- Reasoning -->
+              <div class="border-l-4 border-purple-500 pl-4">
+                <h4 class="font-bold text-gray-900 dark:text-white text-base">
+                  Reasoning (CoT)
+                </h4>
+                <p class="text-gray-500 dark:text-gray-400 mt-1">
+                  Forces a "Chain-of-Thought" (Step-by-step) analysis. Essential for subtle intents or complex narratives.
+                </p>
+                <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
+                  <span class="text-purple-600 dark:text-purple-400 font-bold">How it works:</span> Injects system instruction: <em>"Analyze context first, then deduce intents step-by-step."</em><br>
+                  <span class="text-purple-600 dark:text-purple-400 font-bold">Example:</span> An email telling a story about a storm without explicitly saying "claim". The model deduces "Bad Weather" -> "Damage" -> "Claim Intent".
+                </div>
+              </div>
+
+              <!-- Vision -->
+              <div class="border-l-4 border-green-500 pl-4">
+                <h4 class="font-bold text-gray-900 dark:text-white text-base">
+                  Vision (Visual Analysis)
+                </h4>
+                <p class="text-gray-500 dark:text-gray-400 mt-1">
+                  Integrates visual context from OCR (photos, diagrams, signatures) into the decision process.
+                </p>
+                <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
+                  <span class="text-green-600 dark:text-green-400 font-bold">How it works:</span> Mistral OCR describes images (e.g. "photo of water leak"). The prompt explicitly asks to consider these visual descriptions.<br>
+                  <span class="text-green-600 dark:text-green-400 font-bold">Example:</span> An email body says "See attached". The PDF contains a photo of a crashed car. The model uses "car crash photo" to classify as "Vehicle Accident".
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+            <button
+              type="button"
+              class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm"
+              @click="showStrategyHelp = false"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>
