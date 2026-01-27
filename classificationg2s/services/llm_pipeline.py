@@ -65,13 +65,27 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None) -> d
         "required": ["image_type", "description", "relevance"]
     }
 
+    # Mistral Document AI uses Chat Completions API with document content
+    # https://learn.microsoft.com/en-us/azure/ai-studio/how-to/deploy-models-mistral
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "document",
+                    "document": {
+                        "type": "document_base64",
+                        "document_base64": base64_pdf
+                    }
+                }
+            ]
+        }
+    ]
+
     payload = {
+        "messages": messages,
         "model": config.MISTRAL_DEPLOYMENT,
-        "document": {
-            "type": "document_base64",
-            "document_base64": base64_pdf,
-        },
-        "include_image_base64": False, # We don't need the images back, just the descriptions
+        "include_image_base64": False,
         "bbox_annotation_format": {
             "type": "json_schema",
             "json_schema": image_schema
@@ -81,20 +95,15 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None) -> d
     if not config.MISTRAL_ENDPOINT:
         raise RuntimeError("MISTRAL_ENDPOINT not configured.")
 
-    if config.MISTRAL_MODE.lower() == "maas":
-        # Allow the user to provide the full URL in MISTRAL_ENDPOINT if they wish
-        if config.MISTRAL_ENDPOINT.rstrip("/").endswith("/ocr"):
-            url = config.MISTRAL_ENDPOINT.rstrip("/")
-        else:
-            url = f"{config.MISTRAL_ENDPOINT.rstrip('/')}/v1/ocr"
-    else:
-        url = f"{config.MISTRAL_ENDPOINT.rstrip('/')}/models/{config.MISTRAL_DEPLOYMENT}:ocr"
+    # Use the standard chat completions endpoint
+    url = f"{config.MISTRAL_ENDPOINT.rstrip('/')}/chat/completions?api-version=2024-05-01-preview"
 
-    logger.info(f"[metrics] OCR Request: {url} mode={config.MISTRAL_MODE}")
+    logger.info(f"[metrics] OCR Request: {url} model={config.MISTRAL_DEPLOYMENT}")
 
     with tracer.start_as_current_span("mistral_ocr") as span:
         span.set_attribute("gen_ai.system", "mistral")
-        span.set_attribute("gen_ai.operation", "ocr")
+        span.set_attribute("gen_ai.operation", "chat.completions")
+        span.set_attribute("gen_ai.request.model", config.MISTRAL_DEPLOYMENT)
         async with httpx.AsyncClient(timeout=90) as client:
             resp = await client.post(url, json=payload, headers=headers)
             try:
@@ -105,23 +114,46 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None) -> d
                 span.record_exception(ex)
                 raise
             data = resp.json()
-            usage_info = data.get("usage_info") or {}
-            pages = usage_info.get("pages_processed") or usage_info.get("pages") or 0
+
+            # Extract content from chat completions response
+            choices = data.get("choices", [])
+            if not choices:
+                raise OCRFailed("No choices in response")
+
+            message_content = choices[0].get("message", {}).get("content")
+            if not message_content:
+                raise OCRFailed("Empty message content")
+
+            # Parse the structured response
+            if isinstance(message_content, str):
+                try:
+                    structured_data = json.loads(message_content)
+                except json.JSONDecodeError:
+                    # If not JSON, treat as plain markdown
+                    structured_data = {"markdown": message_content}
+            else:
+                structured_data = message_content
+
+            usage_info = data.get("usage", {})
+            pages = usage_info.get("pages_processed", 0)
 
             logger.info(f"[metrics] OCR Success: {pages} pages processed")
 
             span.set_attribute("gen_ai.usage.pages_processed", pages)
-            content = data.get("markdown") or data.get("content")
+            span.set_attribute("gen_ai.usage.input_tokens", usage_info.get("prompt_tokens", 0))
+            span.set_attribute("gen_ai.usage.output_tokens", usage_info.get("completion_tokens", 0))
+
+            content = structured_data.get("markdown") or structured_data.get("content")
 
             # Extract images/annotations from pages
             annotated_images = []
-            if data.get("pages"):
+            if structured_data.get("pages"):
                 # Prefer page-level content concatenation if top-level is empty
                 if not content:
-                    content = "\n\n".join([p.get("markdown", "") for p in data.get("pages", [])])
+                    content = "\n\n".join([p.get("markdown", "") for p in structured_data.get("pages", [])])
 
                 # Collect images/annotations from pages
-                for page in data.get("pages", []):
+                for page in structured_data.get("pages", []):
                     for img in page.get("images", []):
                         # The annotation fields should be merged into the img object
                         if img.get("description"):
