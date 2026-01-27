@@ -22,6 +22,75 @@ const debugLoading = ref(false)
 const writeTestResults = ref(null)
 const writeTestLoading = ref(false)
 
+// Simulation State
+const simLoading = ref(false)
+const simResult = ref(null)
+const simLogs = ref([])
+
+const addSimLog = (msg, type='info') => {
+    simLogs.value.push({ time: new Date().toLocaleTimeString(), msg, type })
+}
+
+const runSimulation = async () => {
+    simLoading.value = true
+    simResult.value = null
+    simLogs.value = []
+
+    try {
+        addSimLog("Step 1: Uploading Dummy PDF...", 'info')
+        const res = await fetch('/api/admin/debug/simulate-flow', { method: 'POST' })
+        if (!res.ok) throw new Error("Upload failed")
+
+        const data = await res.json()
+        const itemId = data.item_id
+        addSimLog(`Upload Success. ID: ${itemId}`, 'success')
+        addSimLog("Step 2: Waiting for Worker pickup...", 'info')
+
+        // Poll
+        let attempts = 0
+        const poll = setInterval(async () => {
+            attempts++
+            try {
+                // Encode ID for URL path safey
+                const encodedId = encodeURIComponent(itemId)
+                const checkRes = await fetch(`/api/emails/${encodedId}`)
+
+                if (checkRes.ok) {
+                    const item = await checkRes.json()
+
+                    if (item.status === 'PROCESSED' || item.status === 'REVIEW_REQUIRED') {
+                        clearInterval(poll)
+                        simLoading.value = false
+                        simResult.value = item
+                        addSimLog("Step 3: Processing Complete!", 'success')
+                        addSimLog(`Classified as: ${item.classification?.detected_intents?.[0]?.intent || 'Unknown'}`, 'success')
+                    } else if (item.status === 'ERROR') {
+                        clearInterval(poll)
+                        simLoading.value = false
+                        addSimLog(`Processing Failed: ${item.error}`, 'error')
+                    } else {
+                        // Still pending
+                        if (attempts % 2 === 0) addSimLog(`Status: ${item.status}...`, 'info')
+                    }
+                } else {
+                     if (attempts % 5 === 0) addSimLog("Waiting for metadata...", 'info')
+                }
+            } catch (e) {
+                 addSimLog(`Poll error: ${e.message}`, 'error')
+            }
+
+            if (attempts > 30) { // 60 seconds
+                clearInterval(poll)
+                simLoading.value = false
+                addSimLog("Timeout waiting for processing.", 'error')
+            }
+        }, 2000)
+    } catch (e) {
+        simLoading.value = false
+        addSimLog(`Error: ${e.message}`, 'error')
+    }
+}
+
 const runDeepHealthCheck = async () => {
   debugLoading.value = true
   debugResults.value = null
@@ -362,6 +431,81 @@ graph TD
                 >
                   {{ writeTestResults.servicebus_connect === 'ok' ? 'Success (Link Open)' : writeTestResults.servicebus_connect }}
                 </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- End-to-End Simulation -->
+        <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6 border-t-4 border-purple-500">
+          <div class="flex justify-between items-center mb-4">
+            <div>
+              <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+                End-to-End Flow Simulation
+              </h3>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Generates a dummy PDF, uploads it, and tracks it through the Service Bus, Worker, OCR, and AI Classification pipeline.
+              </p>
+            </div>
+            <button
+              class="inline-flex items-center gap-x-1.5 rounded-md bg-purple-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 disabled:opacity-50"
+              :disabled="simLoading"
+              @click="runSimulation"
+            >
+              <PlayIcon
+                class="-ml-0.5 h-5 w-5"
+                aria-hidden="true"
+              />
+              {{ simLoading ? 'Running...' : 'Start Simulation' }}
+            </button>
+          </div>
+
+          <div
+            v-if="simLogs.length > 0"
+            class="mt-4 bg-gray-900 rounded-md p-4 font-mono text-xs text-gray-300 h-48 overflow-y-auto"
+          >
+            <div
+              v-for="(log, i) in simLogs"
+              :key="i"
+              class="mb-1"
+            >
+              <span class="text-gray-500">[{{ log.time }}]</span>
+              <span
+                :class="{
+                  'text-white': log.type === 'info',
+                  'text-green-400': log.type === 'success',
+                  'text-amber-400': log.type === 'warning',
+                  'text-red-400': log.type === 'error'
+                }"
+              > {{ log.msg }}</span>
+            </div>
+          </div>
+
+          <div
+            v-if="simResult"
+            class="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md"
+          >
+            <h4 class="text-sm font-bold text-green-900 dark:text-green-100 flex items-center">
+              <CheckCircleIcon class="h-5 w-5 mr-2 text-green-600" />
+              Flow Verified Successfully
+            </h4>
+            <div class="mt-2 text-xs text-green-800 dark:text-green-300 grid grid-cols-2 gap-4">
+              <div>
+                <span class="font-semibold">Subject:</span> {{ simResult.subject }}
+              </div>
+              <div>
+                <span class="font-semibold">Processing Time:</span> {{ Math.round(simResult.processing_time_ms) }}ms
+              </div>
+              <div class="col-span-2">
+                <span class="font-semibold">Intents:</span>
+                <ul class="list-disc list-inside mt-1">
+                  <li
+                    v-for="intent in simResult.classification?.detected_intents || []"
+                    :key="intent.intent"
+                  >
+                    {{ intent.intent }} ({{ Math.round((intent.confidence||0)*100) }}%)
+                  </li>
+                </ul>
               </div>
             </div>
           </div>

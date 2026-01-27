@@ -4,6 +4,8 @@ from classificationg2s.core import config
 from classificationg2s.services.azure_clients import Clients, get_clients, get_cosmos_container
 import logging
 import uuid
+from datetime import datetime, timezone
+from fpdf import FPDF
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger("classimail.admin")
@@ -11,6 +13,45 @@ logger = logging.getLogger("classimail.admin")
 class ResetRequest(BaseModel):
     confirm_1: bool
     confirm_2: bool
+
+@router.post("/debug/simulate-flow")
+async def simulate_flow(clients: Clients = Depends(get_clients)):
+    """
+    Simulates a complete flow by creating and uploading a dummy PDF.
+    Returns the item_id (blob path) to track via /api/emails/{id}.
+    """
+    try:
+        # 1. Generate Dummy PDF
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("helvetica", size=12)
+        pdf.cell(text=f"Simulation Request - {datetime.now(timezone.utc)}", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(text="Subject: Test Invoice for Simulation", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(text="This is a generated PDF to verify the end-to-End flow.", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(text="Reference: SIM-12345", new_x="LMARGIN", new_y="NEXT")
+
+        pdf_bytes = pdf.output() # Returns bytearray in recent fpdf2
+
+        # 2. Upload to Blob Storage
+        container_client = clients.blob_service_client.get_container_client(config.BLOB_CONTAINER_INPUT)
+        filename = f"debug/simulation_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.pdf"
+        blob_client = container_client.get_blob_client(filename)
+
+        await blob_client.upload_blob(bytes(pdf_bytes), overwrite=True)
+
+        # 3. Construct ID and Return
+        # ID format matches repository logic (container/path)
+        item_id = f"{config.BLOB_CONTAINER_INPUT}/{filename}"
+
+        return {
+            "status": "uploaded",
+            "item_id": item_id,
+            "blob_url": blob_client.url
+        }
+
+    except Exception as e:
+        logger.error(f"Simulation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/debug/connectivity")
 async def check_connectivity(clients: Clients = Depends(get_clients)):
