@@ -14,15 +14,20 @@ import {
     QueueListIcon,
     BanknotesIcon,
     ArrowPathIcon,
-    QuestionMarkCircleIcon
+    QuestionMarkCircleIcon,
+    ChevronDownIcon,
+    ChevronUpIcon,
+    XMarkIcon
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 
 const { t, locale } = useI18n()
 
-const activeTab = ref('classification') // classification | design | processing | finetuning | general | danger
+// Tabs
+const activeTab = ref('classification')
 const showStrategyHelp = ref(false)
 
+// Config Data
 const settings = ref({
     processing_strategy: 'standard',
     phi4_input_per_1k: null,
@@ -39,57 +44,62 @@ const resetConfirm1 = ref(false)
 const resetConfirm2 = ref(false)
 const resetting = ref(false)
 
-const performReset = async () => {
-    if (!resetConfirm1.value || !resetConfirm2.value) return
-    if (!confirm('FINAL WARNING: This is irreversible. Proceed?')) return
+// --- Category Management & Sanitization ---
 
-    resetting.value = true
-    try {
-        const res = await fetch('/api/admin/reset', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                confirm_1: resetConfirm1.value,
-                confirm_2: resetConfirm2.value
-            })
-        })
+const expandedCategories = ref(new Set())
+const newCategory = ref({ name: '', description: '' })
+const newCategoryExpanded = ref(false)
 
-        if (res.ok) {
-            const data = await res.json()
-            alert(`Environment Reset Successful.\nDeleted Blobs: ${data.deleted_blobs}\nDeleted Records: ${data.deleted_records}`)
-            // Reset local state
-            resetConfirm1.value = false
-            resetConfirm2.value = false
-            // Reload page to reflect empty state
-            window.location.reload()
-        } else {
-            const err = await res.json()
-            alert(`Reset Failed: ${err.detail || 'Unknown error'}`)
-        }
-    } catch (e) {
-        alert(`Reset Error: ${e.message}`)
-    } finally {
-        resetting.value = false
+const sanitizeInput = (str, type) => {
+    if (!str) return ''
+    let cleaned = str
+    cleaned = cleaned.replace(/"""/g, '"').replace(/'''/g, "'")
+    cleaned = cleaned.trim()
+
+    if (type === 'name') {
+        cleaned = cleaned.replace(/[\r\n]+/g, ' ')
+        if (cleaned.length > 50) cleaned = cleaned.substring(0, 50)
+    } else {
+        if (cleaned.length > 2000) cleaned = cleaned.substring(0, 2000)
+    }
+    return cleaned
+}
+
+const toggleExpanded = (index) => {
+    if (expandedCategories.value.has(index)) {
+        expandedCategories.value.delete(index)
+    } else {
+        expandedCategories.value.add(index)
     }
 }
 
-// Category Form
-const newCategory = ref({ name: '', description: '' })
-const editingIndex = ref(null)
-const editingCategory = ref({ name: '', description: '' })
-const isEditing = ref(false)
+const updateCategory = (index, field, value) => {
+    const cleanValue = sanitizeInput(value, field)
+    settings.value.categories[index][field] = cleanValue
+}
 
-// Appearance state
-const isDark = ref(false)
-const currentTheme = ref('blue')
-const currentLocale = ref('en')
+const addNewCategory = () => {
+    const name = sanitizeInput(newCategory.value.name, 'name')
+    const desc = sanitizeInput(newCategory.value.description, 'description')
 
-const themes = [
-    { id: 'blue', name: 'Blue', class: 'bg-blue-600' },
-    { id: 'green', name: 'Green', class: 'bg-emerald-600' },
-    { id: 'indigo', name: 'Indigo', class: 'bg-indigo-600' },
-    { id: 'orange', name: 'Orange', class: 'bg-orange-600' }
-]
+    if (name && desc) {
+        if (!settings.value.categories) settings.value.categories = []
+        settings.value.categories.push({ name, description: desc })
+        newCategory.value = { name: '', description: '' }
+        newCategoryExpanded.value = false
+        saveSettings()
+    }
+}
+
+const removeCategory = (index) => {
+    if (confirm('Are you sure you want to remove this category?')) {
+        settings.value.categories.splice(index, 1)
+        expandedCategories.value.delete(index)
+        saveSettings()
+    }
+}
+
+// --- API Calls ---
 
 const loadSettings = async () => {
     loading.value = true
@@ -133,51 +143,50 @@ const saveSettings = async () => {
     }
 }
 
-const addCategory = () => {
-    if (newCategory.value.name) {
-        if (!settings.value.categories) settings.value.categories = []
-        settings.value.categories.push({ ...newCategory.value })
-        newCategory.value = { name: '', description: '' }
-        saveSettings()
+const performReset = async () => {
+    if (!resetConfirm1.value || !resetConfirm2.value) return
+    if (!confirm('FINAL WARNING: This is irreversible. Proceed?')) return
+
+    resetting.value = true
+    try {
+        const res = await fetch('/api/admin/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                confirm_1: resetConfirm1.value,
+                confirm_2: resetConfirm2.value
+            })
+        })
+        if (res.ok) {
+            const data = await res.json()
+            alert(`Reset Successful.\nDeleted Blobs: ${data.deleted_blobs}`)
+            window.location.reload()
+        } else {
+            alert('Reset Failed')
+        }
+    } catch (e) {
+        alert(`Reset Error: ${e.message}`)
+    } finally {
+        resetting.value = false
     }
 }
 
-const removeCategory = (index) => {
-    if (confirm('Are you sure you want to remove this category?')) {
-        settings.value.categories.splice(index, 1)
-        saveSettings()
-    }
-}
+// --- Appearance & Init ---
 
-const startEdit = (index) => {
-    editingIndex.value = index
-    editingCategory.value = { ...settings.value.categories[index] }
-    isEditing.value = true
-}
+const isDark = ref(false)
+const currentTheme = ref('blue')
+const currentLocale = ref('en')
 
-const saveEdit = () => {
-    if (editingIndex.value !== null && editingCategory.value.name) {
-        settings.value.categories[editingIndex.value] = { ...editingCategory.value }
-        isEditing.value = false
-        editingIndex.value = null
-        editingCategory.value = { name: '', description: '' }
-        saveSettings()
-    }
-}
-
-const cancelEdit = () => {
-    isEditing.value = false
-    editingIndex.value = null
-    editingCategory.value = { name: '', description: '' }
-}
+const themes = [
+    { id: 'blue', name: 'Blue', class: 'bg-blue-600' },
+    { id: 'green', name: 'Green', class: 'bg-emerald-600' },
+    { id: 'indigo', name: 'Indigo', class: 'bg-indigo-600' },
+    { id: 'orange', name: 'Orange', class: 'bg-orange-600' }
+]
 
 const toggleDarkMode = () => {
     isDark.value = !isDark.value
-    if (isDark.value) {
-        document.documentElement.classList.add('dark')
-    } else {
-        document.documentElement.classList.remove('dark')
-    }
+    document.documentElement.classList.toggle('dark', isDark.value)
     localStorage.setItem('classimail-dark', isDark.value)
 }
 
@@ -196,15 +205,12 @@ const setLocale = (l) => {
 onMounted(() => {
     loadSettings()
 
-    // Load persisted appearance config
     const savedDark = localStorage.getItem('classimail-dark')
     isDark.value = savedDark === 'true'
     if (isDark.value) document.documentElement.classList.add('dark')
 
     const savedTheme = localStorage.getItem('classimail-theme')
-    if (savedTheme) {
-        setTheme(savedTheme)
-    }
+    if (savedTheme) setTheme(savedTheme)
 
     const savedLocale = localStorage.getItem('classimail-locale')
     if (savedLocale) {
@@ -606,105 +612,156 @@ onMounted(() => {
           <div class="flow-root">
             <ul
               role="list"
-              class="-my-5 divide-y divide-gray-200 dark:divide-gray-700"
+              class="-my-5"
             >
               <li
                 v-for="(cat, idx) in settings.categories"
                 :key="idx"
-                class="py-4"
+                class="py-4 border-b border-gray-200 dark:border-gray-700 last:border-0"
               >
-                <div class="flex items-start justify-between">
-                  <div class="min-w-0 flex-1 mr-4">
-                    <p class="text-sm font-bold text-gray-900 dark:text-white">
-                      {{ cat.name }}
-                    </p>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400 whitespace-pre-wrap">
-                      {{ cat.description }}
-                    </p>
+                <!-- Accordion Header -->
+                <div
+                  class="flex items-center justify-between cursor-pointer group hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-md p-2 -mx-2 transition-colors"
+                  @click="toggleExpanded(idx)"
+                >
+                  <div class="min-w-0 flex-1 flex items-center gap-3">
+                    <button
+                      type="button"
+                      class="text-gray-400 group-hover:text-primary-500 transition-colors"
+                    >
+                      <component
+                        :is="expandedCategories.has(idx) ? ChevronUpIcon : ChevronDownIcon"
+                        class="h-5 w-5"
+                      />
+                    </button>
+                    <div>
+                      <p class="text-sm font-bold text-gray-900 dark:text-white">
+                        {{ cat.name }}
+                      </p>
+                      <p
+                        v-if="!expandedCategories.has(idx)"
+                        class="text-xs text-gray-500 dark:text-gray-400 truncate max-w-md"
+                      >
+                        {{ cat.description }}
+                      </p>
+                    </div>
                   </div>
                   <div class="flex items-center gap-2">
                     <button
                       type="button"
-                      class="inline-flex rounded-md bg-white dark:bg-gray-800 px-2.5 py-1.5 text-sm font-semibold text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                      title="Edit"
-                      @click="startEdit(idx)"
-                    >
-                      <PencilSquareIcon class="h-5 w-5 text-gray-400 hover:text-primary-500" />
-                    </button>
-                    <button
-                      type="button"
-                      class="inline-flex rounded-md bg-white dark:bg-gray-800 px-2.5 py-1.5 text-sm font-semibold text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      class="inline-flex rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       title="Remove"
-                      @click="removeCategory(idx)"
+                      @click.stop="removeCategory(idx)"
                     >
-                      <TrashIcon class="h-5 w-5 text-gray-400 hover:text-red-500" />
+                      <TrashIcon class="h-5 w-5" />
                     </button>
                   </div>
                 </div>
+
+                <!-- Accordion Body (Edit Form) -->
+                <div
+                  v-if="expandedCategories.has(idx)"
+                  class="mt-3 pl-8 pr-2 pb-2"
+                >
+                  <div class="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-md border border-gray-200 dark:border-gray-600">
+                    <div class="grid grid-cols-1 gap-4">
+                      <div>
+                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+                        <input
+                          v-model="cat.name"
+                          type="text"
+                          class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600"
+                          @change="updateCategory(idx, 'name', cat.name)"
+                        >
+                      </div>
+                      <div>
+                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Description (Context for LLM) - {{ cat.description?.length || 0 }}/2000
+                        </label>
+                        <textarea
+                          v-model="cat.description"
+                          rows="3"
+                          maxlength="2000"
+                          class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono text-xs"
+                          @change="updateCategory(idx, 'description', cat.description)"
+                        />
+                      </div>
+                      <div class="flex justify-end pt-2">
+                        <span class="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 italic">
+                          <ExclamationTriangleIcon class="h-3 w-3" />
+                          Changes are applied locally. Click "Save Changes to System" above to commit.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </li>
+
               <li
                 v-if="!settings.categories?.length"
                 class="py-8 text-center text-sm text-gray-500 italic"
               >
-                No categories defined. Add one below.
+                No categories defined.
               </li>
             </ul>
           </div>
 
-          <!-- Add/Edit Form -->
-          <div class="mt-8 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-md border border-gray-200 dark:border-gray-700">
-            <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">
-              {{ isEditing ? 'Edit Category' : 'Add New Category' }}
-            </h4>
-            <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
-              <div class="sm:col-span-2">
-                <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Name</label>
-                <div class="mt-1">
-                  <input
-                    v-model="(isEditing ? editingCategory : newCategory).name"
-                    type="text"
-                    class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600"
-                    placeholder="e.g. Contract Cancellation"
-                  >
+          <!-- Add New Category (Collapsible) -->
+          <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+            <button
+              type="button"
+              class="flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium text-sm w-full"
+              @click="newCategoryExpanded = !newCategoryExpanded"
+            >
+              <component
+                :is="newCategoryExpanded ? ChevronUpIcon : PlusIcon"
+                class="h-5 w-5"
+              />
+              {{ newCategoryExpanded ? 'Cancel Adding Category' : 'Add New Category' }}
+            </button>
+
+            <div
+              v-if="newCategoryExpanded"
+              class="mt-4 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-md border border-gray-200 dark:border-gray-700 transition-all"
+            >
+              <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
+                <div class="sm:col-span-2">
+                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Name</label>
+                  <div class="mt-1">
+                    <input
+                      v-model="newCategory.name"
+                      type="text"
+                      class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600"
+                      placeholder="e.g. Contract Cancellation"
+                    >
+                  </div>
+                </div>
+                <div class="sm:col-span-4">
+                  <div class="flex justify-between">
+                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Description (LLM Context)</label>
+                    <span class="text-xs text-gray-500">{{ newCategory.description?.length || 0 }}/2000</span>
+                  </div>
+                  <div class="mt-1">
+                    <textarea
+                      v-model="newCategory.description"
+                      rows="3"
+                      maxlength="2000"
+                      class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono text-xs"
+                      placeholder="Describe the criteria for this category..."
+                    />
+                  </div>
                 </div>
               </div>
-              <div class="sm:col-span-4">
-                <div class="flex justify-between">
-                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Description (LLM Context)</label>
-                  <span class="text-xs text-gray-500">{{ (isEditing ? editingCategory : newCategory).description?.length || 0 }}/2000</span>
-                </div>
-                <div class="mt-1">
-                  <textarea
-                    v-model="(isEditing ? editingCategory : newCategory).description"
-                    rows="3"
-                    maxlength="2000"
-                    class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600"
-                    placeholder="Describe the criteria for this category..."
-                  />
-                </div>
+              <div class="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  class="inline-flex items-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+                  @click="addNewCategory"
+                >
+                  <PlusIcon class="h-5 w-5 mr-1" />
+                  Add Category
+                </button>
               </div>
-            </div>
-            <div class="mt-4 flex justify-end gap-2">
-              <button
-                v-if="isEditing"
-                type="button"
-                class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                @click="cancelEdit"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                class="inline-flex items-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
-                @click="isEditing ? saveEdit() : addCategory()"
-              >
-                <component
-                  :is="isEditing ? PencilSquareIcon : PlusIcon"
-                  class="h-5 w-5 mr-1"
-                  aria-hidden="true"
-                />
-                {{ isEditing ? 'Update Category' : 'Add Category' }}
-              </button>
             </div>
           </div>
         </div>
