@@ -75,7 +75,7 @@ resource "azurerm_storage_account" "st" {
   shared_access_key_enabled       = false
   default_to_oauth_authentication = true
 
-  allow_nested_items_to_be_public = false
+  allow_nested_items_to_be_public = true
   local_user_enabled              = false
 }
 

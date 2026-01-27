@@ -62,7 +62,9 @@ async def run_classification_pipeline(
 
     try:
         log("ocr", "start")
-        ocr_result = await ocr_with_mistral(pdf_b64, clients=clients)
+        # Enable image extraction only if strategy is 'vision' to save costs/latency
+        include_img = (strategy == "vision")
+        ocr_result = await ocr_with_mistral(pdf_b64, clients=clients, include_images=include_img)
         log("ocr", "ok")
     except Exception as ex:
         from classificationg2s.models import OCRFailed
