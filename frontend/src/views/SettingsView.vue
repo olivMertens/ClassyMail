@@ -174,7 +174,7 @@ const performReset = async () => {
         })
         if (res.ok) {
             const data = await res.json()
-            alert(`Reset Successful.\nDeleted Blobs: ${data.deleted_blobs}`)
+            alert(`Reset Successful.\nDeleted Blobs: ${data.deleted_blobs}\nDeleted Records: ${data.deleted_records}\nPurged DLQ: ${data.deleted_dlq}`)
             window.location.reload()
         } else {
             alert('Reset Failed')
@@ -800,6 +800,7 @@ onMounted(() => {
           <ul class="list-disc list-inside mt-2 text-sm text-red-700 dark:text-red-200">
             <li>Delete ALL emails and classification records from Database.</li>
             <li>Delete ALL files (PDFs) from the Input Storage Container.</li>
+            <li><strong>Purge</strong> the Service Bus Dead-letter Queue.</li>
             <li>Reset the dashboard state completely.</li>
             <li><strong>Preserve</strong> application settings (Categories, Costs, etc).</li>
           </ul>

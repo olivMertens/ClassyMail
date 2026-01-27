@@ -255,18 +255,42 @@ async def reset_environment(
         logger.error(f"Failed to clean Cosmos DB: {e}")
         errors.append(f"DB: {str(e)}")
 
+    # 3. Purge Dead Letter Queue (Service Bus)
+    deleted_dlq = 0
+    try:
+        # Use short timeout to drain
+        if clients.sb_client:
+            receiver = clients.sb_client.get_queue_receiver(
+                queue_name=config.SERVICE_BUS_QUEUE,
+                sub_queue=ServiceBusSubQueue.DEAD_LETTER,
+                prefetch_count=50,
+            )
+            async with receiver:
+                while True:
+                    messages = await receiver.receive_messages(max_message_count=50, max_wait_time=2)
+                    if not messages:
+                        break
+                    for msg in messages:
+                        await receiver.complete_message(msg)
+                        deleted_dlq += 1
+    except Exception as e:
+        logger.error(f"Failed to purge DLQ: {e}")
+        errors.append(f"Service Bus DLQ: {str(e)}")
+
     if errors:
         return {
             "status": "partial_success",
             "deleted_blobs": deleted_blobs,
             "deleted_records": deleted_records,
+            "deleted_dlq": deleted_dlq,
             "errors": errors
         }
 
     return {
         "status": "success",
         "deleted_blobs": deleted_blobs,
-        "deleted_records": deleted_records
+        "deleted_records": deleted_records,
+        "deleted_dlq": deleted_dlq
     }
 
 

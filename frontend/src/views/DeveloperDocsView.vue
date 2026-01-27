@@ -200,7 +200,7 @@ graph TD
 
     SB -->|Trigger| Worker
     Worker -->|Read File| Blob
-    Worker -->|OCR| Mistral[Mistral Document AI 25.05\n(mistral-document-ai-2505)]
+    Worker -->|OCR| Mistral["Mistral Document AI 25.05<br/>(mistral-document-ai-2505)"]
     Worker -->|Classify| OPENAI[Azure OpenAI Phi-4]
 
     Mistral -->|Markdown| Worker

@@ -10,7 +10,8 @@ import {
   ArrowDownTrayIcon,
   QuestionMarkCircleIcon,
   ArrowPathIcon,
-  ChatBubbleLeftRightIcon
+  ChatBubbleLeftRightIcon,
+  XMarkIcon
 } from '@heroicons/vue/24/outline'
 
 defineProps({
@@ -40,6 +41,7 @@ const error = ref(null)
 const reprocessingId = ref(null)
 const dlq = ref({ count: 0, messages: [] })
 const dlqError = ref(null)
+const dlqDismissed = ref(false)
 const diagnostics = ref(null)
 const diagnosticsError = ref(null)
 const currentTab = ref('dashboard')
@@ -286,6 +288,14 @@ const emit = defineEmits(['open-email'])
         Dashboard
       </button>
       <button
+        v-if="dlq.count > 0"
+        :class="['px-3 py-1 rounded-md text-sm font-medium flex items-center gap-1', currentTab==='failures' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300']"
+        @click="currentTab='failures'"
+      >
+        <ExclamationCircleIcon class="h-4 w-4" />
+        Failures ({{ dlq.count }})
+      </button>
+      <button
         :class="['px-3 py-1 rounded-md text-sm font-medium', currentTab==='developer' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300']"
         @click="currentTab='developer'"
       >
@@ -293,26 +303,31 @@ const emit = defineEmits(['open-email'])
       </button>
     </div>
     <div
-      v-if="dlq.count > 0"
-      class="rounded-md bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-4"
+      v-if="dlq.count > 0 && !dlqDismissed && currentTab !== 'failures'"
+      class="rounded-md bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-4 relative"
     >
+      <button
+        class="absolute top-2 right-2 text-red-400 hover:text-red-600 dark:text-red-300 dark:hover:text-red-100"
+        title="Dismiss"
+        @click="dlqDismissed = true"
+      >
+        <XMarkIcon class="h-5 w-5" />
+      </button>
       <div class="flex">
         <ExclamationCircleIcon class="h-5 w-5 text-red-400 mt-0.5" />
         <div class="ml-3">
           <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
             Dead-letter queue has {{ dlq.count }} message(s)
           </h3>
-          <div class="mt-2 text-sm text-red-700 dark:text-red-200">
-            <ul class="list-disc pl-5 space-y-1">
-              <li
-                v-for="msg in dlq.messages"
-                :key="msg.sequence_number || msg.message_id"
-              >
-                <span class="font-mono">{{ msg.blob_id || msg.blob_url || msg.message_id }}</span>
-                <span class="ml-2 text-xs text-gray-500 dark:text-gray-300">reason: {{ msg.dead_letter_reason || 'unknown' }}</span>
-              </li>
-            </ul>
-          </div>
+          <p class="mt-1 text-sm text-red-700 dark:text-red-200">
+            Processing failed for some items.
+            <button
+              class="font-semibold underline ml-1 hover:text-red-900 dark:hover:text-red-100"
+              @click="currentTab='failures'"
+            >
+              View Details
+            </button>
+          </p>
         </div>
       </div>
     </div>
@@ -722,6 +737,62 @@ const emit = defineEmits(['open-email'])
           />
           Reprocess
         </button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    v-if="currentTab==='failures'"
+    class="space-y-4 mt-4"
+  >
+    <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+      <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+        <ExclamationCircleIcon class="h-6 w-6 text-red-500" />
+        Dead Letter Queue (Failures)
+      </h3>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+        These items failed processing and were moved to the Dead Letter Queue in Azure Service Bus.
+        You can purge them by resetting the environment in Settings.
+      </p>
+
+      <div class="overflow-x-auto border rounded-md dark:border-gray-700">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead class="bg-gray-50 dark:bg-gray-700">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Item ID / ID
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Reason
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Description
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Time
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <tr
+              v-for="msg in dlq.messages"
+              :key="msg.message_id"
+            >
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white">
+                {{ msg.blob_id || msg.message_id }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400">
+                {{ msg.dead_letter_reason || 'Unknown' }}
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                {{ msg.dead_letter_error_description || '—' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                {{ msg.enqueued_time_utc || '—' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
