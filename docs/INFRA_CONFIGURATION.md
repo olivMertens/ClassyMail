@@ -33,8 +33,10 @@ Responsible for processing PDFs from the queue.
 | `AZURE_COSMOS_CONTAINER` | Container Name | `emails` |
 | `AZURE_AI_ENDPOINT` | Azure AI Foundry Endpoint | `https://email-poc-aifoundry.cognitiveservices.azure.com/` |
 | `PHI_DEPLOYMENT` | Model Deployment Name | `phi-4` |
-| `MISTRAL_DEPLOYMENT` | OCR Model Deployment | `mistral-ocr-2505` |
+| `MISTRAL_DEPLOYMENT` | OCR Model Deployment | `mistral-document-ai-2505` |
 | `AZURE_CLIENT_ID` | Managed Identity Client ID | `3ae24af5-97c6-437f...` |
+
+> **Note:** Keep `MISTRAL_DEPLOYMENT` consistent across Terraform, config defaults, and AI Foundry deployment (`mistral-document-ai-2505`).
 
 ---
 

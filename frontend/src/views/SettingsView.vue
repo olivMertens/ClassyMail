@@ -6,7 +6,6 @@ import {
     SunIcon,
     PlusIcon,
     TrashIcon,
-    PencilSquareIcon,
     ExclamationTriangleIcon,
     SwatchIcon,
     CpuChipIcon,
@@ -16,8 +15,7 @@ import {
     ArrowPathIcon,
     QuestionMarkCircleIcon,
     ChevronDownIcon,
-    ChevronUpIcon,
-    XMarkIcon
+    ChevronUpIcon
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 

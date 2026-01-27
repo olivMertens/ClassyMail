@@ -1,13 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from classificationg2s.core import config
-from classificationg2s.services.azure_clients import Clients, get_clients, get_cosmos_container, blob_id_from_url
+from classificationg2s.services.azure_clients import Clients, get_clients, blob_id_from_url
 import logging
 import uuid
 import json
+import os
 from datetime import datetime, timezone
 from fpdf import FPDF
-from azure.servicebus import ServiceBusMessage
+from azure.servicebus import ServiceBusMessage, ServiceBusSubQueue
+from classificationg2s.services.messages import extract_blob_url
+from classificationg2s.services.azure_clients import readiness_checks, get_cosmos_container as azure_get_cosmos_container
+from classificationg2s.services.repository import search_email_records
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger("classimail.admin")
@@ -15,6 +19,32 @@ logger = logging.getLogger("classimail.admin")
 class ResetRequest(BaseModel):
     confirm_1: bool
     confirm_2: bool
+
+
+class DeadLetterMessage(BaseModel):
+    message_id: str | None = None
+    delivery_count: int | None = None
+    dead_letter_reason: str | None = None
+    dead_letter_error_description: str | None = None
+    blob_url: str | None = None
+    blob_id: str | None = None
+    enqueued_time_utc: datetime | None = None
+    sequence_number: int | None = None
+
+
+class DeadLetterSummary(BaseModel):
+    count: int
+    messages: list[DeadLetterMessage]
+
+
+class DiagnosticsResponse(BaseModel):
+    env: dict
+    readiness: dict
+    ok: bool
+
+
+class SearchResponse(BaseModel):
+    items: list[dict]
 
 @router.post("/debug/simulate-flow")
 async def simulate_flow(clients: Clients = Depends(get_clients)):
@@ -126,7 +156,7 @@ async def check_connectivity(clients: Clients = Depends(get_clients)):
 
     # 2. Test Cosmos Write/Delete
     try:
-        container = await get_cosmos_container(clients)
+        container = await azure_get_cosmos_container(clients)
         test_id = f"debug-{uuid.uuid4()}"
         test_item = {"id": test_id, "type": "debug_check", "timestamp": str(uuid.uuid4())}
 
@@ -182,7 +212,7 @@ async def reset_environment(
     # Efficient deletion: recreate container or delete by query?
     # Recreating needs management SDK (slower, permissions). Deleting items is safer for data-plane.
     try:
-        container = await get_cosmos_container(clients)
+        container = await azure_get_cosmos_container(clients)
         # Fetch all IDs first (cheaper query)
         query = "SELECT c.id, c.id as partitionKey FROM c"
         # Note: Using backend-for-frontend pattern, simple iteration is fine for POC size.
@@ -210,3 +240,75 @@ async def reset_environment(
         "deleted_blobs": deleted_blobs,
         "deleted_records": deleted_records
     }
+
+
+@router.get("/deadletter", response_model=DeadLetterSummary)
+async def deadletter_summary(clients: Clients = Depends(get_clients)):
+    """Peek the dead-letter queue and return a summary for admin UI."""
+    if not clients.sb_client:
+        raise HTTPException(status_code=503, detail="Service Bus client not initialized")
+
+    try:
+        messages: list[DeadLetterMessage] = []
+        async with clients.sb_client.get_queue_receiver(
+            queue_name=config.SERVICE_BUS_QUEUE,
+            sub_queue=ServiceBusSubQueue.DEAD_LETTER,
+            max_wait_time=5,
+        ) as receiver:
+            peeked = await receiver.peek_messages(max_message_count=10)
+            for m in peeked:
+                body_bytes = b"".join([b for b in m.body])
+                try:
+                    payload = json.loads(body_bytes.decode())
+                except Exception:
+                    payload = {"raw": body_bytes.decode(errors="ignore")}
+                blob_url = extract_blob_url(payload)
+                messages.append(
+                    DeadLetterMessage(
+                        message_id=getattr(m, "message_id", None),
+                        delivery_count=getattr(m, "delivery_count", None),
+                        dead_letter_reason=getattr(m, "dead_letter_reason", None),
+                        dead_letter_error_description=getattr(m, "dead_letter_error_description", None),
+                        blob_url=blob_url,
+                        blob_id=blob_id_from_url(blob_url) if blob_url else None,
+                        enqueued_time_utc=getattr(m, "enqueued_time_utc", None),
+                        sequence_number=getattr(m, "sequence_number", None),
+                    )
+                )
+    except Exception as ex:
+        logger.exception("Failed to peek dead-letter queue: %s", ex)
+        raise HTTPException(status_code=500, detail=f"Failed to peek dead-letter queue: {ex}") from ex
+
+    return DeadLetterSummary(count=len(messages), messages=messages)
+
+
+@router.get("/diagnostics", response_model=DiagnosticsResponse)
+async def diagnostics(clients: Clients = Depends(get_clients)):
+    ok, readiness = await readiness_checks(clients=clients, deep=True)
+    env = {
+        "subscription_id": os.getenv("AZURE_SUBSCRIPTION_ID"),
+        "tenant_id": os.getenv("AZURE_TENANT_ID"),
+        "resource_group": os.getenv("AZURE_RESOURCE_GROUP"),
+        "app_version": os.getenv("APP_VERSION"),
+        "service_bus_fqdn": config.SERVICE_BUS_FQDN,
+        "service_bus_queue": config.SERVICE_BUS_QUEUE,
+        "storage_account_url": config.BLOB_ACCOUNT_URL,
+        "storage_container": config.BLOB_CONTAINER_INPUT,
+        "cosmos_endpoint": config.COSMOS_ENDPOINT,
+        "cosmos_db": config.COSMOS_DB,
+        "cosmos_container": config.COSMOS_CONTAINER,
+        "ai_endpoint": config.MISTRAL_ENDPOINT or config.PHI_ENDPOINT,
+        "mistral_deployment": config.MISTRAL_DEPLOYMENT,
+        "phi_deployment": config.PHI_DEPLOYMENT,
+    }
+    return DiagnosticsResponse(env=env, readiness=readiness, ok=ok)
+
+
+@router.get("/search", response_model=SearchResponse)
+async def search_emails(q: str, limit: int = 5, clients: Clients = Depends(get_clients)):
+    if not q or len(q.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Query too short")
+    limit = min(max(limit, 1), 20)
+
+    items = await search_email_records(q, limit=limit, clients=clients)
+    return SearchResponse(items=items)

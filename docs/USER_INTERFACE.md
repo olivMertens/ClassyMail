@@ -71,6 +71,15 @@ Access via the "Developer" link in the navigation bar.
 - **Architecture**: Dynamic Mermaid diagram showing the system component flow.
 - **Repository**: Process & Codebase links.
 
+## Chat Assistant (Developer Tab)
+- Floating button in the bottom-right corner when the dashboard is loaded.
+- Uses **tool calling** to query Cosmos DB (`search_emails`, `search_email_by_text`, `get_latest_errors`, `get_stats_summary`, `get_top_intents`).
+- Example prompts:
+  - "Find emails about invoices"
+  - "Show latest errors"
+  - "What are the top intents?"
+- Stays scoped to **ClassificationG2S**; refuses unrelated topics.
+
 ## Settings & Danger Zone
 
 The application settings allow customization of the classification engine and environment management.

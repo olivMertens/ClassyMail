@@ -9,7 +9,8 @@ import {
   ClockIcon,
   ArrowDownTrayIcon,
   QuestionMarkCircleIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  ChatBubbleLeftRightIcon
 } from '@heroicons/vue/24/outline'
 
 defineProps({
@@ -28,7 +29,6 @@ const stats = ref({
     average_confidence: 0,
     finetune_min_required: 50
 })
-const showFinetuneHelp = ref(false)
 const filter = ref('all')
 const search = ref('')
 const categoryFilter = ref('')
@@ -38,8 +38,20 @@ const pageSize = ref(20)
 const loading = ref(false)
 const error = ref(null)
 const reprocessingId = ref(null)
+const dlq = ref({ count: 0, messages: [] })
+const dlqError = ref(null)
+const diagnostics = ref(null)
+const diagnosticsError = ref(null)
+const currentTab = ref('dashboard')
+const chatOpen = ref(false)
+const chatQuery = ref('')
+const chatLoading = ref(false)
+const chatError = ref(null)
+const chatResponse = ref(null)
 
 const pageSizeOptions = [20, 50, 100]
+
+const allProcessed = computed(() => stats.value.total > 0 && stats.value.total === stats.value.processed)
 
 const filters = [
   { id: 'all', label: 'All', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
@@ -143,6 +155,66 @@ const fetchEmails = async () => {
     }
 }
 
+const fetchDeadletters = async () => {
+    try {
+        const res = await fetch('/api/admin/deadletter')
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.detail || `Server Error: ${res.status}`)
+        }
+        dlq.value = await res.json()
+        dlqError.value = null
+    } catch (e) {
+        console.error(e)
+        dlqError.value = e.message
+    }
+}
+
+const fetchDiagnostics = async () => {
+    try {
+        const res = await fetch('/api/admin/diagnostics')
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.detail || `Server Error: ${res.status}`)
+        }
+        diagnostics.value = await res.json()
+        diagnosticsError.value = null
+    } catch (e) {
+        console.error(e)
+        diagnosticsError.value = e.message
+    }
+}
+
+const runChatSearch = async () => {
+    chatLoading.value = true
+    chatError.value = null
+    chatResponse.value = null
+    try {
+        const q = chatQuery.value.trim()
+        if (!q) return
+        const res = await fetch('/api/chat', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ messages: [{ role: 'user', content: q }] })
+        })
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.detail || `Server Error: ${res.status}`)
+        }
+        const data = await res.json()
+        chatResponse.value = data.content
+    } catch (e) {
+        chatError.value = e.message
+    } finally {
+        chatLoading.value = false
+    }
+}
+
+const useExample = (text) => {
+    chatQuery.value = text
+    runChatSearch()
+}
+
 // Watchers
 watch([filter, pageSize, categoryFilter, confidenceFilter], () => {
     page.value = 1
@@ -161,9 +233,17 @@ watch([search, categoryFilter], () => {
 
 onMounted(() => {
     fetchEmails()
+    fetchDeadletters()
+    fetchDiagnostics()
     // Poll every 30s
-    const poll = setInterval(fetchEmails, 30000)
-    return () => clearInterval(poll)
+    const pollEmails = setInterval(fetchEmails, 30000)
+    const pollDlq = setInterval(fetchDeadletters, 30000)
+    const pollDiag = setInterval(fetchDiagnostics, 60000)
+    return () => {
+        clearInterval(pollEmails)
+        clearInterval(pollDlq)
+        clearInterval(pollDiag)
+    }
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(stats.value.total / pageSize.value)))
@@ -172,11 +252,6 @@ const progressPercentage = computed(() => {
     if (!stats.value.total) return 0
     return Math.round((stats.value.processed / stats.value.total) * 100)
 })
-
-const formatDate = (dateString) => {
-    if (!dateString) return ''
-    return new Date(dateString).toLocaleString()
-}
 
 const getScoreColor = (email) => {
     const intents = email.classification?.detected_intents || []
@@ -200,8 +275,68 @@ const emit = defineEmits(['open-email'])
 
 <template>
   <div class="space-y-6">
+    <div
+      v-if="allProcessed"
+      class="flex items-center space-x-4 border-b border-gray-200 dark:border-gray-700 pb-2"
+    >
+      <button
+        :class="['px-3 py-1 rounded-md text-sm font-medium', currentTab==='dashboard' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300']"
+        @click="currentTab='dashboard'"
+      >
+        Dashboard
+      </button>
+      <button
+        :class="['px-3 py-1 rounded-md text-sm font-medium', currentTab==='developer' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300']"
+        @click="currentTab='developer'"
+      >
+        Developer
+      </button>
+    </div>
+    <div
+      v-if="dlq.count > 0"
+      class="rounded-md bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-4"
+    >
+      <div class="flex">
+        <ExclamationCircleIcon class="h-5 w-5 text-red-400 mt-0.5" />
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
+            Dead-letter queue has {{ dlq.count }} message(s)
+          </h3>
+          <div class="mt-2 text-sm text-red-700 dark:text-red-200">
+            <ul class="list-disc pl-5 space-y-1">
+              <li
+                v-for="msg in dlq.messages"
+                :key="msg.sequence_number || msg.message_id"
+              >
+                <span class="font-mono">{{ msg.blob_id || msg.blob_url || msg.message_id }}</span>
+                <span class="ml-2 text-xs text-gray-500 dark:text-gray-300">reason: {{ msg.dead_letter_reason || 'unknown' }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
+      v-else-if="dlqError"
+      class="rounded-md bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 p-4"
+    >
+      <div class="flex">
+        <ExclamationCircleIcon class="h-5 w-5 text-amber-400 mt-0.5" />
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-amber-800 dark:text-amber-200">
+            Dead-letter status unavailable
+          </h3>
+          <p class="mt-2 text-sm text-amber-700 dark:text-amber-200">
+            {{ dlqError }}
+          </p>
+        </div>
+      </div>
+    </div>
     <!-- Stats Cards -->
-    <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    <dl
+      v-if="currentTab==='dashboard'"
+      class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4"
+    >
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
           Total Emails
@@ -591,6 +726,62 @@ const emit = defineEmits(['open-email'])
     </div>
   </div>
 
+  <div
+    v-if="currentTab==='developer'"
+    class="space-y-4 mt-4"
+  >
+    <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+          Environment
+        </h3>
+        <button
+          class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100"
+          @click="fetchDiagnostics"
+        >
+          <ArrowPathIcon class="h-4 w-4 mr-1" /> Refresh
+        </button>
+      </div>
+      <div
+        v-if="diagnosticsError"
+        class="mt-2 text-sm text-red-600 dark:text-red-300"
+      >
+        {{ diagnosticsError }}
+      </div>
+      <table
+        v-else-if="diagnostics"
+        class="mt-2 min-w-full text-sm"
+      >
+        <tbody>
+          <tr
+            v-for="(v, k) in diagnostics.env"
+            :key="k"
+            class="border-b border-gray-200 dark:border-gray-700"
+          >
+            <td class="py-1 font-mono text-gray-500 dark:text-gray-300">
+              {{ k }}
+            </td>
+            <td class="py-1 text-gray-900 dark:text-gray-100">
+              {{ v || '—' }}
+            </td>
+          </tr>
+          <tr>
+            <td class="py-1 font-mono text-gray-500 dark:text-gray-300">
+              readiness
+            </td>
+            <td class="py-1">
+              <span :class="diagnostics.ok ? 'text-green-600 dark:text-green-300' : 'text-red-600 dark:text-red-300'">{{ diagnostics.ok ? 'OK' : 'NOT READY' }}</span>
+              <pre
+                v-if="diagnostics.readiness && Object.keys(diagnostics.readiness).length"
+                class="mt-1 bg-gray-100 dark:bg-gray-900 p-2 rounded text-xs text-gray-700 dark:text-gray-200"
+              >{{ JSON.stringify(diagnostics.readiness, null, 2) }}</pre>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Pagination -->
   <div class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
     <div class="flex items-center">
@@ -624,6 +815,154 @@ const emit = defineEmits(['open-email'])
         @click="page++"
       >
         <ChevronRightIcon class="h-5 w-5" />
+      </button>
+    </div>
+    <!-- Floating Chat Assistant -->
+    <div class="fixed bottom-4 right-4 z-50 flex flex-col items-end pointer-events-none">
+      <div
+        v-if="chatOpen"
+        class="mb-4 w-96 bg-white dark:bg-gray-900 shadow-xl rounded-lg border border-gray-200 dark:border-gray-700 pointer-events-auto flex flex-col overflow-hidden"
+        style="max-height: 80vh;"
+      >
+        <!-- Header -->
+        <div class="bg-primary-600 px-4 py-3 flex justify-between items-center text-white">
+          <div class="flex items-center gap-2">
+            <ChatBubbleLeftRightIcon class="h-5 w-5" />
+            <span class="font-medium text-sm">AI Assistant</span>
+          </div>
+          <button
+            class="text-primary-100 hover:text-white"
+            @click="chatOpen = false"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              class="w-5 h-5"
+            >
+              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Content -->
+        <div class="p-4 flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800/50 min-h-[200px]">
+          <div
+            v-if="!chatResponse && !chatLoading"
+            class="space-y-4"
+          >
+            <div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200">
+              <span class="font-bold block mb-1">How it works:</span>
+              I can search the email database using tools (search, latest errors, stats, top intents). Ask me about processed emails.
+            </div>
+            <div>
+              <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">
+                Try Asking:
+              </p>
+              <div class="grid gap-2">
+                <button
+                  v-for="ex in ['Find emails about invoices', 'Show latest errors', 'What are the top intents?', 'Search text containing Urgent']"
+                  :key="ex"
+                  class="text-left text-xs bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 transition-colors shadow-sm"
+                  @click="useExample(ex)"
+                >
+                  {{ ex }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-if="chatLoading"
+            class="flex justify-start mt-2"
+          >
+            <div class="bg-white dark:bg-gray-800 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-2">
+              <div class="animate-spin h-3 w-3 border-2 border-primary-600 border-t-transparent rounded-full" />
+              <span class="text-xs text-gray-500">Searching database...</span>
+            </div>
+          </div>
+
+          <div
+            v-if="chatResponse"
+            class="flex justify-start mt-2"
+          >
+            <div class="bg-white dark:bg-gray-800 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm max-w-[90%]">
+              <div class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
+                {{ chatResponse }}
+              </div>
+              <div class="mt-2 text-[10px] text-gray-400 border-t dark:border-gray-700 pt-1 flex items-center gap-1">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  class="w-3 h-3"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                Generated by Azure AI
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-if="chatError"
+            class="mt-2 text-xs text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-100 dark:border-red-800"
+          >
+            Error: {{ chatError }}
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+          <div class="relative">
+            <textarea
+              v-model="chatQuery"
+              rows="1"
+              class="block w-full rounded-md border-0 py-2 pr-10 pl-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white resize-none"
+              placeholder="Type your message..."
+              @keydown.enter.exact.prevent="runChatSearch"
+            />
+            <button
+              :disabled="!chatQuery.trim() || chatLoading"
+              class="absolute bottom-1.5 right-1.5 p-1.5 rounded-md text-primary-600 hover:text-primary-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+              @click="runChatSearch"
+            >
+              <span class="sr-only">Send</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                class="w-5 h-5"
+              >
+                <path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <button
+        class="pointer-events-auto shadow-lg rounded-full w-14 h-14 bg-primary-600 hover:bg-primary-500 text-white flex items-center justify-center transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600"
+        :class="{'rotate-90': chatOpen}"
+        @click="chatOpen = !chatOpen"
+      >
+        <ChatBubbleLeftRightIcon
+          v-if="!chatOpen"
+          class="h-7 w-7"
+        />
+        <svg
+          v-else
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          class="w-6 h-6"
+        >
+          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+        </svg>
       </button>
     </div>
   </div>

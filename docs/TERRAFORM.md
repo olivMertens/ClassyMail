@@ -65,6 +65,14 @@ Terraform crée une **User Assigned Managed Identity** (`<prefix>-id`) et lui as
 | **AI Foundry / Services** | `Cognitive Services User` | Appel des APIs d'inférence (Phi-4, Mistral). |
 | **Cosmos DB** | `Cosmos DB Built-in Data Contributor` | Lecture/Ecriture des résultats de classification (Scope Database). |
 
+## Variables Chatbot (injection Container App)
+
+- **API** reçoit automatiquement :
+  - `CHAT_ENDPOINT` = endpoint AI Foundry
+  - `CHAT_DEPLOYMENT` = `gpt-5.2-chat`
+  - `CHAT_API_VERSION` = `2024-08-01-preview`
+- **Worker** n’en a pas besoin.
+
 ## Hygiene repo (ce qu’on commit)
 
 À committer :

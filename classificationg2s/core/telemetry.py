@@ -36,7 +36,8 @@ def init_telemetry(app) -> None:
         if otlp_endpoint:
             provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint)))
         trace.set_tracer_provider(provider)
-        FastAPIInstrumentor.instrument_app(app)
+        if app is not None:
+            FastAPIInstrumentor.instrument_app(app)
         HTTPXClientInstrumentor().instrument()
 
 

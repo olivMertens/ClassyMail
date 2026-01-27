@@ -100,6 +100,13 @@ uv run pytest
 ## 🔄 Après terraform : remplir `secrets.env`
 Utiliser `terraform output` (infra/) pour renseigner `secrets.env` ou `secrets.env.example`.
 
+Ajouter (ou laisser les valeurs par défaut) pour l’assistant IA :
+```dotenv
+CHAT_ENDPOINT=... # optionnel, défaut PHI_ENDPOINT
+CHAT_DEPLOYMENT=gpt-5.2-chat
+CHAT_API_VERSION=2024-08-01-preview
+```
+
 ## 📌 Références
 - `scripts/build_acr.ps1`, `scripts/build_acr.sh`
 - `docs/LOCAL_RUN.md`

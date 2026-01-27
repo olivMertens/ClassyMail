@@ -12,7 +12,7 @@ Il sert à valider rapidement :
 - Une architecture **événementielle découplée** (ingestion vs traitement) pour absorber des pics (ex: 10k fichiers).
 - Un workflow de **review humaine** (dashboard interactif) + boucle de **reinforcement / fine-tuning**.
 - Un mode de déploiement cloud **prod-ready** (Terraform + Azure Container Apps) et une exécution locale simple.
-- **Nouveau (Fév 2026)** : Interface "Dark Mode" native, Danger Zone (Reset complet), Filtres avancés (Catégorie/Confiance), et "Average Quality" stat.
+- **Nouveau (Fév 2026)** : Interface "Dark Mode" native, Danger Zone (Reset complet), Filtres avancés (Catégorie/Confiance), "Average Quality" stat, et **Assistant IA (chat) connecté à Cosmos DB**.
 
 ## Comment ça marche (vue d’ensemble)
 
@@ -363,7 +363,7 @@ Références :
 - Tutoriel officiel (GPT-4o-mini, end-to-end) : https://learn.microsoft.com/en-us/azure/ai-foundry/openai/tutorials/fine-tune?view=foundry-classic&tabs=command-line
 
 ## 🧱 Terraform (Foundry)
-- `infra/main.tf` : crée **Foundry** (AIServices), **Project**, **Deployments** (`phi-4`, `mistral-ocr-2505`), **RBAC** `Cognitive Services User` pour l'identité `app_id`.
+- `infra/main.tf` : crée **Foundry** (AIServices), **Project**, **Deployments** (`phi-4`, `mistral-document-ai-2505`), **RBAC** `Cognitive Services User` pour l'identité `app_id`.
 - Commandes :
     ```bash
     terraform init -upgrade
@@ -381,12 +381,15 @@ AZURE_STORAGE_CONTAINER=pdf-inputs
 AZURE_COSMOS_ENDPOINT=...
 AZURE_COSMOS_KEY=...
 MISTRAL_ENDPOINT=...
-MISTRAL_DEPLOYMENT=mistral-ocr-2505
+MISTRAL_DEPLOYMENT=mistral-document-ai-2505
 MISTRAL_MODE=maas
 PHI_ENDPOINT=...
 PHI_DEPLOYMENT=phi-4
 PHI_FALLBACK_ENDPOINT=...
 PHI_FALLBACK_DEPLOYMENT=gpt-4o-mini
+CHAT_ENDPOINT=... # (optionnel, défaut PHI_ENDPOINT)
+CHAT_DEPLOYMENT=gpt-5.2-chat
+CHAT_API_VERSION=2024-08-01-preview
 PHI_PRIMARY_MAX_INPUT_TOKENS=8000
 PHI_FALLBACK_MAX_INPUT_TOKENS=120000
 PHI_RESERVED_OUTPUT_TOKENS=1000
@@ -443,6 +446,9 @@ Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#3-sécurité--accés-rbac) pour
 | `AZURE_AI_KEY` | (Optionnel) Clé API modèle |
 | `AZURE_AI_SCOPE` | Scope token (défaut `https://cognitiveservices.azure.com/.default`) |
 | `AZURE_AI_API_VERSION` | API version (défaut `2024-08-01-preview`) |
+| `CHAT_ENDPOINT` | Endpoint du modèle de chat (défaut: `PHI_ENDPOINT`) |
+| `CHAT_DEPLOYMENT` | Déploiement du modèle de chat (défaut: `gpt-5.2-chat`) |
+| `CHAT_API_VERSION` | Version API du modèle de chat (défaut: `2024-08-01-preview`) |
 | `FALLBACK_COST_PER_1K_INPUT` | Prix input/1K tokens (fallback) (configurable) |
 | `FALLBACK_COST_PER_1K_OUTPUT` | Prix output/1K tokens (fallback) (configurable) |
 

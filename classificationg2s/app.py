@@ -22,6 +22,7 @@ from classificationg2s.api.routers.webhook import router as webhook_router
 from classificationg2s.api.routers.costs import router as costs_router
 from classificationg2s.api.routers.docs import router as docs_router
 from classificationg2s.api.routers.admin import router as admin_router
+from classificationg2s.api.routers.chat import router as chat_router
 
 
 def create_app() -> FastAPI:
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(webhook_router)
     app.include_router(costs_router)
     app.include_router(admin_router)
+    app.include_router(chat_router)
     # UI router must be last to handle catch-all for SPA
     app.include_router(ui_router)
 

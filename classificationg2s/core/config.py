@@ -18,7 +18,7 @@ COSMOS_CONTAINER = os.getenv("AZURE_COSMOS_CONTAINER", "emails")
 # AI endpoints
 MISTRAL_ENDPOINT = os.getenv("MISTRAL_ENDPOINT")  # https://...azure.net
 MISTRAL_MODE = os.getenv("MISTRAL_MODE", "maas")  # maas|inference
-MISTRAL_DEPLOYMENT = os.getenv("MISTRAL_DEPLOYMENT", "mistral-ocr-2505")
+MISTRAL_DEPLOYMENT = os.getenv("MISTRAL_DEPLOYMENT", "mistral-document-ai-2505")
 PHI_ENDPOINT = os.getenv("PHI_ENDPOINT") or os.getenv("AZURE_AI_ENDPOINT")
 PHI_DEPLOYMENT = os.getenv("PHI_DEPLOYMENT", "phi-4")
 AI_API_VERSION = os.getenv("AZURE_AI_API_VERSION", "2024-08-01-preview")
@@ -39,6 +39,11 @@ ANONYMIZER_MAX_TOKENS = int(os.getenv("ANONYMIZER_MAX_TOKENS", "6000"))
 VISION_ENDPOINT = os.getenv("VISION_ENDPOINT") or PHI_ENDPOINT
 VISION_DEPLOYMENT = os.getenv("VISION_DEPLOYMENT", "gpt-4o")
 VISION_API_VERSION = os.getenv("VISION_API_VERSION", AI_API_VERSION)
+
+# Chatbot model
+CHAT_ENDPOINT = os.getenv("CHAT_ENDPOINT") or PHI_ENDPOINT
+CHAT_DEPLOYMENT = os.getenv("CHAT_DEPLOYMENT", "gpt-5.2-chat")
+CHAT_API_VERSION = os.getenv("CHAT_API_VERSION", AI_API_VERSION)
 
 # Context sizing (best-effort). Adjust to match your deployments.
 PHI_PRIMARY_MAX_INPUT_TOKENS = int(os.getenv("PHI_PRIMARY_MAX_INPUT_TOKENS", "8000"))

@@ -95,9 +95,9 @@ const runDeepHealthCheck = async () => {
   debugLoading.value = true
   debugResults.value = null
   try {
-    const res = await fetch('/api/readyz/deep')
+    const res = await fetch('/api/admin/diagnostics')
     if (res.ok) {
-      debugResults.value = { status: 'ready', failures: {} }
+      debugResults.value = await res.json()
     } else {
       const data = await res.json()
       debugResults.value = {
@@ -200,7 +200,7 @@ graph TD
 
     SB -->|Trigger| Worker
     Worker -->|Read File| Blob
-    Worker -->|OCR| Mistral[Mistral AI OCR]
+    Worker -->|OCR| Mistral[Mistral Document AI 25.05\n(mistral-document-ai-2505)]
     Worker -->|Classify| OPENAI[Azure OpenAI Phi-4]
 
     Mistral -->|Markdown| Worker

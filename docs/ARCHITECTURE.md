@@ -31,7 +31,7 @@ flowchart TD
         W[Worker (python -m classificationg2s.worker_main)]
     end
     subgraph AI[AI Foundry - MaaS]
-        Mistral[Mistral OCR 25.05]
+        Mistral[Mistral Document AI 25.05\n(mistral-document-ai-2505)]
         Phi4[Phi-4]
     end
     subgraph Data[Cosmos DB]

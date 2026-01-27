@@ -208,3 +208,92 @@ async def export_finetune_jsonl_iter(
 
         yield json.dumps(example, ensure_ascii=False) + "\n"
         written += 1
+
+
+async def search_email_records(q: str, limit: int = 5, clients: Clients | None = None) -> list[dict]:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    query = (
+        "SELECT c.id, c.status, c.file_url, c.subject, c.error, c.updated_at FROM c "
+        "WHERE CONTAINS(c.id, @q) OR (IS_DEFINED(c.subject) AND CONTAINS(c.subject, @q)) "
+        "OFFSET 0 LIMIT @limit"
+    )
+    params = [
+        {"name": "@q", "value": q},
+        {"name": "@limit", "value": limit},
+    ]
+    items = [x async for x in clients.cosmos_container.query_items(query, parameters=params)]
+    return items
+
+
+async def get_email_by_id(item_id: str, clients: Clients | None = None) -> dict | None:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    query = "SELECT * FROM c WHERE c.id=@id"
+    params = [{"name": "@id", "value": item_id}]
+    it = clients.cosmos_container.query_items(query, parameters=params)
+    async for item in it:
+        return item
+    return None
+
+
+async def search_email_by_text(q: str, limit: int = 5, clients: Clients | None = None) -> list[dict]:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    query = (
+        "SELECT c.id, c.status, c.file_url, c.subject, c.error, c.updated_at FROM c "
+        "WHERE IS_DEFINED(c.search_text) AND CONTAINS(c.search_text, @q) "
+        "OFFSET 0 LIMIT @limit"
+    )
+    params = [
+        {"name": "@q", "value": q},
+        {"name": "@limit", "value": limit},
+    ]
+    items = [x async for x in clients.cosmos_container.query_items(query, parameters=params)]
+    return items
+
+
+async def get_latest_errors(limit: int = 5, clients: Clients | None = None) -> list[dict]:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    query = (
+        "SELECT c.id, c.subject, c.error, c.updated_at FROM c "
+        "WHERE c.status='ERROR' ORDER BY c._ts DESC OFFSET 0 LIMIT @limit"
+    )
+    params = [{"name": "@limit", "value": limit}]
+    items = [x async for x in clients.cosmos_container.query_items(query, parameters=params)]
+    return items
+
+
+async def get_stats_summary(clients: Clients | None = None) -> dict:
+    clients = clients or get_default_clients()
+    # Reuse existing helpers to avoid duplicating queries
+    pending = await count_by_status("PENDING", clients=clients)
+    processing = await count_by_status("PROCESSING", clients=clients)
+    processed = await count_by_status("PROCESSED", clients=clients)
+    error = await count_by_status("ERROR", clients=clients)
+    review_required = await count_by_status("REVIEW_REQUIRED", clients=clients)
+    total = pending + processing + processed + error + review_required
+    return {
+        "total": total,
+        "pending": pending,
+        "processing": processing,
+        "processed": processed,
+        "error": error,
+        "review_required": review_required,
+        "average_confidence": await get_average_confidence(clients=clients),
+    }
+
+
+async def get_top_intents(limit: int = 5, clients: Clients | None = None) -> list[dict]:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    query = (
+        "SELECT i.intent as intent, COUNT(1) as doc_count "
+        "FROM c JOIN i IN c.classification.detected_intents "
+        "WHERE c.status='PROCESSED' "
+        "GROUP BY i.intent ORDER BY doc_count DESC OFFSET 0 LIMIT @limit"
+    )
+    params = [{"name": "@limit", "value": limit}]
+    items = [x async for x in clients.cosmos_container.query_items(query, parameters=params)]
+    return items

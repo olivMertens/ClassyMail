@@ -17,3 +17,4 @@ opentelemetry-instrumentation-httpx==0.60b0
 aiohttp==3.9.5
 python-multipart==0.0.21
 fpdf2==2.7.9
+azure-ai-inference==1.0.0b9

@@ -3,62 +3,39 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+import logging
 from datetime import datetime, timezone
 
+from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ResourceNotFoundError
+from azure.servicebus.aio import AutoLockRenewer
 from classificationg2s.services.azure_clients import Clients
 from classificationg2s.services.pipeline import run_classification_pipeline
 from classificationg2s.services.repository import save_to_cosmos
 from classificationg2s.models import EmailRecord, OCRFailed
 from classificationg2s.services.azure_clients import blob_id_from_url
+from classificationg2s.services.messages import extract_blob_url
 
+logger = logging.getLogger(__name__)
 
-def _extract_blob_url(payload) -> str | None:
-    """Extract a blob URL from either:
-    - our internal message format: {"blob_url": "https://..."}
-    - Event Grid event(s) delivered to Service Bus (EventGrid schema or CloudEvents)
-    """
-    if isinstance(payload, dict):
-        if payload.get("blob_url"):
-            return payload["blob_url"]
-        # Some producers may already send the Event Grid event as a dict.
-        candidates = [payload]
-    elif isinstance(payload, list):
-        candidates = payload
-    else:
-        return None
-
-    for ev in candidates:
-        if not isinstance(ev, dict):
-            continue
-        # Event Grid schema
-        data = ev.get("data") or {}
-        if isinstance(data, dict):
-            url = data.get("url")
-            if isinstance(url, str) and url.startswith("http"):
-                return url
-        # CloudEvents schema
-        data = ev.get("data") or {}
-        if isinstance(data, dict):
-            url = data.get("url")
-            if isinstance(url, str) and url.startswith("http"):
-                return url
-    return None
 
 async def worker_loop_forever(*, queue_name: str, get_settings, clients: Clients):
     if not clients.sb_client:
         raise RuntimeError("Service Bus client not initialized")
 
     concurrency = clients.concurrency_limit
+    auto_lock_renewer = AutoLockRenewer(max_lock_renewal_duration=600)
     while True:
         try:
-            async with clients.sb_client.get_queue_receiver(queue_name=queue_name, max_wait_time=5) as receiver:
+            async with clients.sb_client.get_queue_receiver(
+                queue_name=queue_name, max_wait_time=5, auto_lock_renewer=auto_lock_renewer
+            ) as receiver:
                 async for msg in receiver:
                     async with concurrency:
                         await handle_queue_message(receiver, msg, get_settings=get_settings, clients=clients)
         except asyncio.CancelledError:
             break
         except Exception as ex:
-            print(f"[worker] Error: {ex}")
+            logger.exception("Worker loop error: %s", ex)
             await asyncio.sleep(2)
 
 
@@ -82,32 +59,35 @@ class ProcessingTimer:
 
 async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients):
     body_bytes = b"".join([b for b in msg.body])
+    message_id = getattr(msg, "message_id", None)
+    delivery_count = getattr(msg, "delivery_count", None)
+    logger.info("[msg:%s] Received (delivery=%s, bytes=%s)", message_id, delivery_count, len(body_bytes))
+
     try:
         payload = json.loads(body_bytes.decode())
     except Exception:
         payload = {"blob_url": None, "raw": body_bytes.decode(errors="ignore")}
 
-    blob_url = _extract_blob_url(payload)
+    blob_url = extract_blob_url(payload)
     if not blob_url:
-        print("[worker] ✗ No blob_url found in message, sending to DLQ")
-        await receiver.dead_letter_message(msg, reason="No blob_url in message")
+        logger.warning("[msg:%s] No blob_url found in message, dead-lettering", message_id)
+        await receiver.dead_letter_message(msg, reason="NoBlobUrl")
         return
 
-    print(f"[worker] → Processing message for blob: {blob_url}")
+    logger.info("[msg:%s] → Processing blob: %s", message_id, blob_url)
 
     try:
         with ProcessingTimer() as timer:
-            print(f"[worker] Starting classification pipeline for {blob_url}")
+            logger.info("[msg:%s] Starting classification pipeline", message_id)
             result = await run_classification_pipeline(blob_url, settings=get_settings(), clients=clients)
-            print(f"[worker] Pipeline completed in {timer.duration_ms:.0f}ms")
+            logger.info("[msg:%s] Pipeline completed in %.0fms", message_id, timer.duration_ms)
 
         result.processing_time_ms = timer.duration_ms
-        print(f"[worker] Saving result to Cosmos DB (ID: {result.id})")
+        logger.info("[msg:%s] Saving result to Cosmos DB (ID: %s)", message_id, result.id)
         await save_to_cosmos(result)
-        print(f"[worker] ✓ Processing complete for {result.id}")
+        logger.info("[msg:%s] ✓ Processing complete for %s", message_id, result.id)
         await receiver.complete_message(msg)
     except OCRFailed as ex:
-        # Persist a visible ERROR record so the UI can show stage-1 failures (corrupted PDF, download errors, etc.)
         error_stage = None
         error_text = str(ex)
         if error_text.startswith("stage="):
@@ -128,13 +108,25 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
         try:
             await save_to_cosmos(record)
         except Exception as persist_ex:
-            print(f"[worker] Failed to persist error record: {persist_ex}")
+            logger.exception("[msg:%s] Failed to persist error record: %s", message_id, persist_ex)
 
         reason = "ProcessingFailed"
         if error_stage == "download":
             reason = "CorruptedOrUnreadablePDF"
-        print(f"[worker] Processing failed for {blob_url}: {error_text}")
+        logger.error("[msg:%s] Processing failed for %s: %s", message_id, blob_url, error_text)
         await receiver.dead_letter_message(msg, reason=reason, error_description=error_text)
     except Exception as ex:
-        print(f"[worker] Processing failed for {blob_url}: {ex}")
-        await receiver.abandon_message(msg)
+        logger.exception("[msg:%s] Processing failed for %s", message_id, blob_url)
+        reason = None
+        if isinstance(ex, (ClientAuthenticationError, ResourceNotFoundError)):
+            reason = "AuthOrResourceError"
+        elif isinstance(ex, HttpResponseError):
+            status_code = getattr(ex, "status_code", None)
+            if status_code in (401, 403):
+                reason = "AuthError"
+            elif status_code == 404:
+                reason = "ModelNotFound"
+        if reason:
+            await receiver.dead_letter_message(msg, reason=reason, error_description=str(ex))
+        else:
+            await receiver.abandon_message(msg)

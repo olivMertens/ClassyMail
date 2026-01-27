@@ -24,6 +24,7 @@ dependencies = [
 	"aiohttp==3.13.3",
 	"python-multipart==0.0.21",
 	"fpdf2==2.7.9",
+	"azure-ai-inference>=1.0.0b9",
 ]
 
 [project.optional-dependencies]

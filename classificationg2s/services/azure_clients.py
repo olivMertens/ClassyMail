@@ -249,11 +249,27 @@ async def readiness_checks(
 
         await asyncio.wait_for(_inner(), timeout=timeout_s)
 
+    async def _check_ai(timeout_s: float = 5.0) -> None:
+        async def _inner():
+            # Token acquisition is already covered by credential check, but AI endpoint availability is not.
+            # We perform a lightweight HEAD request to the AI endpoint if available.
+            if not config.MISTRAL_ENDPOINT and not config.PHI_ENDPOINT:
+                return
+            import httpx
+
+            endpoint = config.MISTRAL_ENDPOINT or config.PHI_ENDPOINT
+            async with httpx.AsyncClient(timeout=timeout_s) as client:
+                resp = await client.get(endpoint, timeout=timeout_s)
+                resp.raise_for_status()
+
+        await asyncio.wait_for(_inner(), timeout=timeout_s)
+
     checks = {
         "credential": _check_credential(),
         "servicebus": _check_servicebus(),
         "storage": _check_storage(),
         "cosmos": _check_cosmos(),
+        "ai": _check_ai(),
     }
     results = await asyncio.gather(*checks.values(), return_exceptions=True)
     for name, result in zip(checks.keys(), results):

@@ -17,6 +17,8 @@ locals {
   }
 }
 
+data "azurerm_client_config" "current" {}
+
 provider "azurerm" {
   features {}
   subscription_id     = local.subscription_id != "" ? local.subscription_id : null
@@ -516,6 +518,34 @@ resource "azurerm_container_app" "api" {
         name  = "AZURE_AI_API_VERSION"
         value = "2024-08-01-preview"
       }
+      env {
+        name  = "CHAT_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "CHAT_DEPLOYMENT"
+        value = "gpt-5.2-chat"
+      }
+      env {
+        name  = "CHAT_API_VERSION"
+        value = "2024-08-01-preview"
+      }
+      env {
+        name  = "AZURE_SUBSCRIPTION_ID"
+        value = coalesce(var.subscription_id, data.azurerm_client_config.current.subscription_id)
+      }
+      env {
+        name  = "AZURE_TENANT_ID"
+        value = data.azurerm_client_config.current.tenant_id
+      }
+      env {
+        name  = "AZURE_RESOURCE_GROUP"
+        value = azurerm_resource_group.rg.name
+      }
+      env {
+        name  = "APP_VERSION"
+        value = var.container_image
+      }
 
       # Telemetry
       env {
@@ -663,6 +693,22 @@ resource "azurerm_container_app" "worker" {
       env {
         name  = "AZURE_AI_API_VERSION"
         value = "2024-08-01-preview"
+      }
+      env {
+        name  = "AZURE_SUBSCRIPTION_ID"
+        value = coalesce(var.subscription_id, data.azurerm_client_config.current.subscription_id)
+      }
+      env {
+        name  = "AZURE_TENANT_ID"
+        value = data.azurerm_client_config.current.tenant_id
+      }
+      env {
+        name  = "AZURE_RESOURCE_GROUP"
+        value = azurerm_resource_group.rg.name
+      }
+      env {
+        name  = "APP_VERSION"
+        value = var.container_image
       }
 
       env {

@@ -18,6 +18,9 @@ Recommended default fallback: **gpt-4o-mini** (configure as an Azure OpenAI depl
 
 ## Configuration (env vars)
 
+OCR (Mistral Document AI 25.05):
+- `MISTRAL_DEPLOYMENT` (default: `mistral-document-ai-2505`)
+
 Primary (existing):
 - `PHI_ENDPOINT`
 - `PHI_DEPLOYMENT`
