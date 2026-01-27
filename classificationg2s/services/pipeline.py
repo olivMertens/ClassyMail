@@ -7,6 +7,9 @@ from classificationg2s.models import EmailRecord, ClassificationResult
 from classificationg2s.services.azure_clients import download_blob_as_base64, blob_id_from_url, Clients
 from classificationg2s.services.llm_pipeline import ocr_with_mistral, classify_with_phi4, process_agent_response
 from classificationg2s.services.costing import compute_cost_llm, compute_cost_mistral
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def estimate_pdf_pages(pdf_bytes: bytes) -> int:
@@ -25,7 +28,7 @@ async def run_classification_pipeline(
 ) -> EmailRecord:
     processing_log: list[dict] = []
 
-    print(f"[pipeline] -> Starting pipeline for: {blob_url}")
+    logger.info(f"[pipeline] -> Starting pipeline for: {blob_url}")
 
     # Merge overrides if provided separately (legacy) or extract from settings
     if settings:
@@ -43,7 +46,7 @@ async def run_classification_pipeline(
             "detail": detail,
         }
         processing_log.append(entry)
-        print(f"[pipeline] [{stage}] {event}" + (f": {detail}" if detail else ""))
+        logger.info(f"[pipeline] [{stage}] {event}" + (f": {detail}" if detail else ""))
 
     try:
         log("download", "start")

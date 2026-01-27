@@ -12,6 +12,11 @@ from classificationg2s.services.worker import worker_loop_forever
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
+# Silence noisy Azure logs
+logging.getLogger("azure.servicebus").setLevel(logging.WARNING)
+logging.getLogger("azure.core").setLevel(logging.WARNING)
+logging.getLogger("uamqp").setLevel(logging.WARNING)
+logging.getLogger("azure.identity").setLevel(logging.WARNING)
 
 def _mask(val: str | None) -> str | None:
     if not val:
