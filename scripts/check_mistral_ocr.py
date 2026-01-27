@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 Quick test script to verify Mistral Document AI endpoint is working.
-Tests the /providers/mistral/azure/ocr endpoint with a sample PDF.
+Tests the Microsoft Foundry endpoint with a sample PDF.
 
 Usage:
-    uv run python scripts/test_mistral_ocr_endpoint.py
+    uv run python scripts/check_mistral_ocr.py
 """
 
 import sys

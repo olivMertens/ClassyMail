@@ -4,7 +4,7 @@ Test different Mistral Document AI API endpoints to find the correct one.
 This script tests various API patterns for Mistral Document AI in Azure AI Foundry.
 
 Usage:
-    uv run python scripts/test_mistral_endpoint.py
+    uv run python scripts/check_mistral_endpoint.py
 """
 
 import sys
@@ -14,9 +14,7 @@ from pathlib import Path
 # Add parent dir to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from classificationg2s.core.config import get_config
-
-config = get_config()
+from classificationg2s.core import config
 
 
 ENDPOINTS_TO_TEST = [
@@ -82,7 +80,7 @@ def main():
     # Get config from environment
     base_url = config.MISTRAL_ENDPOINT
     deployment = config.MISTRAL_DEPLOYMENT
-    api_key = config.MISTRAL_API_KEY
+    api_key = config.AI_API_KEY  # Use AI_API_KEY from config
 
     if not all([base_url, deployment, api_key]):
         print("❌ Missing required environment variables:")
