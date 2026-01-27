@@ -1,11 +1,65 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import mermaid from 'mermaid'
-import { CodeBracketIcon, MapIcon, ServerIcon } from '@heroicons/vue/24/outline'
+import {
+  CodeBracketIcon,
+  MapIcon,
+  ServerIcon,
+  CommandLineIcon,
+  PlayIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ArrowPathIcon
+} from '@heroicons/vue/24/outline'
 
 const currentTab = ref('architecture')
 const isDark = ref(false)
 let observer = null
+
+// Debug State
+const debugResults = ref(null)
+const debugLoading = ref(false)
+const writeTestResults = ref(null)
+const writeTestLoading = ref(false)
+
+const runDeepHealthCheck = async () => {
+  debugLoading.value = true
+  debugResults.value = null
+  try {
+    const res = await fetch('/api/readyz/deep')
+    if (res.ok) {
+      debugResults.value = { status: 'ready', failures: {} }
+    } else {
+      const data = await res.json()
+      debugResults.value = {
+        status: 'not_ready',
+        failures: data.detail?.failures || { error: 'Unknown State' }
+      }
+    }
+  } catch (e) {
+    debugResults.value = { status: 'error', failures: { network: e.message } }
+  } finally {
+    debugLoading.value = false
+  }
+}
+
+const runWriteTests = async () => {
+    writeTestLoading.value = true
+    writeTestResults.value = null
+    try {
+        const res = await fetch('/api/admin/debug/connectivity', { method: 'POST' })
+        if (res.ok) {
+            writeTestResults.value = await res.json()
+        } else {
+            const err = await res.json()
+            writeTestResults.value = { error: err.detail || 'Request failed' }
+        }
+    } catch(e) {
+        writeTestResults.value = { error: e.message }
+    } finally {
+        writeTestLoading.value = false
+    }
+}
 
 const initMermaid = async () => {
     const darkMode = document.documentElement.classList.contains('dark')
@@ -136,11 +190,184 @@ graph TD
           />
           Repository
         </button>
+        <button
+          :class="[currentTab === 'debug' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300', 'group inline-flex items-center border-b-2 py-4 px-1 text-sm font-medium']"
+          @click="switchTab('debug')"
+        >
+          <CommandLineIcon
+            class="-ml-0.5 mr-2 h-5 w-5"
+            aria-hidden="true"
+          />
+          Debug & Health
+        </button>
       </nav>
     </div>
 
     <!-- Content -->
     <div class="py-4">
+      <!-- Debug Tab -->
+      <div
+        v-if="currentTab === 'debug'"
+        class="space-y-8"
+      >
+        <!-- Read/Connect Check -->
+        <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+              Service Connection Status
+            </h3>
+            <button
+              class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-700 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
+              @click="runDeepHealthCheck"
+            >
+              <ArrowPathIcon
+                class="-ml-0.5 h-5 w-5"
+                :class="{ 'animate-spin': debugLoading }"
+                aria-hidden="true"
+              />
+              {{ debugLoading ? 'Checking...' : 'Check Connectivity' }}
+            </button>
+          </div>
+
+          <div
+            v-if="debugResults"
+            class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2"
+          >
+            <!-- Items -->
+            <div
+              v-for="service in ['credential', 'servicebus', 'storage', 'cosmos']"
+              :key="service"
+              class="relative flex items-center space-x-3 rounded-lg border border-gray-300 dark:border-gray-700 px-6 py-5 shadow-sm focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-2 hover:border-gray-400 dark:hover:border-gray-500"
+            >
+              <div class="flex-shrink-0">
+                <CheckCircleIcon
+                  v-if="!debugResults.failures[service]"
+                  class="h-8 w-8 text-green-500"
+                />
+                <XCircleIcon
+                  v-else
+                  class="h-8 w-8 text-red-500"
+                />
+              </div>
+              <div class="min-w-0 flex-1">
+                <span
+                  class="absolute inset-0"
+                  aria-hidden="true"
+                />
+                <p class="text-sm font-medium text-gray-900 dark:text-white capitalize">
+                  {{ service }} Connection
+                </p>
+                <p class="truncate text-sm text-gray-500 dark:text-gray-400">
+                  {{ debugResults.failures[service] ? `Error: ${debugResults.failures[service]}` : 'Connected & Authenticated' }}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div
+            v-else
+            class="text-sm text-gray-500 italic"
+          >
+            Click 'Check Connectivity' to probe all Azure services.
+          </div>
+        </div>
+
+        <!-- Write/Upload Active Check -->
+        <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6 border-t-4 border-indigo-500">
+          <div class="flex justify-between items-center mb-4">
+            <div>
+              <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+                Active Write/Upload Tests
+              </h3>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                This attempts real data operations: Uploading a dummy file to Blob Storage and creating a dummy item in Cosmos DB, then deleting them.
+              </p>
+            </div>
+            <button
+              class="inline-flex items-center gap-x-1.5 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
+              :disabled="writeTestLoading"
+              @click="runWriteTests"
+            >
+              <PlayIcon
+                class="-ml-0.5 h-5 w-5"
+                aria-hidden="true"
+              />
+              {{ writeTestLoading ? 'Testing...' : 'Run Write Tests' }}
+            </button>
+          </div>
+
+          <div
+            v-if="writeTestResults"
+            class="mt-4 space-y-4"
+          >
+            <div
+              v-if="writeTestResults.error"
+              class="p-4 bg-red-50 text-red-700 rounded-md"
+            >
+              Global Error: {{ writeTestResults.error }}
+            </div>
+            <div
+              v-else
+              class="grid grid-cols-1 gap-4 sm:grid-cols-3"
+            >
+              <!-- Storage Result -->
+              <div
+                class="p-4 rounded-md border"
+                :class="writeTestResults.storage_upload === 'ok' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'"
+              >
+                <span
+                  class="block text-sm font-bold"
+                  :class="writeTestResults.storage_upload === 'ok' ? 'text-green-800' : 'text-red-800'"
+                >
+                  Blob Storage Upload
+                </span>
+                <span
+                  class="text-sm"
+                  :class="writeTestResults.storage_upload === 'ok' ? 'text-green-700' : 'text-red-700'"
+                >
+                  {{ writeTestResults.storage_upload === 'ok' ? 'Success (Write+Delete)' : writeTestResults.storage_upload }}
+                </span>
+              </div>
+              <!-- Cosmos Result -->
+              <div
+                class="p-4 rounded-md border"
+                :class="writeTestResults.cosmos_write === 'ok' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'"
+              >
+                <span
+                  class="block text-sm font-bold"
+                  :class="writeTestResults.cosmos_write === 'ok' ? 'text-green-800' : 'text-red-800'"
+                >
+                  Cosmos DB Write
+                </span>
+                <span
+                  class="text-sm"
+                  :class="writeTestResults.cosmos_write === 'ok' ? 'text-green-700' : 'text-red-700'"
+                >
+                  {{ writeTestResults.cosmos_write === 'ok' ? 'Success (Create+Delete)' : writeTestResults.cosmos_write }}
+                </span>
+              </div>
+              <!-- SB Connect Result -->
+              <div
+                class="p-4 rounded-md border"
+                :class="writeTestResults.servicebus_connect === 'ok' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'"
+              >
+                <span
+                  class="block text-sm font-bold"
+                  :class="writeTestResults.servicebus_connect === 'ok' ? 'text-green-800' : 'text-red-800'"
+                >
+                  Service Bus Link
+                </span>
+                <span
+                  class="text-sm"
+                  :class="writeTestResults.servicebus_connect === 'ok' ? 'text-green-700' : 'text-red-700'"
+                >
+                  {{ writeTestResults.servicebus_connect === 'ok' ? 'Success (Link Open)' : writeTestResults.servicebus_connect }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Architecture Tab -->
       <div
         v-if="currentTab === 'architecture'"

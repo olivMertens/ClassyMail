@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from classificationg2s.core import config
 from classificationg2s.services.azure_clients import Clients, get_clients, get_cosmos_container
 import logging
+import uuid
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger("classimail.admin")
@@ -10,6 +11,56 @@ logger = logging.getLogger("classimail.admin")
 class ResetRequest(BaseModel):
     confirm_1: bool
     confirm_2: bool
+
+@router.post("/debug/connectivity")
+async def check_connectivity(clients: Clients = Depends(get_clients)):
+    """
+    Performs active write/delete tests to verify permissions and connectivity for Storage and Cosmos DB.
+    """
+    results = {
+        "storage_upload": "pending",
+        "cosmos_write": "pending",
+        "servicebus_connect": "pending"
+    }
+
+    # 1. Test Storage Upload/Delete
+    try:
+        container_client = clients.blob_service_client.get_container_client(config.BLOB_CONTAINER_INPUT)
+        test_blob_name = f"debug-test-{uuid.uuid4()}.txt"
+        test_blob = container_client.get_blob_client(test_blob_name)
+
+        # Upload
+        await test_blob.upload_blob(b"debug connectivity check", overwrite=True)
+        # Delete
+        await test_blob.delete_blob()
+        results["storage_upload"] = "ok"
+    except Exception as e:
+        results["storage_upload"] = str(e)
+
+    # 2. Test Cosmos Write/Delete
+    try:
+        container = await get_cosmos_container(clients)
+        test_id = f"debug-{uuid.uuid4()}"
+        test_item = {"id": test_id, "type": "debug_check", "timestamp": str(uuid.uuid4())}
+
+        # Create
+        await container.create_item(test_item)
+        # Delete
+        await container.delete_item(item=test_id, partition_key=test_id)
+        results["cosmos_write"] = "ok"
+    except Exception as e:
+        results["cosmos_write"] = str(e)
+
+    # 3. Test Service Bus Sender Creation
+    try:
+        sender = clients.sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
+        async with sender:
+            pass # Just opening the link verifies connectivity/auth
+        results["servicebus_connect"] = "ok"
+    except Exception as e:
+        results["servicebus_connect"] = str(e)
+
+    return results
 
 @router.post("/reset", status_code=status.HTTP_200_OK)
 async def reset_environment(
