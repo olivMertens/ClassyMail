@@ -41,7 +41,7 @@ async def save_to_cosmos(record: EmailRecord, clients: Clients | None = None) ->
         record.search_text = compute_search_text(record.markdown)
     clients = clients or get_default_clients()
     await clients.ensure_cosmos_container()
-    await clients.cosmos_container.upsert_item(record.model_dump())
+    await clients.cosmos_container.upsert_item(record.model_dump(mode="json"))
 
 
 async def count_by_status(status: str, clients: Clients | None = None) -> int:
