@@ -36,7 +36,8 @@ async def simulate_flow(clients: Clients = Depends(get_clients)):
 
         # 2. Upload to Blob Storage
         container_client = clients.blob_service_client.get_container_client(config.BLOB_CONTAINER_INPUT)
-        filename = f"debug/simulation_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.pdf"
+        # Use a flat filename to avoid encoding issues with slashes in API IDs
+        filename = f"simulation_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.pdf"
         blob_client = container_client.get_blob_client(filename)
 
         await blob_client.upload_blob(bytes(pdf_bytes), overwrite=True)
