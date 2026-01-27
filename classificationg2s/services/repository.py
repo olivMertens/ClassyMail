@@ -297,3 +297,36 @@ async def get_top_intents(limit: int = 5, clients: Clients | None = None) -> lis
     params = [{"name": "@limit", "value": limit}]
     items = [x async for x in clients.cosmos_container.query_items(query, parameters=params)]
     return items
+
+
+async def get_low_confidence_items(limit: int = 5, intent: str | None = None, clients: Clients | None = None) -> list[dict]:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    limit = min(max(limit, 1), 100)
+    if intent:
+        query = (
+            "SELECT c.id, c.status, c.subject, c.updated_at, "
+            " (SELECT VALUE MAX(i.confidence) FROM i IN c.classification.detected_intents WHERE i.intent=@intent) AS intent_confidence "
+            "FROM c "
+            "WHERE c.status='PROCESSED' "
+            " AND IS_DEFINED(c.classification.detected_intents) "
+            " AND EXISTS(SELECT VALUE 1 FROM i IN c.classification.detected_intents WHERE i.intent=@intent) "
+            "ORDER BY intent_confidence ASC OFFSET 0 LIMIT @limit"
+        )
+        params = [
+            {"name": "@intent", "value": intent},
+            {"name": "@limit", "value": limit},
+        ]
+    else:
+        query = (
+            "SELECT c.id, c.status, c.subject, c.updated_at, "
+            " (SELECT VALUE MAX(i.confidence) FROM i IN c.classification.detected_intents) AS max_confidence "
+            "FROM c "
+            "WHERE c.status='PROCESSED' AND IS_DEFINED(c.classification.detected_intents) "
+            "ORDER BY max_confidence ASC OFFSET 0 LIMIT @limit"
+        )
+        params = [
+            {"name": "@limit", "value": limit},
+        ]
+    items = [x async for x in clients.cosmos_container.query_items(query, parameters=params)]
+    return items

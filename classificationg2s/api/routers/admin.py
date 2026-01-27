@@ -11,7 +11,13 @@ from fpdf import FPDF
 from azure.servicebus import ServiceBusMessage, ServiceBusSubQueue
 from classificationg2s.services.messages import extract_blob_url
 from classificationg2s.services.azure_clients import readiness_checks, get_cosmos_container as azure_get_cosmos_container
-from classificationg2s.services.repository import search_email_records
+from classificationg2s.services.repository import (
+    search_email_records,
+    get_latest_errors,
+    get_stats_summary,
+    get_top_intents,
+    get_low_confidence_items,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger("classimail.admin")
@@ -44,6 +50,28 @@ class DiagnosticsResponse(BaseModel):
 
 
 class SearchResponse(BaseModel):
+    items: list[dict]
+
+
+class ErrorsResponse(BaseModel):
+    items: list[dict]
+
+
+class StatsSummaryResponse(BaseModel):
+    total: int
+    pending: int
+    processing: int
+    processed: int
+    error: int
+    review_required: int
+    average_confidence: float
+
+
+class IntentsResponse(BaseModel):
+    items: list[dict]
+
+
+class LowConfidenceResponse(BaseModel):
     items: list[dict]
 
 @router.post("/debug/simulate-flow")
@@ -312,3 +340,30 @@ async def search_emails(q: str, limit: int = 5, clients: Clients = Depends(get_c
 
     items = await search_email_records(q, limit=limit, clients=clients)
     return SearchResponse(items=items)
+
+
+@router.get("/errors/latest", response_model=ErrorsResponse)
+async def latest_errors(limit: int = 5, clients: Clients = Depends(get_clients)):
+    limit = min(max(limit, 1), 50)
+    items = await get_latest_errors(limit=limit, clients=clients)
+    return ErrorsResponse(items=items)
+
+
+@router.get("/stats/summary", response_model=StatsSummaryResponse)
+async def stats_summary(clients: Clients = Depends(get_clients)):
+    summary = await get_stats_summary(clients=clients)
+    return StatsSummaryResponse(**summary)
+
+
+@router.get("/intents/top", response_model=IntentsResponse)
+async def top_intents(limit: int = 5, clients: Clients = Depends(get_clients)):
+    limit = min(max(limit, 1), 50)
+    items = await get_top_intents(limit=limit, clients=clients)
+    return IntentsResponse(items=items)
+
+
+@router.get("/low-confidence", response_model=LowConfidenceResponse)
+async def low_confidence(limit: int = 5, intent: str | None = None, clients: Clients = Depends(get_clients)):
+    limit = min(max(limit, 1), 50)
+    items = await get_low_confidence_items(limit=limit, intent=intent, clients=clients)
+    return LowConfidenceResponse(items=items)

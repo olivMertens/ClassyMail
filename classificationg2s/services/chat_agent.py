@@ -24,6 +24,7 @@ from classificationg2s.services.repository import (
     get_latest_errors,
     get_stats_summary,
     get_top_intents,
+    get_low_confidence_items,
 )
 
 logger = logging.getLogger("classimail.chatbot")
@@ -152,6 +153,20 @@ class ChatAgent:
                     },
                 )
             ),
+            ChatCompletionsToolDefinition(
+                function=FunctionDefinition(
+                    name="get_low_confidence_items",
+                    description="Get lowest-confidence processed emails. Optionally scope to an intent.",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "limit": {"type": "integer", "description": "Max items", "default": 5},
+                            "intent": {"type": "string", "description": "Filter by intent"}
+                        },
+                        "required": [],
+                    },
+                )
+            ),
         ]
 
         try:
@@ -199,6 +214,11 @@ class ChatAgent:
                         elif fname == "get_top_intents":
                             limit = args.get("limit", 5)
                             result = await get_top_intents(limit=limit, clients=clients)
+                            content = json.dumps(result, default=str)
+                        elif fname == "get_low_confidence_items":
+                            limit = args.get("limit", 5)
+                            intent = args.get("intent")
+                            result = await get_low_confidence_items(limit=limit, intent=intent, clients=clients)
                             content = json.dumps(result, default=str)
                     except Exception as e:  # noqa: BLE001
                         logger.exception("Tool execution failed")
