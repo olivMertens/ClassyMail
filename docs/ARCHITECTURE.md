@@ -83,12 +83,57 @@ sequenceDiagram
     ACA-->>User: Dashboard (PDF+Markdown+Intents+Coûts)
 ```
 
-## 3. Sécurité & Accès
+## 3. Sécurité & Accès (RBAC)
 
-- Identité managée ACA uniquement (pas de clés).
-- RBAC : Cognitive Services User (AI Foundry), Storage Blob Data Contributor (blob), Service Bus Data Sender/Receiver, Cosmos DB Data Contributor, Event Grid -> Service Bus : Azure Service Bus Data Sender.
+Le système repose exclusivement sur des **Identités Managées** (User Assigned Identity) pour éviter la gestion de secrets (Access Keys). L'application n'utilise **pas** de connection strings contenant des secrets (sauf Application Insights, qui est non-sensible).
 
-## 4. Observabilité & Coûts
+### Matrice des Rôles Requis
+
+L'identité managée assignée aux Container Apps (`api` et `worker`) doit disposer des assignations de rôles suivantes sur les ressources Azure :
+
+| Ressource Azure | Rôle RBAC (Nom) | ID du Rôle | Description / Scope |
+| :--- | :--- | :--- | :--- |
+| **Storage Account** | `Storage Blob Data Contributor` | `ba92f5b4-2d11-453d-a403-e96b0029c9fe` | Lecture/Écriture des PDFs dans le container `pdf-inputs`. |
+| **Service Bus** | `Azure Service Bus Data Receiver` | `4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0` | Permet au `worker` de consommer les messages de la queue. |
+| **Service Bus** | `Azure Service Bus Data Sender` | `69a216fc-b8fb-44d8-bc22-1f3c2cd27a39` | Permet à l'API (et DLQ retry) d'envoyer des messages. |
+| **Cosmos DB (SQL)** | `Cosmos DB Built-in Data Contributor` | `00000000-0000-0000-0000-000000000002` | **Data Plane RBAC**. Lecture/Écriture des documents JSON. *Note: Ce n'est pas un rôle IAM Azure classique, mais un rôle SQL natif Cosmos.* |
+| **AI Foundry** | `Cognitive Services User` | `a97b65f3-2400-443d-9d23-a1288a8760ba` | Invocation des modèles (Phi-4, Mistral) via l'endpoint MaaS. |
+| **Container Registry**| `AcrPull` | `7f951dda-4ed3-4680-a7ca-43fe172d538d` | Pull de l'image Docker par l'environnement Container Apps. |
+
+### Flux d'Identité
+
+```mermaid
+flowchart LR
+    ACA[Container App] -- "Identity: ClientID" --> Entra[Entra ID]
+    Entra -- "Access Token" --> ACA
+    ACA -- "Token (Bearer)" --> SDK[Azure SDK]
+    SDK --> Storage[Storage / ServiceBus / Cosmos]
+```
+1. L'application utilise `DefaultAzureCredential` (Python Azure SDK).
+2. En local, elle utilise l'identité du développeur (`az login`).
+3. Sur Azure, elle utilise la `managed_identity_client_id` injectée via la variable d'environnement `AZURE_CLIENT_ID`.
+
+## 4. Stratégie Réseau (Network)
+
+### Mode Public (Configuration POC Actuelle)
+Pour faciliter le déploiement du POC, les ressources (Cosmos DB, Storage, Service Bus) autorisent l'accès réseau public, mais limitent qui peut se connecter :
+
+- **Cosmos DB** : Le pare-feu est configuré pour autoriser l'accès depuis **"Azure Datacenters"** (option `Allow access from Azure Portal/Internal`).
+    - *Implémentation technique* : Autorisation de l'IP virtuelle `0.0.0.0`.
+    - *Pourquoi ?* Les Container Apps sans injection VNet n'ont pas d'IP sortante fixe et ne sont pas dans un réseau privé. Cette exception permet à n'importe quel service Azure (dont vos Container Apps) d'atteindre la base de données, l'authentification RBAC (Identité Managée) assurant la sécurité applicative.
+
+### Mode Privé (Production Entreprise)
+Pour isoler totalement le système d'Internet (VNet Injection), l'architecture cible doit être modifiée comme suit :
+
+1.  **Virtual Network (VNet)** : Créer un VNet Azure avec un subnet dédié (ex: `snet-apps`) délégué à `Microsoft.App/environments`.
+2.  **ACA VNet Injection** : Déployer l'environnement Container App (Managed Environment) en mode **Internal** dans ce subnet. L'application ne sera accessible que depuis le VNet (ou via un Application Gateway / API Management devant).
+3.  **Private Endpoints (PE)** :
+    - Désactiver l'accès public sur Cosmos DB, Storage, Service Bus et AI Foundry.
+    - Créer un **Private Endpoint** pour chaque service PaaS, connecté au VNet.
+    - Configurer des zones **Private DNS** (`privatelink.documents.azure.com`, `privatelink.blob.core.windows.net`, etc.) pour que l'URI standard résolve vers l'IP privée.
+4.  **Flux** : Le trafic sortant des Container Apps restera dans le backbone Azure privé via les Private Endpoints. L'exception pare-feu `0.0.0.0` sur Cosmos DB devra être retirée.
+
+## 5. Observabilité & Coûts
 
 - OpenTelemetry spans custom `gen_ai.*` : pages (Mistral), tokens (Phi‑4).
 - Coûts par email (UI & CSV) : pricing dépend du tenant/région. Les coûts sont configurables via variables d’environnement et doivent être alignés sur la page officielle Azure.

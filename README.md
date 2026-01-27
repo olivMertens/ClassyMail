@@ -405,14 +405,17 @@ uv run --env-file secrets.env uvicorn main:app --reload
 
 ## 📜 Rôles & Accès (RBAC)
 
+Le système utilise **Zero Trust** (via Managed Identity). Voici les rôles précis requis :
+
 | Principal | Ressource | Rôle |
 | --- | --- | --- |
-| Identité managée ACA | Storage Account | Storage Blob Data Reader |
-| Identité managée ACA | Service Bus Namespace | Azure Service Bus Data Receiver/Sender |
-| Identité managée ACA | Cosmos DB (SQL) | Cosmos SQL Built-in Data Contributor (RBAC) |
-| Identité managée ACA | AI Foundry (AIServices) | Cognitive Services User |
-| Event Grid | Service Bus Queue | Event delivery via system topic subscription |
-| ACA (pull image) | Azure Container Registry | AcrPull |
+| Identité managée ACA | Storage Account | **Storage Blob Data Contributor** |
+| Identité managée ACA | Service Bus Namespace | **Azure Service Bus Data Receiver** (Worker) & **Sender** (API) |
+| Identité managée ACA | Cosmos DB (SQL) | **Cosmos DB Built-in Data Contributor** (Role `00000000-0000-0000-0000-000000000002`) |
+| Identité managée ACA | AI Foundry (AIServices) | **Cognitive Services User** |
+| ACA (System) | Azure Container Registry | **AcrPull** |
+
+Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#3-sécurité--accés-rbac) pour la matrice détaillée et les IDs de rôles.
 
 
 ## 🔐 Variables d’environnement
