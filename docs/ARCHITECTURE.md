@@ -7,7 +7,9 @@ Pattern : Event-Driven + Container Apps + AI Foundry (Mistral OCR & Phi‑4)
 **Flux de données :**
 
 1. **Ingestion :** Le PDF arrive dans le Blob Storage (Container `pdf-inputs`).
-2. **Trigger :** Azure Event Grid détecte le fichier et publie un message dans Service Bus (direct) **ou** appelle un webhook qui envoie `{blob_url}` dans Service Bus.
+2. **Trigger :**
+   *   **Cas 1 (Upload API)** : Le fichier est blobé par l'API, qui crée immédiatement une entrée "PENDING" dans la DB et pousse un message direct dans le Service Bus (Visibilité immédiate).
+   *   **Cas 2 (Depôt Portal/FTP)** : Azure Event Grid détecte le fichier (`BlobCreated`) et publie un message dans Service Bus (Visibilité après traitement par le worker).
 3. **OCR (Extraction) :** Le worker (FastAPI) télécharge le PDF et l'envoie au modèle OCR (Mistral) pour obtenir du Markdown.
 4. **Intelligence (Classification) :** Le Markdown est envoyé au modèle LLM (Phi‑4, avec fallback possible) pour produire un JSON strict multi-intents.
 5. **Stockage :** Le résultat (JSON + usage/coût) est stocké dans Cosmos DB (et export CSV possible côté app).
@@ -36,16 +38,23 @@ flowchart TD
         Cosmos[(Classifications)]
     end
 
-    PDF --> BlobIn
-    PDF --> API
-    API --> BlobIn
-    BlobIn --> EG --> SB --> W
+    PDF -->|Upload UI| API
+    PDF -->|Upload Portal/FTP| BlobIn
+
+    API -->|1. Write Blob| BlobIn
+    API -->|2. Create PENDING| Cosmos
+    API -->|3. Manual Trigger (Fast)| SB
+
+    BlobIn -->|Event: BlobCreated (Slow)| EG
+    EG -->|Topic Subsctiption: .pdf| SB
+
+    SB -->|Message| W
     W -->|%PDF -> base64| Mistral
     Mistral -->|Markdown + usage| W
     W -->|Prompt multi-intents| Phi4
     Phi4 -->|JSON + usage| W
-    W --> Cosmos
-    API --> Cosmos
+    W -->|Update: PROCESSED| Cosmos
+    API -->|Read: polling| Cosmos
     API -->|UI| UI[Dashboard]
 
     classDef compute fill:#2563eb,stroke:#1d4ed8,color:#fff
@@ -63,24 +72,42 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     autonumber
+    actor User
+    participant UI as Dashboard
+    participant API
     participant Blob as Blob Storage
-    participant EG as Event Grid
     participant SB as Service Bus
+    participant EG as Event Grid
     participant ACA as Container App (Worker)
-    participant Mistral
-    participant Phi4
     participant Cosmos
 
-    Blob->>EG: BlobCreated (PDF)
-    EG->>SB: Event -> Queue
-    SB->>ACA: Message (blob_url)
+    box "User Upload Flow" #e6f3ff
+    User->>UI: Upload PDF
+    UI->>API: POST /api/upload
+    API->>Blob: Upload Byte Stream
+    API->>Cosmos: Create "PENDING" Record
+    API->>SB: Send Message (blob_url)
+    API-->>UI: 200 OK (List updated)
+    end
+
+    box "Portal Upload Flow" #fff0e6
+    User->>Blob: Upload File via Portal
+    Blob->>EG: BlobCreated Event
+    EG->>SB: Route to Queue (Latency ~30s)
+    end
+
+    box "Async Processing" #efffef
+    SB->>ACA: Consume Message
     ACA->>Blob: Download PDF
-    ACA->>Mistral: POST /v1/ocr (doc_base64)
-    Mistral-->>ACA: markdown + usage.pages
-    ACA->>Phi4: POST /chat/completions
-    Phi4-->>ACA: JSON intents + usage.tokens
-    ACA->>Cosmos: upsert {intents, usage, needs_review}
-    ACA-->>User: Dashboard (PDF+Markdown+Intents+Coûts)
+    ACA->>ACA: OCR & Classification
+    ACA->>Cosmos: Update Status (PROCESSED)
+    end
+
+    loop Every 30s
+        UI->>API: GET /api/emails
+        API->>Cosmos: Query Status
+        Cosmos-->>UI: Updated List
+    end
 ```
 
 ## 3. Sécurité & Accès (RBAC)

@@ -402,9 +402,6 @@ onMounted(() => {
             >
               Standard (Text/OCR Optimized - Default)
             </label>
-            <div class="ml-2 text-xs text-gray-500 max-w-lg">
-              Fast and cost-effective. Uses optimized prompting for standard text extraction and classification. Best for typed documents and clear emails.
-            </div>
           </div>
           <div class="flex items-center">
             <input
@@ -421,9 +418,6 @@ onMounted(() => {
             >
               Reasoning (Deep Reasoning / CoT)
             </label>
-            <div class="ml-2 text-xs text-gray-500 max-w-lg">
-              Forces a "Chain-of-Thought" (Step-by-step) approach. Instructs the model to analyze context and deduce intents logically before classifying. essential for subtle or complex cases.
-            </div>
           </div>
           <div class="flex items-center">
             <input
@@ -440,9 +434,6 @@ onMounted(() => {
             >
               Vision (Vision/Image Analysis - Experimental)
             </label>
-            <div class="ml-2 text-xs text-gray-500 max-w-lg">
-              Integrates visual analysis. Explicitly considers descriptions of non-text elements (photos, diagrams) detected by OCR. Crucial for claims relying on visual evidence (e.g., damage photos).
-            </div>
           </div>
         </div>
       </div>

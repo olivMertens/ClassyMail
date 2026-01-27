@@ -142,7 +142,9 @@ async def auth_headers(clients: Clients | None = None) -> dict:
 
 def blob_id_from_url(blob_url: str) -> str:
     parsed = urlparse(blob_url)
-    return parsed.path.lstrip("/")
+    # Cosmos DB IDs cannot contain '/', so we replace with '-'
+    # e.g., pdf-inputs/doc.pdf -> pdf-inputs-doc.pdf
+    return parsed.path.lstrip("/").replace("/", "-")
 
 
 async def download_blob_as_base64(blob_url: str, return_bytes: bool = False, clients: Clients | None = None) -> str | tuple[str, bytes]:

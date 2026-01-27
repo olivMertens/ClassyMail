@@ -77,9 +77,9 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None) -> d
     }
 
     if config.MISTRAL_MODE.lower() == "maas":
-        url = f"{config.MISTRAL_ENDPOINT}/v1/ocr"
+        url = f"{config.MISTRAL_ENDPOINT.rstrip('/')}/v1/ocr"
     else:
-        url = f"{config.MISTRAL_ENDPOINT}/models/{config.MISTRAL_DEPLOYMENT}:ocr"
+        url = f"{config.MISTRAL_ENDPOINT.rstrip('/')}/models/{config.MISTRAL_DEPLOYMENT}:ocr"
 
     with tracer.start_as_current_span("mistral_ocr") as span:
         span.set_attribute("gen_ai.system", "mistral")

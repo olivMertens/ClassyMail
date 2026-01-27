@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from classificationg2s.core import config
-from classificationg2s.services.azure_clients import Clients, get_clients, get_cosmos_container
+from classificationg2s.services.azure_clients import Clients, get_clients, get_cosmos_container, blob_id_from_url
 import logging
 import uuid
 import json
@@ -43,8 +43,8 @@ async def simulate_flow(clients: Clients = Depends(get_clients)):
         await blob_client.upload_blob(bytes(pdf_bytes), overwrite=True)
 
         # 3. Construct ID and Return
-        # ID format matches repository logic (container/path)
-        item_id = f"{config.BLOB_CONTAINER_INPUT}/{filename}"
+        # Use centralized logic to ensure consistency with worker (sanitized ID)
+        item_id = blob_id_from_url(blob_client.url)
 
         # 4. Trigger Worker Manually (since Event Grid might not be local)
         sender = clients.sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
