@@ -368,16 +368,6 @@ const emit = defineEmits(['open-email'])
       </div>
     </div>
   </div>
-  <!-- Fine-tuning Advice -->
-  <div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-100 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200 flex flex-col gap-1">
-    <span class="font-semibold">Fine-tuning Best Practices:</span>
-    <ul class="list-disc list-inside ml-1">
-      <li>Aim for at least {{ stats.finetune_min_required }} reviewed examples per category for stability.</li>
-      <li>Ensure examples are diverse and correctly labeled (validation is key).</li>
-      <li>For Phi-4 or GPT-4o-mini, quality > quantity. "Garbage in, garbage out".</li>
-    </ul>
-  </div>
-
   <div class="flex flex-col sm:flex-row justify-between gap-4">
     <!-- Tabs -->
     <div class="flex space-x-2 overflow-x-auto pb-2 sm:pb-0">

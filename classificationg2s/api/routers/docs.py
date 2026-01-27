@@ -22,15 +22,15 @@ async def custom_redoc(theme: str = "light"):
     bg_color = "#ffffff"
 
     if theme == "dark":
-        bg_color = "#1f2937"  # tailwind gray-800
+        bg_color = "#0f172a"  # slate-900
         options["theme"] = {
             "colors": {
                 "primary": {
-                    "main": "#60a5fa"  # blue-400 (lighter for dark mode)
+                    "main": "#38bdf8"  # sky-400 (brighter blue for dark mode)
                 },
                 "text": {
-                    "primary": "#f3f4f6",  # gray-100
-                    "secondary": "#d1d5db" # gray-300
+                    "primary": "#f8fafc",  # slate-50 (high contrast)
+                    "secondary": "#cbd5e1" # slate-300
                 },
                 "http": {
                     "get": "#4ade80",    # green-400
@@ -44,40 +44,40 @@ async def custom_redoc(theme: str = "light"):
                 "headings": {
                     "fontFamily": "Inter, system-ui, sans-serif",
                     "fontWeight": "600",
-                    "color": "#f9fafb" # gray-50
+                    "color": "#f1f5f9" # slate-100
                 },
                 "code": {
                     "fontFamily": "Menlo, Monaco, Consolas, monospace",
-                    "color": "#e5e7eb", # gray-200
-                    "backgroundColor": "#111827" # gray-900
+                    "color": "#e2e8f0", # slate-200
+                    "backgroundColor": "#1e293b" # slate-800
                 }
             },
             "sidebar": {
-                "backgroundColor": "#1f2937", # gray-800
-                "textColor": "#f3f4f6",       # gray-100
+                "backgroundColor": "#1e293b", # slate-800 (slightly lighter than body)
+                "textColor": "#f1f5f9",       # slate-100
                 "arrow": {
-                    "color": "#9ca3af"        # gray-400
+                    "color": "#94a3b8"        # slate-400
                 },
                 "activeAnchor": {
-                    "backgroundColor": "#111827", # gray-900
-                    "textColor": "#60a5fa"        # blue-400
+                    "backgroundColor": "#0f172a", # slate-900
+                    "textColor": "#38bdf8"        # sky-400
                 }
             },
             "rightPanel": {
-                "backgroundColor": "#111827", # gray-900
-                "textColor": "#f3f4f6",
+                "backgroundColor": "#020617", # slate-950 (darkest for code)
+                "textColor": "#f1f5f9",
                 "servers": {
                     "overlay": {
-                        "backgroundColor": "#1f2937",
-                        "textColor": "#f3f4f6"
+                        "backgroundColor": "#1e293b",
+                        "textColor": "#f1f5f9"
                     },
                     "url": {
-                        "backgroundColor": "#374151"
+                        "backgroundColor": "#334155"
                     }
                 }
             },
             "codeBlock": {
-                "backgroundColor": "#030712" # gray-950 (deeper black)
+                "backgroundColor": "#020617" # slate-950
             }
         }
 

@@ -4,8 +4,10 @@ from classificationg2s.core import config
 from classificationg2s.services.azure_clients import Clients, get_clients, get_cosmos_container
 import logging
 import uuid
+import json
 from datetime import datetime, timezone
 from fpdf import FPDF
+from azure.servicebus import ServiceBusMessage
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger("classimail.admin")
@@ -43,8 +45,15 @@ async def simulate_flow(clients: Clients = Depends(get_clients)):
         # ID format matches repository logic (container/path)
         item_id = f"{config.BLOB_CONTAINER_INPUT}/{filename}"
 
+        # 4. Trigger Worker Manually (since Event Grid might not be local)
+        sender = clients.sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
+        async with sender:
+            # Matches worker/_extract_blob_url expectation
+            message_payload = {"blob_url": blob_client.url}
+            await sender.send_messages(ServiceBusMessage(json.dumps(message_payload)))
+
         return {
-            "status": "uploaded",
+            "status": "uploaded_and_queued",
             "item_id": item_id,
             "blob_url": blob_client.url
         }
