@@ -45,8 +45,9 @@ class ChatAgent:
             return
 
         # Use Key if available, else DefaultAzureCredential (Entra ID)
-        if config.AI_API_KEY:
-            credential = AzureKeyCredential(config.AI_API_KEY)
+        api_key = getattr(config, "AI_API_KEY", None)
+        if api_key:
+            credential = AzureKeyCredential(api_key)
         else:
             credential = DefaultAzureCredential()
 

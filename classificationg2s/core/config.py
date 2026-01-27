@@ -23,6 +23,7 @@ PHI_ENDPOINT = os.getenv("PHI_ENDPOINT") or os.getenv("AZURE_AI_ENDPOINT")
 PHI_DEPLOYMENT = os.getenv("PHI_DEPLOYMENT", "phi-4")
 AI_API_VERSION = os.getenv("AZURE_AI_API_VERSION", "2024-08-01-preview")
 AI_SCOPE = os.getenv("AZURE_AI_SCOPE", "https://cognitiveservices.azure.com/.default")
+AI_API_KEY = os.getenv("AZURE_AI_KEY")
 
 # Fallback model (for long contexts / safety net).
 PHI_FALLBACK_ENDPOINT = os.getenv("PHI_FALLBACK_ENDPOINT") or PHI_ENDPOINT
