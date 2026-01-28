@@ -91,8 +91,29 @@ The application settings allow customization of the classification engine and en
 - **Telemetry Logs**: Real-time view of traces and exceptions from Azure Application Insights (requires `LOG_ANALYTICS_WORKSPACE_ID` configuration).
 
 ### Developer Tab (Danger Zone)
-This restricted area allows administrators to reset the environment for testing.
+This restricted area allows administrators to test, diagnose, and manage the environment.
+
+#### Diagnostics Section
+- **Check Connectivity**: Performs active read/write tests on Storage, Cosmos DB, and Service Bus to verify permissions and connectivity.
+  - **Results**: Shows status of each service (ok / error message).
+  - **Use Case**: Troubleshooting authentication or network issues.
+
+#### Testing Section
+- **Simulate Flow**: Generates a realistic French insurance email PDF and sends it through the entire pipeline (upload → process → queue).
+  - **Output**: Returns the `item_id` to track via the email list.
+  - **Expected Category**: Randomly selected based on template.
+  - **Use Case**: End-to-end testing without manual PDF uploads.
+
+#### Dead Letter Queue Management
+- **View Dead Letter Messages**: Peeks into the Service Bus Dead Letter Queue to diagnose failed messages.
+  - **Details**: Shows message ID, delivery count, error reason, and linked email processing log.
+  - **Use Case**: Investigating why emails failed processing.
+- **Purge Dead Letter Queue**: Clears all messages from the Dead Letter Queue.
+  - **Safety**: Direct action, no confirmation required (use cautiously).
+  - **Use Case**: Cleanup after investigating errors.
+
+#### Reset Section
 - **Delete All Data**: Completely wipes the database and storage.
-    - **Actions Performed**: Deletes all items in Cosmos DB container, deletes all blobs in `pdf-inputs`.
+    - **Actions Performed**: Deletes all items in Cosmos DB container, deletes all blobs in `pdf-inputs`, and purges the Dead Letter Queue.
     - **Safety**: Requires two confirmations to proceed.
     - **Use Case**: Cleaning up after a POC session or before a new demo run.
