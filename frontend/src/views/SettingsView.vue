@@ -1132,8 +1132,9 @@ onMounted(() => {
                   Integrates visual context from OCR (photos, diagrams, signatures) into the decision process.
                 </p>
                 <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
-                  <span class="text-green-600 dark:text-green-400 font-bold">How it works:</span> Mistral OCR describes images (e.g. "photo of water leak"). The prompt explicitly asks to consider these visual descriptions.<br>
-                  <span class="text-green-600 dark:text-green-400 font-bold">Example:</span> An email body says "See attached". The PDF contains a photo of a crashed car. The model uses "car crash photo" to classify as "Vehicle Accident".
+                  <span class="text-green-600 dark:text-green-400 font-bold">How it works:</span> Uses Mistral BBox Annotation capability.<br>
+                  <span class="text-green-600 dark:text-green-400 font-bold">Annotation:</span> Extracts structured descriptions (summary, details) for every visual element found (charts, photos).<br>
+                  <span class="text-green-600 dark:text-green-400 font-bold">Enrichment:</span> These descriptions are injected into the Markdown before classification, allowing the AI to "see" your attachments.
                 </div>
               </div>
             </div>

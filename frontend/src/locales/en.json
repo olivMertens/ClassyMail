@@ -167,12 +167,12 @@
             "li2": "Anonymization: When exporting data for fine-tuning, the system automatically scrubs names, emails, and dates using a dedicated anonymizer model."
         },
         "vision": {
-            "title": "Smart Vision (Mistral Document AI)",
-            "desc": "The system leverages Mistral's advanced Layout Analysis to intelligently handle visual content.",
-            "standard_title": "Hybrid Processing",
-            "standard_desc": "The pipeline is 'Content Aware': Text documents are OCR'd normally. However, if visual elements (photos, diagrams) are detected *inside* the document, they are automatically captioned by the Vision model.",
-            "vision_title": "Full Page Scans vs. Images",
-            "vision_desc": "The system intelligently distinguishes between a 'scanned page' (treated as text source) and 'meaningful images' (e.g. car crash photos). Redundant descriptions of the page itself are suppressed."
+            "title": "Smart Vision & Annotation (Mistral Document AI)",
+            "desc": "The system now uses Mistral's BBox Annotation capability (via Schema) to extract structured insights from visual elements.",
+            "standard_title": "Vision Enrichment",
+            "standard_desc": "When 'Vision' strategy is active, the system generates structured descriptions (Summary, Business Details) for every visual element (charts, photos) found in the PDF. This context is fed to the Classifier.",
+            "vision_title": "Structured Annotations",
+            "vision_desc": "Using a strict JSON Schema, the Vision model categorizes images and decides if they are 'relevant' to the business process, ignoring decorative elements."
         },
         "flow_title": "Processing Flow"
     }

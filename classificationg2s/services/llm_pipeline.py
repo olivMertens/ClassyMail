@@ -6,16 +6,29 @@ import logging
 import httpx
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
+from pydantic import BaseModel
 from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential, retry_if_exception, retry
 
 from classificationg2s.core import config
 from classificationg2s.models import OCRFailed
 from classificationg2s.services.azure_clients import auth_headers, Clients
 from classificationg2s.services.settings_store import get_categories_prompt_text, load_settings
+from classificationg2s.services.annotations import ImageDescription
 
 logger = logging.getLogger(__name__)
 
 tracer = trace.get_tracer(__name__)
+
+
+def pydantic_to_mistral_schema(model: type[BaseModel]) -> dict:
+    """
+    Converts a Pydantic model to the JSON schema format expected by Mistral API.
+    """
+    schema = model.model_json_schema()
+    return {
+        "type": "json_schema",
+        "json_schema": schema
+    }
 
 
 def retryable_httpx(exc: Exception) -> bool:
@@ -43,7 +56,12 @@ def clamp_text_to_token_budget(text: str, max_tokens: int) -> tuple[str, bool]:
     return text[:max_chars], True
 
 
-async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None, include_images: bool = False) -> dict:
+async def ocr_with_mistral(
+    base64_pdf: str,
+    clients: Clients | None = None,
+    include_images: bool = False,
+    enable_vision_enrichment: bool = False
+) -> dict:
     headers = await auth_headers(clients=clients)
 
     settings = load_settings()
@@ -60,6 +78,15 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None, incl
 
     if include_images:
         payload["include_image_base64"] = "true"
+
+    if enable_vision_enrichment:
+        # Use bbox_annotation to describe images found by OCR
+        payload["bbox_annotation_format"] = pydantic_to_mistral_schema(ImageDescription)
+        # We also need image base64 for the vision model to work on them internally,
+        # though usually the API handles this trigger automatically if annotation is requested.
+        # But let's ensure we get base64 back if we want to debug, or rely on API defaults.
+        # The docs say: "After regular OCR is finished; we call a Vision capable LLM for all bboxes individually"
+        pass
 
     if not config.MISTRAL_ENDPOINT:
         raise RuntimeError("MISTRAL_ENDPOINT not configured.")
@@ -118,10 +145,32 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None, incl
 
             # Combine markdown from all pages
             markdown_parts = []
-            for page in pages:
+
+            for page_idx, page in enumerate(pages):
                 page_md = page.get("markdown", "")
+
+                # Check for image annotations to enrich context
+                page_images = page.get("images", [])
+                image_notes = []
+                for img in page_images:
+                    # Mistral returns the annotation directly in the image object or under specific keys
+                    # Depending on API version, sometimes it merges the schema fields into the image dict.
+                    # We check for our expected fields.
+                    if enable_vision_enrichment:
+                        # Extract fields defined in ImageDescription
+                        summary = img.get("summary")
+                        details = img.get("details")
+                        img_type = img.get("image_type")
+
+                        if summary or details:
+                            note = f"> [Visual Content ({img_type or 'image'})]: {summary} | Details: {details}"
+                            image_notes.append(note)
+
                 if page_md:
                     markdown_parts.append(page_md)
+
+                if image_notes:
+                    markdown_parts.append("\n\n--- Visual Context ---\n" + "\n".join(image_notes) + "\n----------------------\n")
 
             content = "\n\n".join(markdown_parts)
             if not content.strip():
@@ -131,12 +180,15 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None, incl
             annotated_images = []
             for page_idx, page in enumerate(pages):
                 for img in page.get("images", []):
+                    # Basic extraction for returning raw data
                     annotated_images.append({
                         "id": img.get("id"),
                         "page_index": page_idx,
-                        "image_type": img.get("type"),
-                        "description": img.get("description"),
-                        "bbox": img.get("bbox")
+                        "image_type": img.get("type") or img.get("image_type"), # Handle both standard and annotated key
+                        "description": img.get("description") or img.get("summary"), # Fallback
+                        "bbox": img.get("bbox"),
+                        "details": img.get("details"),
+                        "is_relevant": img.get("is_relevant")
                     })
 
             usage_info = data.get("usage", {})

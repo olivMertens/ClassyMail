@@ -64,7 +64,13 @@ async def run_classification_pipeline(
         log("ocr", "start")
         # Enable image extraction only if strategy is 'vision' to save costs/latency
         include_img = (strategy == "vision")
-        ocr_result = await ocr_with_mistral(pdf_b64, clients=clients, include_images=include_img)
+        # Use new enrichment capability for vision strategy
+        ocr_result = await ocr_with_mistral(
+            pdf_b64,
+            clients=clients,
+            include_images=include_img,
+            enable_vision_enrichment=include_img
+        )
         log("ocr", "ok")
     except Exception as ex:
         from classificationg2s.models import OCRFailed
@@ -76,25 +82,6 @@ async def run_classification_pipeline(
 
     markdown = ocr_result.get("markdown") or ""
     mistral_images = ocr_result.get("images", [])
-
-    # Ingest Mistral's own visual descriptions (Annotations)
-    if mistral_images:
-         vision_markdown_lines = ["\n\n## Visual Context (Extracted by OCR)\n"]
-         has_relevant_images = False
-         for idx, img in enumerate(mistral_images):
-             desc = img.get("description")
-             relevance = img.get("relevance", "Unknown")
-
-             # Filter out noise if possible
-             if relevance and relevance.lower() == "irrelevant":
-                 continue
-
-             if desc:
-                 has_relevant_images = True
-                 vision_markdown_lines.append(f"- **Image {idx+1} ({img.get('image_type', 'Unknown')})**: {desc}")
-
-         if has_relevant_images:
-             markdown += "\n" + "\n".join(vision_markdown_lines)
 
     try:
         log("classify", "start")
