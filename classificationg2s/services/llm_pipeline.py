@@ -66,7 +66,8 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None, incl
         raise RuntimeError("MISTRAL_ENDPOINT not configured.")
 
     # Mistral Document AI endpoint (Microsoft Foundry)
-    # MISTRAL_ENDPOINT already contains the full URL (e.g., https://email-poc-aifoundry.cognitiveservices.azure.com)
+    # Reference: https://github.com/retkowsky/Azure-AIGEN-demos/blob/main/Mistral%20Document%20AI/Mistral%20Document%20AI%20with%20Azure%20AI%20Foundry.ipynb
+    # The endpoint should be used directly without appending paths (e.g., https://xxx.cognitiveservices.azure.com)
     url = config.MISTRAL_ENDPOINT.rstrip('/')
 
     logger.info(f"[metrics] OCR Request: {url} model={config.MISTRAL_DEPLOYMENT}")

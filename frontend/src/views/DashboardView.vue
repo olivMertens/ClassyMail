@@ -422,213 +422,113 @@ const emit = defineEmits(['open-email'])
     >
       No data available yet.
     </div>
+  </div>
 
-    <!-- Actions Row -->
-    <div class="flex flex-col sm:flex-row justify-between items-end gap-4 mt-2 border-t pt-4 dark:border-gray-700">
-      <p class="text-xs text-gray-500 dark:text-gray-400">
-        {{ stats.processed }} of {{ stats.total }} emails processed.
-        <span
-          v-if="stats.total > 0 && progressPercentage < 100"
-          class="ml-2 animate-pulse text-primary-600"
-        >Processing... (Auto-refresh 15s)</span>
-        <span
-          v-else-if="stats.total > 0"
-          class="ml-2 text-green-600"
-        >Complete</span>
-      </p>
+  <!-- Filters & Search Toolbar -->
+  <div class="flex flex-col gap-4 bg-white dark:bg-gray-800 p-4 shadow rounded-lg">
+    <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+      <!-- Tab-like Filters -->
+      <div class="flex p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+        <button
+          v-for="f in filters"
+          :key="f.id"
+          class="px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap"
+          :class="filter === f.id ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
+          @click="filter = f.id"
+        >
+          {{ f.label }}
+        </button>
+      </div>
 
-      <div class="flex flex-wrap gap-2 items-center">
-        <!-- Export CSV -->
-        <div class="relative flex items-center group">
-          <button
-            class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="stats.total === 0"
-            @click="exportCsv"
-          >
-            <ArrowDownTrayIcon
-              class="-ml-0.5 h-5 w-5 text-gray-400"
-              aria-hidden="true"
-            />
-            Export CSV
-          </button>
-          <QuestionMarkCircleIcon
-            v-if="stats.total === 0"
-            class="ml-1 h-5 w-5 text-gray-300 cursor-help"
-            title="Disabled: No emails available to export."
+      <!-- Search -->
+      <div class="relative w-full sm:max-w-xs">
+        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+          <MagnifyingGlassIcon
+            class="h-5 w-5 text-gray-400"
+            aria-hidden="true"
           />
         </div>
-
-        <!-- JSONL Buttons -->
-        <div class="relative flex items-center gap-2 border-l pl-2 ml-2 dark:border-gray-700">
-          <button
-            class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="!stats.finetune_ready"
-            @click="exportJsonl('train')"
-          >
-            <ArrowDownTrayIcon
-              class="-ml-0.5 h-5 w-5 text-gray-400"
-              aria-hidden="true"
-            />
-            JSONL (Train)
-          </button>
-          <button
-            class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="!stats.finetune_ready"
-            @click="exportJsonl('test')"
-          >
-            <ArrowDownTrayIcon
-              class="-ml-0.5 h-5 w-5 text-gray-400"
-              aria-hidden="true"
-            />
-            JSONL (Test)
-          </button>
-
-          <div class="relative flex items-center">
-            <button
-              class="inline-flex items-center gap-x-1.5 rounded-md bg-white dark:bg-gray-800 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="!stats.finetune_ready"
-              @click="exportJsonl('all')"
-            >
-              <ArrowDownTrayIcon
-                class="-ml-0.5 h-5 w-5 text-gray-400"
-                aria-hidden="true"
-              />
-              JSONL (All)
-            </button>
-            <div class="ml-2 relative group">
-              <QuestionMarkCircleIcon
-                class="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help"
-                :class="{'text-amber-500': !stats.finetune_ready}"
-              />
-              <!-- Tooltip on Hover -->
-              <div
-                class="absolute bottom-full right-0 mb-2 w-72 bg-white dark:bg-gray-800 p-3 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 text-xs hidden group-hover:block"
-              >
-                <div
-                  v-if="!stats.finetune_ready"
-                  class="mb-2 pb-2 border-b border-gray-100 dark:border-gray-700 text-amber-600 dark:text-amber-400 font-bold"
-                >
-                  Action Disabled:
-                  <span class="font-normal text-gray-600 dark:text-gray-300 block mt-1">
-                    You need at least {{ stats.finetune_min_required }} reviewed emails to generate a fine-tuning dataset.
-                  </span>
-                </div>
-                <span class="font-semibold text-gray-900 dark:text-white block mb-2">Fine-tuning Best Practices:</span>
-                <ul class="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
-                  <li>Aim for at least {{ stats.finetune_min_required }} reviewed examples per category for stability.</li>
-                  <li>Ensure examples are diverse and correctly labeled (validation is key).</li>
-                  <li>For Phi-4 or GPT-4o-mini, quality > quantity. "Garbage in, garbage out".</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
+        <input
+          v-model="search"
+          type="text"
+          class="block w-full rounded-md border-0 py-2 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:ring-gray-600 dark:text-white dark:placeholder-gray-400"
+          placeholder="Search subject, sender..."
+        >
       </div>
     </div>
-  </div>
-  <div class="flex flex-col sm:flex-row justify-between gap-4">
-    <!-- Tabs -->
-    <div class="flex space-x-2 overflow-x-auto pb-2 sm:pb-0">
-      <button
-        v-for="f in filters"
-        :key="f.id"
-        class="px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors"
-        :class="filter === f.id ? 'ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-900 ' + f.color : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm'"
-        @click="filter = f.id"
-      >
-        {{ f.label }}
-      </button>
-    </div>
-    <!-- Search -->
-    <div class="relative rounded-md shadow-sm max-w-xs w-full">
-      <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-        <MagnifyingGlassIcon
-          class="h-5 w-5 text-gray-400"
-          aria-hidden="true"
-        />
-      </div>
-      <input
-        v-model="search"
-        type="text"
-        class="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white dark:placeholder-gray-500"
-        placeholder="Search emails..."
-      >
-    </div>
-  </div>
 
-  <!-- Filters Row 2 -->
-  <div class="flex flex-col sm:flex-row gap-4">
-    <div class="flex-1">
-      <label
-        for="category-filter"
-        class="sr-only"
-      >Category</label>
-      <input
-        id="category-filter"
-        v-model="categoryFilter"
-        type="text"
-        placeholder="Filter by Category Name..."
-        class="block w-full rounded-md border-0 py-1.5 pl-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white dark:placeholder-gray-500"
-      >
-    </div>
-    <div class="w-full sm:w-48">
-      <label
-        for="confidence-filter"
-        class="sr-only"
-      >Confidence</label>
-      <select
-        id="confidence-filter"
-        v-model="confidenceFilter"
-        class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white"
-      >
-        <option value="">
-          Any Confidence
-        </option>
-        <option value="lt_10">
-          &lt; 10% (Very Low)
-        </option>
-        <option value="lt_30">
-          &lt; 30%
-        </option>
-        <option value="lt_50">
-          &lt; 50%
-        </option>
-        <option value="lt_90">
-          &lt; 90%
-        </option>
-        <option value="eq_100">
-          100% (High)
-        </option>
-      </select>
-    </div>
-    <!-- View Mode Toggle -->
-    <div class="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
-      <button
-        type="button"
-        :class="[
-          'flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all',
-          viewMode === 'cards'
-            ? 'bg-white dark:bg-gray-600 text-primary-600 dark:text-primary-300 shadow-sm'
-            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-        ]"
-        @click="viewMode = 'cards'"
-      >
-        <Squares2X2Icon class="h-4 w-4" />
-        Cards
-      </button>
-      <button
-        type="button"
-        :class="[
-          'flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all',
-          viewMode === 'table'
-            ? 'bg-white dark:bg-gray-600 text-primary-600 dark:text-primary-300 shadow-sm'
-            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-        ]"
-        @click="viewMode = 'table'"
-      >
-        <TableCellsIcon class="h-4 w-4" />
-        Table
-      </button>
+    <!-- Secondary Filters Row -->
+    <div class="flex flex-col sm:flex-row gap-4 items-center">
+      <!-- Category Filter -->
+      <div class="relative w-full sm:w-64">
+        <input
+          id="category-filter"
+          v-model="categoryFilter"
+          type="text"
+          placeholder="Filter by Category..."
+          class="block w-full rounded-md border-0 py-2 pl-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:ring-gray-600 dark:text-white dark:placeholder-gray-400"
+        >
+      </div>
+
+      <!-- Confidence Filter -->
+      <div class="w-full sm:w-48">
+        <select
+          id="confidence-filter"
+          v-model="confidenceFilter"
+          class="block w-full rounded-md border-0 py-2 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:ring-gray-600 dark:text-white"
+        >
+          <option value="">
+            Any Confidence
+          </option>
+          <option value="lt_10">
+            &lt; 10% (Very Low)
+          </option>
+          <option value="lt_30">
+            &lt; 30%
+          </option>
+          <option value="lt_50">
+            &lt; 50%
+          </option>
+          <option value="lt_90">
+            &lt; 90%
+          </option>
+          <option value="eq_100">
+            100% (High)
+          </option>
+        </select>
+      </div>
+
+      <div class="flex-grow" />
+
+      <!-- View Mode Toggle -->
+      <div class="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg shrink-0">
+        <button
+          type="button"
+          :class="[
+            'flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all',
+            viewMode === 'cards'
+              ? 'bg-white dark:bg-gray-600 text-primary-600 dark:text-primary-300 shadow-sm'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+          ]"
+          @click="viewMode = 'cards'"
+        >
+          <Squares2X2Icon class="h-4 w-4" />
+          Cards
+        </button>
+        <button
+          type="button"
+          :class="[
+            'flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all',
+            viewMode === 'table'
+              ? 'bg-white dark:bg-gray-600 text-primary-600 dark:text-primary-300 shadow-sm'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+          ]"
+          @click="viewMode = 'table'"
+        >
+          <TableCellsIcon class="h-4 w-4" />
+          Table
+        </button>
+      </div>
     </div>
   </div>
 
