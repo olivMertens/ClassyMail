@@ -594,133 +594,103 @@ const emit = defineEmits(['open-email'])
   <!-- Cards View -->
   <div
     v-else-if="viewMode === 'cards'"
-    class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+    class="grid gap-4 mt-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
   >
     <div
       v-for="email in emails"
       :key="email.id"
       :class="[
-        'rounded-lg shadow-sm border hover:shadow-md transition-shadow flex flex-col h-full',
+        'rounded-lg shadow-sm border hover:shadow-md transition-shadow flex flex-col h-full text-sm group',
         email.test_mode
           ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700'
           : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
       ]"
     >
-      <div class="p-5 flex-1">
-        <!-- Test Mode Badge -->
-        <div
-          v-if="email.test_mode"
-          class="mb-2"
-        >
-          <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 rounded">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              class="w-3 h-3"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M8.5 3.528v4.644c0 .729-.29 1.428-.805 1.944l-1.217 1.216a8.75 8.75 0 013.55.621l.502.201a7.25 7.25 0 004.178.365l-2.403-2.403a2.75 2.75 0 01-.805-1.944V3.528a40.205 40.205 0 00-3 0zm4.5.084l.19.015a.75.75 0 10.12-1.495 41.364 41.364 0 00-6.62 0 .75.75 0 00.12 1.495L7 3.612v4.56c0 .331-.132.649-.366.883L2.6 13.09c-1.496 1.496-.817 4.15 1.403 4.475C5.961 17.852 7.963 18 10 18s4.039-.148 5.997-.436c2.22-.325 2.9-2.979 1.403-4.475l-4.034-4.034A1.25 1.25 0 0113 9.172V3.612z"
-                clip-rule="evenodd"
-              />
-            </svg>
-            TEST E2E
-          </span>
-          <span
-            v-if="email.expected_category"
-            class="ml-2 text-xs text-amber-700 dark:text-amber-400"
-          >
-            Expected: {{ email.expected_category }}
-          </span>
-        </div>
-        <div class="flex justify-between items-start mb-2">
-          <div class="flex flex-col gap-1">
+      <div class="p-3 flex-1 flex flex-col gap-2">
+        <!-- Header: Status + Actions -->
+        <div class="flex justify-between items-start">
+          <div class="flex items-center gap-2">
             <span
-              class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset w-fit"
+              v-if="email.status === 'ERROR'"
+              class="text-red-500"
+              title="Error"
+            ><ExclamationCircleIcon class="h-4 w-4" /></span>
+            <span
+              v-else-if="email.status === 'PROCESSED'"
+              class="text-green-500"
+              title="Processed"
+            ><CheckCircleIcon class="h-4 w-4" /></span>
+            <span
+              v-else-if="email.status === 'REVIEW_REQUIRED'"
+              class="text-amber-500"
+              title="Review Required"
+            ><ClockIcon class="h-4 w-4" /></span>
+
+            <span
+              v-if="email.classification?.detected_intents?.length"
+              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ring-1 ring-inset"
               :class="getScoreColor(email)"
             >
-              Score {{ getScore(email) }}
+              {{ getScore(email) }}
             </span>
-            <span
-              v-if="email.processing_time_ms"
-              class="text-xs text-gray-400"
+          </div>
+
+          <!-- Minimal Actions -->
+          <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              title="View Details"
+              class="text-gray-400 hover:text-primary-600"
+              @click="emit('open-email', email)"
             >
-              {{ Math.round(email.processing_time_ms) }}ms
+              <EyeIcon class="h-4 w-4" />
+            </button>
+            <button
+              title="Reprocess"
+              :disabled="reprocessingId === email.id"
+              class="text-gray-400 hover:text-green-600"
+              @click="reprocessEmail(email)"
+            >
+              <ArrowPathIcon
+                class="h-4 w-4"
+                :class="{'animate-spin': reprocessingId === email.id}"
+              />
+            </button>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div class="min-w-0">
+          <h3
+            class="font-medium text-gray-900 dark:text-white truncate text-sm leading-tight"
+            :title="email.subject"
+          >
+            {{ email.subject || 'No Subject' }}
+          </h3>
+          <p class="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+            {{ email.sender || 'Unknown Sender' }}
+          </p>
+        </div>
+
+        <!-- Footer: ID & Category -->
+        <div class="mt-auto pt-2 flex items-center justify-between gap-2 border-t border-gray-100 dark:border-gray-700/50">
+          <div class="text-[10px] text-gray-400 font-mono truncate max-w-[40%]">
+            #{{ email.id.slice(0,6) }}
+          </div>
+          <div
+            v-if="email.classification?.detected_intents?.length"
+            class="flex-shrink-0"
+          >
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800 max-w-[100px] truncate">
+              {{ email.classification.detected_intents[0].intent }}
             </span>
           </div>
-          <span
-            v-if="email.status === 'ERROR'"
-            class="text-red-500"
-            title="Error"
-          >
-            <ExclamationCircleIcon class="h-5 w-5" />
-          </span>
-          <span
-            v-else-if="email.status === 'PROCESSED'"
-            class="text-green-500"
-            title="Processed"
-          >
-            <CheckCircleIcon class="h-5 w-5" />
-          </span>
-          <span
-            v-else-if="email.status === 'REVIEW_REQUIRED'"
-            class="text-amber-500"
-            title="Review Required"
-          >
-            <ClockIcon class="h-5 w-5" />
-          </span>
-        </div>
-
-        <h3
-          class="text-lg font-medium text-gray-900 dark:text-white truncate mb-1"
-          :title="email.subject"
-        >
-          {{ email.subject || 'No Subject' }}
-        </h3>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          {{ email.sender || 'Unknown Sender' }}
-        </p>
-
-        <div class="mt-2 space-y-1">
           <div
-            v-if="!(email.classification?.detected_intents || []).length"
-            class="text-xs text-gray-400 dark:text-gray-500 italic"
+            v-else
+            class="text-[10px] text-gray-400 italic"
           >
-            Aucune catégorie détectée
-          </div>
-          <div
-            v-for="intent in email.classification?.detected_intents || []"
-            :key="intent.intent"
-            class="flex justify-between text-xs"
-          >
-            <span
-              class="text-gray-600 dark:text-gray-300 truncate pr-2"
-              :title="intent.intent"
-            >{{ intent.intent }}</span>
-            <span class="font-mono text-gray-500 dark:text-gray-400">{{ (intent.confidence * 100).toFixed(0) }}%</span>
+            No category
           </div>
         </div>
-      </div>
-
-      <div class="bg-gray-50 dark:bg-gray-700/50 px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center rounded-b-lg">
-        <button
-          class="text-sm font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400"
-          @click="emit('open-email', email)"
-        >
-          Open Details
-        </button>
-        <button
-          class="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 flex items-center gap-1"
-          :disabled="reprocessingId === email.id"
-          @click="reprocessEmail(email)"
-        >
-          <ArrowPathIcon
-            class="h-4 w-4"
-            :class="{'animate-spin': reprocessingId === email.id}"
-          />
-          Reprocess
-        </button>
       </div>
     </div>
   </div>
