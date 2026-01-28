@@ -121,6 +121,23 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
         await receiver.dead_letter_message(msg, reason=reason, error_description=error_text)
     except Exception as ex:
         logger.exception("[msg:%s] Processing failed for %s", message_id, blob_url)
+
+        # Persist error state to Cosmos for visibility in Dashboard
+        try:
+            record = EmailRecord(
+                id=blob_id_from_url(blob_url),
+                file_url=blob_url,
+                status="ERROR",
+                error=str(ex),
+                error_stage="worker_unhandled",
+                updated_at=datetime.now(timezone.utc),
+                processing_log=[{"ts": datetime.now(timezone.utc).isoformat(), "stage": "worker", "event": "unhandled_exception", "details": str(ex)}]
+            )
+            await save_to_cosmos(record)
+        except Exception:
+            # If saving to Cosmos fails (e.g. connectivity), we fall back to DLQ only
+            logger.warning("[msg:%s] Could not persist error record to Cosmos", message_id)
+
         reason = None
         if isinstance(ex, (ClientAuthenticationError, ResourceNotFoundError)):
             reason = "AuthOrResourceError"

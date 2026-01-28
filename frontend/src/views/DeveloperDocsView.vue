@@ -38,8 +38,15 @@ const runSimulation = async () => {
 
     try {
         addSimLog("Step 1: Uploading Dummy PDF...", 'info')
-        const res = await fetch('/api/admin/debug/simulate-flow', { method: 'POST' })
-        if (!res.ok) throw new Error("Upload failed")
+        const res = await fetch('/api/admin/debug/simulate-flow', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        })
+        if (!res.ok) {
+            const errBody = await res.json().catch(() => ({ detail: res.statusText }))
+            throw new Error(errBody.detail || "Upload failed")
+        }
 
         const data = await res.json()
         const itemId = data.item_id
@@ -186,9 +193,9 @@ const switchTab = (tab) => {
 const diagram = `
 graph TD
     classDef azure fill:#0072C6,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef app fill:#50e6ff,stroke:#333,stroke-width:2px;
-    classDef db fill:#59b4d9,stroke:#333,stroke-width:2px;
-    classDef ai fill:#ff9900,stroke:#333,stroke-width:2px;
+    classDef app fill:#50e6ff,stroke:#333,stroke-width:2px,color:#000;
+    classDef db fill:#59b4d9,stroke:#333,stroke-width:2px,color:#000;
+    classDef ai fill:#ff9900,stroke:#333,stroke-width:2px,color:#000;
 
     Client([Client Browser]) -->|HTTPS| FE[Vue Frontend]
     FE -->|API Calls| API[FastAPI Backend]

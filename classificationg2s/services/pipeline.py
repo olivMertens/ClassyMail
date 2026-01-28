@@ -5,7 +5,7 @@ from typing import Optional
 
 from classificationg2s.models import EmailRecord, ClassificationResult
 from classificationg2s.services.azure_clients import download_blob_as_base64, blob_id_from_url, Clients
-from classificationg2s.services.llm_pipeline import ocr_with_mistral, classify_with_phi4, process_agent_response
+from classificationg2s.services.llm_pipeline import ocr_with_mistral, classify_with_phi4, process_agent_response, generate_embedding
 from classificationg2s.services.costing import compute_cost_llm, compute_cost_mistral
 import logging
 
@@ -96,6 +96,18 @@ async def run_classification_pipeline(
         raise err from ex
     processed = process_agent_response(classification_raw)
 
+    # Generate Embeddings
+    vector = []
+    try:
+        log("embedding", "start")
+        if markdown:
+            vector = await generate_embedding(markdown, clients=clients)
+        log("embedding", "ok", f"dim={len(vector)}")
+    except Exception as ex:
+        log("embedding", "error", f"Failed to generate embedding: {ex}")
+        # We generally don't want to fail the whole pipeline if embedding fails,
+        # but we should log it.
+
     status = "REVIEW_REQUIRED" if processed.get("needs_review") else "PROCESSED"
     markdown_trunc = markdown[:30000] if markdown else None
 
@@ -128,6 +140,7 @@ async def run_classification_pipeline(
         markdown=markdown_trunc,
         subject=response_data.get("subject"),
         sender=response_data.get("sender"),
+        vector=vector,
         classification=ClassificationResult(
             **{
                 "detected_intents": processed.get("intents", []),

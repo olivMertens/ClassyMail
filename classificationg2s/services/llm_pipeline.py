@@ -422,3 +422,43 @@ Analyse cette correction.
         pass
 
     return None
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=5), retry=retry_if_exception(retryable_httpx))
+async def generate_embedding(text: str, clients: Clients | None = None) -> list[float]:
+    """
+    Generates vector embeddings for the given text using the configured embedding model.
+    """
+    if not config.EMBEDDING_ENDPOINT or not text:
+        return []
+
+    # Truncate text to avoid token limits (text-embedding-3-small limit is ~8k tokens)
+    # 24k chars is roughly 6k tokens, safe enough.
+    text_truncated = text[:24000]
+
+    headers = await auth_headers(clients=clients)
+
+    url = f"{config.EMBEDDING_ENDPOINT}/openai/deployments/{config.EMBEDDING_DEPLOYMENT}/embeddings?api-version={config.EMBEDDING_API_VERSION}"
+
+    payload = {
+        "input": text_truncated,
+        "model": config.EMBEDDING_DEPLOYMENT
+    }
+
+    with tracer.start_as_current_span("generate_embedding") as span:
+        span.set_attribute("gen_ai.system", "azure_openai")
+        span.set_attribute("gen_ai.operation", "embeddings")
+
+        async with httpx.AsyncClient(timeout=30) as client:
+            try:
+                resp = await client.post(url, json=payload, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+                return data["data"][0]["embedding"]
+            except Exception as ex:
+                logger.error(f"Embedding generation failed: {ex}")
+                span.record_exception(ex)
+                span.set_status(Status(StatusCode.ERROR))
+                # Depending on requirement, we might want to return empty list or raise
+                # Returning empty list allows processing to continue without vector search capability for this item
+                return []

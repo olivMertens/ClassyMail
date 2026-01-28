@@ -9,6 +9,7 @@ from typing import Optional
 from classificationg2s.models import EmailRecord
 from classificationg2s.services.azure_clients import Clients, get_default_clients
 from classificationg2s.services.anonymizer import anonymize_markdown_for_finetune
+from classificationg2s.services.llm_pipeline import generate_embedding
 from classificationg2s.core import config
 
 
@@ -263,6 +264,40 @@ async def search_email_by_text(q: str, limit: int = 5, clients: Clients | None =
     ]
     items = [x async for x in _query(clients.cosmos_container, query, parameters=params, max_items=limit)]
     return items
+
+
+async def search_similar_emails(q: str, limit: int = 5, clients: Clients | None = None) -> list[dict]:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    limit = _bound_limit(limit)
+
+    # Generate vector for query
+    vector = await generate_embedding(q, clients=clients)
+    if not vector:
+         # Fallback to text search if embedding fails
+         return await search_email_by_text(q, limit, clients)
+
+    # Vector Search Query (Cosine Distance)
+    query = (
+        "SELECT TOP @limit c.id, c.status, c.file_url, c.subject, c.error, c.updated_at, VectorDistance(c.vector, @vector) as distance "
+        "FROM c "
+        "WHERE IS_DEFINED(c.vector) "
+        "ORDER BY VectorDistance(c.vector, @vector) ASC"
+    )
+
+    params = [
+        {"name": "@vector", "value": vector},
+        {"name": "@limit", "value": limit},
+    ]
+
+    # Note: Vector search requires container with Vector Policy.
+    try:
+        items = [x async for x in _query(clients.cosmos_container, query, parameters=params, max_items=limit)]
+        return items
+    except Exception:
+        # If vector search fails (e.g. policy not applied), fallback
+        return await search_email_by_text(q, limit, clients)
+
 
 
 async def get_latest_errors(limit: int = 5, clients: Clients | None = None) -> list[dict]:

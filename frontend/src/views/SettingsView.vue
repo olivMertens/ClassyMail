@@ -51,6 +51,10 @@ const resetConfirm2 = ref(false)
 const resetting = ref(false)
 const purgingDlq = ref(false)
 
+// Connectivity Test State
+const connTestLoading = ref(false)
+const connTestResults = ref(null)
+
 // Simulate Flow State
 const simulatingFlow = ref(false)
 const useAoaiEnhancement = ref(false)
@@ -240,10 +244,29 @@ const performDlqPurge = async () => {
     }
 }
 
+const runConnectivityTest = async () => {
+    connTestLoading.value = true
+    connTestResults.value = null
+    try {
+        const res = await fetch('/api/admin/debug/connectivity', { method: 'POST' })
+        if (res.ok) {
+            connTestResults.value = await res.json()
+            alert('Connectivity Test Complete. See results.')
+        } else {
+            const err = await res.json()
+            alert(`Connectivity Test Failed: ${err.detail || 'Request failed'}`)
+        }
+    } catch(e) {
+        alert(`Connectivity Error: ${e.message}`)
+    } finally {
+        connTestLoading.value = false
+    }
+}
+
 const performSimulateFlow = async () => {
     simulatingFlow.value = true
     try {
-        const res = await fetch('/api/admin/simulate-flow', {
+        const res = await fetch('/api/admin/debug/simulate-flow', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1008,22 +1031,63 @@ onMounted(() => {
           <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
             Verify that the backend has proper permissions and network connectivity to Azure services.
           </p>
-          <div class="mt-3 flex gap-2">
-            <a
-              href="/api/admin/diagnostics"
-              target="_blank"
-              class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
+          <div class="mt-3 flex flex-col gap-2">
+            <div class="flex gap-2">
+              <a
+                href="/api/admin/diagnostics"
+                target="_blank"
+                class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
+              >
+                View Diagnostics
+              </a>
+              <button
+                type="button"
+                class="inline-flex items-center rounded-md bg-blue-100 px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 disabled:opacity-50"
+                :disabled="connTestLoading"
+                title="Test active read/write operations on Storage, Cosmos DB, and Service Bus"
+                @click="runConnectivityTest"
+              >
+                <ArrowPathIcon
+                  v-if="connTestLoading"
+                  class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
+                  aria-hidden="true"
+                />
+                {{ connTestLoading ? 'Testing...' : 'Run Connectivity Test' }}
+              </button>
+            </div>
+
+            <div
+              v-if="connTestResults"
+              class="mt-4 p-4 rounded-md border text-sm"
+              :class="(!connTestResults.error && connTestResults.storage_upload === 'ok' && connTestResults.cosmos_write === 'ok' && connTestResults.servicebus_connect === 'ok') ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'"
             >
-              View Diagnostics
-            </a>
-            <button
-              type="button"
-              class="inline-flex items-center rounded-md bg-blue-100 px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
-              disabled
-              title="Test active read/write operations on Storage, Cosmos DB, and Service Bus (available via API endpoint)"
-            >
-              Run Connectivity Test
-            </button>
+              <div
+                v-if="connTestResults.error"
+                class="text-red-600 dark:text-red-400 font-bold mb-2"
+              >
+                Global Error: {{ connTestResults.error }}
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <span class="font-bold block text-gray-700 dark:text-gray-300">Storage (Write/Del):</span>
+                  <span :class="connTestResults.storage_upload === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                    {{ connTestResults.storage_upload === 'ok' ? 'PASS' : 'FAIL' }}
+                  </span>
+                </div>
+                <div>
+                  <span class="font-bold block text-gray-700 dark:text-gray-300">Cosmos (Write/Del):</span>
+                  <span :class="connTestResults.cosmos_write === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                    {{ connTestResults.cosmos_write === 'ok' ? 'PASS' : 'FAIL' }}
+                  </span>
+                </div>
+                <div>
+                  <span class="font-bold block text-gray-700 dark:text-gray-300">Service Bus (Link):</span>
+                  <span :class="connTestResults.servicebus_connect === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                    {{ connTestResults.servicebus_connect === 'ok' ? 'PASS' : 'FAIL' }}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

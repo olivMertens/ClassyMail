@@ -21,6 +21,7 @@ from classificationg2s.services.repository import (
     search_email_records,
     get_email_by_id,
     search_email_by_text,
+    search_similar_emails,
     get_latest_errors,
     get_stats_summary,
     get_top_intents,
@@ -133,6 +134,20 @@ class ChatAgent:
             ),
             ChatCompletionsToolDefinition(
                 function=FunctionDefinition(
+                    name="search_similar_emails",
+                    description="Search for emails semantically similar to the query using Vector Search.",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "The text to find similar emails for."},
+                            "limit": {"type": "integer", "description": "Max items", "default": 5},
+                        },
+                        "required": ["query"],
+                    },
+                )
+            ),
+            ChatCompletionsToolDefinition(
+                function=FunctionDefinition(
                     name="get_latest_errors",
                     description="List latest errored emails (id, subject, error, updated_at).",
                     parameters={
@@ -214,6 +229,11 @@ class ChatAgent:
                             query = args.get("query")
                             limit = args.get("limit", 5)
                             results = await search_email_by_text(query, limit=limit, clients=clients)
+                            content = json.dumps(results, default=str)
+                        elif fname == "search_similar_emails":
+                            query = args.get("query")
+                            limit = args.get("limit", 5)
+                            results = await search_similar_emails(query, limit=limit, clients=clients)
                             content = json.dumps(results, default=str)
                         elif fname == "get_latest_errors":
                             limit = args.get("limit", 5)

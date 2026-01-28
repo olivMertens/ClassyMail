@@ -626,6 +626,11 @@ const emit = defineEmits(['open-email'])
               title="Error"
             ><ExclamationCircleIcon class="h-4 w-4" /></span>
             <span
+              v-else-if="email.status === 'PENDING' || email.status === 'uploaded'"
+              class="text-blue-500 animate-pulse"
+              title="Processing..."
+            ><ArrowPathIcon class="h-4 w-4 animate-spin" /></span>
+            <span
               v-else-if="email.status === 'PROCESSED'"
               class="text-green-500"
               title="Processed"
@@ -934,10 +939,12 @@ const emit = defineEmits(['open-email'])
                   ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                   : email.status === 'REVIEW_REQUIRED'
                     ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300'
-                    : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                    : (email.status === 'PENDING' || email.status === 'uploaded')
+                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 animate-pulse'
+                      : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
               ]"
             >
-              {{ email.status === 'REVIEW_REQUIRED' ? 'To Review' : email.status === 'PROCESSED' ? 'Processed' : 'Error' }}
+              {{ email.status === 'REVIEW_REQUIRED' ? 'To Review' : email.status === 'PROCESSED' ? 'Processed' : (email.status === 'PENDING' || email.status === 'uploaded') ? 'Processing' : 'Error' }}
             </span>
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">

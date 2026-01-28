@@ -38,6 +38,7 @@ class EmailRecord(BaseModel):
     processing_time_ms: Optional[float] = None
     markdown: Optional[str] = None
     search_text: Optional[str] = None
+    vector: Optional[List[float]] = None
     classification: Optional[ClassificationResult] = None
     classification_history: List[HistoryEntry] = []
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
