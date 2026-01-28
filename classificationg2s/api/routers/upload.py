@@ -20,6 +20,30 @@ router = APIRouter(prefix="/api", tags=["upload"])
 
 @router.post("/upload")
 async def upload_pdfs(files: list[UploadFile] = File(...), clients: Clients = Depends(get_clients)):
+    """
+    Upload PDF files to Blob Storage.
+
+    STORAGE ORGANIZATION:
+    ──────────────────────────────────────────────────────
+    Files are organized by date and assigned a unique UUID:
+
+      uploads/[YEAR]/[MONTH]/[DAY]/[UUID]-[filename]
+
+    Example:
+      uploads/2026/01/28/a1b2c3d4-insurance-claim.pdf
+
+    Benefits:
+    - Date-based partitioning allows easy archival/lifecycle policies
+    - UUID prevents name collisions while preserving original filename
+    - Blob hierarchy is human-readable and queryable
+    - Supports Event Grid routing by prefix
+
+    Constraints:
+    - Max 10 files per batch
+    - Max 10MB per file (enforced)
+    - PDF format only
+    ──────────────────────────────────────────────────────
+    """
     if len(files) > 10:
         raise HTTPException(status_code=400, detail="Max 10 fichiers")
 
