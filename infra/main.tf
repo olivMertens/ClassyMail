@@ -309,17 +309,6 @@ resource "azurerm_cosmosdb_sql_container" "container" {
   database_name       = azurerm_cosmosdb_sql_database.sql.name
   partition_key_paths = ["/id"]
 
-  # Vector Search Configuration
-  vector_embedding_policy {
-    vector_embedding {
-      path              = "/classification/embedding"
-      data_type         = "float32"
-      distance_function = "cosine"
-      dimensions        = 1536 # OpenAI text-embedding-3-small
-    }
-  }
-
-
   # Politique d'indexation: garder l'index sur les champs utiles aux requêtes (status, reviewed, classification.needs_review, _ts)
   # et désindexer les gros champs rarement filtrés pour réduire les RU (markdown, raw_response, logs, usage).
   indexing_policy {
@@ -327,12 +316,6 @@ resource "azurerm_cosmosdb_sql_container" "container" {
 
     included_path {
       path = "/*"
-    }
-
-    # Vector Index
-    vector_index {
-      path = "/classification/embedding"
-      type = "quantizedFlat" # or "flat", "diskANN" (preview)
     }
 
     excluded_path {
