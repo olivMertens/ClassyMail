@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import logging
 
 from opentelemetry import trace
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -9,6 +10,8 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+logger = logging.getLogger(__name__)
 
 
 def init_telemetry(app) -> None:
@@ -22,14 +25,19 @@ def init_telemetry(app) -> None:
         if appinsights_conn:
             try:
                 from azure.monitor.opentelemetry.exporter import AzureMonitorTraceExporter
-            except ImportError:
-                # Exporter is optional (keeps local dev lightweight). If set in Azure, ensure the
-                # dependency is installed in the container image.
-                pass
-            else:
                 provider.add_span_processor(
                     BatchSpanProcessor(AzureMonitorTraceExporter(connection_string=appinsights_conn))
                 )
+                logger.info("Enabled Azure Monitor Telemetry Exporter")
+            except ImportError:
+                # Exporter is optional (keeps local dev lightweight). If set in Azure, ensure the
+                # dependency is installed in the container image.
+                logger.warning(
+                    "APPLICATIONINSIGHTS_CONNECTION_STRING is set, but 'azure-monitor-opentelemetry-exporter' "
+                    "module is missing. Telemetry will NOT be sent to Azure Monitor."
+                )
+            except Exception as e:
+                logger.error(f"Failed to initialize Azure Monitor Exporter: {e}")
 
         # Fallback: generic OTLP HTTP exporter.
         otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")

@@ -23,9 +23,16 @@ const initMermaid = async () => {
         element.removeAttribute('data-processed')
         element.innerHTML = diagram
     }
-    await mermaid.run({
-        nodes: document.querySelectorAll('.mermaid-graph')
-    })
+    try {
+        await mermaid.run({
+            nodes: document.querySelectorAll('.mermaid-graph')
+        })
+    } catch (e) {
+        console.warn('Mermaid rendering failed:', e)
+        if (element) {
+            element.innerHTML = '<div class="text-red-500 text-xs p-2">Diagram Error</div>'
+        }
+    }
 }
 
 onMounted(() => {

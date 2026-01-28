@@ -20,9 +20,10 @@ const formatTime = (t) => {
 <template>
   <div
     v-if="show && message"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75 p-4"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75 p-4 backdrop-blur-sm"
+    @click.self="emit('close')"
   >
-    <div class="relative w-full max-w-3xl bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div class="relative w-full max-w-3xl bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden transform transition-all">
       <div class="px-5 py-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
           Dead Letter Details

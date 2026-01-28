@@ -47,11 +47,13 @@ Each generated email includes:
 ## Testing Workflow
 
 1. **Generate test emails:**
+
    ```bash
    uv run python scripts/generate_realistic_emails.py --count 50
    ```
 
 2. **Upload via API:**
+
    ```bash
    curl -X POST http://localhost:8000/api/upload \
      -H "Content-Type: multipart/form-data" \
@@ -59,7 +61,8 @@ Each generated email includes:
    ```
 
 3. **Or use the Web UI:**
-   - Navigate to http://localhost:8000/
+
+   - Navigate to <http://localhost:8000/>
    - Use the upload interface
    - Check dashboard for classification results
 
@@ -71,6 +74,7 @@ To test the full E2E flow including email sending:
 2. Configure SendGrid API key (`SENDGRID_API_KEY`)
 3. Set test recipient email (`TEST_EMAIL_RECIPIENT`)
 4. Use the webhook endpoint:
+
    ```bash
    curl -X POST http://localhost:8000/api/webhook \
      -H "Content-Type: application/json" \
@@ -99,18 +103,21 @@ uv sync --extra dev
 
 ## Examples
 
-### Generate 100 mixed emails:
+### Generate 100 mixed emails
+
 ```bash
 uv run python scripts/generate_realistic_emails.py --count 100
 ```
 
-### Generate only attestation and résiliation emails:
+### Generate only attestation and résiliation emails
+
 ```bash
 uv run python scripts/generate_realistic_emails.py --count 30 \
   --categories "Attestation habitation" "Résiliation"
 ```
 
-### Custom output with many emails:
+### Custom output with many emails
+
 ```bash
 uv run python scripts/generate_realistic_emails.py \
   --count 200 \

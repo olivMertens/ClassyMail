@@ -48,8 +48,8 @@ Selon ton objectif :
     4. [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md) — boucle de review + export JSONL + fine-tune
 
 - **Je veux builder/déployer**
-    - [docs/DEV_LOCAL_BUILD.md](docs/DEV_LOCAL_BUILD.md) — build/push image, déploiement ACA sans CI
-    - [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) — CI/CD GitHub Actions
+  - [docs/DEV_LOCAL_BUILD.md](docs/DEV_LOCAL_BUILD.md) — build/push image, déploiement ACA sans CI
+  - [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) — CI/CD GitHub Actions
 
 ### Référence (liste complète)
 
@@ -66,21 +66,23 @@ Selon ton objectif :
 
 ## 🔗 References
 
-- **Mistral Document AI Catalog:** https://ai.azure.com/catalog/models/mistral-document-ai-2505
-- Pricing (Azure AI Foundry models): https://azure.microsoft.com/fr-fr/pricing/details/ai-foundry-models/microsoft/
-- Fine-tuning (Azure AI Foundry / Azure OpenAI): https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python
-- Phi Cookbook (community): https://github.com/microsoft/PhiCookBookfin
-- Running Phi-4 locally (Foundry Local guide): https://techcommunity.microsoft.com/blog/educatordeveloperblog/running-phi-4-locally-with-microsoft-foundry-local-a-step-by-step-guide/4466304
+- **Mistral Document AI Catalog:** <https://ai.azure.com/catalog/models/mistral-document-ai-2505>
+- Pricing (Azure AI Foundry models): <https://azure.microsoft.com/fr-fr/pricing/details/ai-foundry-models/microsoft/>
+- Fine-tuning (Azure AI Foundry / Azure OpenAI): <https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python>
+- Phi Cookbook (community): <https://github.com/microsoft/PhiCookBookfin>
+- Running Phi-4 locally (Foundry Local guide): <https://techcommunity.microsoft.com/blog/educatordeveloperblog/running-phi-4-locally-with-microsoft-foundry-local-a-step-by-step-guide/4466304>
 
 ## ⚠️ Mistral Document AI Limitations
 
 **Document Size Limits:**
+
 - **Maximum file size:** 30 MB
 - **Maximum pages (OCR):** 30 pages
 - **Maximum pages (Annotations):** 8 pages
 - **Supported formats:** PDF, PPTX, DOCX, PNG, JPEG/JPG, AVIF
 
 **Important Notes:**
+
 - Pure OCR processes efficiently and quickly
 - Annotation processes can be slower and may result in timeouts
 - Content safety is applied for annotations only, not enforced for OCR outputs
@@ -93,6 +95,7 @@ Ce projet implémente un pipeline de classification d'emails à haut volume et f
 <!-- (Note: add a screenshot to docs/assets if available, otherwise just text description below) -->
 
 The new frontend provides a dark-mode enabled dashboard to:
+
 - Monitor email processing metrics (including "Avg. Quality").
 - Upload/drag-and-drop PDF files directly.
 - Filter emails by **Category name** and **Confidence score** (e.g. "< 50%").
@@ -128,6 +131,7 @@ uv run uvicorn main:app --reload
 CI/CD : [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) | GitLab : [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md)
 
 Tests rapides : voir [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md#lancer-lappli)
+
 1. **UI** : validation/correction (FastAPI Dashboard)
 2. **Golden Dataset** : `classification.needs_review=false`, `reviewed=true`
 3. **Export Foundry** : JSONL hebdomadaire
@@ -157,6 +161,7 @@ python scripts/generate_dummy_pdfs.py --count 100 --target-words 320 --out datas
 ```
 
 Notes:
+
 - Les fichiers sont nommés avec un suffixe unique (timestamp + UUID court), par ex:
     `sample_001_<categorie>_<timestamp>_<id>.pdf`
 - Quand `--count <= 3`, le script affiche le chemin complet des fichiers générés.
@@ -166,6 +171,7 @@ Notes:
 Objectif: vérifier que le pipeline détecte un PDF illisible dès l'étape 1 (download) et que l'UI affiche clairement l'erreur.
 
 Pré-requis:
+
 - App démarrée (local ou ACA)
 - Variables Storage configurées (`AZURE_STORAGE_ACCOUNT_URL`, `AZURE_STORAGE_CONTAINER`)
 
@@ -180,6 +186,7 @@ python scripts/simulate_corrupted_pdf.py --base-url https://<your-app>.<region>.
 ```
 
 Résultat attendu:
+
 - Un item `status=ERROR` apparaît dans l'onglet `⚠ Erreurs`, avec `error_stage=download` + un petit `processing_log`.
 
 ### Option LLM (Azure OpenAI / Foundry compatible)
@@ -222,6 +229,7 @@ python scripts/generate_dummy_pdfs.py --count 75 --target-words 300 --use-aoai
 - `PATCH /api/emails/{id}` : Validation (`intents` array, status=PROCESSED).
 
 ### Observability & Coûts
+
 - **OpenTelemetry** (OTLP) via `OTEL_EXPORTER_OTLP_ENDPOINT`
 - **Usage & coûts** stockés par email (`usage.phi4.usage`, `usage.phi4_cost_usd`, `usage.mistral.estimated_pages`, `usage.mistral.cost_usd`)
 
@@ -249,11 +257,11 @@ Le projet inclut une application frontend moderne dans le dossier `frontend/`.
 
 - **Stack** : Vue 3, Vite, Tailwind CSS, Headless UI.
 - **Features** :
-    - Dashboard analytique (KPIs, graphes).
-    - Vue liste avec filtres (statut, recherche full-text, dates).
-    - Vue détail optimisée pour la review (PDF split-screen, Markdown, formulaire JSON).
-    - Upload Drag & Drop.
-    - Dark mode natif.
+  - Dashboard analytique (KPIs, graphes).
+  - Vue liste avec filtres (statut, recherche full-text, dates).
+  - Vue détail optimisée pour la review (PDF split-screen, Markdown, formulaire JSON).
+  - Upload Drag & Drop.
+  - Dark mode natif.
 - **Build** : `npm run build` génère les assets dans `static/dist/`. FastAPI sert `index.html` comme point d'entrée SPA.
 
 Ancien frontend (legacy) : `templates/index.html` (remplacé).
@@ -273,6 +281,7 @@ npm run dev
 L'URL locale sera typiquement `http://localhost:5173`. Configurez le proxy Vite ou CORS si nécessaire pour taper sur l'API Python (`http://localhost:8000`).
 
 ### Setup Backend (uv)
+
 ```bash
 uv lock
 uv sync
@@ -285,18 +294,21 @@ Entrypoint historique (si besoin): `uvicorn main:app --reload`
 Note: Python 3.11/3.12 recommended (Azure SDK support on 3.13 may lag).
 
 ### Avec Poetry
+
 ```bash
 poetry install
 poetry run uvicorn main:app --reload
 ```
 
 ### Avec pip
+
 ```bash
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
 ### Remplir `secrets.env` après Terraform
+
 Les valeurs proviennent des outputs Terraform (voir `terraform output`).
 
 ```dotenv
@@ -314,6 +326,8 @@ AZURE_COSMOS_CONTAINER=emails
 
 MISTRAL_ENDPOINT=$AI_ENDPOINT
 PHI_ENDPOINT=$AI_ENDPOINT
+ANONYMIZER_ENDPOINT=$AI_ENDPOINT
+VISION_ENDPOINT=$AI_ENDPOINT
 ```
 
 ### CI/CD
@@ -327,8 +341,9 @@ See the docs for the full YAML examples, authentication options (OIDC vs secrets
 ---
 
 ## ✨ Fonctionnalités Clés
+
 - Ingestion Event Grid → Service Bus → Worker async (`Semaphore(5)`).
-- OCR Mistral (`/v1/ocr` MaaS, `document_base64`), fallback inference `{deployment}:ocr`.
+- OCR Mistral (`document_base64`), fallback inference `{deployment}:ocr`.
 - Classification Phi‑4 multi-intentions (JSON strict) + `needs_review` (seuil 0.9).
 - Fallback automatique vers un modèle long-contexte (ex: `gpt-4o-mini`) si le markdown OCR dépasse la fenêtre de contexte du modèle principal.
 - Coûts & usage par email (pages, tokens, €), visibles UI + export CSV.
@@ -339,6 +354,7 @@ See the docs for the full YAML examples, authentication options (OIDC vs secrets
 Pour les détails (variables, logique, pricing), voir [docs/MODELS.md](docs/MODELS.md).
 
 ## 📄 Format RFAT (JSON)
+
 ```json
 {
     "id": "pdf-inputs/2025/01/mail123.pdf",
@@ -360,6 +376,7 @@ Pour les détails (variables, logique, pricing), voir [docs/MODELS.md](docs/MODE
 ```
 
 ## 🛠 Fine-tuning Phi‑4 (LoRA) & GPT‑4o-mini (Azure)
+
 Voir [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md) pour les détails (anonymisation, format JSONL, split train/validation).
 
 1. **Collecte** : `needs_review=false` (validations humaines) dans Cosmos DB.
@@ -377,10 +394,11 @@ Voir [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md) pour les détails (ano
 5. **Configuration** : `PHI_DEPLOYMENT=phi-4-custom` (ou fallback `gpt-4o-mini-custom`), `PHI_ENDPOINT` = endpoint Foundry.
 
 Références :
-- Doc fine-tuning Azure AI Foundry/Azure OpenAI : https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python
-- Tutoriel officiel (GPT-4o-mini, end-to-end) : https://learn.microsoft.com/en-us/azure/ai-foundry/openai/tutorials/fine-tune?view=foundry-classic&tabs=command-line
+- Doc fine-tuning Azure AI Foundry/Azure OpenAI : <https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python>
+- Tutoriel officiel (GPT-4o-mini, end-to-end) : <https://learn.microsoft.com/en-us/azure/ai-foundry/openai/tutorials/fine-tune?view=foundry-classic&tabs=command-line>
 
 ## 🧱 Terraform (Foundry)
+
 - `infra/main.tf` : crée **Foundry** (AIServices), **Project**, **Deployments** (`phi-4`, `mistral-document-ai-2505`), **RBAC** `Cognitive Services User` pour l'identité `app_id`.
 - Commandes :
     ```bash
@@ -390,8 +408,10 @@ Références :
     ```
 
 ## 🔐 Lancement local (uv)
+
 Créer `secrets.env` :
-```
+
+```dotenv
 AZURE_SERVICE_BUS_FQDN=...
 AZURE_SERVICE_BUS_QUEUE=pdf-processing-queue
 AZURE_STORAGE_ACCOUNT_URL=...
@@ -401,6 +421,7 @@ AZURE_COSMOS_KEY=...
 MISTRAL_ENDPOINT=...
 MISTRAL_DEPLOYMENT=mistral-document-ai-2505
 MISTRAL_MODE=maas
+MISTRAL_OCR_MAX_ATTEMPTS=3
 PHI_ENDPOINT=...
 PHI_DEPLOYMENT=phi-4
 PHI_FALLBACK_ENDPOINT=...
@@ -408,6 +429,12 @@ PHI_FALLBACK_DEPLOYMENT=gpt-4o-mini
 CHAT_ENDPOINT=... # (optionnel, défaut PHI_ENDPOINT)
 CHAT_DEPLOYMENT=gpt-5.2-chat
 CHAT_API_VERSION=2024-08-01-preview
+ANONYMIZER_ENDPOINT=...
+ANONYMIZER_DEPLOYMENT=gpt-4o-mini
+ANONYMIZER_API_VERSION=2024-10-01-preview
+VISION_ENDPOINT=...
+VISION_DEPLOYMENT=gpt-4o
+VISION_API_VERSION=2024-10-01-preview
 PHI_PRIMARY_MAX_INPUT_TOKENS=8000
 PHI_FALLBACK_MAX_INPUT_TOKENS=120000
 PHI_RESERVED_OUTPUT_TOKENS=1000
@@ -417,6 +444,7 @@ FALLBACK_COST_PER_1K_INPUT=0
 FALLBACK_COST_PER_1K_OUTPUT=0
 MISTRAL_OCR_COST_PER_1K_PAGES=1.0
 OTEL_EXPORTER_OTLP_ENDPOINT=...
+UPLOAD_MAX_BYTES=31457280
 ```
 
 ```bash
@@ -491,9 +519,9 @@ Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#3-sécurité--accés-rbac) pour
 
 ## 🛠 Déploiement
 
-1.  **Terraform** : `cd infra && terraform apply`
-2.  **App** : Deployer le conteneur Docker sur l'instance Container App créée.
-3.  **Configuration** : Identité Managée de l'App avec droits `Cognitive Services User`, `Service Bus Data Receiver/Sender`, `Storage Blob Data Contributor`, `Cosmos DB Data Contributor`.
+1. **Terraform** : `cd infra && terraform apply`
+2. **App** : Deployer le conteneur Docker sur l'instance Container App créée.
+3. **Configuration** : Identité Managée de l'App avec droits `Cognitive Services User`, `Service Bus Data Receiver/Sender`, `Storage Blob Data Contributor`, `Cosmos DB Data Contributor`.
 
 ### CI/CD GitHub Actions (uv + Azure Container Apps)
 

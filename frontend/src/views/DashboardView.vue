@@ -14,7 +14,8 @@ import {
   XMarkIcon,
   EyeIcon,
   TableCellsIcon,
-  Squares2X2Icon
+  Squares2X2Icon,
+  TrashIcon
 } from '@heroicons/vue/24/outline'
 import DlqDetailModal from '@/components/DlqDetailModal.vue'
 
@@ -36,7 +37,6 @@ const stats = ref({
 })
 const filter = ref('all')
 const search = ref('')
-const categoryFilter = ref('')
 const confidenceFilter = ref('')
 const page = ref(1)
 const pageSize = ref(20)
@@ -57,6 +57,7 @@ const chatLoading = ref(false)
 const chatError = ref(null)
 const chatResponse = ref(null)
 const viewMode = ref('cards') // 'cards' or 'table'
+const purging = ref(false)
 
 const pageSizeOptions = [20, 50, 100]
 
@@ -137,7 +138,6 @@ const fetchEmails = async () => {
         params.set('page', page.value)
         params.set('page_size', pageSize.value)
         if (search.value) params.set('search', search.value)
-        if (categoryFilter.value) params.set('category', categoryFilter.value)
         if (confidenceFilter.value) params.set('confidence_filter', confidenceFilter.value)
 
         const res = await fetch(`/api/emails?${params.toString()}`)
@@ -233,15 +233,36 @@ const useExample = (text) => {
     runChatSearch()
 }
 
+const purgeDlq = async () => {
+    if (!confirm("Are you sure you want to delete all messages in the Dead Letter Queue? This action cannot be undone.")) return
+
+    purging.value = true
+    try {
+        const res = await fetch('/api/admin/purge-dlq', { method: 'POST' })
+        if (!res.ok) throw new Error('Failed to purge DLQ')
+        const data = await res.json()
+        alert(`Purged ${data.deleted_dlq} messages.`)
+        await fetchDeadletters() // Refresh list
+        if (dlq.value.count === 0) {
+            currentTab.value = 'dashboard'
+            dlqDismissed.value = false // Reset close state so it reappears if new errors come
+        }
+    } catch (e) {
+        alert(e.message)
+    } finally {
+        purging.value = false
+    }
+}
+
 // Watchers
-watch([filter, pageSize, categoryFilter, confidenceFilter], () => {
+watch([filter, pageSize, confidenceFilter], () => {
     page.value = 1
     fetchEmails()
 })
 
 // Debounce search
 let timeout
-watch([search, categoryFilter], () => {
+watch([search], () => {
     clearTimeout(timeout)
     timeout = setTimeout(() => {
         page.value = 1
@@ -467,17 +488,6 @@ const emit = defineEmits(['open-email'])
 
     <!-- Secondary Filters Row -->
     <div class="flex flex-col sm:flex-row gap-4 items-center">
-      <!-- Category Filter -->
-      <div class="relative w-full sm:w-64">
-        <input
-          id="category-filter"
-          v-model="categoryFilter"
-          type="text"
-          placeholder="Filter by Category..."
-          class="block w-full rounded-md border-0 py-2 pl-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:ring-gray-600 dark:text-white dark:placeholder-gray-400"
-        >
-      </div>
-
       <!-- Confidence Filter -->
       <div class="w-full sm:w-48">
         <select
@@ -662,9 +672,9 @@ const emit = defineEmits(['open-email'])
         <div class="min-w-0">
           <h3
             class="font-medium text-gray-900 dark:text-white truncate text-sm leading-tight"
-            :title="email.subject"
+            :title="email.subject || (email.file_url ? decodeURIComponent(email.file_url.split('/').pop().split('?')[0]) : 'No Subject')"
           >
-            {{ email.subject || 'No Subject' }}
+            {{ email.subject || (email.file_url ? decodeURIComponent(email.file_url.split('/').pop().split('?')[0]) : 'No Subject') }}
           </h3>
           <p class="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
             {{ email.sender || 'Unknown Sender' }}
@@ -700,14 +710,34 @@ const emit = defineEmits(['open-email'])
     class="space-y-4 mt-4"
   >
     <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-      <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2 flex items-center gap-2">
-        <ExclamationCircleIcon class="h-6 w-6 text-red-500" />
-        Dead Letter Queue (Failures)
-      </h3>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-        These items failed processing and were moved to the Dead Letter Queue in Azure Service Bus.
-        You can purge them by resetting the environment in Settings.
-      </p>
+      <div class="flex justify-between items-start mb-4">
+        <div>
+          <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+            <ExclamationCircleIcon class="h-6 w-6 text-red-500" />
+            Dead Letter Queue (Failures)
+          </h3>
+          <p class="text-sm text-gray-500 dark:text-gray-400">
+            These items failed processing and were moved to the Dead Letter Queue in Azure Service Bus.
+          </p>
+        </div>
+        <div class="flex gap-2">
+          <button
+            class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium transition-colors"
+            @click="currentTab='dashboard'"
+          >
+            <XMarkIcon class="h-4 w-4" />
+            Close View
+          </button>
+          <button
+            class="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+            :disabled="purging"
+            @click="purgeDlq"
+          >
+            <TrashIcon class="h-4 w-4" />
+            {{ purging ? 'Purging...' : 'Purge All' }}
+          </button>
+        </div>
+      </div>
 
       <div class="overflow-x-auto border rounded-md dark:border-gray-700">
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">

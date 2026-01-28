@@ -138,9 +138,13 @@ const initMermaid = async () => {
         securityLevel: 'loose'
     })
     await nextTick()
-    await mermaid.run({
-        nodes: document.querySelectorAll('.mermaid')
-    })
+    try {
+        await mermaid.run({
+            nodes: document.querySelectorAll('.mermaid')
+        })
+    } catch (e) {
+        console.warn('Mermaid rendering failed:', e)
+    }
 }
 
 onMounted(() => {
