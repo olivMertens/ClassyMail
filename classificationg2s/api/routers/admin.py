@@ -7,7 +7,6 @@ import uuid
 import json
 import os
 from datetime import datetime, timezone, timedelta
-from fpdf import FPDF
 from azure.servicebus import ServiceBusMessage, ServiceBusSubQueue
 from classificationg2s.services.messages import extract_blob_url
 from classificationg2s.services.azure_clients import readiness_checks, get_cosmos_container as azure_get_cosmos_container
@@ -18,6 +17,7 @@ from classificationg2s.services.repository import (
     get_top_intents,
     get_low_confidence_items,
 )
+from classificationg2s.services.generator import generate_email_pdf
 from azure.monitor.query.aio import LogsQueryClient
 from azure.monitor.query import LogsQueryStatus
 
@@ -27,6 +27,10 @@ logger = logging.getLogger("classimail.admin")
 class ResetRequest(BaseModel):
     confirm_1: bool
     confirm_2: bool
+
+
+class SimulateFlowRequest(BaseModel):
+    use_aoai: bool = False
 
 
 class AppInsightLog(BaseModel):
@@ -90,64 +94,33 @@ class LowConfidenceResponse(BaseModel):
     items: list[dict]
 
 @router.post("/debug/simulate-flow")
-async def simulate_flow(clients: Clients = Depends(get_clients)):
+async def simulate_flow(
+    request: SimulateFlowRequest,
+    clients: Clients = Depends(get_clients)
+):
     """
     Simulates a complete flow by creating and uploading a realistic French insurance email PDF.
+
+    Features:
+    - Generates a random insurance email from templates
+    - Optionally uses AOAI to enhance realism (based on request param or auto-detect)
+    - Uploads to Blob Storage with dated folder structure
+    - Creates PENDING record for immediate UI feedback
+    - Triggers worker via Service Bus
+
     Returns the item_id (blob path) to track via /api/emails/{id}.
     """
     try:
+        # Use AOAI if explicitly requested or auto-detect if available
+        use_aoai = request.use_aoai or bool(os.getenv("AZURE_OPENAI_ENDPOINT"))
+
         logger.info("[SIMULATION] Starting E2E simulation flow with realistic email")
 
-        # 1. Generate Realistic Email PDF
+        # 1. Generate Realistic Email PDF (with AOAI if available)
         logger.info("[SIMULATION] Step 1: Generating realistic French insurance email PDF")
-        import random
-
-        # Pick random category and template
-        EMAIL_TEMPLATES = {
-            "Attestation habitation": [
-                ("Demande d'attestation d'assurance habitation", "Marie Dubois",
-                 "Je souhaiterais recevoir une attestation d'assurance habitation pour mon logement situé au 15 rue des Fleurs, 75001 Paris. Cette attestation est nécessaire pour la signature de mon contrat de location prévu le 15 février prochain."),
-            ],
-            "Résiliation": [
-                ("Demande de résiliation de contrat", "Sophie Laurent",
-                 "Je souhaite résilier mon contrat d'assurance habitation n° HAB-12345 à compter du 31 mars 2026. Je déménage à l'étranger pour raisons professionnelles."),
-            ],
-            "Sinistre dégât des eaux": [
-                ("Déclaration sinistre dégât des eaux", "Claire Rousseau",
-                 "Je déclare un sinistre dégât des eaux survenu le 25 janvier 2026 dans mon appartement. L'eau provient de l'étage supérieur et a endommagé mon salon et ma chambre. Contrat : HAB-54321."),
-            ],
-        }
-
-        category = random.choice(list(EMAIL_TEMPLATES.keys()))
-        subject, sender, body = random.choice(EMAIL_TEMPLATES[category])
-
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(200, 10, txt="EMAIL", ln=True, align="C")
-        pdf.ln(5)
-
-        pdf.set_font("Arial", "B", 10)
-        pdf.cell(30, 10, txt="From:", ln=False)
-        pdf.set_font("Arial", "", 10)
-        pdf.cell(170, 10, txt=sender, ln=True)
-
-        pdf.set_font("Arial", "B", 10)
-        pdf.cell(30, 10, txt="Subject:", ln=False)
-        pdf.set_font("Arial", "", 10)
-        pdf.multi_cell(170, 10, txt=subject)
-
-        pdf.set_font("Arial", "B", 10)
-        pdf.cell(30, 10, txt="Date:", ln=False)
-        pdf.set_font("Arial", "", 10)
-        pdf.cell(170, 10, txt=datetime.now().strftime("%d/%m/%Y %H:%M"), ln=True)
-
-        pdf.ln(10)
-        pdf.set_font("Arial", "", 11)
-        pdf.multi_cell(0, 6, txt=body)
-
-        pdf_bytes = pdf.output() # Returns bytearray in recent fpdf2
-        logger.info(f"[SIMULATION] Generated realistic PDF: {len(pdf_bytes)} bytes, Category: {category}")
+        pdf_bytes, category, subject = generate_email_pdf(use_aoai=use_aoai)
+        aoai_status = "enhanced" if use_aoai else "template"
+        logger.info(f"[SIMULATION] Generated {aoai_status} PDF: {len(pdf_bytes)} bytes, Category: {category}")
 
         # 2. Upload to Blob Storage (use dated folder structure like upload.py)
         logger.info("[SIMULATION] Step 2: Uploading to Blob Storage")

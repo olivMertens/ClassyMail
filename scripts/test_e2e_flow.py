@@ -16,7 +16,6 @@ import argparse
 import sys
 import time
 from datetime import datetime
-from io import BytesIO
 from pathlib import Path
 
 import httpx
@@ -24,78 +23,9 @@ import httpx
 # Add parent dir to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-try:
-    from fpdf import FPDF
-except ImportError:
-    print("Error: fpdf2 is required. Install it with: uv pip install fpdf2")
-    sys.exit(1)
+from classificationg2s.services.generator import generate_email_pdf
 
 
-# Realistic email templates
-EMAIL_TEMPLATES = {
-    "Attestation habitation": [
-        ("Demande d'attestation d'assurance habitation", "Marie Dubois",
-         "Je souhaiterais recevoir une attestation d'assurance habitation pour mon logement situé au 15 rue des Fleurs, 75001 Paris. Cette attestation est nécessaire pour la signature de mon contrat de location prévu le 15 février prochain."),
-        ("Attestation urgente", "Jean Martin",
-         "Mon agence me réclame une attestation d'assurance habitation pour mon nouveau logement. Adresse : 42 Avenue de la République, 69003 Lyon. Merci de me la faire parvenir rapidement."),
-    ],
-    "Résiliation": [
-        ("Demande de résiliation de contrat", "Sophie Laurent",
-         "Je souhaite résilier mon contrat d'assurance habitation n° HAB-12345 à compter du 31 mars 2026. Je déménage à l'étranger pour raisons professionnelles."),
-        ("Résiliation suite déménagement", "Pierre Durand",
-         "Suite à mon déménagement, je vous informe de ma volonté de résilier mon contrat d'assurance auto n° AUTO-98765 au 15 février 2026."),
-    ],
-    "Sinistre dégât des eaux": [
-        ("Déclaration sinistre dégât des eaux", "Claire Rousseau",
-         "Je déclare un sinistre dégât des eaux survenu le 25 janvier 2026 dans mon appartement. L'eau provient de l'étage supérieur et a endommagé mon salon et ma chambre. Contrat : HAB-54321."),
-        ("Dégât des eaux urgent", "Marc Blanc",
-         "Fuite d'eau importante dans ma cuisine depuis ce matin. Dégâts matériels importants (meubles, électroménager). Intervention plombier en cours. Besoin expertise rapide."),
-    ],
-    "Demande de devis": [
-        ("Devis assurance auto", "Thomas Petit",
-         "Je souhaite obtenir un devis pour assurer ma nouvelle voiture (Renault Clio 2026). Je recherche une formule tous risques avec protection conducteur."),
-        ("Devis habitation", "Emma Moreau",
-         "Pourriez-vous m'établir un devis pour une assurance habitation ? Appartement de 65m², 2 pièces, Paris 18ème. Locataire. Besoin couverture complète."),
-    ],
-    "Modification contrat": [
-        ("Changement d'adresse", "Lucas Simon",
-         "Je déménage le 1er mars 2026. Nouvelle adresse : 28 Boulevard Gambetta, 33000 Bordeaux. Merci de mettre à jour mon contrat HAB-11111."),
-        ("Ajout conducteur secondaire", "Julie Bernard",
-         "Je souhaite ajouter mon conjoint comme conducteur secondaire sur mon contrat auto n° AUTO-22222. Permis obtenu en 2020, aucun sinistre."),
-    ],
-}
-
-
-def generate_email_pdf(subject: str, sender: str, body: str) -> bytes:
-    """Generate a PDF email."""
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(200, 10, txt="EMAIL", ln=True, align="C")
-    pdf.ln(5)
-
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(30, 10, txt="From:", ln=False)
-    pdf.set_font("Arial", "", 10)
-    pdf.cell(170, 10, txt=sender, ln=True)
-
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(30, 10, txt="Subject:", ln=False)
-    pdf.set_font("Arial", "", 10)
-    pdf.multi_cell(170, 10, txt=subject)
-
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(30, 10, txt="Date:", ln=False)
-    pdf.set_font("Arial", "", 10)
-    pdf.cell(170, 10, txt=datetime.now().strftime("%d/%m/%Y %H:%M"), ln=True)
-
-    pdf.ln(10)
-    pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(0, 6, txt=body)
-
-    buffer = BytesIO()
-    pdf.output(buffer)
-    return buffer.getvalue()
 
 
 def upload_pdf(api_url: str, pdf_bytes: bytes, filename: str) -> dict:
@@ -131,6 +61,7 @@ def main():
     parser.add_argument("--count", type=int, default=5, help="Number of emails to generate")
     parser.add_argument("--api-url", default="http://localhost:8000", help="API base URL")
     parser.add_argument("--wait", type=int, default=10, help="Seconds to wait between uploads")
+    parser.add_argument("--use-aoai", action="store_true", help="Use Azure OpenAI to enhance email bodies")
     args = parser.parse_args()
 
     print("=" * 70)
@@ -140,28 +71,24 @@ def main():
     print(f"API URL: {args.api_url}")
     print(f"Emails to generate: {args.count}")
     print(f"Wait time: {args.wait}s")
+    print(f"Use AOAI enhancement: {args.use_aoai}")
     print()
 
     # Generate and upload emails
     results = []
 
     for i in range(args.count):
-        # Pick random category and template
-        import random
-        category = random.choice(list(EMAIL_TEMPLATES.keys()))
-        templates = EMAIL_TEMPLATES[category]
-        subject, sender, body = random.choice(templates)
-
         # Generate filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"test_email_{timestamp}_{i+1}.pdf"
 
         print(f"[{i+1}/{args.count}] Generating email...")
-        print(f"  Category: {category}")
-        print(f"  Subject: {subject}")
 
         # Generate PDF
-        pdf_bytes = generate_email_pdf(subject, sender, body)
+        pdf_bytes, category, subject = generate_email_pdf(use_aoai=args.use_aoai)
+
+        print(f"  Category: {category}")
+        print(f"  Subject: {subject}")
         print(f"  PDF size: {len(pdf_bytes):,} bytes")
 
         # Upload
@@ -219,6 +146,8 @@ def main():
     print(f"  1. Check dashboard: {args.api_url}")
     print("  2. Wait for processing to complete (~30-60s per email)")
     print("  3. Verify classifications match expected categories")
+    if not args.use_aoai:
+        print("  4. For more realistic emails, run with: --use-aoai (requires AZURE_OPENAI_ENDPOINT)")
     print()
 
     return 0 if not failed else 1
