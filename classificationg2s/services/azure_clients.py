@@ -43,8 +43,7 @@ class Clients:
         self.blob_service_client = BlobServiceClient(account_url=config.BLOB_ACCOUNT_URL, credential=self.credential)
         self.cosmos_client = CosmosClient(
             config.COSMOS_ENDPOINT,
-            credential=self.credential if not config.COSMOS_KEY else None,
-            key=config.COSMOS_KEY,
+            credential=config.COSMOS_KEY if config.COSMOS_KEY else self.credential,
         )
 
     async def close(self) -> None:
@@ -68,8 +67,7 @@ class Clients:
             if self.cosmos_client is None:
                 self.cosmos_client = CosmosClient(
                     config.COSMOS_ENDPOINT,
-                    credential=self.credential if not config.COSMOS_KEY else None,
-                    key=config.COSMOS_KEY,
+                    credential=config.COSMOS_KEY if config.COSMOS_KEY else self.credential,
                 )
 
             db = await self.cosmos_client.create_database_if_not_exists(id=config.COSMOS_DB)

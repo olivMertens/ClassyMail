@@ -206,6 +206,19 @@ resource "azapi_resource" "deployment_mistral_ocr" {
   })
 }
 
+resource "azapi_resource" "deployment_embedding" {
+  count     = var.enable_model_deployments ? 1 : 0
+  type      = "Microsoft.CognitiveServices/accounts/deployments@2023-05-01"
+  name      = "text-embedding-3-small"
+  parent_id = azapi_resource.ai_foundry.id
+  body = jsonencode({
+    sku = { name = "Standard", capacity = 120 }
+    properties = {
+      model = { format = "OpenAI", name = "text-embedding-3-small", version = "1" }
+    }
+  })
+}
+
 # RBAC Assignments
 resource "azurerm_role_assignment" "aca_storage_reader" {
   scope                = azurerm_storage_account.st.id
@@ -276,6 +289,8 @@ resource "azurerm_cosmosdb_sql_role_assignment" "aca_cosmos_sql_contrib" {
   # Format attendu par l'API dans ce tenant: un préfixe ARM (subscriptions/.../databaseAccounts/...) + segments data-plane (dbs/.../colls/...).
   # IMPORTANT: db-scope is required in some tenants for metadata access (readMetadata).
   scope = "${azurerm_cosmosdb_account.db.id}/dbs/${azurerm_cosmosdb_sql_database.sql.name}"
+
+  depends_on = [azurerm_cosmosdb_sql_database.sql]
 }
 
 resource "azurerm_cosmosdb_sql_database" "sql" {
@@ -495,6 +510,14 @@ resource "azurerm_container_app" "api" {
         value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
       }
       env {
+        name  = "EMBEDDING_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "EMBEDDING_DEPLOYMENT"
+        value = "text-embedding-3-small"
+      }
+      env {
         name  = "PHI_ENDPOINT"
         value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
       }
@@ -669,6 +692,14 @@ resource "azurerm_container_app" "worker" {
       env {
         name  = "AZURE_AI_ENDPOINT"
         value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "EMBEDDING_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "EMBEDDING_DEPLOYMENT"
+        value = "text-embedding-3-small"
       }
       env {
         name  = "PHI_ENDPOINT"

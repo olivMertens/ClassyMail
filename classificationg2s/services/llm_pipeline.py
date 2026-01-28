@@ -280,7 +280,7 @@ FORMAT DE RÉPONSE ATTENDU (JSON UNIQUEMENT) :
         "max_tokens": config.PHI_RESERVED_OUTPUT_TOKENS,
     }
 
-    url = f"{chosen_endpoint}/openai/deployments/{chosen_deployment}/chat/completions?api-version={config.AI_API_VERSION}"
+    url = f"{chosen_endpoint.rstrip('/')}/openai/deployments/{chosen_deployment}/chat/completions?api-version={config.AI_API_VERSION}"
 
     logger.info(f"[metrics] Classify Request: {chosen_deployment} strategy={strategy} fallback={use_fallback}")
     logger.info(f"[metrics] Token Estimate: system={system_tokens} user={user_tokens_est} truncated={truncated}")
@@ -410,7 +410,7 @@ Analyse cette correction.
         "max_tokens": 150,
     }
 
-    url = f"{config.PHI_ENDPOINT}/openai/deployments/{config.PHI_DEPLOYMENT}/chat/completions?api-version={config.AI_API_VERSION}"
+    url = f"{config.PHI_ENDPOINT.rstrip('/')}/openai/deployments/{config.PHI_DEPLOYMENT}/chat/completions?api-version={config.AI_API_VERSION}"
 
     try:
         async with httpx.AsyncClient(timeout=10) as client: # Fast timeout for UI responsiveness
@@ -438,7 +438,7 @@ async def generate_embedding(text: str, clients: Clients | None = None) -> list[
 
     headers = await auth_headers(clients=clients)
 
-    url = f"{config.EMBEDDING_ENDPOINT}/openai/deployments/{config.EMBEDDING_DEPLOYMENT}/embeddings?api-version={config.EMBEDDING_API_VERSION}"
+    url = f"{config.EMBEDDING_ENDPOINT.rstrip('/')}/openai/deployments/{config.EMBEDDING_DEPLOYMENT}/embeddings?api-version={config.EMBEDDING_API_VERSION}"
 
     payload = {
         "input": text_truncated,

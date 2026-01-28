@@ -4,6 +4,20 @@ This repo uses a 2-step AI pipeline:
 
 1) OCR: Mistral Document AI → Markdown
 2) Classification: LLM → strict JSON multi-intents
+3) Vector Search: Text Embedding for RAG (Chatbot)
+
+## Vector Search & Embeddings
+
+The "Chat with Email" feature uses **Retrieval Augmented Generation (RAG)**.
+- It requires an embedding model to convert email content into vectors.
+- Vectors are stored in Cosmos DB (NoSQL API) with vector index enabled.
+
+**Required Model:**
+- **Model:** `text-embedding-3-small` (or equivalent)
+- **Deployment Name:** `text-embedding-3-small` (configure via `EMBEDDING_DEPLOYMENT` env var)
+- **Endpoint:** Uses `EMBEDDING_ENDPOINT` (or defaults to `PHI_ENDPOINT`)
+
+Ensure this model is deployed in your Azure AI Foundry / Azure OpenAI resource for the chatbot to work.
 
 ## Mistral Document AI OCR
 
