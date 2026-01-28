@@ -51,6 +51,10 @@ const resetConfirm2 = ref(false)
 const resetting = ref(false)
 const purgingDlq = ref(false)
 
+// Simulate Flow State
+const simulatingFlow = ref(false)
+const useAoaiEnhancement = ref(false)
+
 // Logs State
 const appLogs = ref([])
 const loadingLogs = ref(false)
@@ -233,6 +237,31 @@ const performDlqPurge = async () => {
         alert(`Purge Error: ${e.message}`)
     } finally {
         purgingDlq.value = false
+    }
+}
+
+const performSimulateFlow = async () => {
+    simulatingFlow.value = true
+    try {
+        const res = await fetch('/api/admin/simulate-flow', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                use_aoai: useAoaiEnhancement.value
+            })
+        })
+        if (res.ok) {
+            const data = await res.json()
+            const aoaiNote = useAoaiEnhancement.value ? ' (with AOAI enhancement)' : ' (template-based)'
+            alert(`✓ E2E Simulation Complete${aoaiNote}\n\nBlob ID: ${data.item_id}\n\nYou can track this email in the Dashboard.`)
+        } else {
+            const err = await res.json()
+            alert(`Simulation Failed: ${err.detail || 'Unknown error'}`)
+        }
+    } catch (e) {
+        alert(`Simulation Error: ${e.message}`)
+    } finally {
+        simulatingFlow.value = false
     }
 }
 
@@ -962,92 +991,113 @@ onMounted(() => {
       <div class="px-4 py-5 sm:p-6">
         <h3 class="text-base font-semibold leading-6 text-red-600 dark:text-red-400 flex items-center gap-2">
           <ExclamationTriangleIcon class="h-5 w-5" />
-          Atomic Zone - Environment Reset
+          Admin Tools & Diagnostics
         </h3>
         <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
           <p>
-            Proceed with extreme caution. This action will permanently delete all data in the current environment.
+            Advanced administrative operations for testing, troubleshooting, and environment management.
           </p>
         </div>
 
-        <div class="mt-5 bg-red-50 dark:bg-red-900/20 p-4 rounded-md">
-          <h4 class="text-sm font-medium text-red-800 dark:text-red-300">
-            This action will:
+        <!-- Diagnostics Section -->
+        <div class="mt-8">
+          <h4 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+            <ExclamationTriangleIcon class="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            Connectivity & Diagnostics
           </h4>
-          <ul class="list-disc list-inside mt-2 text-sm text-red-700 dark:text-red-200">
-            <li>Delete ALL emails and classification records from Database.</li>
-            <li>Delete ALL files (PDFs) from the Input Storage Container.</li>
-            <li><strong>Purge</strong> the Service Bus Dead-letter Queue.</li>
-            <li>Reset the dashboard state completely.</li>
-            <li><strong>Preserve</strong> application settings (Categories, Costs, etc).</li>
-          </ul>
-        </div>
-
-        <div class="mt-6 space-y-4">
-          <div class="flex items-start">
-            <div class="flex h-6 items-center">
-              <input
-                id="confirm_1"
-                v-model="resetConfirm1"
-                type="checkbox"
-                class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-600 dark:bg-gray-700 dark:border-gray-600"
-              >
-            </div>
-            <div class="ml-3 text-sm leading-6">
-              <label
-                for="confirm_1"
-                class="font-medium text-gray-900 dark:text-white"
-              >I understand this deletes all data permanently.</label>
-            </div>
-          </div>
-          <div class="flex items-start">
-            <div class="flex h-6 items-center">
-              <input
-                id="confirm_2"
-                v-model="resetConfirm2"
-                type="checkbox"
-                class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-600 dark:bg-gray-700 dark:border-gray-600"
-              >
-            </div>
-            <div class="ml-3 text-sm leading-6">
-              <label
-                for="confirm_2"
-                class="font-medium text-gray-900 dark:text-white"
-              >I confirm I want to reset the environment.</label>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            class="mt-4 inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="!resetConfirm1 || !resetConfirm2 || resetting"
-            @click="performReset"
-          >
-            <TrashIcon
-              v-if="!resetting"
-              class="-ml-0.5 mr-1.5 h-5 w-5"
-              aria-hidden="true"
-            />
-            <ArrowPathIcon
-              v-else
-              class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
-              aria-hidden="true"
-            />
-            {{ resetting ? 'Nuking Environment...' : 'NUKE EVERYTHING' }}
-          </button>
-        </div>
-
-        <div class="mt-8 border-t border-red-200 dark:border-red-900 pt-6">
-          <h4 class="text-sm font-medium text-gray-900 dark:text-white">
-            Maintenance Operations
-          </h4>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Specific maintenance tasks that do not reset the entire environment.
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Verify that the backend has proper permissions and network connectivity to Azure services.
           </p>
-          <div class="mt-4">
+          <div class="mt-3 flex gap-2">
+            <a
+              href="/api/admin/diagnostics"
+              target="_blank"
+              class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
+            >
+              View Diagnostics
+            </a>
             <button
               type="button"
-              class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-600 shadow-sm ring-1 ring-inset ring-red-300 hover:bg-red-50 dark:bg-gray-800 dark:text-red-400 dark:ring-red-900 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="inline-flex items-center rounded-md bg-blue-100 px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+              disabled
+              title="Test active read/write operations on Storage, Cosmos DB, and Service Bus (available via API endpoint)"
+            >
+              Run Connectivity Test
+            </button>
+          </div>
+        </div>
+
+        <!-- Testing Section -->
+        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+          <h4 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+            <ExclamationTriangleIcon class="h-4 w-4 text-green-600 dark:text-green-400" />
+            End-to-End Testing
+          </h4>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Generate synthetic emails and send them through the complete pipeline for testing.
+          </p>
+
+          <!-- AOAI Enhancement Toggle -->
+          <div class="mt-4 flex items-center">
+            <div class="flex h-6 items-center">
+              <input
+                id="use_aoai"
+                v-model="useAoaiEnhancement"
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-600 dark:bg-gray-700 dark:border-gray-600"
+              >
+            </div>
+            <div class="ml-3 text-sm leading-6">
+              <label
+                for="use_aoai"
+                class="font-medium text-gray-900 dark:text-white"
+              >Enhance with AOAI</label>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                If enabled and AZURE_OPENAI_ENDPOINT is configured, generates realistic AI-enhanced emails instead of templates.
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-3 flex gap-2">
+            <button
+              type="button"
+              class="inline-flex items-center rounded-md bg-green-100 px-3 py-2 text-sm font-semibold text-green-700 shadow-sm hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="simulatingFlow"
+              @click="performSimulateFlow"
+            >
+              <ArrowPathIcon
+                v-if="simulatingFlow"
+                class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
+                aria-hidden="true"
+              />
+              {{ simulatingFlow ? 'Generating & Uploading...' : 'Simulate Flow' }}
+            </button>
+          </div>
+          <p class="mt-2 text-xs text-gray-600 dark:text-gray-400">
+            Creates a random email (Attestation, Resignation, Water Damage, etc.) and uploads it to test the full classification pipeline.
+          </p>
+        </div>
+
+        <!-- Dead Letter Queue Management -->
+        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+          <h4 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+            <ExclamationTriangleIcon class="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+            Dead Letter Queue (DLQ) Management
+          </h4>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Service Bus automatically moves processing failures to the DLQ after max retries. Use these tools to investigate and clear them.
+          </p>
+          <div class="mt-3 flex gap-2">
+            <a
+              href="/api/admin/deadletter"
+              target="_blank"
+              class="inline-flex items-center rounded-md bg-yellow-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-yellow-500"
+            >
+              View DLQ Messages
+            </a>
+            <button
+              type="button"
+              class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-yellow-600 shadow-sm ring-1 ring-inset ring-yellow-300 hover:bg-yellow-50 dark:bg-gray-800 dark:text-yellow-400 dark:ring-yellow-900 dark:hover:bg-yellow-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="purgingDlq"
               @click="performDlqPurge"
             >
@@ -1061,92 +1111,175 @@ onMounted(() => {
                 class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
                 aria-hidden="true"
               />
-              {{ purgingDlq ? 'Purging DLQ...' : 'Purge Dead-letter Queue Only' }}
+              {{ purgingDlq ? 'Purging DLQ...' : 'Purge DLQ' }}
+            </button>
+          </div>
+          <p class="mt-2 text-xs text-gray-600 dark:text-gray-400">
+            Messages land in DLQ when processing fails repeatedly. Investigate the cause, then purge to retry or clean up.
+          </p>
+        </div>
+
+        <!-- Reset Section -->
+        <div class="mt-8 border-t border-red-200 dark:border-red-900 pt-6">
+          <h3 class="text-sm font-semibold leading-6 text-red-600 dark:text-red-400 flex items-center gap-2">
+            <ExclamationTriangleIcon class="h-5 w-5" />
+            Atomic Reset - Delete All Data
+          </h3>
+          <div class="mt-2 max-w-xl text-xs text-gray-500 dark:text-gray-400">
+            <p>
+              Proceed with extreme caution. This action will permanently delete all data in the current environment.
+            </p>
+          </div>
+
+          <div class="mt-5 bg-red-50 dark:bg-red-900/20 p-4 rounded-md">
+            <h4 class="text-sm font-medium text-red-800 dark:text-red-300">
+              This action will:
+            </h4>
+            <ul class="list-disc list-inside mt-2 text-sm text-red-700 dark:text-red-200">
+              <li>Delete ALL emails and classification records from Database.</li>
+              <li>Delete ALL files (PDFs) from the Input Storage Container.</li>
+              <li><strong>Purge</strong> the Service Bus Dead-letter Queue.</li>
+              <li>Reset the dashboard state completely.</li>
+              <li><strong>Preserve</strong> application settings (Categories, Costs, etc).</li>
+            </ul>
+          </div>
+
+          <div class="mt-6 space-y-4">
+            <div class="flex items-start">
+              <div class="flex h-6 items-center">
+                <input
+                  id="confirm_1"
+                  v-model="resetConfirm1"
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-600 dark:bg-gray-700 dark:border-gray-600"
+                >
+              </div>
+              <div class="ml-3 text-sm leading-6">
+                <label
+                  for="confirm_1"
+                  class="font-medium text-gray-900 dark:text-white"
+                >I understand this deletes all data permanently.</label>
+              </div>
+            </div>
+            <div class="flex items-start">
+              <div class="flex h-6 items-center">
+                <input
+                  id="confirm_2"
+                  v-model="resetConfirm2"
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-600 dark:bg-gray-700 dark:border-gray-600"
+                >
+              </div>
+              <div class="ml-3 text-sm leading-6">
+                <label
+                  for="confirm_2"
+                  class="font-medium text-gray-900 dark:text-white"
+                >I confirm I want to reset the environment.</label>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              class="mt-4 inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="!resetConfirm1 || !resetConfirm2 || resetting"
+              @click="performReset"
+            >
+              <TrashIcon
+                v-if="!resetting"
+                class="-ml-0.5 mr-1.5 h-5 w-5"
+                aria-hidden="true"
+              />
+              <ArrowPathIcon
+                v-else
+                class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
+                aria-hidden="true"
+              />
+              {{ resetting ? 'Nuking Environment...' : 'NUKE EVERYTHING' }}
             </button>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Strategy Help Modal -->
-    <div
-      v-if="showStrategyHelp"
-      class="fixed inset-0 z-50 overflow-y-auto"
-      aria-labelledby="modal-title"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <!-- Strategy Help Modal -->
         <div
-          class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-          aria-hidden="true"
-          @click="showStrategyHelp = false"
-        />
-        <span
-          class="hidden sm:inline-block sm:align-middle sm:h-screen"
-          aria-hidden="true"
-        >&#8203;</span>
-        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-gray-200 dark:border-gray-700">
-          <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <h3
-              id="modal-title"
-              class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4"
-            >
-              Processing Strategies Explained
-            </h3>
-            <div class="space-y-6 text-sm">
-              <!-- Standard -->
-              <div class="border-l-4 border-indigo-500 pl-4">
-                <h4 class="font-bold text-gray-900 dark:text-white text-base">
-                  Standard (Default)
-                </h4>
-                <p class="text-gray-500 dark:text-gray-400 mt-1">
-                  Fast and optimized for standard text extraction. Uses zero-shot prompting optimized for cost.
-                </p>
-                <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
-                  <span class="text-indigo-600 dark:text-indigo-400 font-bold">How it works:</span> Passes OCR text directly to the model.<br>
-                  <span class="text-indigo-600 dark:text-indigo-400 font-bold">Example:</span> A clearly typed PDF claiming an "Address Change". The model identifies keywords and classifies instantly.
+          v-if="showStrategyHelp"
+          class="fixed inset-0 z-50 overflow-y-auto"
+          aria-labelledby="modal-title"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div
+              class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+              aria-hidden="true"
+              @click="showStrategyHelp = false"
+            />
+            <span
+              class="hidden sm:inline-block sm:align-middle sm:h-screen"
+              aria-hidden="true"
+            >&#8203;</span>
+            <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-gray-200 dark:border-gray-700">
+              <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <h3
+                  id="modal-title"
+                  class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4"
+                >
+                  Processing Strategies Explained
+                </h3>
+                <div class="space-y-6 text-sm">
+                  <!-- Standard -->
+                  <div class="border-l-4 border-indigo-500 pl-4">
+                    <h4 class="font-bold text-gray-900 dark:text-white text-base">
+                      Standard (Default)
+                    </h4>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1">
+                      Fast and optimized for standard text extraction. Uses zero-shot prompting optimized for cost.
+                    </p>
+                    <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
+                      <span class="text-indigo-600 dark:text-indigo-400 font-bold">How it works:</span> Passes OCR text directly to the model.<br>
+                      <span class="text-indigo-600 dark:text-indigo-400 font-bold">Example:</span> A clearly typed PDF claiming an "Address Change". The model identifies keywords and classifies instantly.
+                    </div>
+                  </div>
+
+                  <!-- Reasoning -->
+                  <div class="border-l-4 border-purple-500 pl-4">
+                    <h4 class="font-bold text-gray-900 dark:text-white text-base">
+                      Reasoning (CoT)
+                    </h4>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1">
+                      Forces a "Chain-of-Thought" (Step-by-step) analysis. Essential for subtle intents or complex narratives.
+                    </p>
+                    <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
+                      <span class="text-purple-600 dark:text-purple-400 font-bold">How it works:</span> Injects system instruction: <em>"Analyze context first, then deduce intents step-by-step."</em><br>
+                      <span class="text-purple-600 dark:text-purple-400 font-bold">Example:</span> An email telling a story about a storm without explicitly saying "claim". The model deduces "Bad Weather" -> "Damage" -> "Claim Intent".
+                    </div>
+                  </div>
+
+                  <!-- Vision -->
+                  <div class="border-l-4 border-green-500 pl-4">
+                    <h4 class="font-bold text-gray-900 dark:text-white text-base">
+                      Vision (Visual Analysis)
+                    </h4>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1">
+                      Integrates visual context from OCR (photos, diagrams, signatures) into the decision process.
+                    </p>
+                    <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
+                      <span class="text-green-600 dark:text-green-400 font-bold">How it works:</span> Uses Mistral BBox Annotation capability.<br>
+                      <span class="text-green-600 dark:text-green-400 font-bold">Annotation:</span> Extracts structured descriptions (summary, details) for every visual element found (charts, photos).<br>
+                      <span class="text-green-600 dark:text-green-400 font-bold">Enrichment:</span> These descriptions are injected into the Markdown before classification, allowing the AI to "see" your attachments.
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              <!-- Reasoning -->
-              <div class="border-l-4 border-purple-500 pl-4">
-                <h4 class="font-bold text-gray-900 dark:text-white text-base">
-                  Reasoning (CoT)
-                </h4>
-                <p class="text-gray-500 dark:text-gray-400 mt-1">
-                  Forces a "Chain-of-Thought" (Step-by-step) analysis. Essential for subtle intents or complex narratives.
-                </p>
-                <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
-                  <span class="text-purple-600 dark:text-purple-400 font-bold">How it works:</span> Injects system instruction: <em>"Analyze context first, then deduce intents step-by-step."</em><br>
-                  <span class="text-purple-600 dark:text-purple-400 font-bold">Example:</span> An email telling a story about a storm without explicitly saying "claim". The model deduces "Bad Weather" -> "Damage" -> "Claim Intent".
-                </div>
-              </div>
-
-              <!-- Vision -->
-              <div class="border-l-4 border-green-500 pl-4">
-                <h4 class="font-bold text-gray-900 dark:text-white text-base">
-                  Vision (Visual Analysis)
-                </h4>
-                <p class="text-gray-500 dark:text-gray-400 mt-1">
-                  Integrates visual context from OCR (photos, diagrams, signatures) into the decision process.
-                </p>
-                <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
-                  <span class="text-green-600 dark:text-green-400 font-bold">How it works:</span> Uses Mistral BBox Annotation capability.<br>
-                  <span class="text-green-600 dark:text-green-400 font-bold">Annotation:</span> Extracts structured descriptions (summary, details) for every visual element found (charts, photos).<br>
-                  <span class="text-green-600 dark:text-green-400 font-bold">Enrichment:</span> These descriptions are injected into the Markdown before classification, allowing the AI to "see" your attachments.
-                </div>
+              <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm"
+                  @click="showStrategyHelp = false"
+                >
+                  Close
+                </button>
               </div>
             </div>
-          </div>
-          <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-            <button
-              type="button"
-              class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm"
-              @click="showStrategyHelp = false"
-            >
-              Close
-            </button>
           </div>
         </div>
       </div>
