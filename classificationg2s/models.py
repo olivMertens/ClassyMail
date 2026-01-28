@@ -61,4 +61,7 @@ class EmailListResponse(BaseModel):
 
 
 class OCRFailed(Exception):
-    pass
+    def __init__(self, message: str, *, processing_log: list[dict] | None = None, retryable: bool = False):
+        super().__init__(message)
+        self.processing_log = processing_log
+        self.retryable = retryable

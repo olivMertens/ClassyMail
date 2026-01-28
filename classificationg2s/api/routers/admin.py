@@ -36,6 +36,7 @@ class DeadLetterMessage(BaseModel):
     blob_id: str | None = None
     enqueued_time_utc: datetime | None = None
     sequence_number: int | None = None
+    processing_log: list[dict] | None = None
 
 
 class DeadLetterSummary(BaseModel):
@@ -391,6 +392,16 @@ async def deadletter_summary(clients: Clients = Depends(get_clients)):
                 except Exception:
                     payload = {"raw": body_bytes.decode(errors="ignore")}
                 blob_url = extract_blob_url(payload)
+                blob_id = blob_id_from_url(blob_url) if blob_url else None
+                processing_log = None
+                if blob_id:
+                    try:
+                        await clients.ensure_cosmos_container()
+                        doc = await clients.cosmos_container.read_item(item=blob_id, partition_key=blob_id)
+                        processing_log = doc.get("processing_log")
+                    except Exception:
+                        processing_log = None
+
                 messages.append(
                     DeadLetterMessage(
                         message_id=getattr(m, "message_id", None),
@@ -398,9 +409,10 @@ async def deadletter_summary(clients: Clients = Depends(get_clients)):
                         dead_letter_reason=getattr(m, "dead_letter_reason", None),
                         dead_letter_error_description=getattr(m, "dead_letter_error_description", None),
                         blob_url=blob_url,
-                        blob_id=blob_id_from_url(blob_url) if blob_url else None,
+                        blob_id=blob_id,
                         enqueued_time_utc=getattr(m, "enqueued_time_utc", None),
                         sequence_number=getattr(m, "sequence_number", None),
+                        processing_log=processing_log,
                     )
                 )
     except Exception as ex:

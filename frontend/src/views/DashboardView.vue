@@ -16,6 +16,7 @@ import {
   TableCellsIcon,
   Squares2X2Icon
 } from '@heroicons/vue/24/outline'
+import DlqDetailModal from '@/components/DlqDetailModal.vue'
 
 defineProps({
   active: {
@@ -49,6 +50,8 @@ const diagnostics = ref(null)
 const diagnosticsError = ref(null)
 const currentTab = ref('dashboard')
 const chatOpen = ref(false)
+const dlqModalOpen = ref(false)
+const selectedDlq = ref(null)
 const chatQuery = ref('')
 const chatLoading = ref(false)
 const chatError = ref(null)
@@ -193,6 +196,11 @@ const fetchDiagnostics = async () => {
         console.error(e)
         diagnosticsError.value = e.message
     }
+}
+
+const openDlqDetails = (msg) => {
+    selectedDlq.value = msg
+    dlqModalOpen.value = true
 }
 
 const runChatSearch = async () => {
@@ -747,6 +755,9 @@ const emit = defineEmits(['open-email'])
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Time
               </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -765,6 +776,14 @@ const emit = defineEmits(['open-email'])
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                 {{ msg.enqueued_time_utc || '—' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <button
+                  class="text-primary-600 dark:text-primary-400 hover:underline"
+                  @click="openDlqDetails(msg)"
+                >
+                  View
+                </button>
               </td>
             </tr>
           </tbody>
@@ -1122,4 +1141,10 @@ const emit = defineEmits(['open-email'])
       </button>
     </div>
   </div>
+
+  <DlqDetailModal
+    :show="dlqModalOpen"
+    :message="selectedDlq"
+    @close="dlqModalOpen = false"
+  />
 </template>

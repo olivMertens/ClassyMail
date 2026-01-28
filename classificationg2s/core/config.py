@@ -56,6 +56,7 @@ PHI_RESERVED_OUTPUT_TOKENS = int(os.getenv("PHI_RESERVED_OUTPUT_TOKENS", "1000")
 PHI4_COST_PER_1K_INPUT = float(os.getenv("PHI4_COST_PER_1K_INPUT", "0.000107"))
 PHI4_COST_PER_1K_OUTPUT = float(os.getenv("PHI4_COST_PER_1K_OUTPUT", "0.00043"))
 MISTRAL_OCR_COST_PER_1K_PAGES = float(os.getenv("MISTRAL_OCR_COST_PER_1K_PAGES", "1.0"))
+MISTRAL_OCR_MAX_ATTEMPTS = int(os.getenv("MISTRAL_OCR_MAX_ATTEMPTS", "3"))
 
 # Pricing for fallback model is tenant/region specific. Keep as config (default 0).
 FALLBACK_COST_PER_1K_INPUT = float(os.getenv("FALLBACK_COST_PER_1K_INPUT", "0"))

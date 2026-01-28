@@ -32,12 +32,14 @@ const settings = ref({
     phi4_output_per_1k: null,
     mistral_per_1k_pages: null,
     finetune_min_examples: 50,
+    ocr_max_attempts: 3,
     categories: []
 })
 const defaults = ref({
     phi4_input_per_1k: null,
     phi4_output_per_1k: null,
-    mistral_per_1k_pages: null
+    mistral_per_1k_pages: null,
+    ocr_max_attempts: 3
 })
 const loading = ref(false)
 const saved = ref(false)
@@ -141,6 +143,7 @@ const saveSettings = async () => {
             phi4_output_per_1k: settings.value.phi4_output_per_1k ? Number(settings.value.phi4_output_per_1k) : undefined,
             mistral_per_1k_pages: settings.value.mistral_per_1k_pages ? Number(settings.value.mistral_per_1k_pages) : undefined,
             finetune_min_examples: settings.value.finetune_min_examples ? Number(settings.value.finetune_min_examples) : 50,
+            ocr_max_attempts: settings.value.ocr_max_attempts ? Number(settings.value.ocr_max_attempts) : 3,
             categories: settings.value.categories
         }
 
@@ -473,6 +476,21 @@ onMounted(() => {
               Vision (Vision/Image Analysis - Experimental)
             </label>
           </div>
+        </div>
+
+        <div class="mt-6">
+          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">OCR Max Retries</label>
+          <input
+            v-model="settings.ocr_max_attempts"
+            type="number"
+            min="1"
+            max="10"
+            class="mt-1 block w-full max-w-xs rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+            :placeholder="defaults.ocr_max_attempts ?? 3"
+          >
+          <p class="mt-1 text-xs text-gray-500">
+            Number of attempts for OCR (network/transient errors will be retried with exponential backoff).
+          </p>
         </div>
       </div>
     </div>

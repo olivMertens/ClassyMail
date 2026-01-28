@@ -16,8 +16,20 @@ DEFAULT_SETTINGS = {
     "cost_overrides": {},
     "categories": DEFAULT_CATEGORIES,
     "processing_strategy": "standard",  # standard | reasoning | vision
-    "finetune_min_examples": 50
+    "finetune_min_examples": 50,
+    "ocr_max_attempts": 3,
 }
+
+def _sanitize_ocr_attempts(val) -> int:
+    try:
+        v = int(val)
+    except Exception:
+        return 3
+    if v < 1:
+        v = 1
+    if v > 10:
+        v = 10
+    return v
 
 def load_settings() -> dict:
     if not DATA_FILE.exists():
@@ -33,6 +45,10 @@ def load_settings() -> dict:
             data["processing_strategy"] = "standard"
         if "finetune_min_examples" not in data:
             data["finetune_min_examples"] = 50
+        if "ocr_max_attempts" not in data:
+            data["ocr_max_attempts"] = 3
+        else:
+            data["ocr_max_attempts"] = _sanitize_ocr_attempts(data["ocr_max_attempts"])
         return data
     except Exception:
         return DEFAULT_SETTINGS.copy()
@@ -64,6 +80,9 @@ def save_settings(settings: dict):
             settings["finetune_min_examples"] = val
         except (ValueError, TypeError):
             settings["finetune_min_examples"] = 50
+
+    if "ocr_max_attempts" in settings:
+        settings["ocr_max_attempts"] = _sanitize_ocr_attempts(settings["ocr_max_attempts"])
 
     DATA_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
 

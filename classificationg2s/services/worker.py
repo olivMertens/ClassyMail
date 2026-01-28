@@ -90,11 +90,15 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
     except OCRFailed as ex:
         error_stage = None
         error_text = str(ex)
+        processing_log = getattr(ex, "processing_log", None)
         if error_text.startswith("stage="):
             try:
                 error_stage = error_text.split(":", 1)[0].split("=", 1)[1].strip()
             except Exception:
                 error_stage = None
+
+        if processing_log:
+            logger.error("[msg:%s] OCR processing_log: %s", message_id, processing_log)
 
         record = EmailRecord(
             id=blob_id_from_url(blob_url),
@@ -103,7 +107,7 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
             error=error_text,
             error_stage=error_stage,
             updated_at=datetime.now(timezone.utc),
-            processing_log=getattr(ex, "processing_log", None),
+            processing_log=processing_log,
         )
         try:
             await save_to_cosmos(record)

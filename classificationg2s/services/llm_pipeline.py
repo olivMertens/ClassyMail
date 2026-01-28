@@ -6,12 +6,12 @@ import logging
 import httpx
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential, retry_if_exception, retry
 
 from classificationg2s.core import config
 from classificationg2s.models import OCRFailed
 from classificationg2s.services.azure_clients import auth_headers, Clients
-from classificationg2s.services.settings_store import get_categories_prompt_text
+from classificationg2s.services.settings_store import get_categories_prompt_text, load_settings
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,8 @@ tracer = trace.get_tracer(__name__)
 
 
 def retryable_httpx(exc: Exception) -> bool:
+    if isinstance(exc, OCRFailed):
+        return bool(getattr(exc, "retryable", False))
     return (
         isinstance(exc, httpx.HTTPStatusError)
         and exc.response is not None
@@ -41,15 +43,13 @@ def clamp_text_to_token_budget(text: str, max_tokens: int) -> tuple[str, bool]:
     return text[:max_chars], True
 
 
-@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10), retry=retry_if_exception(retryable_httpx))
 async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None, include_images: bool = False) -> dict:
     headers = await auth_headers(clients=clients)
 
-    # Mistral Document AI API format (Microsoft Foundry)
-    # Reference: https://github.com/retkowsky/Azure-AIGEN-demos/blob/main/Mistral%20Document%20AI/Mistral%20Document%20AI%20with%20Azure%20AI%20Foundry.ipynb
-    # MISTRAL_ENDPOINT contains the full URL (e.g., https://xxx.cognitiveservices.azure.com)
-    # Payload: {"model": "...", "document": {...}, "include_image_base64": "true" (optional)}
+    settings = load_settings()
+    attempts = max(1, min(10, int(settings.get("ocr_max_attempts", getattr(config, "MISTRAL_OCR_MAX_ATTEMPTS", 3)))))
 
+    # Mistral Document AI API format (Microsoft Foundry)
     payload = {
         "model": config.MISTRAL_DEPLOYMENT,
         "document": {
@@ -58,46 +58,61 @@ async def ocr_with_mistral(base64_pdf: str, clients: Clients | None = None, incl
         }
     }
 
-    # Option to extract images from PDF (useful for PDFs with charts, diagrams, etc.)
     if include_images:
         payload["include_image_base64"] = "true"
 
     if not config.MISTRAL_ENDPOINT:
         raise RuntimeError("MISTRAL_ENDPOINT not configured.")
 
-    # Mistral Document AI endpoint (Microsoft Foundry)
-    # Reference: https://github.com/retkowsky/Azure-AIGEN-demos/blob/main/Mistral%20Document%20AI/Mistral%20Document%20AI%20with%20Azure%20AI%20Foundry.ipynb
-    # The endpoint should be used directly without appending paths (e.g., https://xxx.cognitiveservices.azure.com)
     url = config.MISTRAL_ENDPOINT.rstrip('/')
 
-    logger.info(f"[metrics] OCR Request: {url} model={config.MISTRAL_DEPLOYMENT}")
+    processing_log: list[dict] = []
 
     with tracer.start_as_current_span("mistral_document_ai") as span:
         span.set_attribute("gen_ai.system", "mistral")
         span.set_attribute("gen_ai.operation", "document.ocr")
         span.set_attribute("gen_ai.request.model", config.MISTRAL_DEPLOYMENT)
-        async with httpx.AsyncClient(timeout=90) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            try:
-                resp.raise_for_status()
-            except httpx.HTTPStatusError as ex:
-                logger.error(f"[metrics] OCR Failed: {ex.response.status_code} - {ex.response.text}")
-                span.set_status(Status(StatusCode.ERROR))
-                span.record_exception(ex)
-                raise
 
-            # Parse JSON response with error handling
-            try:
-                data = resp.json()
-            except json.JSONDecodeError as ex:
-                response_text = resp.text[:500]  # First 500 chars
-                logger.error(f"[metrics] OCR JSON Parse Error: {ex} | Response: {response_text}")
-                span.set_status(Status(StatusCode.ERROR))
-                span.record_exception(ex)
-                raise OCRFailed(f"stage=ocr: Invalid JSON response from Mistral: {ex}")
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(attempts),
+            wait=wait_exponential(multiplier=1, min=1, max=10),
+            retry=retry_if_exception(retryable_httpx),
+            reraise=True,
+        ):
+            with attempt:
+                attempt_no = attempt.retry_state.attempt_number
+                logger.info(f"[metrics] OCR Request attempt {attempt_no}/{attempts}: {url} model={config.MISTRAL_DEPLOYMENT}")
+                span.set_attribute("gen_ai.retry.attempt", attempt_no)
 
-            # Mistral Document AI returns: {"pages": [{"markdown": "...", "images": [...]}]}
-            pages = data.get("pages", [])
+                async with httpx.AsyncClient(timeout=90) as client:
+                    resp = await client.post(url, json=payload, headers=headers)
+                    try:
+                        resp.raise_for_status()
+                    except httpx.HTTPStatusError as ex:
+                        logger.error(f"[metrics] OCR Failed: {ex.response.status_code} - {ex.response.text[:500]}")
+                        span.set_status(Status(StatusCode.ERROR))
+                        span.record_exception(ex)
+                        raise
+
+                    try:
+                        data = resp.json()
+                    except json.JSONDecodeError as ex:
+                        response_text = resp.text[:1000]
+                        headers_snippet = {k: v for k, v in resp.headers.items() if k.lower() in ("content-type", "x-ms-error-code", "date")}
+                        log_entry = {
+                            "status_code": resp.status_code,
+                            "headers": headers_snippet,
+                            "text_snippet": response_text,
+                            "attempt": attempt_no,
+                        }
+                        processing_log.append(log_entry)
+                        logger.error(f"[metrics] OCR JSON Parse Error: {ex} | status={resp.status_code} headers={headers_snippet} | Response: {response_text}")
+                        span.set_status(Status(StatusCode.ERROR))
+                        span.record_exception(ex)
+                        raise OCRFailed(f"stage=ocr: Invalid JSON response from Mistral: {ex}", processing_log=processing_log, retryable=True)
+
+                    # Mistral Document AI returns: {"pages": [{"markdown": "...", "images": [...]}]}
+                    pages = data.get("pages", [])
             if not pages:
                 raise OCRFailed("No pages in Mistral Document AI response")
 

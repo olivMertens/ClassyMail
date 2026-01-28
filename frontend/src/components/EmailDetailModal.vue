@@ -291,11 +291,32 @@ const renderMarkdown = (text) => md.render(text || '')
                   <!-- Error Box -->
                   <div
                     v-if="email.error"
-                    class="rounded-md bg-red-50 dark:bg-red-900/20 p-4 border border-red-200 dark:border-red-800"
+                    class="rounded-md bg-red-50 dark:bg-red-900/20 p-4 border border-red-200 dark:border-red-800 space-y-3"
                   >
                     <p class="text-sm text-red-700 dark:text-red-200">
                       {{ email.error }}
                     </p>
+                    <div
+                      v-if="email.processing_log?.length"
+                      class="mt-2 text-xs text-gray-700 dark:text-gray-200"
+                    >
+                      <div class="font-semibold mb-1">
+                        Processing Log
+                      </div>
+                      <div class="space-y-2">
+                        <div
+                          v-for="(entry, idx) in email.processing_log"
+                          :key="idx"
+                          class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded p-2 font-mono"
+                        >
+                          <div>Status: {{ entry.status_code }} | Attempt: {{ entry.attempt }}</div>
+                          <div>Headers: {{ entry.headers }}</div>
+                          <div class="mt-1 whitespace-pre-wrap">
+                            {{ entry.text_snippet }}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div class="prose dark:prose-invert max-w-none text-sm max-h-60 overflow-y-auto border border-gray-100 rounded p-2">
