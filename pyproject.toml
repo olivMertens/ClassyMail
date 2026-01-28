@@ -25,6 +25,7 @@ dependencies = [
 	"python-multipart==0.0.21",
 	"fpdf2==2.7.9",
 	"azure-ai-inference>=1.0.0b9",
+	"azure-monitor-query>=1.4.0",
 ]
 
 [project.optional-dependencies]
@@ -63,6 +64,7 @@ opentelemetry-instrumentation-httpx = "0.60b0"
 aiohttp = "==3.9.5"
 python-multipart = "^0.0.21"
 fpdf2 = "^2.7.9"
+azure-monitor-query = "^1.4.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.0"
