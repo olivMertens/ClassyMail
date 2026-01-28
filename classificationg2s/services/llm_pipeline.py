@@ -140,8 +140,9 @@ async def ocr_with_mistral(
 
                     # Mistral Document AI returns: {"pages": [{"markdown": "...", "images": [...]}]}
                     pages = data.get("pages", [])
-            if not pages:
-                raise OCRFailed("No pages in Mistral Document AI response")
+
+                if not pages:
+                    raise OCRFailed("No pages in Mistral Document AI response")
 
             # Combine markdown from all pages
             markdown_parts = []

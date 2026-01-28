@@ -189,23 +189,54 @@ async def download_blob_as_base64(blob_url: str, return_bytes: bool = False, cli
 
 async def build_sas_url(blob_url: str, expiry_minutes: int = 60, clients: Clients | None = None) -> Optional[str]:
     account_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
+    clients = clients or get_default_clients()
+
     try:
         parsed = urlparse(blob_url)
         account = parsed.netloc.split(".")[0]
         container, *rest = parsed.path.lstrip("/").split("/")
         blob_name = "/".join(rest)
-        if not account_key:
+
+        expiry = datetime.utcnow() + timedelta(minutes=expiry_minutes)
+
+        if account_key:
+            # Shared Key SAS (Legacy/Local)
+            sas = generate_blob_sas(
+                account_name=account,
+                account_key=account_key,
+                container_name=container,
+                blob_name=blob_name,
+                permission=BlobSasPermissions(read=True),
+                expiry=expiry,
+            )
+        elif clients.blob_service_client:
+            # User Delegation SAS (Managed Identity / Entra ID)
+            # Must acquire a delegation key first.
+            now = datetime.utcnow()
+            # Key validity: slightly overlapping the SAS validity to avoid race conditions.
+            user_delegation_key = await clients.blob_service_client.get_user_delegation_key(
+                key_start_time=now - timedelta(minutes=5),
+                key_expiry_time=expiry + timedelta(minutes=5)
+            )
+
+            sas = generate_blob_sas(
+                account_name=account,
+                container_name=container,
+                blob_name=blob_name,
+                user_delegation_key=user_delegation_key,
+                permission=BlobSasPermissions(read=True),
+                expiry=expiry,
+            )
+        else:
             return blob_url
-        sas = generate_blob_sas(
-            account_name=account,
-            account_key=account_key,
-            container_name=container,
-            blob_name=blob_name,
-            permission=BlobSasPermissions(read=True),
-            expiry=datetime.utcnow() + timedelta(minutes=expiry_minutes),
-        )
+
         return f"https://{account}.blob.core.windows.net/{container}/{blob_name}?{sas}"
-    except Exception:
+    except Exception as e:
+        # If generation fails (e.g. invalid permissions), return None or original URL?
+        # Returning None makes the UI handle it (but 404 logic in emails.py might suppress it).
+        # We'll return None to stay consistent with original logic catch block.
+        # But logging it would be good.
+        print(f"Failed to generate SAS: {e}")
         return None
 
 
