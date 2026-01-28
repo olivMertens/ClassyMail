@@ -49,7 +49,7 @@ Selon ton objectif :
 
 - **Je veux builder/déployer**
     - [docs/DEV_LOCAL_BUILD.md](docs/DEV_LOCAL_BUILD.md) — build/push image, déploiement ACA sans CI
-    - [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) / [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md) — CI/CD
+    - [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) — CI/CD GitHub Actions
 
 ### Référence (liste complète)
 
@@ -59,10 +59,10 @@ Selon ton objectif :
 - [docs/MODELS.md](docs/MODELS.md)
 - [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md)
 - [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md)
-- [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md)
 - [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md)
 - [docs/DEV_LOCAL_BUILD.md](docs/DEV_LOCAL_BUILD.md)
 - [docs/SCENARIO_E2E.md](docs/SCENARIO_E2E.md)
+- [docs/USER_INTERFACE.md](docs/USER_INTERFACE.md)
 
 ## 🔗 References
 
@@ -320,7 +320,6 @@ PHI_ENDPOINT=$AI_ENDPOINT
 
 CI/CD setup lives in:
 - GitHub Actions: [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md)
-- GitLab CI: [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md)
 
 See the docs for the full YAML examples, authentication options (OIDC vs secrets), and recommended environment protections.
 
