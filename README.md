@@ -470,7 +470,8 @@ Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#3-sécurité--accés-rbac) pour
 | `CHAT_API_VERSION` | Version API du modèle de chat (défaut: `2024-08-01-preview`) |
 | `COSMOS_QUERY_MAX_LIMIT` | Limite max résultats par requête Cosmos (défaut: `20`) |
 | `FALLBACK_COST_PER_1K_INPUT` | Prix input/1K tokens (fallback) (configurable) |
-| `FALLBACK_COST_PER_1K_OUTPUT` | Prix output/1K tokens (fallback) (configurable) |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | (Optional) Log traces to App Insights |
+| `LOG_ANALYTICS_WORKSPACE_ID` | (Optional) Configure Telemetry Logs tab in Dashboard |
 
 > Tous les services utilisent **DefaultAzureCredential** par défaut. Accorder les rôles nécessaires :
 > - Storage: `Storage Blob Data Contributor`

@@ -6,7 +6,7 @@ import logging
 import uuid
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fpdf import FPDF
 from azure.servicebus import ServiceBusMessage, ServiceBusSubQueue
 from classificationg2s.services.messages import extract_blob_url
@@ -18,6 +18,8 @@ from classificationg2s.services.repository import (
     get_top_intents,
     get_low_confidence_items,
 )
+from azure.monitor.query.aio import LogsQueryClient
+from azure.monitor.query import LogsQueryStatus
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger("classimail.admin")
@@ -25,6 +27,18 @@ logger = logging.getLogger("classimail.admin")
 class ResetRequest(BaseModel):
     confirm_1: bool
     confirm_2: bool
+
+
+class AppInsightLog(BaseModel):
+    timestamp: datetime
+    message: str
+    severity_level: int | None
+    type: str # Trace or Exception
+    properties: dict | None
+
+
+class LogsResponse(BaseModel):
+    items: list[AppInsightLog]
 
 
 class DeadLetterMessage(BaseModel):
@@ -480,3 +494,69 @@ async def low_confidence(limit: int = 5, intent: str | None = None, clients: Cli
     limit = min(max(limit, 1), config.COSMOS_QUERY_MAX_LIMIT)
     items = await get_low_confidence_items(limit=limit, intent=intent, clients=clients)
     return LowConfidenceResponse(items=items)
+
+
+@router.get("/telemetry/logs", response_model=LogsResponse)
+async def get_app_insights_logs(days: int = 1, limit: int = 50, clients: Clients = Depends(get_clients)):
+    """
+    Fetches recent traces and exceptions from Application Insights via Log Analytics.
+    """
+    workspace_id = config.LOG_ANALYTICS_WORKSPACE_ID
+    if not workspace_id:
+        # Fallback if not configured: return empty (or error if critical, but UI should handle it)
+        logger.warning("LOG_ANALYTICS_WORKSPACE_ID not set. Cannot fetch logs.")
+        return LogsResponse(items=[])
+
+    try:
+        query = f"""
+        union AppTraces, AppExceptions
+        | where TimeGenerated > ago({days}d)
+        | project TimeGenerated, Message, SeverityLevel, Type, Properties
+        | order by TimeGenerated desc
+        | take {limit}
+        """
+
+        async with LogsQueryClient(clients.credential) as client:
+            response = await client.query_workspace(
+                workspace_id=workspace_id,
+                query=query,
+                timespan=timedelta(days=days)
+            )
+
+        if response.status == LogsQueryStatus.FAILURE:
+            logger.error(f"Logs query failed: {response.partial_error}")
+            raise HTTPException(status_code=502, detail="Logs query failed")
+
+        logs = []
+        for table in response.tables:
+            for row in table.rows:
+                # row is a mapped object or list depending on SDK version, usually list in python if not strictly typed
+                # Columns: TimeGenerated, Message, SeverityLevel, Type, Properties
+# Create dictionary safely
+                data = {c.name: row[i] for i, c in enumerate(table.columns)}
+
+                # Parse properties if string
+                props = data.get("Properties")
+                if isinstance(props, str) and props:
+                    try:
+                        props = json.loads(props)
+                    except ValueError:
+                        pass
+                elif not isinstance(props, dict):
+                    props = {}
+
+                logs.append(AppInsightLog(
+                    timestamp=data["TimeGenerated"],
+                    message=data.get("Message") or data.get("OuterMessage") or "No message", # AppExceptions use OuterMessage sometimes? No, unified schema usually.
+                    severity_level=data.get("SeverityLevel"),
+                    type=data.get("Type"),
+                    properties=props
+                ))
+
+        return LogsResponse(items=logs)
+
+    except Exception as e:
+        logger.error(f"Failed to query Log Analytics: {e}")
+        # Return empty list or raise? UI needs robustness.
+        # Ensure we don't break the UI panel if creds are wrong.
+        return LogsResponse(items=[])

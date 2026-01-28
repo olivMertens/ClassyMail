@@ -35,8 +35,7 @@ async def ensure_cosmos_container() -> None:
         if _cosmos_client is None:
             _cosmos_client = CosmosClient(
                 config.COSMOS_ENDPOINT,
-                credential=_credential if not config.COSMOS_KEY else None,
-                key=config.COSMOS_KEY,
+                credential=config.COSMOS_KEY if config.COSMOS_KEY else _credential,
             )
 
         db = await _cosmos_client.create_database_if_not_exists(id=config.COSMOS_DB)

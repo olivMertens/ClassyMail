@@ -15,7 +15,8 @@ import {
     ArrowPathIcon,
     QuestionMarkCircleIcon,
     ChevronDownIcon,
-    ChevronUpIcon
+    ChevronUpIcon,
+    CommandLineIcon
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 
@@ -49,6 +50,11 @@ const resetConfirm1 = ref(false)
 const resetConfirm2 = ref(false)
 const resetting = ref(false)
 const purgingDlq = ref(false)
+
+// Logs State
+const appLogs = ref([])
+const loadingLogs = ref(false)
+const logsError = ref(null)
 
 // --- Category Management & Sanitization ---
 
@@ -106,6 +112,24 @@ const removeCategory = (index) => {
 }
 
 // --- API Calls ---
+
+const fetchAppLogs = async () => {
+    loadingLogs.value = true
+    logsError.value = null
+    try {
+        const res = await fetch('/api/admin/telemetry/logs?days=1&limit=100')
+        if (res.ok) {
+            const data = await res.json()
+            appLogs.value = data.items || []
+        } else {
+            logsError.value = 'Failed to fetch logs'
+        }
+    } catch (e) {
+        logsError.value = e.message
+    } finally {
+        loadingLogs.value = false
+    }
+}
 
 const loadDefaults = async () => {
     try {
@@ -311,6 +335,13 @@ onMounted(() => {
         >
           <BanknotesIcon class="h-4 w-4" />
           General & Costs
+        </button>
+        <button
+          :class="[activeTab === 'logs' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          @click="{ activeTab = 'logs'; fetchAppLogs(); }"
+        >
+          <CommandLineIcon class="h-4 w-4" />
+          Telemetry Logs
         </button>
         <button
           :class="[activeTab === 'danger' ? 'border-red-500 text-red-600 dark:text-red-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
@@ -814,6 +845,111 @@ onMounted(() => {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Telemetry Logs Tab -->
+    <div
+      v-show="activeTab === 'logs'"
+      class="bg-white dark:bg-gray-800 shadow sm:rounded-lg"
+    >
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+            Application Insights Telemetry
+          </h3>
+          <button
+            class="rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 top-0"
+            @click="fetchAppLogs"
+          >
+            <ArrowPathIcon
+              class="h-4 w-4 inline mr-1"
+              :class="{ 'animate-spin': loadingLogs }"
+            />
+            Refresh
+          </button>
+        </div>
+
+        <div
+          v-if="logsError"
+          class="p-4 bg-red-50 text-red-700 rounded-md mb-4 dark:bg-red-900/20 dark:text-red-300 text-sm"
+        >
+          {{ logsError }}
+        </div>
+
+        <div
+          v-if="loadingLogs && !appLogs.length"
+          class="text-gray-500 text-sm text-center py-8"
+        >
+          Loading logs from Azure Monitor...
+        </div>
+
+        <div
+          v-if="!loadingLogs && !appLogs.length && !logsError"
+          class="text-gray-500 text-sm text-center py-8"
+        >
+          No logs found in the last 24 hours.
+        </div>
+
+        <div
+          v-if="appLogs.length"
+          class="overflow-x-auto"
+        >
+          <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-700">
+            <thead>
+              <tr>
+                <th
+                  scope="col"
+                  class="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-gray-900 dark:text-white sm:pl-0"
+                >
+                  Time
+                </th>
+                <th
+                  scope="col"
+                  class="px-3 py-3.5 text-left text-xs font-semibold text-gray-900 dark:text-white"
+                >
+                  Sev
+                </th>
+                <th
+                  scope="col"
+                  class="px-3 py-3.5 text-left text-xs font-semibold text-gray-900 dark:text-white"
+                >
+                  Message
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+              <tr
+                v-for="(log, idx) in appLogs"
+                :key="idx"
+              >
+                <td class="whitespace-nowrap py-2 pl-4 pr-3 text-xs text-gray-500 dark:text-gray-400 sm:pl-0">
+                  {{ new Date(log.timestamp).toLocaleString() }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-2 text-xs">
+                  <span
+                    v-if="log.severity_level == 0 || log.type =='AppExceptions'"
+                    class="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10 dark:bg-red-400/10 dark:text-red-400"
+                  >Error</span>
+                  <span
+                    v-else-if="log.severity_level == 1"
+                    class="inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20 dark:bg-yellow-400/10 dark:text-yellow-500"
+                  >Warn</span>
+                  <span
+                    v-else
+                    class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-400/10 dark:text-blue-400"
+                  >Info</span>
+                </td>
+                <td
+                  class="px-3 py-2 text-xs text-gray-500 dark:text-gray-300 font-mono break-all line-clamp-2 hover:line-clamp-none cursor-help transition-all"
+                  :title="log.message"
+                >
+                  {{ log.message }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

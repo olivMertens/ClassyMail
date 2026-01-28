@@ -62,5 +62,8 @@ MISTRAL_OCR_MAX_ATTEMPTS = int(os.getenv("MISTRAL_OCR_MAX_ATTEMPTS", "3"))
 FALLBACK_COST_PER_1K_INPUT = float(os.getenv("FALLBACK_COST_PER_1K_INPUT", "0"))
 FALLBACK_COST_PER_1K_OUTPUT = float(os.getenv("FALLBACK_COST_PER_1K_OUTPUT", "0"))
 
+# Log Analytics Workspace ID for querying logs
+LOG_ANALYTICS_WORKSPACE_ID = os.getenv("LOG_ANALYTICS_WORKSPACE_ID")
+
 # Upload
 MAX_UPLOAD_SIZE = int(os.getenv("UPLOAD_MAX_BYTES", 10 * 1024 * 1024))  # 10MB
