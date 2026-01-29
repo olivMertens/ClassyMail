@@ -253,6 +253,13 @@ resource "azurerm_role_assignment" "aca_sb_sender" {
   principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
+# Log Analytics Reader for querying telemetry logs
+resource "azurerm_role_assignment" "aca_log_analytics_reader" {
+  scope                = azurerm_log_analytics_workspace.log.id
+  role_definition_name = "Log Analytics Reader"
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
+}
+
 resource "azurerm_role_assignment" "acr_pull" {
   count                = var.acr_name != "" ? 1 : 0
   scope                = data.azurerm_container_registry.acr[0].id
@@ -374,6 +381,10 @@ resource "azurerm_role_assignment" "rbac_ai" {
 output "SERVICEBUS_NAMESPACE" { value = azurerm_servicebus_namespace.sb.name }
 output "AI_ENDPOINT" { value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, null) }
 output "APP_ID_CLIENT_ID" { value = azurerm_user_assigned_identity.app_id.client_id }
+output "APP_ID_PRINCIPAL_ID" {
+  description = "Principal ID de l'identité managée (pour RBAC)"
+  value       = azurerm_user_assigned_identity.app_id.principal_id
+}
 
 output "AZURE_SERVICE_BUS_FQDN" { value = "${azurerm_servicebus_namespace.sb.name}.servicebus.windows.net" }
 output "AZURE_SERVICE_BUS_QUEUE" { value = azurerm_servicebus_queue.q.name }
@@ -385,6 +396,22 @@ output "AZURE_STORAGE_CONTAINER" { value = azurerm_storage_container.pdf_inputs.
 output "AZURE_COSMOS_ENDPOINT" { value = azurerm_cosmosdb_account.db.endpoint }
 output "AZURE_COSMOS_DB" { value = azurerm_cosmosdb_sql_database.sql.name }
 output "AZURE_COSMOS_CONTAINER" { value = azurerm_cosmosdb_sql_container.container.name }
+
+output "LOG_ANALYTICS_WORKSPACE_ID" {
+  description = "Workspace ID pour Log Analytics (LOG_ANALYTICS_WORKSPACE_ID)"
+  value       = azurerm_log_analytics_workspace.log.workspace_id
+}
+
+output "APPLICATION_INSIGHTS_CONNECTION_STRING" {
+  description = "Connection string Application Insights"
+  value       = azurerm_application_insights.appi.connection_string
+  sensitive   = true
+}
+
+output "API_URL" {
+  description = "URL publique de l'API"
+  value       = "https://${azurerm_container_app.api.ingress[0].fqdn}"
+}
 
 output "AZURE_COSMOS_KEY" {
   value     = var.cosmos_use_rbac ? null : azurerm_cosmosdb_account.db.primary_key
@@ -615,6 +642,10 @@ resource "azurerm_container_app" "api" {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         value = azurerm_application_insights.appi.connection_string
       }
+      env {
+        name  = "LOG_ANALYTICS_WORKSPACE_ID"
+        value = azurerm_log_analytics_workspace.log.workspace_id
+      }
 
       liveness_probe {
         transport     = "HTTP"
@@ -790,6 +821,10 @@ resource "azurerm_container_app" "worker" {
       env {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         value = azurerm_application_insights.appi.connection_string
+      }
+      env {
+        name  = "LOG_ANALYTICS_WORKSPACE_ID"
+        value = azurerm_log_analytics_workspace.log.workspace_id
       }
     }
 

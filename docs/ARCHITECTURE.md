@@ -88,7 +88,7 @@ L'identité managée assignée aux Container Apps (`api` et `worker`) doit dispo
 | **Container Registry**| `AcrPull` | `7f951dda-4ed3-4680-a7ca-43fe172d538d` | Pull de l'image Docker par l'environnement Container Apps. |
 | **Application Insights** | `Monitoring Metrics Publisher` | `3913510d-42f4-4e42-8a64-420c390055eb` | Télémétrie OpenTelemetry (traces distribuées, métriques). |
 | **Event Grid System Topic** | `EventGrid EventSubscription Contributor` | `428e0ff0-5e57-4d9c-a221-2c70d0e0a443` | Abonnement aux événements Blob Storage → Service Bus. |
-| **Log Analytics Workspace** | `Log Analytics Contributor` | `92aaf0da-9dab-42b6-94a3-d43ce8d16293` | Logs centralisés & requêtes diagnostiques (KQL). |
+| **Log Analytics Workspace** | `Log Analytics Reader` | `73c42c96-874c-492b-b04d-ab87d138a893` | Lecture des logs centralisés & requêtes diagnostiques (KQL) depuis l'API UI. |
 
 ### Flux d'Identité
 

@@ -34,6 +34,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
 	"pytest==8.2.0",
+	"pytest-asyncio==0.24.0",
 	"ruff==0.6.9",
 	"pre-commit==3.7.0",
 ]
@@ -71,6 +72,7 @@ azure-monitor-query = "^1.4.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.0"
+pytest-asyncio = "^0.24.0"
 ruff = "^0.6.9"
 pre-commit = "^3.7.0"
 
@@ -88,3 +90,5 @@ exclude = ["main.py"]
 
 [tool.pytest.ini_options]
 addopts = "-p no:xdist"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

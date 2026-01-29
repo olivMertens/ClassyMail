@@ -20,7 +20,22 @@
         "costs_desc": "Override the default pricing used for cost calculations. Leave blank to use defaults.",
         "strategy_standard_help": "Fast & Efficient. Best for standard typed text documents and clear emails.",
         "strategy_reasoning_help": "Deep Analysis. Uses Chain-of-Thought to justify decisions before classifying. Useful for ambiguous cases.",
-        "strategy_vision_help": "Multimodal. Analyzes visual elements (images, layouts) in addition to text. Best for documents with photos or complex structures."
+        "strategy_vision_help": "Multimodal. Analyzes visual elements (images, layouts) in addition to text. Best for documents with photos or complex structures.",
+        "tabs": {
+            "categories": "Categories",
+            "processing": "Processing Strategy",
+            "finetuning": "Fine-tuning",
+            "general": "General & Costs",
+            "logs": "Telemetry Logs",
+            "danger": "Danger Zone"
+        },
+        "categories": {
+            "warning_title": "Critical Configuration",
+            "warning_text": "Modifying categories radically changes how the AI classifies incoming emails. Changes propagate to the System Prompt immediately. Descriptions are essential for LLM context.",
+            "managed_title": "Managed Categories",
+            "save_button": "Save System Changes",
+            "current_categories": "Current active categories extracted by the LLM."
+        }
     },
     "upload": {
         "title": "Upload Documents",
