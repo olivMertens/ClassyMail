@@ -388,7 +388,7 @@ const renderMarkdown = (text) => md.render(text || '')
                   <!-- Category Selection -->
                   <div>
                     <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                      Categories
+                      Catégories
                     </h4>
                     <div class="flex flex-wrap gap-2 mb-3">
                       <button
@@ -426,14 +426,29 @@ const renderMarkdown = (text) => md.render(text || '')
                     </div>
                   </div>
 
+                  <!-- IA Reasoning -->
+                  <div v-if="email.classification?.detected_intents?.some(i => i.justification)">
+                    <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                      Raisonnement IA
+                    </h4>
+                    <ul class="text-xs text-gray-600 dark:text-gray-300 space-y-1">
+                      <li
+                        v-for="i in email.classification.detected_intents.filter(i => i.justification)"
+                        :key="i.intent"
+                      >
+                        <strong>{{ i.intent }} ({{ Math.round((i.confidence||0)*100) }}%) :</strong> {{ i.justification }}
+                      </li>
+                    </ul>
+                  </div>
+
                   <!-- Reason -->
                   <div>
-                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Correction Reason / Comment</label>
+                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Raison / Commentaire</label>
                     <textarea
                       v-model="correctionReason"
                       rows="2"
                       class="mt-1 block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-700"
-                      placeholder="Why did you change the category? (Used for reinforcement learning)"
+                      placeholder="Pourquoi cette correction ? (Apprentissage)"
                     />
                   </div>
 

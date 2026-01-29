@@ -673,8 +673,11 @@ const emit = defineEmits(['open-email'])
             class="flex-shrink-0"
           >
             <span
-              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800 max-w-[100px] truncate"
-              :title="email.classification.detected_intents.length > 1 ? 'Autres: ' + email.classification.detected_intents.slice(1).map(i => `${i.intent} (${Math.round((i.confidence||0)*100)}%)`).join(', ') : ''"
+              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800 max-w-[120px] truncate"
+              :title="[
+                email.classification.detected_intents[0].justification ? `Justification: ${email.classification.detected_intents[0].justification}` : '',
+                email.classification.detected_intents.length > 1 ? 'Autres: ' + email.classification.detected_intents.slice(1).map(i => `${i.intent} (${Math.round((i.confidence||0)*100)}%)${i.justification ? ' → ' + i.justification : ''}`).join(', ') : ''
+              ].filter(Boolean).join('\n')"
             >
               {{ email.classification.detected_intents[0].intent }} ({{ Math.round((email.classification.detected_intents[0].confidence || 0)*100) }}%)
             </span>
@@ -912,6 +915,7 @@ const emit = defineEmits(['open-email'])
                 v-for="(intent, idx) in email.classification.detected_intents.slice(0, 2)"
                 :key="idx"
                 class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
+                :title="intent.justification ? `Justification: ${intent.justification}` : ''"
               >
                 {{ intent.intent }} ({{ Math.round(intent.confidence * 100) }}%)
               </span>
