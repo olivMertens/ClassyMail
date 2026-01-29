@@ -52,14 +52,15 @@ flowchart LR
   API -->|2) Write blob\nuploads/YYYY/MM/DD/...| B
   B -->|3) Microsoft.Storage.BlobCreated| T
   T --> S
-  S -->|4) Event payload| Q
-  Q -->|5) Consume message\n(blob_url ou EventGrid data.url)| W
-  W -->|6) Download PDF| B
-  W -->|7) OCR| OCR
-  OCR -->|Markdown + usage| W
-  W -->|8) Classification| LLM
-  LLM -->|JSON intents + usage| W
-  W -->|9) Upsert result| C
+  S --> Q
+  Q -->|4) Event payload| W
+  W -->|5) Consume message\n(blob_url ou EventGrid data.url)| Worker
+  Worker -->|6) Download PDF| B
+  Worker -->|7) OCR| OCR
+  OCR -->|Markdown + usage| Worker
+  Worker -->|8) Classification| LLM
+  LLM -->|JSON intents + usage| Worker
+  Worker -->|9) Upsert result| C
   API -->|10) Read results\n(list/detail/stats)| C
   API -->|11) UI| U
 ```

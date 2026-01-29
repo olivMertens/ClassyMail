@@ -217,32 +217,71 @@ const switchTab = (tab) => {
 
 // Architecture Diagram Definition
 const diagram = `
-flowchart TD
-    Client([Client Browser]) -->|HTTPS| FE[Vue Frontend]
-    FE -->|API| API[FastAPI]
-    FE -->|Chat| API
+flowchart TB
+    Client([👤 Client Browser]) -->|HTTPS| FE[🎨 Vue SPA]
+    FE -->|REST API| API[⚡ FastAPI]
 
-    subgraph ACA[Azure Container Apps]
-        API
-        Worker[Worker]
+    subgraph ACA[☁️ Azure Container Apps Environment]
+        direction TB
+        API[📡 API Container<br/>Port 8000]
+        Worker[⚙️ Worker Container<br/>Service Bus Consumer]
     end
 
-    API -->|Blob (write)| Blob[Blob Storage]
-    API -->|Stream PDF (read)| Blob
-    API -->|Meta| Cosmos[Cosmos DB]
-    API -->|Queue| SB[Service Bus]
+    subgraph Storage[💾 Azure Storage Account]
+        Blob[(📁 Blob Container<br/>uploads/)]
+    end
 
-    SB --> Worker
-    Worker -->|Read PDF| Blob
-    Worker -->|OCR| Mistral[Mistral Document AI]
-    Worker -->|Classify| OPENAI[Phi-4]
+    subgraph Data[🗄️ Azure Cosmos DB]
+        Cosmos[(📊 NoSQL Container<br/>emailsdb)]
+    end
 
-    Mistral --> Worker
-    OPENAI --> Worker
-    Worker --> Cosmos
+    subgraph Queue[📬 Azure Service Bus]
+        SB[📮 Queue: email-processing]
+    end
 
-    API -->|Vector Search| Cosmos
-    API -->|Chat Completion| OPENAI
+    subgraph AI[🤖 Azure AI Foundry]
+        direction LR
+        Mistral[👁️ Mistral Document AI<br/>OCR + Vision]
+        Phi4[🧠 Phi-4 Mini<br/>Classification]
+    end
+
+    subgraph Security[🔐 Managed Identity + RBAC]
+        MSI[🎫 User Assigned Identity]
+    end
+
+    %% Upload Flow
+    Client -->|1️⃣ Upload PDF| API
+    API -->|2️⃣ Write| Blob
+    API -->|3️⃣ Send Message| SB
+
+    %% Worker Processing Flow
+    SB -->|4️⃣ Consume| Worker
+    Worker -->|5️⃣ Download PDF| Blob
+    Worker -->|6️⃣ Extract Text/Images| Mistral
+    Mistral -->|Markdown + Usage| Worker
+    Worker -->|7️⃣ Classify Intents| Phi4
+    Phi4 -->|JSON + Confidence| Worker
+    Worker -->|8️⃣ Save Result| Cosmos
+
+    %% Read Flow
+    API -->|9️⃣ Query Metadata| Cosmos
+    API -->|🔟 Stream PDF| Blob
+    API -->|1️⃣1️⃣ Render UI| FE
+
+    %% Security
+    MSI -.->|Authenticate| API
+    MSI -.->|Authenticate| Worker
+
+    %% Styling
+    classDef azureBlue fill:#0078D4,stroke:#004578,color:#fff
+    classDef aiPurple fill:#8B5CF6,stroke:#6D28D9,color:#fff
+    classDef storageCyan fill:#06B6D4,stroke:#0891B2,color:#fff
+    classDef securityGreen fill:#10B981,stroke:#059669,color:#fff
+
+    class ACA,Storage,Data,Queue azureBlue
+    class AI,Mistral,Phi4 aiPurple
+    class Blob,Cosmos,SB storageCyan
+    class Security,MSI securityGreen
 `
 </script>
 
@@ -742,8 +781,19 @@ flowchart TD
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-300 font-mono">
                     Storage Blob Data Contributor
                   </td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-300">
-                    Read inputs (PDFs) & write logs
+                  <td class="px-3 py-4 text-sm text-gray-500 dark:text-gray-300">
+                    <strong>Write:</strong> Upload incoming PDFs & logs
+                  </td>
+                </tr>
+                <tr>
+                  <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 dark:text-white sm:pl-6">
+                    Storage Account
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-300 font-mono">
+                    Storage Blob Data Reader
+                  </td>
+                  <td class="px-3 py-4 text-sm text-gray-500 dark:text-gray-300">
+                    <strong>Read:</strong> Worker downloads PDFs, API streams PDFs to browser (PDF Viewer)
                   </td>
                 </tr>
                 <tr>
