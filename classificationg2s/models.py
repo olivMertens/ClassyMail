@@ -32,6 +32,8 @@ class HistoryEntry(BaseModel):
 class EmailRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     file_url: str
+    file_url_proxy: Optional[str] = None  # Managed Identity proxy endpoint
+    file_url_sas: Optional[str] = None    # Legacy SAS URL (deprecated)
     status: str
     subject: Optional[str] = None
     sender: Optional[str] = None

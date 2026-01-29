@@ -141,6 +141,8 @@ async def list_emails(
         next_token: str | None = None
         async for page_items in pages:
             async for item in page_items:
+                # Add proxy URL for secure blob access via Managed Identity
+                item["file_url_proxy"] = f"/api/emails/{item['id']}/file"
                 items.append(EmailRecord(**item))
             next_token = pages.continuation_token
             break
