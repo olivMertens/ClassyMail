@@ -220,23 +220,29 @@ const diagram = `
 flowchart TD
     Client([Client Browser]) -->|HTTPS| FE[Vue Frontend]
     FE -->|API| API[FastAPI]
+    FE -->|Chat| API
 
     subgraph ACA[Azure Container Apps]
         API
         Worker[Worker]
     end
 
-    API -->|Blob| Blob[Blob Storage]
+    API -->|Blob (write)| Blob[Blob Storage]
+    API -->|Stream PDF (read)| Blob
     API -->|Meta| Cosmos[Cosmos DB]
     API -->|Queue| SB[Service Bus]
 
     SB --> Worker
+    Worker -->|Read PDF| Blob
     Worker -->|OCR| Mistral[Mistral Document AI]
     Worker -->|Classify| OPENAI[Phi-4]
 
     Mistral --> Worker
     OPENAI --> Worker
     Worker --> Cosmos
+
+    API -->|Vector Search| Cosmos
+    API -->|Chat Completion| OPENAI
 `
 </script>
 
