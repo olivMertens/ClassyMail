@@ -16,103 +16,53 @@ Pattern : Event-Driven + Container Apps + AI Foundry (Mistral OCR & Phi‑4)
 
 ```mermaid
 flowchart TD
-    subgraph Client [Environnement Client]
-        PDF[PDF Email]
-    end
-    subgraph Storage[Storage]
-        BlobIn[(Blob Storage: pdf-inputs)]
-    end
-    subgraph Ingestion[Ingestion]
-        EG[Event Grid]
-        SB[(Service Bus Queue)]
-    end
-    subgraph Compute[Azure Container Apps]
-        API[API + UI + Chatbot (FastAPI)]
-        W[Worker (python -m classificationg2s.worker_main)]
-    end
-    subgraph AI[AI Foundry - MaaS]
-        Mistral[Mistral Document AI 25.05\n(mistral-document-ai-2505)]
-        Phi4[Phi-4]
-    end
-    subgraph Data[Cosmos DB]
-        Cosmos[(Classifications + Vectors)]
-    end
-
-    PDF -->|Upload UI| API
-    PDF -->|Upload Portal/FTP| BlobIn
-
-    API -->|1. Write Blob| BlobIn
-    API -->|2. Create PENDING| Cosmos
-    API -->|3. Manual Trigger (Fast)| SB
-
-    BlobIn -->|Event: BlobCreated (Slow)| EG
-    EG -->|Topic Subsctiption: .pdf| SB
-
-    SB -->|Message| W
-    W -->|%PDF -> base64| Mistral
-    Mistral -->|Markdown + usage| W
-    W -->|Prompt multi-intents| Phi4
-    Phi4 -->|JSON + usage| W
-    W -->|Update: PROCESSED| Cosmos
-    API -->|Read: polling| Cosmos
-    API -->|UI| UI[Dashboard]
-
-    %% Chatbot
-    UI -->|Chat| API
-    API -->|Vector Search| Cosmos
-    API -->|LLM (chat completion)| Phi4
-
-    classDef compute fill:#2563eb,stroke:#1d4ed8,color:#fff
-    classDef ai fill:#16a34a,stroke:#15803d,color:#fff
-    classDef storage fill:#71717a,stroke:#52525b,color:#fff
-    classDef data fill:#f97316,stroke:#ea580c,color:#fff
-    class API,W compute
-    class Mistral,Phi4 ai
-    class BlobIn storage
-    class Cosmos data
+    PDF[PDF Email] --> API[API + UI]
+    PDF --> BlobIn[(Blob: pdf-inputs)]
+    API --> BlobIn
+    BlobIn --> EG[Event Grid]
+    EG --> SB[(Service Bus)]
+    SB --> W[Worker]
+    W --> OCR[Mistral OCR]
+    OCR --> LLM[Phi-4 / gpt-4o-mini]
+    LLM --> Cosmos[(Cosmos DB)]
+    API --> Cosmos
+    API --> UI[Dashboard]
 ```
 
 ## 2. Séquence de traitement
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor User
-    participant UI as Dashboard
-    participant API
-    participant Blob as Blob Storage
-    participant SB as Service Bus
-    participant EG as Event Grid
-    participant ACA as Container App (Worker)
-    participant Cosmos
+autonumber
+participant User
+participant UI
+participant API
+participant Blob
+participant SB
+participant EG
+participant Worker
+participant Cosmos
 
-    box "User Upload Flow" #e6f3ff
-    User->>UI: Upload PDF
-    UI->>API: POST /api/upload
-    API->>Blob: Upload Byte Stream
-    API->>Cosmos: Create "PENDING" Record
-    API->>SB: Send Message (blob_url)
-    API-->>UI: 200 OK (List updated)
-    end
+User->>UI: Upload PDF
+UI->>API: POST /api/upload
+API->>Blob: Upload
+API->>Cosmos: Create PENDING
+API->>SB: Enqueue blob_url
 
-    box "Portal Upload Flow" #fff0e6
-    User->>Blob: Upload File via Portal
-    Blob->>EG: BlobCreated Event
-    EG->>SB: Route to Queue (Latency ~30s)
-    end
+User->>Blob: Portal upload
+Blob->>EG: BlobCreated
+EG->>SB: Enqueue blob_url
 
-    box "Async Processing" #efffef
-    SB->>ACA: Consume Message
-    ACA->>Blob: Download PDF
-    ACA->>ACA: OCR & Classification
-    ACA->>Cosmos: Update Status (PROCESSED)
-    end
+SB->>Worker: Consume
+Worker->>Blob: Download PDF
+Worker->>Worker: OCR + Classify
+Worker->>Cosmos: Update PROCESSED
 
-    loop Every 30s
-        UI->>API: GET /api/emails
-        API->>Cosmos: Query Status
-        Cosmos-->>UI: Updated List
-    end
+loop Poll
+  UI->>API: GET /api/emails
+  API->>Cosmos: Query status
+  Cosmos-->>UI: List
+end
 ```
 
 ## 3. Sécurité & Accès (RBAC)

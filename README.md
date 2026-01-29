@@ -14,14 +14,11 @@
 - Quickstart: `uv sync && uv run uvicorn main:app --reload` (+ `secrets.env`)
 
 ## Pourquoi ce POC ?
-
-Ce repo est un **POC “agent + pipeline”** pour traiter des emails/PDFs **à fort volume**, avec un objectif de **latence stable** et de **coûts observables**.
-Il sert à valider rapidement :
-
-- Une architecture **événementielle découplée** (ingestion vs traitement) pour absorber des pics (ex: 10k fichiers).
-- Un workflow de **review humaine** (dashboard interactif) + boucle de **reinforcement / fine-tuning**.
-- Un mode de déploiement cloud **prod-ready** (Terraform + Azure Container Apps) et une exécution locale simple.
-- **Nouveau (Fév 2026)** : Interface "Dark Mode" native, Danger Zone (Reset complet), Filtres avancés (Catégorie/Confiance), "Average Quality" stat, et **Assistant IA (chat) connecté à Cosmos DB**.
+POC “agent + pipeline” pour emails/PDFs volumineux : latence stable, coûts traçables, review humaine, fine-tuning.
+- Architecture événementielle (Blob → Event Grid → Service Bus → Worker)
+- Dashboard review + export (CSV/JSONL)
+- Déploiement Azure (Terraform + ACA), exécution locale simple
+- Dark mode, Danger Zone, filtres, assistant IA
 
 ## Comment ça marche (vue d’ensemble)
 
@@ -145,84 +142,17 @@ Tests rapides : voir [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md#lancer-lappli)
 
 ---
 
-## 🧪 Génération de données (POC / Demo)
+## 🧪 Génération de données
+Voir [docs/TESTING_EMAIL_GENERATION.md](docs/TESTING_EMAIL_GENERATION.md)
 
-Pour démontrer le POC (stress OCR + classification + boucle de review/fine-tuning), le repo inclut un générateur de PDFs « email-like » volontairement bruités :
+## 🧩 Backend FastAPI
+Voir [docs/PIPELINE.md](docs/PIPELINE.md) et [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md)
 
-- Script: [scripts/generate_dummy_pdfs.py](scripts/generate_dummy_pdfs.py)
-- Objectif: produire 50–100 emails aléatoires, souvent longs (~300 mots), avec bruit (FR/EN/ES, argot, SMS, typos, forwards, multi-sujets…)
+## 💻 Frontend SPA
+Voir [docs/USER_INTERFACE.md](docs/USER_INTERFACE.md)
 
-Exemples:
-
-```bash
-# Dépendance du générateur PDF (uniquement pour ce script)
-pip install fpdf2
-
-# Générer 1 PDF (pratique pour vérifier le nom unique/id) — le script affiche le chemin du fichier
-python scripts/generate_dummy_pdfs.py --count 1 --out dataset/pdf
-
-python scripts/generate_dummy_pdfs.py --count 75 --target-words 300
-python scripts/generate_dummy_pdfs.py --count 100 --target-words 320 --out dataset/pdf
-```
-
-Notes:
-
-- Les fichiers sont nommés avec un suffixe unique (timestamp + UUID court), par ex:
-    `sample_001_<categorie>_<timestamp>_<id>.pdf`
-- Quand `--count <= 3`, le script affiche le chemin complet des fichiers générés.
-
-### Simuler un PDF corrompu (end-to-end)
-
-Objectif: vérifier que le pipeline détecte un PDF illisible dès l'étape 1 (download) et que l'UI affiche clairement l'erreur.
-
-Pré-requis:
-
-- App démarrée (local ou ACA)
-- Variables Storage configurées (`AZURE_STORAGE_ACCOUNT_URL`, `AZURE_STORAGE_CONTAINER`)
-
-Exemples:
-
-```bash
-# Local
-python scripts/simulate_corrupted_pdf.py --base-url http://localhost:8000
-
-# ACA (remplacer l'URL)
-python scripts/simulate_corrupted_pdf.py --base-url https://<your-app>.<region>.azurecontainerapps.io
-```
-
-Résultat attendu:
-
-- Un item `status=ERROR` apparaît dans l'onglet `⚠ Erreurs`, avec `error_stage=download` + un petit `processing_log`.
-
-### Option LLM (Azure OpenAI / Foundry compatible)
-
-Le script peut générer/étendre le contenu via un LLM avant de créer les PDFs.
-
-Variables d'environnement:
-
-- `AZURE_OPENAI_ENDPOINT` (obligatoire)
-- `AZURE_OPENAI_DEPLOYMENT` (optionnel, défaut: `gpt-4o-mini`)
-- `AZURE_OPENAI_API_VERSION` (optionnel, défaut: `2024-10-01-preview`)
-- `AZURE_OPENAI_TIMEOUT` (optionnel)
-
-Exemple PowerShell:
-
-```powershell
-$env:AZURE_OPENAI_ENDPOINT = "https://<resource>.openai.azure.com"
-$env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o-mini"
-# Optionnel (si auth par key)
-$env:AZURE_OPENAI_API_KEY = "<key>"
-```
-
-Authentification (fallback automatique):
-
-- **API key**: définir `AZURE_OPENAI_API_KEY`
-- **Entra ID (recommandé)**: ne pas définir la key, et s'authentifier via `DefaultAzureCredential` (ex: `az login`).
-- Scope configurable via `AZURE_OPENAI_SCOPE` (défaut: `https://cognitiveservices.azure.com/.default`).
-
-```bash
-python scripts/generate_dummy_pdfs.py --count 75 --target-words 300 --use-aoai
-```
+## ⚙️ Configuration
+Voir [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md) et [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## 🧩 Backend FastAPI
 
