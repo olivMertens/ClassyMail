@@ -33,36 +33,36 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-autonumber
-participant User
-participant UI
-participant API
-participant Blob
-participant SB
-participant EG
-participant Worker
-participant Cosmos
+    autonumber
+    participant User
+    participant UI
+    participant API
+    participant Blob
+    participant SB
+    participant EG
+    participant Worker
+    participant Cosmos
 
-User->>UI: Upload PDF
-UI->>API: POST /api/upload
-API->>Blob: Upload
-API->>Cosmos: Create PENDING
-API->>SB: Enqueue blob_url
+    User->>UI: Upload PDF
+    UI->>API: POST /api/upload
+    API->>Blob: Upload
+    API->>Cosmos: Create PENDING
+    API->>SB: Enqueue blob_url
 
-User->>Blob: Portal upload
-Blob->>EG: BlobCreated
-EG->>SB: Enqueue blob_url
+    User->>Blob: Portal upload
+    Blob->>EG: BlobCreated
+    EG->>SB: Enqueue blob_url
 
-SB->>Worker: Consume
-Worker->>Blob: Download PDF
-Worker->>Worker: OCR + Classify
-Worker->>Cosmos: Update PROCESSED
+    SB->>Worker: Consume
+    Worker->>Blob: Download PDF
+    Worker->>Worker: OCR + Classify
+    Worker->>Cosmos: Update PROCESSED
 
-loop Poll
-  UI->>API: GET /api/emails
-  API->>Cosmos: Query status
-  Cosmos-->>UI: List
-end
+    loop Poll
+        UI->>API: GET /api/emails
+        API->>Cosmos: Query status
+        Cosmos-->>UI: List
+    end
 ```
 
 ## 3. Sécurité & Accès (RBAC)
