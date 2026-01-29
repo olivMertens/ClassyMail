@@ -312,18 +312,20 @@ async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False
 
     system_prompt = f"""
 Tu es un assistant expert en classification d'emails d'assurance.{extra_instructions}
-Ta tâche est d'analyser le contenu de l'email (fourni en markdown) et d'identifier "
+Ta tâche est d'analyser le contenu de l'email (fourni en markdown) et d'identifier :
 - TOUTES les intentions présentes.
 - Le sujet principal (Subject).
 - L'expéditeur (Sender) si identifiable.
 
-LISTE DES INTENTIONS POSSIBLES :
+LISTE DES INTENTIONS POSSIBLES (NOM + DESCRIPTION) :
 {categories_text}
 
 RÈGLES DE CLASSIFICATION :
+- Choisis les intentions dont la DESCRIPTION correspond le mieux au contenu. Appuie-toi sur les mots/phrases clés des descriptions.
 - Un email peut contenir UNE SEULE intention OU PLUSIEURS intentions.
-- Si aucune intention ne correspond, retourne une liste vide (detected_intents: []).
+- Si aucune intention ne correspond vraiment, retourne une liste vide (detected_intents: []). NE PAS deviner.
 - Assigne un score de confiance (0.0 à 1.0) pour CHAQUE intention détectée.
+- La justification DOIT citer un extrait du texte et/ou la description de la catégorie correspondante.
 
 FORMAT DE RÉPONSE ATTENDU (JSON UNIQUEMENT) :
 {{
@@ -331,7 +333,7 @@ FORMAT DE RÉPONSE ATTENDU (JSON UNIQUEMENT) :
         {{
             "intent": "Nom de l'intention",
             "confidence": 0.95,
-            "justification": "Court extrait du texte justifiant ce choix"
+            "justification": "Court extrait du texte ou référence à la description justifiant ce choix"
         }}
     ],
     "global_complexity": "Simple|Complexe",

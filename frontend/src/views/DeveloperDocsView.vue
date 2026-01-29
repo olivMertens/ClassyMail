@@ -217,36 +217,26 @@ const switchTab = (tab) => {
 
 // Architecture Diagram Definition
 const diagram = `
-graph TD
-    classDef azure fill:#0072C6,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef app fill:#50e6ff,stroke:#333,stroke-width:2px,color:#000;
-    classDef db fill:#59b4d9,stroke:#333,stroke-width:2px,color:#000;
-    classDef ai fill:#ff9900,stroke:#333,stroke-width:2px,color:#000;
-
+flowchart TD
     Client([Client Browser]) -->|HTTPS| FE[Vue Frontend]
-    FE -->|API Calls| API[FastAPI Backend]
+    FE -->|API| API[FastAPI]
 
-    subgraph Azure Container Apps
+    subgraph ACA[Azure Container Apps]
         API
-        Worker[Background Worker]
+        Worker[Worker]
     end
 
-    API -->|Save Upload| Blob[Azure Blob Storage]
-    API -->|Metadata| Cosmos[Cosmos DB]
-    API -->|Queue Job| SB[Service Bus]
+    API -->|Blob| Blob[Blob Storage]
+    API -->|Meta| Cosmos[Cosmos DB]
+    API -->|Queue| SB[Service Bus]
 
-    SB -->|Trigger| Worker
-    Worker -->|Read File| Blob
-    Worker -->|OCR| Mistral["Mistral Document AI 25.05<br/>(mistral-document-ai-2505)"]
-    Worker -->|Classify| OPENAI[Azure OpenAI Phi-4]
+    SB --> Worker
+    Worker -->|OCR| Mistral[Mistral Document AI]
+    Worker -->|Classify| OPENAI[Phi-4]
 
-    Mistral -->|Markdown| Worker
-    OPENAI -->|JSON Intent| Worker
-    Worker -->|Update| Cosmos
-
-    class Blob,Cosmos,SB azure;
-    class FE,API,Worker app;
-    class Mistral,OPENAI ai;
+    Mistral --> Worker
+    OPENAI --> Worker
+    Worker --> Cosmos
 `
 </script>
 
