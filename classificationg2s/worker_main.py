@@ -53,10 +53,11 @@ async def main():
     await clients.init()
     set_default_clients(clients)
     try:
+        from classificationg2s.services.settings_store import load_settings_async
         await worker_loop_forever(
             clients=clients,
             queue_name=config.SERVICE_BUS_QUEUE,
-            get_settings=lambda: {},
+            get_settings=lambda: load_settings_async(clients),
         )
     finally:
         await clients.close()

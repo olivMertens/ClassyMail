@@ -19,6 +19,7 @@ DEFAULT_SETTINGS = {
     "finetune_min_examples": 50,
     "ocr_max_attempts": 3,
 }
+PROCESSING_STRATEGY_ENV = "PROCESSING_STRATEGY"
 
 def _sanitize_ocr_attempts(val) -> int:
     try:
@@ -31,9 +32,16 @@ def _sanitize_ocr_attempts(val) -> int:
         v = 10
     return v
 
+def _apply_env_overrides(settings: dict) -> dict:
+    import os
+    env_strategy = os.getenv(PROCESSING_STRATEGY_ENV)
+    if env_strategy in ("standard", "reasoning", "vision"):
+        settings["processing_strategy"] = env_strategy
+    return settings
+
 def load_settings() -> dict:
     if not DATA_FILE.exists():
-        return DEFAULT_SETTINGS.copy()
+        return _apply_env_overrides(DEFAULT_SETTINGS.copy())
     try:
         data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
         # Merge with defaults to ensure keys exist
@@ -49,9 +57,21 @@ def load_settings() -> dict:
             data["ocr_max_attempts"] = 3
         else:
             data["ocr_max_attempts"] = _sanitize_ocr_attempts(data["ocr_max_attempts"])
-        return data
+        return _apply_env_overrides(data)
     except Exception:
-        return DEFAULT_SETTINGS.copy()
+        return _apply_env_overrides(DEFAULT_SETTINGS.copy())
+
+async def load_settings_async(clients=None) -> dict:
+    try:
+        if clients and getattr(clients, "cosmos_container", None):
+            item = await clients.cosmos_container.read_item(item="settings", partition_key="settings")
+            if item:
+                s = item.copy()
+                s.pop("id", None)
+                return _apply_env_overrides(s)
+    except Exception:
+        pass
+    return load_settings()
 
 def save_settings(settings: dict):
     DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -85,6 +105,15 @@ def save_settings(settings: dict):
         settings["ocr_max_attempts"] = _sanitize_ocr_attempts(settings["ocr_max_attempts"])
 
     DATA_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+
+async def save_settings_async(settings: dict, clients=None):
+    save_settings(settings)
+    try:
+        if clients and getattr(clients, "cosmos_container", None):
+            doc = {"id": "settings", **settings}
+            await clients.cosmos_container.upsert_item(doc)
+    except Exception:
+        pass
 
 def get_categories_prompt_text() -> str:
     settings = load_settings()

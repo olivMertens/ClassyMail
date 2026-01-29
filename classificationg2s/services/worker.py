@@ -5,6 +5,7 @@ import json
 import time
 import logging
 from datetime import datetime, timezone
+import inspect
 
 from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ResourceNotFoundError
 from azure.servicebus.aio import AutoLockRenewer
@@ -77,11 +78,16 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
     logger.info("[msg:%s] → Processing blob: %s", message_id, blob_url)
 
     try:
+        settings = get_settings()
+        if inspect.iscoroutine(settings):
+            settings = await settings
         with ProcessingTimer() as timer:
             logger.info("[msg:%s] Starting classification pipeline", message_id)
-            result = await run_classification_pipeline(blob_url, settings=get_settings(), clients=clients)
+            result = await run_classification_pipeline(blob_url, settings=settings, clients=clients)
             logger.info("[msg:%s] Pipeline completed in %.0fms", message_id, timer.duration_ms)
 
+        arrival_time = getattr(msg, "enqueued_time_utc", datetime.now(timezone.utc))
+        result.created_at = arrival_time
         result.processing_time_ms = timer.duration_ms
         logger.info("[msg:%s] Saving result to Cosmos DB (ID: %s)", message_id, result.id)
         await save_to_cosmos(result)
@@ -100,12 +106,14 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
         if processing_log:
             logger.error("[msg:%s] OCR processing_log: %s", message_id, processing_log)
 
+        arrival_time = getattr(msg, "enqueued_time_utc", datetime.now(timezone.utc))
         record = EmailRecord(
             id=blob_id_from_url(blob_url),
             file_url=blob_url,
             status="ERROR",
             error=error_text,
             error_stage=error_stage,
+            created_at=arrival_time,
             updated_at=datetime.now(timezone.utc),
             processing_log=processing_log,
         )
@@ -123,6 +131,7 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
         logger.exception("[msg:%s] Processing failed for %s", message_id, blob_url)
 
         # Persist error state to Cosmos for visibility in Dashboard
+        arrival_time = getattr(msg, "enqueued_time_utc", datetime.now(timezone.utc))
         try:
             record = EmailRecord(
                 id=blob_id_from_url(blob_url),
@@ -130,6 +139,7 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
                 status="ERROR",
                 error=str(ex),
                 error_stage="worker_unhandled",
+                created_at=arrival_time,
                 updated_at=datetime.now(timezone.utc),
                 processing_log=[{"ts": datetime.now(timezone.utc).isoformat(), "stage": "worker", "event": "unhandled_exception", "details": str(ex)}]
             )
