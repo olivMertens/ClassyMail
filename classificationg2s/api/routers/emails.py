@@ -364,28 +364,51 @@ async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
 
 @router.get("/emails/{item_id}/file")
 async def download_email_file(item_id: str, clients: Clients = Depends(get_clients)):
+    """Proxy endpoint to stream PDF files using Managed Identity authentication."""
+    logger.info(f"[PDF Proxy] Request for item_id={item_id}")
     try:
         await clients.ensure_cosmos_container()
+        logger.debug(f"[PDF Proxy] Fetching metadata from Cosmos for item_id={item_id}")
         item = await clients.cosmos_container.read_item(item=item_id, partition_key=item_id)
         blob_url = item.get("file_url")
         if not blob_url:
+            logger.error(f"[PDF Proxy] No file_url found in Cosmos record for item_id={item_id}")
             raise HTTPException(status_code=404, detail="No file_url on record")
+
+        logger.info(f"[PDF Proxy] Streaming blob via Managed Identity: {blob_url}")
         blob_client = BlobClient.from_blob_url(blob_url, credential=clients.credential)
-        downloader = await blob_client.download_blob()
+
+        try:
+            downloader = await blob_client.download_blob()
+        except Exception as blob_err:
+            logger.error(f"[PDF Proxy] Failed to access blob at {blob_url}: {blob_err}", exc_info=True)
+            raise HTTPException(status_code=404, detail=f"Blob not accessible: {str(blob_err)}")
+
         content_type = getattr(getattr(downloader, 'properties', None), 'content_settings', None)
         if content_type:
             content_type = content_type.content_type
         else:
             content_type = "application/pdf"
+
+        logger.debug(f"[PDF Proxy] Content-Type={content_type}")
+
         async def iter_chunks():
-            async for chunk in downloader.chunks():
-                yield chunk
+            chunk_count = 0
+            try:
+                async for chunk in downloader.chunks():
+                    chunk_count += 1
+                    yield chunk
+                logger.info(f"[PDF Proxy] Successfully streamed {chunk_count} chunks for item_id={item_id}")
+            except Exception as stream_err:
+                logger.error(f"[PDF Proxy] Stream interrupted at chunk {chunk_count} for item_id={item_id}: {stream_err}")
+                raise
+
         disposition = f"inline; filename={blob_url.split('/')[-1].split('?')[0]}"
         return StreamingResponse(iter_chunks(), media_type=content_type, headers={"Content-Disposition": disposition})
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Failed to stream blob")
+        logger.exception(f"[PDF Proxy] Unexpected error for item_id={item_id}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
