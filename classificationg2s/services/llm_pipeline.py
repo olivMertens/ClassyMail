@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import asyncio
 
 import httpx
 from opentelemetry import trace
@@ -130,9 +131,18 @@ async def ocr_with_mistral(
     settings = load_settings()
     attempts = max(1, min(10, int(settings.get("ocr_max_attempts", getattr(config, "MISTRAL_OCR_MAX_ATTEMPTS", 3)))))
 
-    # Mistral Document AI API format (Microsoft Foundry)
-    # Per user feedback, we use image_url with data: URI.
-    # We also attempt to convert PDF to images for better robustness on Azure.
+            # Mistral Document AI API format (Microsoft Foundry)
+    if not config.MISTRAL_ENDPOINT:
+        raise RuntimeError("MISTRAL_ENDPOINT not configured.")
+
+    base_end = config.MISTRAL_ENDPOINT.rstrip("/")
+    if base_end.endswith("/providers/mistral/azure/ocr"):
+        url = base_end
+    else:
+        url = f"{base_end}/providers/mistral/azure/ocr"
+
+    # Prepare payloads (per page if image conversion works, else single PDF)
+    payloads = []
     try:
         import fitz
         from PIL import Image
@@ -142,11 +152,6 @@ async def ocr_with_mistral(
         pdf_data = base64.b64decode(base64_pdf)
         doc = fitz.open(stream=pdf_data, filetype="pdf")
 
-        # If it's a multi-page PDF, we send it as a list of images if possible,
-        # or combine them depending on the API's capabilities.
-        # For now, let's start with the first page to confirm the path,
-        # but the goal is to support multipage.
-        images_data_uris = []
         for page_idx in range(len(doc)):
             page = doc.load_page(page_idx)
             pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
@@ -154,23 +159,22 @@ async def ocr_with_mistral(
             buf = io.BytesIO()
             img.save(buf, format="JPEG", quality=85)
             img_b64 = base64.b64encode(buf.getvalue()).decode()
-            images_data_uris.append(f"data:image/jpeg;base64,{img_b64}")
+
+            p = {
+                "model": config.MISTRAL_DEPLOYMENT,
+                "document": {
+                    "type": "image_url",
+                    "image_url": f"data:image/jpeg;base64,{img_b64}"
+                },
+                "include_image_base64": include_images
+            }
+            if enable_vision_enrichment:
+                p["bbox_annotation_format"] = pydantic_to_mistral_schema(ImageDescription)
+            payloads.append(p)
         doc.close()
-
-        # Mistral OCR supports multiple images in a list
-        image_payload = images_data_uris[0] if len(images_data_uris) == 1 else images_data_uris
-
-        payload = {
-            "model": config.MISTRAL_DEPLOYMENT,
-            "document": {
-                "type": "image_url",
-                "image_url": image_payload
-            },
-            "include_image_base64": include_images
-        }
     except Exception as e:
         logger.warning(f"Failed to convert PDF to images, falling back to raw PDF base64: {e}")
-        payload = {
+        p = {
             "model": config.MISTRAL_DEPLOYMENT,
             "document": {
                 "type": "image_url",
@@ -178,85 +182,73 @@ async def ocr_with_mistral(
             },
             "include_image_base64": include_images
         }
+        if enable_vision_enrichment:
+            p["bbox_annotation_format"] = pydantic_to_mistral_schema(ImageDescription)
+        payloads.append(p)
 
-    if enable_vision_enrichment:
-        # Use bbox_annotation to describe images found by OCR
-        payload["bbox_annotation_format"] = pydantic_to_mistral_schema(ImageDescription)
-        # We also need image base64 for the vision model to work on them internally,
-        # though usually the API handles this trigger automatically if annotation is requested.
-        # But let's ensure we get base64 back if we want to debug, or rely on API defaults.
-        # The docs say: "After regular OCR is finished; we call a Vision capable LLM for all bboxes individually"
-        pass
-
-    if not config.MISTRAL_ENDPOINT:
-        raise RuntimeError("MISTRAL_ENDPOINT not configured.")
-
-    base_end = config.MISTRAL_ENDPOINT.rstrip('/')
-    # Strict fallback: if the endpoint doesn't already end with the MaaS OCR path, append it.
-    # We only support /providers/mistral/azure/ocr for MaaS.
-    if base_end.endswith("/providers/mistral/azure/ocr"):
-        url = base_end
-    else:
-        url = f"{base_end}/providers/mistral/azure/ocr"
-
-
-    processing_log: list[dict] = []
     ocr_pages: list = []
     usage_info: dict = {}
 
-    with tracer.start_as_current_span("mistral_document_ai") as span:
-        span.set_attribute("gen_ai.system", "mistral")
-        span.set_attribute("gen_ai.operation", "document.ocr")
-        span.set_attribute("gen_ai.request.model", config.MISTRAL_DEPLOYMENT)
+    # Process pages concurrently
+    async def process_payload(payload):
+        processing_log: list[dict] = []
+        local_ocr_pages = []
+        local_usage = {}
 
-        async for attempt in AsyncRetrying(
-            stop=stop_after_attempt(attempts),
-            wait=wait_exponential(multiplier=1, min=1, max=10),
-            retry=retry_if_exception(retryable_httpx),
-            reraise=True,
-        ):
-            with attempt:
-                attempt_no = attempt.retry_state.attempt_number
-                logger.info(f"[metrics] OCR Request attempt {attempt_no}/{attempts}: {url} model={config.MISTRAL_DEPLOYMENT}")
-                span.set_attribute("gen_ai.retry.attempt", attempt_no)
+        with tracer.start_as_current_span("mistral_document_ai_page") as span:
+            span.set_attribute("gen_ai.system", "mistral")
+            span.set_attribute("gen_ai.operation", "document.ocr")
 
-                async with httpx.AsyncClient(timeout=90) as client:
-                    resp = await client.post(url, json=payload, headers=headers)
-                    try:
-                        resp.raise_for_status()
-                    except httpx.HTTPStatusError as ex:
-                        logger.error(f"[metrics] OCR Failed: {ex.response.status_code} - {ex.response.text[:500]}")
-                        span.set_status(Status(StatusCode.ERROR))
-                        span.record_exception(ex)
-                        raise
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(attempts),
+                wait=wait_exponential(multiplier=1, min=1, max=10),
+                retry=retry_if_exception(retryable_httpx),
+                reraise=True,
+            ):
+                with attempt:
+                    attempt_no = attempt.retry_state.attempt_number
+                    logger.info(f"[metrics] OCR Request attempt {attempt_no}/{attempts}: {url}")
 
-                    try:
-                        data = resp.json()
-                        # Mistral Document AI returns: {"pages": [{"markdown": "...", "images": [...]}]}
-                        ocr_pages = data.get("pages", [])
-                        usage_info = data.get("usage", {})
-                    except json.JSONDecodeError as ex:
-                        response_text = resp.text[:1000]
-                        headers_snippet = {k: v for k, v in resp.headers.items() if k.lower() in ("content-type", "x-ms-error-code", "date")}
-                        log_entry = {
-                            "status_code": resp.status_code,
-                            "headers": headers_snippet,
-                            "text_snippet": response_text,
-                            "attempt": attempt_no,
-                        }
-                        processing_log.append(log_entry)
-                        logger.error(f"[metrics] OCR JSON Parse Error: {ex} | status={resp.status_code} headers={headers_snippet} | Response: {response_text}")
-                        span.set_status(Status(StatusCode.ERROR))
-                        span.record_exception(ex)
-                        raise OCRFailed(f"stage=ocr: Invalid JSON response from Mistral: {ex}", processing_log=processing_log, retryable=True)
+                    async with httpx.AsyncClient(timeout=90) as client:
+                        resp = await client.post(url, json=payload, headers=headers)
+                        try:
+                            resp.raise_for_status()
+                        except httpx.HTTPStatusError as ex:
+                            logger.error(f"[metrics] OCR Failed: {ex.response.status_code} - {ex.response.text[:500]}")
+                            span.record_exception(ex)
+                            raise
 
-                if not ocr_pages:
-                    logger.error(f"[metrics] OCR Failed: No pages in Mistral Document AI response. Raw response preview: {str(data)[:500]}")
-                    raise OCRFailed("No pages in Mistral Document AI response")
+                        try:
+                            data = resp.json()
+                            local_ocr_pages = data.get("pages", [])
+                            local_usage = data.get("usage", {})
+                        except json.JSONDecodeError as ex:
+                            response_text = resp.text[:1000]
+                            log_entry = {
+                                "status_code": resp.status_code,
+                                "text_snippet": response_text,
+                                "attempt": attempt_no,
+                            }
+                            processing_log.append(log_entry)
+                            logger.error(f"[metrics] OCR JSON Parse Error: {ex}")
+                            raise OCRFailed(f"stage=ocr: Invalid JSON response: {ex}", processing_log=processing_log, retryable=True)
 
-                # Success - the loop will exit because no exception was raised in the 'with attempt' block
+                    if not local_ocr_pages:
+                        raise OCRFailed("No pages in Mistral Document AI response")
+            return local_ocr_pages, local_usage
 
-        content, annotated_images = _combine_ocr_pages(ocr_pages, enable_vision_enrichment=enable_vision_enrichment, data=data)
+    # Run tasks
+    with tracer.start_as_current_span("mistral_document_process_all") as span:
+        tasks = [process_payload(p) for p in payloads]
+        results = await asyncio.gather(*tasks, return_exceptions=False)
+
+        for pages, usage in results:
+            ocr_pages.extend(pages)
+            # Accumulate usage roughly
+            for k, v in usage.items():
+                usage_info[k] = usage_info.get(k, 0) + v
+
+        content, annotated_images = _combine_ocr_pages(ocr_pages, enable_vision_enrichment=enable_vision_enrichment, data=None)
 
         pages_count = len(ocr_pages)
 
@@ -266,7 +258,7 @@ async def ocr_with_mistral(
         span.set_attribute("gen_ai.usage.input_tokens", usage_info.get("prompt_tokens", 0))
         span.set_attribute("gen_ai.usage.output_tokens", usage_info.get("completion_tokens", 0))
 
-        return {"markdown": content, "usage": usage_info, "images": annotated_images}
+    return {"markdown": content, "usage": usage_info, "images": annotated_images}
 
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10), retry=retry_if_exception(retryable_httpx))
