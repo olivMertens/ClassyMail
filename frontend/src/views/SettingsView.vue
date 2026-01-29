@@ -613,6 +613,33 @@ onMounted(() => {
             Number of attempts for OCR (network/transient errors will be retried with exponential backoff).
           </p>
         </div>
+
+        <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6 flex items-center gap-4">
+          <button
+            type="button"
+            :disabled="loading"
+            class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50"
+            @click="saveSettings"
+          >
+            {{ loading ? t('settings.saving') : t('settings.save') }}
+          </button>
+          <transition
+            enter-active-class="transition ease-out duration-200"
+            enter-from-class="opacity-0 translate-y-1"
+            enter-to-class="opacity-100 translate-y-0"
+            leave-active-class="transition ease-in duration-150"
+            leave-from-class="opacity-100 translate-y-0"
+            leave-to-class="opacity-0 translate-y-1"
+          >
+            <div
+              v-if="saved"
+              class="flex items-center text-green-600 dark:text-green-400 text-sm font-medium"
+            >
+              <CheckCircleIcon class="h-5 w-5 mr-1" />
+              {{ t('settings.saved') }}
+            </div>
+          </transition>
+        </div>
       </div>
     </div>
 
@@ -1265,7 +1292,7 @@ onMounted(() => {
                 </p>
                 <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
                   <span class="text-green-600 dark:text-green-400 font-bold">How it works:</span> Uses Mistral BBox Annotation capability per page image.<br>
-                  <span class="text-green-600 dark:text-green-400 font-bold">Annotation:</span> Extracts structured descriptions (summary, details) for each visual element detected on page images (charts, photos, signatures).<br>
+                  <span class="text-green-600 dark:text-green-400 font-bold">Annotation:</span> Extracts structured descriptions for visual elements. <em>Note: Annotations are currently experimental. If not supported by the model/region (422 error), the system automatically falls back to Standard strategy.</em><br>
                   <span class="text-green-600 dark:text-green-400 font-bold">Enrichment:</span> These descriptions are injected into the Markdown before classification, allowing the AI to "see" the page visuals.
                 </div>
               </div>

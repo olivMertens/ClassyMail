@@ -227,47 +227,77 @@ async def ocr_with_mistral(
         local_ocr_pages = []
         local_usage = {}
 
-        with tracer.start_as_current_span("mistral_document_ai_page") as span:
-            span.set_attribute("gen_ai.system", "mistral")
-            span.set_attribute("gen_ai.operation", "document.ocr")
+        # Clone payload to allow modification (fallback)
+        current_payload = payload.copy()
+        fallback_attempted = False
 
-            async for attempt in AsyncRetrying(
-                stop=stop_after_attempt(attempts),
-                wait=wait_exponential(multiplier=1, min=1, max=10),
-                retry=retry_if_exception(retryable_httpx),
-                reraise=True,
-            ):
-                with attempt:
-                    attempt_no = attempt.retry_state.attempt_number
-                    logger.info(f"[metrics] OCR Request attempt {attempt_no}/{attempts}: {url}")
+        while True:
+            with tracer.start_as_current_span("mistral_document_ai_page") as span:
+                span.set_attribute("gen_ai.system", "mistral")
+                span.set_attribute("gen_ai.operation", "document.ocr")
+                if fallback_attempted:
+                    span.set_attribute("app.vision_fallback", True)
 
-                    async with httpx.AsyncClient(timeout=90) as client:
-                        resp = await client.post(url, json=payload, headers=headers)
-                        try:
-                            resp.raise_for_status()
-                        except httpx.HTTPStatusError as ex:
-                            logger.error(f"[metrics] OCR Failed: {ex.response.status_code} - {ex.response.text[:500]}")
-                            span.record_exception(ex)
-                            raise
+                try:
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(attempts),
+                        wait=wait_exponential(multiplier=1, min=1, max=10),
+                        retry=retry_if_exception(retryable_httpx),
+                        reraise=True,
+                    ):
+                        with attempt:
+                            attempt_no = attempt.retry_state.attempt_number
+                            logger.info(f"[metrics] OCR Request attempt {attempt_no}/{attempts}: {url}")
 
-                        try:
-                            data = resp.json()
-                            local_ocr_pages = data.get("pages", [])
-                            local_usage = data.get("usage", {})
-                        except json.JSONDecodeError as ex:
-                            response_text = resp.text[:1000]
-                            log_entry = {
-                                "status_code": resp.status_code,
-                                "text_snippet": response_text,
-                                "attempt": attempt_no,
-                            }
-                            processing_log.append(log_entry)
-                            logger.error(f"[metrics] OCR JSON Parse Error: {ex}")
-                            raise OCRFailed(f"stage=ocr: Invalid JSON response: {ex}", processing_log=processing_log, retryable=True)
+                            async with httpx.AsyncClient(timeout=90) as client:
+                                resp = await client.post(url, json=current_payload, headers=headers)
+                                try:
+                                    resp.raise_for_status()
+                                except httpx.HTTPStatusError as ex:
+                                    if ex.response.status_code == 422:
+                                        # Special handling for 422 (Unprocessable Entity)
+                                        # This often happens with Vision features on unsupported regions or schema issues
+                                        logger.warning(f"[metrics] OCR 422 Unprocessable Entity: {ex.response.text[:200]}")
+                                        raise OCRFailed(f"OCR 422: {ex.response.text}", retryable=False) # Break retry loop to trigger fallback logic below
 
-                    if not local_ocr_pages:
-                        raise OCRFailed("No pages in Mistral Document AI response")
-            return local_ocr_pages, local_usage
+                                    logger.error(f"[metrics] OCR Failed: {ex.response.status_code} - {ex.response.text[:500]}")
+                                    span.record_exception(ex)
+                                    raise
+
+                                try:
+                                    data = resp.json()
+                                    local_ocr_pages = data.get("pages", [])
+                                    local_usage = data.get("usage", {})
+                                except json.JSONDecodeError as ex:
+                                    response_text = resp.text[:1000]
+                                    log_entry = {
+                                        "status_code": resp.status_code,
+                                        "text_snippet": response_text,
+                                        "attempt": attempt_no,
+                                    }
+                                    processing_log.append(log_entry)
+                                    logger.error(f"[metrics] OCR JSON Parse Error: {ex}")
+                                    raise OCRFailed(f"stage=ocr: Invalid JSON response: {ex}", processing_log=processing_log, retryable=True)
+
+                            if not local_ocr_pages:
+                                raise OCRFailed("No pages in Mistral Document AI response")
+
+                    # Success
+                    return local_ocr_pages, local_usage
+
+                except OCRFailed as e:
+                    # Check if we can fallback for 422
+                    if "OCR 422" in str(e) and not fallback_attempted and "bbox_annotation_format" in current_payload:
+                        logger.warning("[metrics] Vision enrichment failed (422). Retrying without vision params.")
+                        fallback_attempted = True
+                        if "bbox_annotation_format" in current_payload:
+                            del current_payload["bbox_annotation_format"]
+                        # Continue outer while loop to retry with new payload
+                        continue
+                    raise e
+                except Exception as e:
+                    raise e
+            break # Should not be reached if successful return inside loop
 
     # Run tasks
     with tracer.start_as_current_span("mistral_document_process_all") as span:
