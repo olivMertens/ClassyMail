@@ -183,6 +183,14 @@
             "vision_title": "Structured Annotations",
             "vision_desc": "Using a strict JSON Schema, the Vision model categorizes images and decides if they are 'relevant' to the business process, ignoring decorative elements."
         },
-        "flow_title": "Processing Flow"
+        "flow_title": "Processing Flow",
+        "workflow": {
+            "title": "Workflow Choices",
+            "desc": "The application uses a hybrid approach: OCR for text extraction, followed by LLM analysis (Phi-4). This ensures both structured data capability and semantic understanding, while keeping costs low by using smaller specialized models."
+        },
+        "updates": {
+            "title": "Updates & Corrections",
+            "desc": "Users can correct classifications in the Review interface. Corrections are stored and used to calculate the 'Accuracy' metric and improve future models via fine-tuning."
+        }
     }
 }

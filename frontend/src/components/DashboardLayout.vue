@@ -178,7 +178,7 @@ const navigation = computed(() => [
         <!-- User/Footer area -->
         <div
           class="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          @click="showConnectionModal = true; checkConnectivity()"
+          @click="showInfoModal = true"
         >
           <div
             v-if="!sidebarCollapsed"

@@ -177,6 +177,14 @@
             "vision_title": "Scans vs Images Utiles",
             "vision_desc": "Le système distingue intelligemment une 'page scannée' (traitée comme source de texte) des 'images porteuses de sens' (ex: photo d'accident). Les descriptions redondantes de la page elle-même sont supprimées."
         },
-        "flow_title": "Flux de Traitement"
+        "flow_title": "Flux de Traitement",
+        "workflow": {
+            "title": "Choix du Workflow",
+            "desc": "L'application utilise une approche hybride : OCR pour l'extraction de texte, suivi d'une analyse LLM (Phi-4). Cela garantit à la fois une capacité de données structurées et une compréhension sémantique, tout en maintenant les coûts bas."
+        },
+        "updates": {
+            "title": "Mises à jour et Corrections",
+            "desc": "Les utilisateurs peuvent corriger les classifications dans l'interface de Revue. Les corrections sont stockées et utilisées pour calculer la métrique de 'Précision' et améliorer les futurs modèles via le fine-tuning."
+        }
     }
 }
