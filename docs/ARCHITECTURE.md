@@ -84,8 +84,11 @@ L'identité managée assignée aux Container Apps (`api` et `worker`) doit dispo
 | **Service Bus** | `Azure Service Bus Data Receiver` | `4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0` | Permet au `worker` de consommer les messages de la queue. |
 | **Service Bus** | `Azure Service Bus Data Sender` | `69a216fc-b8fb-44d8-bc22-1f3c2cd27a39` | Permet à l'API (et DLQ retry) d'envoyer des messages. |
 | **Cosmos DB (SQL)** | `Cosmos DB Built-in Data Contributor` | `00000000-0000-0000-0000-000000000002` | **Data Plane RBAC**. Lecture/Écriture des documents JSON. *Note: Ce n'est pas un rôle IAM Azure classique, mais un rôle SQL natif Cosmos.* |
-| **AI Foundry** | `Cognitive Services User` | `a97b65f3-2400-443d-9d23-a1288a8760ba` | Invocation des modèles (Phi-4, Mistral) via l'endpoint MaaS. |
+| **AI Foundry Project** | `Cognitive Services User` | `a97b65f3-2400-443d-9d23-a1288a8760ba` | **Modèles Déployés**: <br/>• **Phi-4 v7** (Classification primaire)<br/>• **Mistral Document AI 2505** (OCR + Vision)<br/>• **GPT-5.1 / GPT-5.2-chat** (Conversational AI)<br/>• **GPT-4o-mini** (Fallback)<br/>• **text-embedding-3-small** (Embeddings) |
 | **Container Registry**| `AcrPull` | `7f951dda-4ed3-4680-a7ca-43fe172d538d` | Pull de l'image Docker par l'environnement Container Apps. |
+| **Application Insights** | `Monitoring Metrics Publisher` | `3913510d-42f4-4e42-8a64-420c390055eb` | Télémétrie OpenTelemetry (traces distribuées, métriques). |
+| **Event Grid System Topic** | `EventGrid EventSubscription Contributor` | `428e0ff0-5e57-4d9c-a221-2c70d0e0a443` | Abonnement aux événements Blob Storage → Service Bus. |
+| **Log Analytics Workspace** | `Log Analytics Contributor` | `92aaf0da-9dab-42b6-94a3-d43ce8d16293` | Logs centralisés & requêtes diagnostiques (KQL). |
 
 ### Flux d'Identité
 

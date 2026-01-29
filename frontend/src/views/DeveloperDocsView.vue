@@ -239,10 +239,13 @@ flowchart TB
         SB[📮 Queue: email-processing]
     end
 
-    subgraph AI[🤖 Azure AI Foundry]
-        direction LR
-        Mistral[👁️ Mistral Document AI<br/>OCR + Vision]
-        Phi4[🧠 Phi-4 Mini<br/>Classification]
+    subgraph AI[🤖 Azure AI Foundry Project]
+        direction TB
+        Mistral[👁️ Mistral Document AI 2505<br/>OCR + Vision + Structured Extraction]
+        Phi4[🧠 Phi-4 v7<br/>Intent Classification]
+        GPT5[💬 GPT-5.1 / GPT-5.2-chat<br/>Conversational AI + Enhancement]
+        GPT4o[🔄 GPT-4o-mini<br/>Fallback + Legacy Support]
+        Embed[📊 text-embedding-3-small<br/>Vector Embeddings]
     end
 
     subgraph Security[🔐 Managed Identity + RBAC]
@@ -268,6 +271,11 @@ flowchart TB
     API -->|🔟 Stream PDF| Blob
     API -->|1️⃣1️⃣ Render UI| FE
 
+    %% Optional AI Enhancement
+    API -.->|Chat/Enhancement| GPT5
+    Worker -.->|Fallback| GPT4o
+    API -.->|Vector Search| Embed
+
     %% Security
     MSI -.->|Authenticate| API
     MSI -.->|Authenticate| Worker
@@ -279,7 +287,7 @@ flowchart TB
     classDef securityGreen fill:#10B981,stroke:#059669,color:#fff
 
     class ACA,Storage,Data,Queue azureBlue
-    class AI,Mistral,Phi4 aiPurple
+    class AI,Mistral,Phi4,GPT5,GPT4o,Embed aiPurple
     class Blob,Cosmos,SB storageCyan
     class Security,MSI securityGreen
 `
@@ -830,14 +838,54 @@ flowchart TB
                   </td>
                 </tr>
                 <tr>
-                  <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 dark:text-white sm:pl-6">
-                    AI Foundry
+                  <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 dark:text-white sm:pl-6">
+                    AI Foundry Project
                   </td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-300 font-mono">
+                  <td class="px-3 py-4 text-sm text-gray-500 dark:text-gray-300 font-mono">
                     Cognitive Services User
                   </td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-300">
-                    Invoke Phi-4 & Mistral Models
+                  <td class="px-3 py-4 text-sm text-gray-500 dark:text-gray-300">
+                    <strong>Deployed Models:</strong>
+                    <ul class="list-disc list-inside text-xs mt-1">
+                      <li><strong>Phi-4 v7</strong> - Intent Classification (Primary)</li>
+                      <li><strong>Mistral Document AI 2505</strong> - OCR + Vision + BBox Annotations</li>
+                      <li><strong>GPT-5.1 & GPT-5.2-chat</strong> - Conversational AI & Enhancement</li>
+                      <li><strong>GPT-4o-mini</strong> - Fallback & Legacy Compatibility</li>
+                      <li><strong>text-embedding-3-small</strong> - Vector Embeddings</li>
+                    </ul>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 dark:text-white sm:pl-6">
+                    Application Insights
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-300 font-mono">
+                    Monitoring Metrics Publisher
+                  </td>
+                  <td class="px-3 py-4 text-sm text-gray-500 dark:text-gray-300">
+                    Telemetry & distributed tracing (OpenTelemetry SDK)
+                  </td>
+                </tr>
+                <tr>
+                  <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 dark:text-white sm:pl-6">
+                    Event Grid System Topic
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-300 font-mono">
+                    EventGrid EventSubscription Contributor
+                  </td>
+                  <td class="px-3 py-4 text-sm text-gray-500 dark:text-gray-300">
+                    Subscribe to Blob Storage events (BlobCreated → Service Bus)
+                  </td>
+                </tr>
+                <tr>
+                  <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 dark:text-white sm:pl-6">
+                    Log Analytics Workspace
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-300 font-mono">
+                    Log Analytics Contributor
+                  </td>
+                  <td class="px-3 py-4 text-sm text-gray-500 dark:text-gray-300">
+                    Centralized logging & diagnostic queries (Kusto KQL)
                   </td>
                 </tr>
               </tbody>
