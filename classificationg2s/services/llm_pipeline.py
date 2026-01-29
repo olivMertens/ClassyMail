@@ -86,16 +86,31 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
             markdown_parts.append(page_md)
 
         if page_images and enable_vision_enrichment:
+            # Inject images as markdown [image](description) for better context integration
             image_notes = []
             for img in page_images:
-                summary = img.get("summary")
-                details = img.get("details")
-                img_type = img.get("image_type") or img.get("type")
+                summary = img.get("summary") or ""
+                details = img.get("details") or ""
+                img_type = img.get("image_type") or img.get("type") or "image"
+
+                # Generate rich description
+                description = f"{img_type}"
+                if summary:
+                    description += f": {summary}"
+                if details:
+                    description += f" ({details})"
+
+                # Add markdown image reference with description
+                image_md = f"![{description}](page_{page_idx}_img_{img.get('id', len(image_notes))})"
+                image_notes.append(image_md)
+
+                # Also add contextual note for clarity
                 if summary or details:
-                    note = f"> [Visual Content ({img_type or 'image'})]: {summary} | Details: {details}"
+                    note = f"> **Visual Element**: {summary or img_type}" + (f" - {details}" if details else "")
                     image_notes.append(note)
+
             if image_notes:
-                markdown_parts.append("\n\n--- Visual Context ---\n" + "\n".join(image_notes) + "\n----------------------\n")
+                markdown_parts.append("\n\n" + "\n\n".join(image_notes) + "\n")
 
         for img in page_images:
             annotated_images.append({
@@ -367,9 +382,12 @@ FORMAT DE RÉPONSE ATTENDU (JSON UNIQUEMENT) :
         }}
     ],
     "global_complexity": "Simple|Complexe",
+    "classification_reason": "Explication courte si detected_intents est vide (ex: 'Aucune intention ne correspond car le contenu est hors périmètre assurance')",
     "subject": "Sujet ou Objet de l'email extrait du texte",
     "sender": "Nom ou Email de l'expéditeur extrait"
 }}
+
+IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason avec une explication claire.
 """
 
     system_tokens = estimate_tokens_rough(system_prompt)

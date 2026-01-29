@@ -684,9 +684,10 @@ const emit = defineEmits(['open-email'])
           </div>
           <div
             v-else
-            class="text-[10px] text-gray-400 italic"
+            class="text-[10px] text-gray-400 italic max-w-[150px] truncate"
+            :title="email.classification?.classification_reason || 'No category detected'"
           >
-            No category
+            {{ email.classification?.classification_reason || 'No category' }}
           </div>
           <div
             v-if="formatDuration(email)"

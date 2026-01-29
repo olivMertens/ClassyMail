@@ -17,6 +17,7 @@ class ClassificationResult(BaseModel):
     detected_intents: List[ClassificationIntent]
     global_complexity: Optional[str] = None
     needs_review: bool = False
+    classification_reason: Optional[str] = None  # Explanation when no category found
     raw_response: Optional[dict] = None
 
 

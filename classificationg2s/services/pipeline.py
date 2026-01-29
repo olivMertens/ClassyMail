@@ -148,6 +148,7 @@ async def run_classification_pipeline(
                 "global_complexity": response_data.get("global_complexity")
                 if processed.get("raw_response")
                 else None,
+                "classification_reason": response_data.get("classification_reason"),
                 "needs_review": processed.get("needs_review", False),
                 "raw_response": processed.get("raw_response"),
             }
