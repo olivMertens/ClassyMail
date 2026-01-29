@@ -416,7 +416,6 @@ Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#3-sécurité--accés-rbac) pour
 | `AZURE_SERVICE_BUS_QUEUE` | Nom de la queue (défaut: `pdf-processing-queue`) |
 | `AZURE_STORAGE_ACCOUNT_URL` | URL compte storage (ex: `https://acct.blob.core.windows.net`) |
 | `AZURE_STORAGE_CONTAINER` | Container des PDFs (défaut: `pdf-inputs`) |
-| `AZURE_STORAGE_ACCOUNT_KEY` | (Optionnel) clé pour générer des SAS |
 | `AZURE_COSMOS_ENDPOINT` | Endpoint Cosmos DB |
 | `AZURE_COSMOS_KEY` | (Optionnel si MSI) clé Cosmos |
 | `AZURE_COSMOS_DB` | DB Cosmos (défaut: `emailsdb`) |

@@ -595,17 +595,13 @@ async def blob_info(blob_url: str, clients: Clients = Depends(get_clients)):
     container = parsed.path.lstrip('/').split('/')[0] if parsed.path else ''
     blob_name = '/'.join(parsed.path.lstrip('/').split('/')[1:]) if parsed.path else ''
     exists = False
-    sas_url = None
     try:
         blob_client = BlobClient.from_blob_url(blob_url, credential=clients.credential)
         exists = await blob_client.exists()
     except Exception as e:
         return {"error": str(e), "container": container, "blob": blob_name, "exists": exists}
-    try:
-        sas_url = await clients.build_sas_url(blob_url) if hasattr(clients, 'build_sas_url') else None
-    except Exception:
-        sas_url = None
-    return {"container": container, "blob": blob_name, "exists": exists, "sas_url": sas_url}
+
+    return {"container": container, "blob": blob_name, "exists": exists, "sas_url": None}
 
 
 @router.get("/test-mistral-ocr")

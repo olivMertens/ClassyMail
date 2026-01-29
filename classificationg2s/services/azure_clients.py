@@ -3,15 +3,12 @@ from __future__ import annotations
 import asyncio
 import os
 import logging
-from datetime import datetime, timedelta
-from typing import Optional
 from urllib.parse import urlparse
 
 from azure.core.exceptions import AzureError
 from azure.identity.aio import DefaultAzureCredential
 from azure.servicebus.aio import ServiceBusClient
 from azure.storage.blob.aio import BlobClient, BlobServiceClient
-from azure.storage.blob import generate_blob_sas, BlobSasPermissions
 from azure.cosmos.aio import CosmosClient
 from azure.cosmos import PartitionKey
 
@@ -213,56 +210,6 @@ async def download_blob_as_base64(blob_url: str, return_bytes: bool = False, cli
 
     b64 = base64.b64encode(data).decode()
     return (b64, data) if return_bytes else b64
-
-
-async def build_sas_url(blob_url: str, expiry_minutes: int = 60, clients: Clients | None = None) -> Optional[str]:
-    account_key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
-    clients = clients or get_default_clients()
-
-    try:
-        parsed = urlparse(blob_url)
-        account = parsed.netloc.split(".")[0]
-        container, *rest = parsed.path.lstrip("/").split("/")
-        blob_name = "/".join(rest)
-
-        expiry = datetime.utcnow() + timedelta(minutes=expiry_minutes)
-
-        if account_key:
-            # Shared Key SAS (Legacy/Local)
-            sas = generate_blob_sas(
-                account_name=account,
-                account_key=account_key,
-                container_name=container,
-                blob_name=blob_name,
-                permission=BlobSasPermissions(read=True),
-                expiry=expiry,
-            )
-        elif clients.blob_service_client:
-            # User Delegation SAS (Managed Identity / Entra ID)
-            # Must acquire a delegation key first.
-            now = datetime.utcnow()
-            # Key validity: slightly overlapping the SAS validity to avoid race conditions.
-            user_delegation_key = await clients.blob_service_client.get_user_delegation_key(
-                key_start_time=now - timedelta(minutes=5),
-                key_expiry_time=expiry + timedelta(minutes=5)
-            )
-
-            sas = generate_blob_sas(
-                account_name=account,
-                container_name=container,
-                blob_name=blob_name,
-                user_delegation_key=user_delegation_key,
-                permission=BlobSasPermissions(read=True),
-                expiry=expiry,
-            )
-        else:
-            logger.warning(f"build_sas_url: no account_key and no blob_service_client; cannot sign SAS for container={container} blob={blob_name}")
-            return blob_url
-
-        return f"https://{account}.blob.core.windows.net/{container}/{blob_name}?{sas}"
-    except Exception as e:
-        logger.warning(f"build_sas_url failed: container={locals().get('container','?')} blob={locals().get('blob_name','?')} error={e}")
-        return None
 
 
 async def readiness_checks(

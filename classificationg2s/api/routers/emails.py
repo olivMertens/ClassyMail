@@ -15,7 +15,6 @@ from azure.storage.blob.aio import BlobClient
 from classificationg2s.core import config
 from classificationg2s.models import EmailListResponse, EmailRecord
 from classificationg2s.services.azure_clients import (
-    build_sas_url,
     get_cosmos_container,
     get_sb_client,
     get_clients,
@@ -207,9 +206,7 @@ async def get_email(item_id: str, cosmos_container=Depends(get_cosmos_container)
 
     try:
         item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
-        sas_url = await build_sas_url(item.get("file_url"), clients=clients)
-        if sas_url:
-            item["file_url_sas"] = sas_url
+        # item["file_url_sas"] = removed (use proxy)
         item["file_url_proxy"] = f"/api/emails/{item_id}/file"
         return EmailRecord(**item)
     except Exception:
