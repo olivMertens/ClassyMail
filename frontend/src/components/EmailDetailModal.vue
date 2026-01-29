@@ -190,7 +190,7 @@ const parseArrivalDate = (fileUrl) => {
         const m = fileUrl.match(/uploads\/(\d{4})\/(\d{2})\/(\d{2})\//)
         if (m) {
             const [, y, mo, d] = m
-            return new Date(`${y}-${mo}-${d}T00:00:00Z`).toISOString()
+            return new Date(`${y}-${mo}-${d}T00:00:00Z`)
         }
     } catch (e) { /* ignore */ }
     return null
@@ -278,6 +278,12 @@ const renderMarkdown = (text) => md.render(text || '')
                   Open PDF
                 </a>
               </div>
+              <div
+                v-if="pdfUrl && !email?.file_url_sas"
+                class="px-3 py-2 text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-200 border-t border-amber-200 dark:border-amber-800"
+              >
+                Private container: a direct blob URL without SAS returns <code>ResourceNotFound</code>. Use the SAS link when available.
+              </div>
             </div>
 
             <!-- Right: Data -->
@@ -322,7 +328,7 @@ const renderMarkdown = (text) => md.render(text || '')
                   <div class="grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400">
                     <div><span class="font-semibold">Subject:</span> {{ email.subject || '—' }}</div>
                     <div><span class="font-semibold">Sender:</span> {{ email.sender || '—' }}</div>
-                    <div><span class="font-semibold">Arrived:</span> {{ parseArrivalDate(email.file_url || email.file_url_sas) ? new Date(parseArrivalDate(email.file_url || email.file_url_sas)).toLocaleString() : (email.created_at ? new Date(email.created_at).toLocaleString() : '—') }}</div>
+                    <div><span class="font-semibold">Arrived:</span> {{ email.created_at ? new Date(email.created_at).toLocaleString() : (parseArrivalDate(email.file_url || email.file_url_sas) ? parseArrivalDate(email.file_url || email.file_url_sas).toLocaleString() : '—') }}</div>
                     <div><span class="font-semibold">Processed:</span> {{ email.updated_at ? new Date(email.updated_at).toLocaleString() : '—' }}</div>
                   </div>
 
@@ -373,7 +379,7 @@ const renderMarkdown = (text) => md.render(text || '')
                     <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                       🧾 OCR Text / Texte OCR
                     </h4>
-                    <div class="prose dark:prose-invert max-w-none text-sm max-h-60 overflow-y-auto border border-gray-100 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900">
+                    <div class="prose dark:prose-invert max-w-none text-sm max-h-60 overflow-y-auto border border-gray-100 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
                       <!-- eslint-disable-next-line vue/no-v-html -->
                       <div v-html="renderMarkdown(email.markdown)" />
                     </div>

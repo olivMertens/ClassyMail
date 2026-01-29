@@ -27,7 +27,7 @@ flowchart TD
         SB[(Service Bus Queue)]
     end
     subgraph Compute[Azure Container Apps]
-        API[API + UI (FastAPI)]
+        API[API + UI + Chatbot (FastAPI)]
         W[Worker (python -m classificationg2s.worker_main)]
     end
     subgraph AI[AI Foundry - MaaS]
@@ -35,7 +35,7 @@ flowchart TD
         Phi4[Phi-4]
     end
     subgraph Data[Cosmos DB]
-        Cosmos[(Classifications)]
+        Cosmos[(Classifications + Vectors)]
     end
 
     PDF -->|Upload UI| API
@@ -56,6 +56,11 @@ flowchart TD
     W -->|Update: PROCESSED| Cosmos
     API -->|Read: polling| Cosmos
     API -->|UI| UI[Dashboard]
+
+    %% Chatbot
+    UI -->|Chat| API
+    API -->|Vector Search| Cosmos
+    API -->|LLM (chat completion)| Phi4
 
     classDef compute fill:#2563eb,stroke:#1d4ed8,color:#fff
     classDef ai fill:#16a34a,stroke:#15803d,color:#fff

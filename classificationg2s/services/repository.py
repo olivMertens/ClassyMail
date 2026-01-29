@@ -79,7 +79,7 @@ async def count_reviewed_ready_items(clients: Clients | None = None) -> int:
 async def get_average_confidence(*, clients: Clients | None = None) -> float:
     clients = clients or get_default_clients()
     await clients.ensure_cosmos_container()
-    query = "SELECT VALUE AVG(i.confidence) FROM c JOIN i IN c.classification.detected_intents WHERE c.status='PROCESSED'"
+    query = "SELECT VALUE AVG(i.confidence) FROM c JOIN i IN c.classification.detected_intents WHERE c.status IN ('PROCESSED','REVIEW_REQUIRED')"
     it = clients.cosmos_container.query_items(query)
     async for v in it:
         return float(v or 0.0)

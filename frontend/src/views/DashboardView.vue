@@ -1,4 +1,5 @@
 <script setup>
+/* eslint-disable vue/no-v-html */
 import { ref, onMounted, computed, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import {
@@ -71,40 +72,6 @@ const filters = [
   { id: 'PROCESSED', label: 'Processed', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
   { id: 'ERROR', label: 'Errors', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
 ]
-
-const downloadFile = async (url, filename) => {
-    try {
-        const res = await fetch(url)
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err.detail?.message || err.detail || `Server Error: ${res.status}`)
-        }
-        const blob = await res.blob()
-        const downloadUrl = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = downloadUrl
-
-        // Try to get filename from content-disposition if not provided
-        if (!filename) {
-            const disposition = res.headers.get('Content-Disposition')
-            if (disposition && disposition.indexOf('attachment') !== -1) {
-                const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition)
-                if (matches != null && matches[1]) {
-                    filename = matches[1].replace(/['"]/g, '')
-                }
-            }
-        }
-
-        a.download = filename || 'download'
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        window.URL.revokeObjectURL(downloadUrl)
-    } catch (e) {
-        console.error(e)
-        alert(e.message) // Simple alert for error feedback
-    }
-}
 
 const reprocessEmail = async (email) => {
     if (confirm('Are you sure you want to reprocess this email? It will be re-queued.')) {
@@ -1111,6 +1078,7 @@ const emit = defineEmits(['open-email'])
             class="flex justify-start mt-2"
           >
             <div class="bg-white dark:bg-gray-800 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm max-w-[90%]">
+              <!-- eslint-disable-next-line vue/no-v-html -->
               <div
                 class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed prose prose-sm dark:prose-invert max-w-none"
                 v-html="chatResponseHtml"

@@ -407,10 +407,12 @@ def process_agent_response(agent_response: dict) -> dict:
         data = agent_response if isinstance(agent_response, dict) else json.loads(agent_response)
         intents = data.get("detected_intents", [])
         needs_review = False
+        settings = load_settings()
+        review_threshold = float(settings.get("review_confidence_threshold", getattr(config, "REVIEW_CONFIDENCE_THRESHOLD", 0.85)))
         if not intents:
             needs_review = True
         for item in intents:
-            if item.get("confidence", 0) < 0.9:
+            if item.get("confidence", 0) < review_threshold:
                 needs_review = True
                 break
         if len(intents) > 3:

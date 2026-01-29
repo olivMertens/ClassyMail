@@ -9,9 +9,12 @@ The Dashboard is the central hub for monitoring progress and managing the email 
 ### Status Cards
 
 - **Total Emails**: The count of all emails ingested into the system.
-- **To Review**: The number of emails that require human attention (low confidence or explicit "Review needed" flag).
-- **Processed**: The number of emails successfully classified and finalized.
-- **Avg. Quality**: The average confidence score of all processed emails, providing a global view of model performance.
+- **To Review**: Emails flagged for human attention (no intents, too many intents, or any intent confidence below the review threshold).
+- **Processed**: Emails finalized without requiring human review.
+- **Avg. Quality**: Average confidence across **processed + to review** emails (excludes errors/missing intents).
+
+> **Review Threshold**: `REVIEW_CONFIDENCE_THRESHOLD` (default **0.85**). Any intent **< threshold** ⇒ `REVIEW_REQUIRED`.
+> Configure via env var or settings (`review_confidence_threshold`).
 
 ### Pipeline Progress
 
@@ -36,6 +39,11 @@ A visual progress bar tracking the completion of the classification task.
 ## Email List View
 
 Emails are displayed as cards containing:
+
+> **PDF Access (SAS)**
+> - The UI fetches `/api/emails/{id}` which generates a SAS **on demand** (per request).
+> - **Private containers** return `ResourceNotFound` for direct blob URL without SAS.
+> - Always use the **SAS URL** (`file_url_sas`) for sharing/downloading PDFs.
 
 - **Score Badge**: Color-coded confidence score (Green > 0.85, Amber > 0.5, Red < 0.5).
 - **Icons**: Status indicators (Checkmark for Processed, Clock for Review, Exclamation for Error).

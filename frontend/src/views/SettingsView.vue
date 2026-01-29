@@ -34,13 +34,15 @@ const settings = ref({
     mistral_per_1k_pages: null,
     finetune_min_examples: 50,
     ocr_max_attempts: 3,
+    review_confidence_threshold: 0.85,
     categories: []
 })
 const defaults = ref({
     phi4_input_per_1k: null,
     phi4_output_per_1k: null,
     mistral_per_1k_pages: null,
-    ocr_max_attempts: 3
+    ocr_max_attempts: 3,
+    review_confidence_threshold: 0.85
 })
 const loading = ref(false)
 const saved = ref(false)
@@ -180,6 +182,7 @@ const saveSettings = async () => {
             mistral_per_1k_pages: settings.value.mistral_per_1k_pages ? Number(settings.value.mistral_per_1k_pages) : undefined,
             finetune_min_examples: settings.value.finetune_min_examples ? Number(settings.value.finetune_min_examples) : 50,
             ocr_max_attempts: settings.value.ocr_max_attempts ? Number(settings.value.ocr_max_attempts) : 3,
+            review_confidence_threshold: settings.value.review_confidence_threshold ? Number(settings.value.review_confidence_threshold) : 0.85,
             categories: settings.value.categories
         }
 
@@ -672,6 +675,24 @@ onMounted(() => {
                 class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
               >
             </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Review Confidence Threshold (0-1)</label>
+            <div class="mt-1">
+              <input
+                v-model="settings.review_confidence_threshold"
+                :placeholder="defaults.review_confidence_threshold ?? 0.85"
+                type="number"
+                min="0"
+                max="1"
+                step="0.01"
+                class="block w-full max-w-xs rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+              >
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Emails with any intent confidence below this threshold are flagged <strong>To Review</strong>.
+            </p>
           </div>
 
           <div>
