@@ -104,13 +104,13 @@ def main():
         all_errors.extend(errors)
 
     if all_errors:
-        print("\n🔴 Mermaid Validation Errors:\n")
+        print("\nMermaid Validation Errors:\n")
         for error in all_errors:
             print(f"  {error}")
-        print(f"\n❌ Found {len(all_errors)} error(s)")
+        print(f"\nFound {len(all_errors)} error(s)")
         sys.exit(1)
     else:
-        print("✅ All Mermaid diagrams are valid")
+        print("All Mermaid diagrams are valid")
         sys.exit(0)
 
 

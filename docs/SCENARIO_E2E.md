@@ -50,7 +50,9 @@ flowchart LR
   U -->|1) Upload PDF (API)\nOU upload direct Blob| API
   U -->|1bis) Upload direct| B
   API -->|2) Write blob\nuploads/YYYY/MM/DD/...| B
-  B -->|3) Microsoft.Storage.BlobCreated| T --> S -->|4) Event payload| Q
+  B -->|3) Microsoft.Storage.BlobCreated| T
+  T --> S
+  S -->|4) Event payload| Q
   Q -->|5) Consume message\n(blob_url ou EventGrid data.url)| W
   W -->|6) Download PDF| B
   W -->|7) OCR| OCR

@@ -86,31 +86,26 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
             markdown_parts.append(page_md)
 
         if page_images and enable_vision_enrichment:
-            # Inject images as markdown [image](description) for better context integration
+            # Append rich contextual descriptions for images (Mistral already includes ![...](img-X.jpeg) in markdown)
+            # We enrich with detailed annotations to help Phi-4 understand visual context
             image_notes = []
             for img in page_images:
                 summary = img.get("summary") or ""
                 details = img.get("details") or ""
                 img_type = img.get("image_type") or img.get("type") or "image"
+                img_id = img.get("id") or f"img-{len(image_notes)}"
 
-                # Generate rich description
-                description = f"{img_type}"
-                if summary:
-                    description += f": {summary}"
-                if details:
-                    description += f" ({details})"
-
-                # Add markdown image reference with description
-                image_md = f"![{description}](page_{page_idx}_img_{img.get('id', len(image_notes))})"
-                image_notes.append(image_md)
-
-                # Also add contextual note for clarity
+                # Generate rich contextual annotation
                 if summary or details:
-                    note = f"> **Visual Element**: {summary or img_type}" + (f" - {details}" if details else "")
-                    image_notes.append(note)
+                    annotation = f"📎 **Image Context ({img_id})**: {img_type}"
+                    if summary:
+                        annotation += f" - {summary}"
+                    if details:
+                        annotation += f" ({details})"
+                    image_notes.append(annotation)
 
             if image_notes:
-                markdown_parts.append("\n\n" + "\n\n".join(image_notes) + "\n")
+                markdown_parts.append("\n\n---\n**Visual Elements Detected:**\n" + "\n".join(image_notes) + "\n---\n")
 
         for img in page_images:
             annotated_images.append({

@@ -1,5 +1,7 @@
 # ARCHITECTURE
 
+> 📊 **Viewing Diagrams**: All Mermaid diagrams can be exported as PNG/SVG using our [Mermaid Export Tool](./mermaid-export.html) - just copy the diagram code and paste it into the tool.
+
 ## 1. Architecture Solution (Mermaid)
 
 Pattern : Event-Driven + Container Apps + AI Foundry (Mistral OCR & Phi‑4)
