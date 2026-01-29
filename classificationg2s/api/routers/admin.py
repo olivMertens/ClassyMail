@@ -410,6 +410,12 @@ async def deadletter_summary(clients: Clients = Depends(get_clients)):
     return DeadLetterSummary(count=len(messages), messages=messages)
 
 
+@router.get("/version")
+async def version():
+    env_version = os.getenv("APP_VERSION")
+    return {"version": env_version or "unknown"}
+
+
 @router.get("/diagnostics", response_model=DiagnosticsResponse)
 async def diagnostics(clients: Clients = Depends(get_clients)):
     ok, readiness = await readiness_checks(clients=clients, deep=True)

@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from fastapi.responses import StreamingResponse
 
 from azure.servicebus import ServiceBusMessage
+from azure.storage.blob.aio import BlobClient
 
 from classificationg2s.core import config
 from classificationg2s.models import EmailListResponse, EmailRecord
@@ -209,6 +210,7 @@ async def get_email(item_id: str, cosmos_container=Depends(get_cosmos_container)
         sas_url = await build_sas_url(item.get("file_url"), clients=clients)
         if sas_url:
             item["file_url_sas"] = sas_url
+        item["file_url_proxy"] = f"/api/emails/{item_id}/file"
         return EmailRecord(**item)
     except Exception:
         raise HTTPException(status_code=404, detail="Not found")
@@ -359,6 +361,33 @@ async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=emails.csv"},
     )
+
+
+@router.get("/emails/{item_id}/file")
+async def download_email_file(item_id: str, clients: Clients = Depends(get_clients)):
+    try:
+        await clients.ensure_cosmos_container()
+        item = await clients.cosmos_container.read_item(item=item_id, partition_key=item_id)
+        blob_url = item.get("file_url")
+        if not blob_url:
+            raise HTTPException(status_code=404, detail="No file_url on record")
+        blob_client = BlobClient.from_blob_url(blob_url, credential=clients.credential)
+        downloader = await blob_client.download_blob()
+        content_type = getattr(getattr(downloader, 'properties', None), 'content_settings', None)
+        if content_type:
+            content_type = content_type.content_type
+        else:
+            content_type = "application/pdf"
+        async def iter_chunks():
+            async for chunk in downloader.chunks():
+                yield chunk
+        disposition = f"inline; filename={blob_url.split('/')[-1].split('?')[0]}"
+        return StreamingResponse(iter_chunks(), media_type=content_type, headers={"Content-Disposition": disposition})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to stream blob")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/emails/export-finetune-jsonl")

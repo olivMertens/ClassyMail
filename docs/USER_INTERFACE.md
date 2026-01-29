@@ -40,10 +40,10 @@ A visual progress bar tracking the completion of the classification task.
 
 Emails are displayed as cards containing:
 
-> **PDF Access (SAS)**
-> - The UI fetches `/api/emails/{id}` which generates a SAS **on demand** (per request).
-> - **Private containers** return `ResourceNotFound` for direct blob URL without SAS.
-> - Always use the **SAS URL** (`file_url_sas`) for sharing/downloading PDFs.
+> **PDF Access (sécurisé)**
+> - L’UI appelle `/api/emails/{id}` qui renvoie `file_url_proxy`.
+> - `/api/emails/{id}/file` *stream* le PDF via l’API (Identity + RBAC). Aucun SAS exposé.
+> - Conservez le conteneur privé ; pas d’accès direct sans l’API.
 
 - **Score Badge**: Color-coded confidence score (Green > 0.85, Amber > 0.5, Red < 0.5).
 - **Icons**: Status indicators (Checkmark for Processed, Clock for Review, Exclamation for Error).

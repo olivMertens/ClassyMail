@@ -109,7 +109,8 @@
             "infra": "Infra (queue/storage)"
         },
         "disclaimer": "*Tarifs indicatifs, dépendants de la région et de l'usage réel.",
-        "close": "OK"
+        "close": "OK",
+        "version": "Version"
     },
     "guide": {
         "title": "Documentation de l'Application",

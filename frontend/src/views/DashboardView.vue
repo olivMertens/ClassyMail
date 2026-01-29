@@ -67,10 +67,10 @@ const pageSizeOptions = [20, 50, 100]
 const allProcessed = computed(() => stats.value.total > 0 && stats.value.total === stats.value.processed)
 
 const filters = [
-  { id: 'all', label: 'All', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
-  { id: 'REVIEW_REQUIRED', label: 'To Review', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
-  { id: 'PROCESSED', label: 'Processed', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
-  { id: 'ERROR', label: 'Errors', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
+  { id: 'all', label: 'Toutes', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
+  { id: 'REVIEW_REQUIRED', label: 'À revoir', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
+  { id: 'PROCESSED', label: 'Traitées', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
+  { id: 'ERROR', label: 'Erreurs', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
 ]
 
 const reprocessEmail = async (email) => {
@@ -250,7 +250,7 @@ const totalPages = computed(() => Math.max(1, Math.ceil(stats.value.total / page
 
 const progressPercentage = computed(() => {
     if (!stats.value.total) return 0
-    return Math.round((stats.value.processed / stats.value.total) * 100)
+    return Math.round(((stats.value.processed + stats.value.review_required) / stats.value.total) * 100)
 })
 
 const getScoreColor = (email) => {
@@ -267,7 +267,7 @@ const getScoreColor = (email) => {
 const getScore = (email) => {
     const intents = email.classification?.detected_intents || []
     if (!intents.length) return 'N/A'
-    return Math.max(...intents.map(i => i.confidence || 0)).toFixed(2)
+    return (Math.max(...intents.map(i => i.confidence || 0)) * 100).toFixed(0) + '%'
 }
 
 const formatDuration = (email) => {
@@ -454,7 +454,7 @@ const emit = defineEmits(['open-email'])
           v-model="search"
           type="text"
           class="block w-full rounded-md border-0 py-2.5 pl-10 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:ring-gray-600 dark:text-white dark:placeholder-gray-400"
-          placeholder="Search subject, sender..."
+          placeholder="Rechercher sujet, expéditeur..."
         >
       </div>
     </div>
@@ -592,7 +592,10 @@ const emit = defineEmits(['open-email'])
     >
       <div class="p-3 flex-1 flex flex-col gap-2">
         <!-- Header: Status + Actions -->
-        <div class="flex justify-between items-start">
+        <div
+          class="flex justify-between items-start"
+          :title="email.classification?.detected_intents?.length > 1 ? 'Autres: ' + email.classification.detected_intents.slice(1).map(i => `${i.intent} (${Math.round((i.confidence||0)*100)}%)`).join(', ') : ''"
+        >
           <div class="flex items-center gap-2">
             <span
               v-if="email.status === 'ERROR'"
@@ -669,8 +672,11 @@ const emit = defineEmits(['open-email'])
             v-if="email.classification?.detected_intents?.length"
             class="flex-shrink-0"
           >
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800 max-w-[100px] truncate">
-              {{ email.classification.detected_intents[0].intent }}
+            <span
+              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800 max-w-[100px] truncate"
+              :title="email.classification.detected_intents.length > 1 ? 'Autres: ' + email.classification.detected_intents.slice(1).map(i => `${i.intent} (${Math.round((i.confidence||0)*100)}%)`).join(', ') : ''"
+            >
+              {{ email.classification.detected_intents[0].intent }} ({{ Math.round((email.classification.detected_intents[0].confidence || 0)*100) }}%)
             </span>
           </div>
           <div
@@ -843,22 +849,22 @@ const emit = defineEmits(['open-email'])
       <thead class="bg-gray-50 dark:bg-gray-900">
         <tr>
           <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Subject / Sender
+            Sujet / Expéditeur
           </th>
           <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Category
+            Catégorie
           </th>
           <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Status
+            Statut
           </th>
           <th class="hidden lg:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Arrived
+            Arrivée
           </th>
           <th class="hidden lg:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Processed
+            Traité
           </th>
           <th class="hidden md:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Duration
+            Durée
           </th>
           <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
             Actions

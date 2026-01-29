@@ -25,7 +25,7 @@ const availableCategories = ref([])
 const correctionReason = ref('')
 const activeTab = ref('review') // review | history
 
-const pdfUrl = computed(() => email.value?.file_url_sas || email.value?.file_url || null)
+const pdfUrl = computed(() => email.value?.file_url_proxy || email.value?.file_url_sas || email.value?.file_url || null)
 
 // New Multi-select state
 const selectedCategoryNames = ref([])

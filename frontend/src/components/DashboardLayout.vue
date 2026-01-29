@@ -139,7 +139,7 @@ const navigation = computed(() => [
             @click="sidebarCollapsed = !sidebarCollapsed"
           >
             <Bars3Icon
-              v-if="sidebarCollapsed"
+              v-if="!sidebarCollapsed"
               class="h-6 w-6 text-gray-500 dark:text-gray-400"
             />
             <XMarkIcon

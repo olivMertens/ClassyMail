@@ -398,6 +398,12 @@ variable "container_image" {
   }
 }
 
+variable "app_version" {
+  type        = string
+  description = "Optional application version (commit SHA). If empty, container_image is used."
+  default     = ""
+}
+
 variable "acr_name" {
   type        = string
   description = "Optional: ACR name to grant AcrPull to the managed identity."
@@ -590,7 +596,7 @@ resource "azurerm_container_app" "api" {
       }
       env {
         name  = "APP_VERSION"
-        value = var.container_image
+        value = var.app_version != "" ? var.app_version : var.container_image
       }
 
       # Telemetry
@@ -767,7 +773,7 @@ resource "azurerm_container_app" "worker" {
       }
       env {
         name  = "APP_VERSION"
-        value = var.container_image
+        value = var.app_version != "" ? var.app_version : var.container_image
       }
 
       env {
