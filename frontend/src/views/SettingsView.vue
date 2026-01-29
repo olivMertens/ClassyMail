@@ -410,34 +410,34 @@ onMounted(() => {
           @click="activeTab = 'processing'"
         >
           <CpuChipIcon class="h-4 w-4" />
-          Processing Strategy
+          {{ t('settings.tabs.processing') }}
         </button>
         <button
           :class="[activeTab === 'finetuning' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
           @click="activeTab = 'finetuning'"
         >
           <AdjustmentsHorizontalIcon class="h-4 w-4" />
-          Fine-tuning
+          {{ t('settings.tabs.finetuning') }}
         </button>
         <button
           :class="[activeTab === 'general' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
           @click="activeTab = 'general'"
         >
           <BanknotesIcon class="h-4 w-4" />
-          General & Costs
+          {{ t('settings.tabs.general') }}
         </button>
         <button
           :class="[activeTab === 'logs' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
           @click="{ activeTab = 'logs'; fetchAppLogs(); }"
         >
           <CommandLineIcon class="h-4 w-4" />
-          Telemetry Logs
+          {{ t('settings.tabs.logs') }}
         </button>
         <button
           :class="[activeTab === 'danger' ? 'border-red-500 text-red-600 dark:text-red-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
           @click="activeTab = 'danger'"
         >
-          Danger Zone
+          {{ t('settings.tabs.danger') }}
           <ExclamationTriangleIcon class="h-4 w-4 text-red-500" />
         </button>
       </nav>
@@ -767,13 +767,11 @@ onMounted(() => {
             </div>
             <div class="ml-3">
               <h3 class="text-sm font-medium text-amber-800 dark:text-amber-200">
-                Critical Configuration
+                {{ t('settings.categories.warning_title') }}
               </h3>
               <div class="mt-2 text-sm text-amber-700 dark:text-amber-300">
                 <p>
-                  Modifying categories drastically changes how the AI classifies incoming emails.
-                  Changes propagate to the System Prompt immediately.
-                  Descriptions are key for the LLM context.
+                  {{ t('settings.categories.warning_text') }}
                 </p>
               </div>
             </div>
@@ -782,19 +780,19 @@ onMounted(() => {
 
         <div class="flex justify-between items-center">
           <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
-            Managed Categories
+            {{ t('settings.categories.managed_title') }}
           </h3>
           <button
             type="button"
             class="text-sm text-primary-600 hover:text-primary-500"
             @click="saveSettings"
           >
-            Save Changes to System
+            {{ t('settings.categories.save_button') }}
           </button>
         </div>
 
         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          Current active categories extracted by the LLM.
+          {{ t('settings.categories.current_categories') }}
         </p>
 
         <div class="mt-5">

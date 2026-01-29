@@ -20,7 +20,22 @@
         "costs_desc": "Modifier la tarification par défaut pour le calcul des coûts. Laisser vide pour utiliser les défauts.",
         "strategy_standard_help": "Rapide & Efficace. Idéal pour les textes dactylographiés standard et emails clairs.",
         "strategy_reasoning_help": "Analyse Profonde. Utilise le 'Chain-of-Thought' pour justifier avant de classifier. Utile pour les cas ambigus.",
-        "strategy_vision_help": "Multimodal. Analyse les éléments visuels (images, mise en page). Idéal pour les documents avec photos ou structures complexes."
+        "strategy_vision_help": "Multimodal. Analyse les éléments visuels (images, mise en page). Idéal pour les documents avec photos ou structures complexes.",
+        "tabs": {
+            "categories": "Catégories",
+            "processing": "Stratégie de Traitement",
+            "finetuning": "Fine-tuning",
+            "general": "Général & Coûts",
+            "logs": "Journaux Télémétrie",
+            "danger": "Zone Dangereuse"
+        },
+        "categories": {
+            "warning_title": "Configuration Critique",
+            "warning_text": "La modification des catégories change radicalement la façon dont l AI classe les emails entrants. Les changements se propagent au Prompt Système immédiatement. Les descriptions sont essentielles pour le contexte du LLM.",
+            "managed_title": "Catégories Gérées",
+            "save_button": "Enregistrer les Changements Système",
+            "current_categories": "Catégories actives actuelles extraites par le LLM."
+        }
     },
     "upload": {
         "title": "Importer des documents",
