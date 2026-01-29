@@ -350,8 +350,7 @@ See the docs for the full YAML examples, authentication options (OIDC vs secrets
 - Coûts & usage par email (pages, tokens, €), visibles UI + export CSV.
 - Observabilité OpenTelemetry (HTTPx, spans custom `gen_ai.*`).
 - CI/CD GitHub Actions (uv, ACR, Azure Container Apps).
-- Terraform Foundry (Hub + Project + Deployments + RBAC `Cognitive Services User`).
-
+- Terraform Foundry (Hub + Project + Deployments + RBAC `Cognitive Services User`).- **Large PDFs**: PDFs ≥ 30 pages are **automatically chunked** into 30-page parts and sent via `document_url` to Mistral OCR; results are merged transparently.
 Pour les détails (variables, logique, pricing), voir [docs/MODELS.md](docs/MODELS.md).
 
 ## 📄 Format RFAT (JSON)

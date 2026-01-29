@@ -48,6 +48,7 @@ sequenceDiagram
 ## Assumptions
 
 - PDFs are uploaded into a known container (default: `pdf-inputs`).
+- PDFs ≥ 30 pages are split into 30-page chunks; each chunk is sent as `document_url` to Mistral OCR and merged.
 - Event Grid emits a `BlobCreated` event. The worker supports either:
     - our internal message: `{ "blob_url": "https://..." }` (e.g. via `/webhook/ingest`)
     - raw Event Grid event payload delivered to Service Bus (it extracts `data.url`).
@@ -62,6 +63,7 @@ sequenceDiagram
 - **Strict JSON output**: simplifies post-processing, validation, and storage; enables consistent fine-tuning datasets.
 - **Fallback model**: long OCR markdown can exceed the primary model’s context window; fallback keeps the pipeline resilient.
 - **RBAC-first (no keys)**: aligns with common enterprise policies (Storage OAuth-only, Service Bus local auth disabled, Cosmos RBAC).
+- **Bounded OCR payloads**: chunk PDFs ≥ 30 pages into 30-page parts to stay within service limits.
 - **Idempotent storage (upsert)**: repeated processing should not create duplicates; enables safe retries.
 
 ## Improvement ideas
