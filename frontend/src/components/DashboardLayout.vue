@@ -138,11 +138,11 @@ const navigation = computed(() => [
             :class="sidebarCollapsed ? 'mx-auto' : ''"
             @click="sidebarCollapsed = !sidebarCollapsed"
           >
-            <Bars3Icon
+            <XMarkIcon
               v-if="!sidebarCollapsed"
               class="h-6 w-6 text-gray-500 dark:text-gray-400"
             />
-            <XMarkIcon
+            <Bars3Icon
               v-else
               class="h-6 w-6 text-gray-500 dark:text-gray-400"
             />
