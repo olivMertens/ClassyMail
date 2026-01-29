@@ -109,11 +109,11 @@ class ChatAgent:
                 "type": "function",
                 "function": {
                     "name": "search_emails",
-                    "description": "Search for emails in the database by keyword, subject, or ID.",
+                    "description": "Search emails by exact ID or subject line only (metadata search). NOT for full-text content search.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "query": {"type": "string", "description": "The search query (keyword, subject snippet, or ID)"}
+                            "query": {"type": "string", "description": "Email ID or exact subject line snippet"}
                         },
                         "required": ["query"]
                     }
@@ -137,11 +137,11 @@ class ChatAgent:
                 "type": "function",
                 "function": {
                     "name": "search_email_by_text",
-                    "description": "Search email records by search_text field (full-text snippet).",
+                    "description": "PRIMARY SEARCH TOOL. Search the full OCR content (markdown) of emails for any keyword or phrase. Use this for general searches like 'accident', 'address change', customer names, etc.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "query": {"type": "string", "description": "Search text"},
+                            "query": {"type": "string", "description": "Keyword or phrase to search in email content (OCR markdown)"},
                             "limit": {"type": "integer", "description": "Max items", "default": 5}
                         },
                         "required": ["query"]
@@ -236,15 +236,17 @@ class ChatAgent:
             system_prompt = (
                 "You are a dedicated AI assistant for the 'ClassificationG2S' email processing system. "
                 "Your ONLY purpose is to help users manage and search for insurance emails processed by this system. "
-                "You have access to a database via the 'search_emails' tool. "
+                "You have access to multiple search tools - ALWAYS use 'search_email_by_text' for general keyword searches (it searches the full OCR content). "
                 "RULES:\n"
                 "1. If the user asks about anything unrelated to this system (e.g., general knowledge, coding, other brands, sports, weather), "
                 "politely refuse and state that you can only assist with email classification tasks.\n"
-                "2. extensive use of the 'search_emails' tool is encouraged to provide specific details.\n"
-                "3. Never mention or promote competitor brands. Stay focused on this internal system.\n"
-                "4. Be concise and professional.\n"
-                "5. When you reference any email by id, include direct links if available (view/api).\n"
-                "6. If asked about throughput or durations, use get_processing_stats_by_day and report per-day count and avg/sum durations in seconds."
+                "2. For ANY keyword search (like 'accident', 'address change', customer names), ALWAYS use 'search_email_by_text' first (it searches OCR markdown content).\n"
+                "3. Use 'search_similar_emails' for semantic/concept searches when exact keywords might not match.\n"
+                "4. Use 'search_emails' ONLY if user provides exact email ID or subject line.\n"
+                "5. Never mention or promote competitor brands. Stay focused on this internal system.\n"
+                "6. Be concise and professional.\n"
+                "7. When you reference any email by id, include direct links if available (view/api).\n"
+                "8. If asked about throughput or durations, use get_processing_stats_by_day and report per-day count and avg/sum durations in seconds."
             )
             conversation.insert(0, {"role": "system", "content": system_prompt})
 
