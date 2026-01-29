@@ -131,7 +131,7 @@ async def ocr_with_mistral(
     settings = load_settings()
     attempts = max(1, min(10, int(settings.get("ocr_max_attempts", getattr(config, "MISTRAL_OCR_MAX_ATTEMPTS", 3)))))
 
-            # Mistral Document AI API format (Microsoft Foundry)
+    # Mistral Document AI API format (Microsoft Foundry)
     if not config.MISTRAL_ENDPOINT:
         raise RuntimeError("MISTRAL_ENDPOINT not configured.")
 
@@ -150,36 +150,67 @@ async def ocr_with_mistral(
         import io
         import base64
 
+        def _split_pdf_base64(pdf_data: bytes, max_pages: int = 30) -> list[str]:
+            """Split PDF into base64-encoded chunks of max_pages each.
+            Reference: https://github.com/mistralai/cookbook/blob/main/mistral/ocr/documentChunking/documentAIChunking.py
+            """
+            doc_full = fitz.open(stream=pdf_data, filetype="pdf")
+            chunks: list[str] = []
+            for start in range(0, len(doc_full), max_pages):
+                sub = fitz.open()
+                sub.insert_pdf(doc_full, from_page=start, to_page=min(len(doc_full) - 1, start + max_pages - 1))
+                chunks.append(base64.b64encode(sub.tobytes()).decode())
+                sub.close()
+            doc_full.close()
+            return chunks
+
         pdf_data = base64.b64decode(base64_pdf)
         doc = fitz.open(stream=pdf_data, filetype="pdf")
+        page_count = len(doc)
 
-        for page_idx in range(len(doc)):
-            page = doc.load_page(page_idx)
-            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=85)
-            img_b64 = base64.b64encode(buf.getvalue()).decode()
+        if page_count >= 30:
+            # Chunk large PDFs by pages and send as PDF (document_url)
+            for chunk_b64 in _split_pdf_base64(pdf_data, max_pages=30):
+                p = {
+                    "model": config.MISTRAL_DEPLOYMENT,
+                    "document": {
+                        "type": "document_url",
+                        "document_url": f"data:application/pdf;base64,{chunk_b64}"
+                    },
+                    "include_image_base64": include_images
+                }
+                if enable_vision_enrichment:
+                    p["bbox_annotation_format"] = pydantic_to_mistral_schema(ImageDescription)
+                payloads.append(p)
+        else:
+            # Per-page image conversion
+            for page_idx in range(page_count):
+                page = doc.load_page(page_idx)
+                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=85)
+                img_b64 = base64.b64encode(buf.getvalue()).decode()
 
-            p = {
-                "model": config.MISTRAL_DEPLOYMENT,
-                "document": {
-                    "type": "image_url",
-                    "image_url": f"data:image/jpeg;base64,{img_b64}"
-                },
-                "include_image_base64": include_images
-            }
-            if enable_vision_enrichment:
-                p["bbox_annotation_format"] = pydantic_to_mistral_schema(ImageDescription)
-            payloads.append(p)
+                p = {
+                    "model": config.MISTRAL_DEPLOYMENT,
+                    "document": {
+                        "type": "image_url",
+                        "image_url": f"data:image/jpeg;base64,{img_b64}"
+                    },
+                    "include_image_base64": include_images
+                }
+                if enable_vision_enrichment:
+                    p["bbox_annotation_format"] = pydantic_to_mistral_schema(ImageDescription)
+                payloads.append(p)
         doc.close()
     except Exception as e:
         logger.warning(f"Failed to convert PDF to images, falling back to raw PDF base64: {e}")
         p = {
             "model": config.MISTRAL_DEPLOYMENT,
             "document": {
-                "type": "image_url",
-                "image_url": f"data:application/pdf;base64,{base64_pdf}"
+                "type": "document_url",
+                "document_url": f"data:application/pdf;base64,{base64_pdf}"
             },
             "include_image_base64": include_images
         }
