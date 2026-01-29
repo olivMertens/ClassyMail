@@ -1,6 +1,8 @@
 # ARCHITECTURE
 
-> 📊 **Viewing Diagrams**: All Mermaid diagrams can be exported as PNG/SVG using our [Mermaid Export Tool](./mermaid-export.html) - just copy the diagram code and paste it into the tool.
+> 📊 **Interactive Diagrams**: Each diagram below has zoom 🔍 and download 📥 buttons. See [README_DIAGRAMS.md](./README_DIAGRAMS.md) for usage guide.
+>
+> **Alternative**: Use the [Mermaid Export Tool](./mermaid-export.html) to export any diagram as PNG/SVG.
 
 ## 1. Architecture Solution (Mermaid)
 

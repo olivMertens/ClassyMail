@@ -1,5 +1,7 @@
 # PIPELINE
 
+> 📊 **Interactive Diagrams**: Zoom and download controls available. See [README_DIAGRAMS.md](./README_DIAGRAMS.md).
+
 This document explains the end-to-end processing pipeline (PDF → OCR → classification → dashboard), plus assumptions, design decisions, and improvement ideas.
 
 ## High-level flow

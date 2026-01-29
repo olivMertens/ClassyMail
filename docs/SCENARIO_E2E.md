@@ -1,5 +1,5 @@
 # Scénario de test bout en bout (E2E)
-
+> 📊 **Interactive Diagrams**: Each diagram has zoom 🔍 and download 📥 controls. See [README_DIAGRAMS.md](./README_DIAGRAMS.md).
 Ce document décrit un scénario complet pour tester le système de bout en bout : génération de PDFs → dépôt dans Blob Storage → (Event Grid) → Service Bus → worker → stockage dans Cosmos DB → consultation via l’API/UI.
 
 ## Objectif
