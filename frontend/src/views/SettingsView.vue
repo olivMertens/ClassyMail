@@ -1260,12 +1260,13 @@ onMounted(() => {
                   Vision (Visual Analysis)
                 </h4>
                 <p class="text-gray-500 dark:text-gray-400 mt-1">
-                  Integrates visual context from OCR (photos, diagrams, signatures) into the decision process.
+                  Integrates visual context from OCR (photos, diagrams, signatures) into the decision process.<br>
+                  <strong>Scope:</strong> Only images rendered from PDF pages by OCR are used (inline/page visuals). Attachments not embedded in the PDF pages are ignored.
                 </p>
                 <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
-                  <span class="text-green-600 dark:text-green-400 font-bold">How it works:</span> Uses Mistral BBox Annotation capability.<br>
-                  <span class="text-green-600 dark:text-green-400 font-bold">Annotation:</span> Extracts structured descriptions (summary, details) for every visual element found (charts, photos).<br>
-                  <span class="text-green-600 dark:text-green-400 font-bold">Enrichment:</span> These descriptions are injected into the Markdown before classification, allowing the AI to "see" your attachments.
+                  <span class="text-green-600 dark:text-green-400 font-bold">How it works:</span> Uses Mistral BBox Annotation capability per page image.<br>
+                  <span class="text-green-600 dark:text-green-400 font-bold">Annotation:</span> Extracts structured descriptions (summary, details) for each visual element detected on page images (charts, photos, signatures).<br>
+                  <span class="text-green-600 dark:text-green-400 font-bold">Enrichment:</span> These descriptions are injected into the Markdown before classification, allowing the AI to "see" the page visuals.
                 </div>
               </div>
             </div>

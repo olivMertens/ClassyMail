@@ -64,6 +64,7 @@ async def run_classification_pipeline(
         log("ocr", "start")
         # Enable image extraction only if strategy is 'vision' to save costs/latency
         include_img = (strategy == "vision")
+        # Vision uses OCR-rendered page images only (no attachments). Enrichment annotates those page images.
         # Use new enrichment capability for vision strategy
         ocr_result = await ocr_with_mistral(
             pdf_b64,

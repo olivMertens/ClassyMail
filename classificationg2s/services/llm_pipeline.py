@@ -142,6 +142,7 @@ async def ocr_with_mistral(
         url = f"{base_end}/providers/mistral/azure/ocr"
 
     # Prepare payloads (per page if image conversion works, else single PDF)
+    # NOTE: Vision strategy uses OCR-rendered page images only (no attachments/external images).
     payloads = []
     try:
         import fitz

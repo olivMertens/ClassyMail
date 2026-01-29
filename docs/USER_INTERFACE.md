@@ -108,8 +108,7 @@ The application settings allow customization of the classification engine and en
 
 - **Dark Mode**: Toggle the application theme.
 - **Cost Overrides**: Adjust the unit prices used for cost estimation (Useful for "What-If" analysis).
-- **Processing Strategy**: Switch between "Standard" (Fast), "Reasoning" (CoT), or "Vision" modes.
-- **Telemetry Logs**: Real-time view of traces and exceptions from Azure Application Insights (requires `LOG_ANALYTICS_WORKSPACE_ID` configuration).
+- **Processing Strategy**: Switch between "Standard" (Fast), "Reasoning" (CoT), or "Vision" modes.  - **Vision scope**: Only images rendered from PDF pages by OCR are used (inline/page visuals). Attachments not embedded in PDF pages are ignored.- **Telemetry Logs**: Real-time view of traces and exceptions from Azure Application Insights (requires `LOG_ANALYTICS_WORKSPACE_ID` configuration).
 
 ### Developer Tab (Danger Zone)
 
