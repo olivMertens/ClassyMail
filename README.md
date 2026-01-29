@@ -7,6 +7,12 @@
 > **⚠️ Important Update (Jan 2026):** Fixed Mistral Document AI to use Microsoft Foundry endpoint directly (no path suffix needed).
 > This is NOT the standard OpenAI Chat Completions API. See [docs/MODELS.md](docs/MODELS.md) for details.
 
+## TL;DR
+- Upload PDF → Event Grid → Service Bus → Worker → OCR (Mistral) → Classify (Phi-4) → Cosmos → UI
+- **Vision**: OCR-rendered page images only; PDFs ≥30 pages chunked (30-page parts via `document_url`)
+- Infra: Terraform (ACA, SB, Blob, Cosmos), DI with `Clients`, Python 3.12, `uv` workflows
+- Quickstart: `uv sync && uv run uvicorn main:app --reload` (+ `secrets.env`)
+
 ## Pourquoi ce POC ?
 
 Ce repo est un **POC “agent + pipeline”** pour traiter des emails/PDFs **à fort volume**, avec un objectif de **latence stable** et de **coûts observables**.
@@ -108,16 +114,14 @@ The new frontend provides a dark-mode enabled dashboard to:
 
 ```mermaid
 flowchart TD
-    user[User] -->|Upload PDF / Review| ui[SPA (Vue 3 + Tailwind)]
-    ui -->|API calls| api[FastAPI API]
-    api -->|Download PDF| blob[(Blob Storage)]
-    blob -->|Event Grid| sbq[Service Bus Queue]
-    sbq -->|Worker| api
-    api -->|OCR document_base64| ocr[Mistral OCR]
-    ocr -->|Markdown| api
-    api -->|Classify intents| llm["Phi-4 (primary)<br/>Fallback: gpt-4o-mini"]
-    llm -->|JSON| api
-    api -->|Persist| cosmos[(Cosmos DB)]
+    U[User] --> UI[SPA (Vue 3 + Tailwind)]
+    UI --> API[FastAPI]
+    API --> BLOB[(Blob Storage)]
+    BLOB --> SBQ[Service Bus]
+    SBQ --> WORKER[Worker]
+    WORKER --> OCR[Mistral OCR]
+    OCR --> LLM[Phi-4 / gpt-4o-mini]
+    LLM --> COSMOS[(Cosmos DB)]
 
 
 ## 🔧 Installation & Exécution (aperçu)
