@@ -385,21 +385,28 @@ async def get_processing_stats_by_day(days: int = 7, clients: Clients | None = N
     clients = clients or get_default_clients()
     await clients.ensure_cosmos_container()
     days = max(1, min(days, 30))
-    query = (
-        "SELECT STRING(TimestampToDateTime("
-        "   DateTimeToTimestamp(c.updated_at) - (DateTimeToTimestamp(c.updated_at) % 86400)"
-        ")) as day, "
-        " COUNT(1) as count, "
-        " SUM(c.processing_time_ms) as sum_ms, "
-        " AVG(c.processing_time_ms) as avg_ms "
-        "FROM c "
-        "WHERE c.status='PROCESSED' AND IS_DEFINED(c.processing_time_ms) "
-        " AND c.updated_at >= DateTimeAdd('day', -@days, GetCurrentDateTime()) "
-        "GROUP BY STRING(TimestampToDateTime("
-        "   DateTimeToTimestamp(c.updated_at) - (DateTimeToTimestamp(c.updated_at) % 86400)"
-        ")) "
-        "ORDER BY day DESC"
-    )
-    params = [{"name": "@days", "value": days}]
-    items = [x async for x in _query(clients.cosmos_container, query, parameters=params, max_items=days)]
-    return items
+    try:
+        query = (
+            "SELECT STRING(TimestampToDateTime("
+            "   DateTimeToTimestamp(c.updated_at) - (DateTimeToTimestamp(c.updated_at) % 86400)"
+            ")) as day, "
+            " COUNT(1) as count, "
+            " SUM(c.processing_time_ms) as sum_ms, "
+            " AVG(c.processing_time_ms) as avg_ms "
+            "FROM c "
+            "WHERE c.status='PROCESSED' AND IS_DEFINED(c.processing_time_ms) "
+            " AND c.updated_at >= DateTimeAdd('day', -@days, GetCurrentDateTime()) "
+            "GROUP BY STRING(TimestampToDateTime("
+            "   DateTimeToTimestamp(c.updated_at) - (DateTimeToTimestamp(c.updated_at) % 86400)"
+            ")) "
+            "ORDER BY day DESC"
+        )
+        params = [{"name": "@days", "value": days}]
+        items = [x async for x in _query(clients.cosmos_container, query, parameters=params, max_items=days)]
+        return items
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to get processing stats: {e}", exc_info=True)
+        # Return empty list on error to avoid crashing the UI
+        return []

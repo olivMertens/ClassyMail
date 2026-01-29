@@ -17,6 +17,12 @@ repos:
         language: system
         files: ^frontend/
         pass_filenames: false
+      - id: validate-mermaid
+        name: validate-mermaid
+        entry: python scripts/validate_mermaid.py
+        language: system
+        files: \.md$
+        pass_filenames: true
   # Terraform hooks disabled on Windows (requires bash/WSL)
   # - repo: https://github.com/antonbabenko/pre-commit-terraform
   #   rev: v1.83.6
