@@ -75,7 +75,7 @@ L'identité managée assignée aux Container Apps (`api` et `worker`) doit dispo
 
 | Ressource Azure | Rôle RBAC (Nom) | ID du Rôle | Description / Scope |
 | :--- | :--- | :--- | :--- |
-| **Storage Account** | `Storage Blob Data Contributor` | `ba92f5b4-2d11-453d-a403-e96b0029c9fe` | Lecture/Écriture des PDFs dans le container `pdf-inputs`. |
+| **Storage Account** | `Storage Blob Data Contributor` / `Storage Blob Data Reader` | `ba92f5b4-2d11-453d-a403-e96b0029c9fe` / `2a2b9908-6ea1-4ae2-8e65-a410df84e7d1` | Lecture/Ecriture des PDFs et streaming API |
 | **Service Bus** | `Azure Service Bus Data Receiver` | `4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0` | Permet au `worker` de consommer les messages de la queue. |
 | **Service Bus** | `Azure Service Bus Data Sender` | `69a216fc-b8fb-44d8-bc22-1f3c2cd27a39` | Permet à l'API (et DLQ retry) d'envoyer des messages. |
 | **Cosmos DB (SQL)** | `Cosmos DB Built-in Data Contributor` | `00000000-0000-0000-0000-000000000002` | **Data Plane RBAC**. Lecture/Écriture des documents JSON. *Note: Ce n'est pas un rôle IAM Azure classique, mais un rôle SQL natif Cosmos.* |

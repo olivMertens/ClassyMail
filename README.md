@@ -392,7 +392,14 @@ Le système utilise **Zero Trust** (via Managed Identity). Voici les rôles pré
 
 | Principal | Ressource | Rôle |
 | --- | --- | --- |
-| Identité managée ACA | Storage Account | **Storage Blob Data Contributor** |
+| Identité managée ACA | Storage Account | **Storage Blob Data Contributor** (write) / **Storage Blob Data Reader** (read-only streaming) |
+
+```bash
+az role assignment create \
+  --assignee <ACA_MANAGED_IDENTITY_CLIENT_ID> \
+  --role "Storage Blob Data Reader" \
+  --scope $(az storage account show --name <storage> --query id -o tsv)
+```
 | Identité managée ACA | Service Bus Namespace | **Azure Service Bus Data Receiver** (Worker) & **Sender** (API) |
 | Identité managée ACA | Cosmos DB (SQL) | **Cosmos DB Built-in Data Contributor** (Role `00000000-0000-0000-0000-000000000002`) |
 | Identité managée ACA | AI Foundry (AIServices) | **Cognitive Services User** |

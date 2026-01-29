@@ -58,7 +58,14 @@ Terraform crée une **User Assigned Managed Identity** (`<prefix>-id`) et lui as
 
 | Ressource | Rôle | Description |
 |-----------|------|-------------|
-| **Storage Account** | `Storage Blob Data Contributor` | Lecture/Ecriture des PDFs dans le container `pdf-inputs`. |
+| **Storage Account** | `Storage Blob Data Contributor` (write), `Storage Blob Data Reader` (read) | Lecture/écriture des PDFs + streaming API.
+
+```bash
+az role assignment create \
+  --assignee <ACA_MANAGED_IDENTITY_CLIENT_ID> \
+  --role "Storage Blob Data Reader" \
+  --scope $(az storage account show --name <storage> --query id -o tsv)
+```
 | **Service Bus** | `Azure Service Bus Data Receiver` | Lecture des messages depuis la queue (Worker). |
 | **Service Bus** | `Azure Service Bus Data Sender` | Envoi (si besoin) ou gestion deadcheck (API/Worker). |
 | **ACR** | `AcrPull` | Pull des images Docker privées (si `acr_name` fourni). |

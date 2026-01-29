@@ -234,6 +234,13 @@ resource "azurerm_role_assignment" "aca_storage_reader" {
   principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
+# Optional: explicit read role (useful for read-only API streaming)
+resource "azurerm_role_assignment" "aca_storage_reader_read" {
+  scope                = azurerm_storage_account.st.id
+  role_definition_name = "Storage Blob Data Reader"
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
+}
+
 resource "azurerm_role_assignment" "aca_sb_receiver" {
   scope                = azurerm_servicebus_namespace.sb.id
   role_definition_name = "Azure Service Bus Data Receiver"
