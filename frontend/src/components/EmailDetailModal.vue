@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
 
@@ -24,6 +24,8 @@ const intentsJson = ref('[]')
 const availableCategories = ref([])
 const correctionReason = ref('')
 const activeTab = ref('review') // review | history
+
+const pdfUrl = computed(() => email.value?.file_url_sas || email.value?.file_url || null)
 
 // New Multi-select state
 const selectedCategoryNames = ref([])
@@ -182,6 +184,18 @@ watch(() => props.isOpen, (newVal) => {
     }
 })
 
+const parseArrivalDate = (fileUrl) => {
+    if (!fileUrl) return null
+    try {
+        const m = fileUrl.match(/uploads\/(\d{4})\/(\d{2})\/(\d{2})\//)
+        if (m) {
+            const [, y, mo, d] = m
+            return new Date(`${y}-${mo}-${d}T00:00:00Z`).toISOString()
+        }
+    } catch (e) { /* ignore */ }
+    return null
+}
+
 const renderMarkdown = (text) => md.render(text || '')
 </script>
 
@@ -236,17 +250,33 @@ const renderMarkdown = (text) => md.render(text || '')
           <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
             <!-- Left: PDF -->
             <div class="md:w-1/2 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 flex flex-col">
-              <iframe
-                v-if="email?.file_url_sas || email?.file_url"
-                :src="email?.file_url_sas || email?.file_url"
-                class="w-full h-full"
-                title="PDF Preview"
-              />
+              <div class="flex-1 flex flex-col">
+                <iframe
+                  v-if="pdfUrl"
+                  :src="pdfUrl"
+                  class="w-full flex-1"
+                  title="PDF Preview"
+                />
+                <div
+                  v-else
+                  class="flex-1 flex items-center justify-center text-gray-500"
+                >
+                  {{ loading ? 'Loading PDF...' : 'No PDF URL available' }}
+                </div>
+              </div>
               <div
-                v-else
-                class="flex-1 flex items-center justify-center text-gray-500"
+                v-if="pdfUrl"
+                class="p-2 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs text-primary-600 dark:text-primary-300 flex justify-between items-center"
               >
-                {{ loading ? 'Loading PDF...' : 'No PDF URL available' }}
+                <span>Having trouble? Open in a new tab:</span>
+                <a
+                  :href="pdfUrl"
+                  target="_blank"
+                  rel="noopener"
+                  class="font-semibold hover:underline"
+                >
+                  Open PDF
+                </a>
               </div>
             </div>
 
@@ -288,6 +318,26 @@ const renderMarkdown = (text) => md.render(text || '')
                   v-else-if="activeTab === 'review' && email"
                   class="space-y-6"
                 >
+                  <!-- Meta Info -->
+                  <div class="grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <div><span class="font-semibold">Subject:</span> {{ email.subject || '—' }}</div>
+                    <div><span class="font-semibold">Sender:</span> {{ email.sender || '—' }}</div>
+                    <div><span class="font-semibold">Arrived:</span> {{ parseArrivalDate(email.file_url || email.file_url_sas) ? new Date(parseArrivalDate(email.file_url || email.file_url_sas)).toLocaleString() : (email.created_at ? new Date(email.created_at).toLocaleString() : '—') }}</div>
+                    <div><span class="font-semibold">Processed:</span> {{ email.updated_at ? new Date(email.updated_at).toLocaleString() : '—' }}</div>
+                  </div>
+
+                  <!-- Debug URLs -->
+                  <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+                    <div v-if="email.file_url">
+                      <span class="font-semibold">Blob URL:</span>
+                      <code class="break-all">{{ email.file_url }}</code>
+                    </div>
+                    <div v-if="email.file_url_sas">
+                      <span class="font-semibold">SAS URL:</span>
+                      <code class="break-all">{{ email.file_url_sas }}</code>
+                    </div>
+                  </div>
+
                   <!-- Error Box -->
                   <div
                     v-if="email.error"
@@ -319,9 +369,14 @@ const renderMarkdown = (text) => md.render(text || '')
                     </div>
                   </div>
 
-                  <div class="prose dark:prose-invert max-w-none text-sm max-h-60 overflow-y-auto border border-gray-100 rounded p-2">
-                    <!-- eslint-disable-next-line vue/no-v-html -->
-                    <div v-html="renderMarkdown(email.markdown)" />
+                  <div>
+                    <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                      🧾 OCR Text / Texte OCR
+                    </h4>
+                    <div class="prose dark:prose-invert max-w-none text-sm max-h-60 overflow-y-auto border border-gray-100 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900">
+                      <!-- eslint-disable-next-line vue/no-v-html -->
+                      <div v-html="renderMarkdown(email.markdown)" />
+                    </div>
                   </div>
 
                   <!-- Category Selection -->
@@ -367,11 +422,11 @@ const renderMarkdown = (text) => md.render(text || '')
 
                   <!-- Reason -->
                   <div>
-                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Correction Reason / Comment</label>
+                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Correction Reason / Comment</label>
                     <textarea
                       v-model="correctionReason"
                       rows="2"
-                      class="mt-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-700"
+                      class="mt-1 block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-700"
                       placeholder="Why did you change the category? (Used for reinforcement learning)"
                     />
                   </div>
@@ -401,7 +456,7 @@ const renderMarkdown = (text) => md.render(text || '')
                   class="space-y-6"
                 >
                   <h3 class="text-sm font-medium text-gray-900 dark:text-white">
-                    Classification History
+                    Classification History / Historique des corrections
                   </h3>
                   <div class="flow-root">
                     <ul

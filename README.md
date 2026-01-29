@@ -39,7 +39,8 @@ Selon ton objectif :
 - **Je veux tester le système E2E** (recommandé pour débuter)
     1. [docs/SCENARIO_E2E.md](docs/SCENARIO_E2E.md) — scénario complet (PDF → Blob → Event Grid → Service Bus → Worker → Cosmos → UI), en local et sur Azure
     2. [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md) — exécution locale, variables `secrets.env`, upload/trigger
-    3. [docs/TERRAFORM.md](docs/TERRAFORM.md) — provisionner l’infra Azure + récupérer les outputs
+    3. [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md) — commandes locales rapides (build, run, tests, diagnostics)
+    4. [docs/TERRAFORM.md](docs/TERRAFORM.md) — provisionner l’infra Azure + récupérer les outputs
 
 - **Je veux comprendre l’architecture** (deep dive)
     1. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — composants, RBAC, scaling

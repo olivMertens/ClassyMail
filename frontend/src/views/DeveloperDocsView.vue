@@ -9,7 +9,8 @@ import {
   PlayIcon,
   CheckCircleIcon,
   XCircleIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline'
 
 const currentTab = ref('architecture')
@@ -22,13 +23,36 @@ const debugLoading = ref(false)
 const writeTestResults = ref(null)
 const writeTestLoading = ref(false)
 
+// LLM Test State
+const llmTestLoading = ref(false)
+const llmTestResults = ref(null)
+
 // Simulation State
 const simLoading = ref(false)
 const simResult = ref(null)
 const simLogs = ref([])
+const useAoaiEnhancement = ref(false)
 
 const addSimLog = (msg, type='info') => {
     simLogs.value.push({ time: new Date().toLocaleTimeString(), msg, type })
+}
+
+const runLLMTests = async () => {
+    llmTestLoading.value = true
+    llmTestResults.value = null
+    try {
+        const [phi4Res, mistralRes, gptRes] = await Promise.all([
+            fetch('/api/admin/test-phi4').then(r => r.json()).catch(e => ({ status: 'error', error: e.message })),
+            fetch('/api/admin/test-mistral-ocr').then(r => r.json()).catch(e => ({ status: 'error', error: e.message })),
+            fetch('/api/admin/test-gpt').then(r => r.json()).catch(e => ({ status: 'error', error: e.message }))
+        ])
+        llmTestResults.value = { phi4: phi4Res, mistral: mistralRes, gpt: gptRes }
+    } catch (err) {
+        console.error('LLM tests failed:', err)
+        llmTestResults.value = { error: err.message }
+    } finally {
+        llmTestLoading.value = false
+    }
 }
 
 const runSimulation = async () => {
@@ -38,7 +62,9 @@ const runSimulation = async () => {
 
     try {
         addSimLog("Step 1: Uploading Dummy PDF...", 'info')
-        const res = await fetch('/api/admin/debug/simulate-flow', {
+        const params = new URLSearchParams()
+        if (useAoaiEnhancement.value) params.append('use_aoai', 'true')
+        const res = await fetch(`/api/admin/debug/simulate-flow?${params}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({})
@@ -229,7 +255,7 @@ graph TD
     <div class="md:flex md:items-center md:justify-between">
       <div class="min-w-0 flex-1">
         <h2 class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">
-          Developer Documentation
+          Developer Zone
         </h2>
       </div>
     </div>
@@ -447,28 +473,165 @@ graph TD
           </div>
         </div>
 
-        <!-- End-to-End Simulation -->
+        <!-- LLM Models Testing -->
         <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6 border-t-4 border-purple-500">
           <div class="flex justify-between items-center mb-4">
             <div>
               <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
-                End-to-End Flow Simulation
+                LLM Models Testing
               </h3>
               <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Generates a dummy PDF, uploads it, and tracks it through the Service Bus, Worker, OCR, and AI Classification pipeline.
+                Test all deployed LLM models: Phi-4 (classification), Mistral (OCR), and GPT-5 (chat).
               </p>
             </div>
             <button
               class="inline-flex items-center gap-x-1.5 rounded-md bg-purple-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 disabled:opacity-50"
-              :disabled="simLoading"
-              @click="runSimulation"
+              :disabled="llmTestLoading"
+              @click="runLLMTests"
             >
               <PlayIcon
                 class="-ml-0.5 h-5 w-5"
                 aria-hidden="true"
               />
-              {{ simLoading ? 'Running...' : 'Start Simulation' }}
+              {{ llmTestLoading ? 'Testing...' : 'Test All LLM Models' }}
             </button>
+          </div>
+
+          <div
+            v-if="llmTestResults"
+            class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3"
+          >
+            <!-- Phi-4 Result -->
+            <div
+              class="p-4 rounded-md border"
+              :class="llmTestResults.phi4?.status === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'"
+            >
+              <div class="flex items-center gap-2 mb-2">
+                <CheckCircleIcon
+                  v-if="llmTestResults.phi4?.status === 'success'"
+                  class="h-5 w-5 text-green-600 dark:text-green-400"
+                />
+                <ExclamationTriangleIcon
+                  v-else
+                  class="h-5 w-5 text-red-600 dark:text-red-400"
+                />
+                <span
+                  class="font-bold text-sm"
+                  :class="llmTestResults.phi4?.status === 'success' ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'"
+                >
+                  Phi-4 Classification
+                </span>
+              </div>
+              <p
+                class="text-xs"
+                :class="llmTestResults.phi4?.status === 'success' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'"
+              >
+                {{ llmTestResults.phi4?.status === 'success' ? llmTestResults.phi4.response : llmTestResults.phi4?.error }}
+              </p>
+            </div>
+            <!-- Mistral OCR Result -->
+            <div
+              class="p-4 rounded-md border"
+              :class="llmTestResults.mistral?.status === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'"
+            >
+              <div class="flex items-center gap-2 mb-2">
+                <CheckCircleIcon
+                  v-if="llmTestResults.mistral?.status === 'success'"
+                  class="h-5 w-5 text-green-600 dark:text-green-400"
+                />
+                <ExclamationTriangleIcon
+                  v-else
+                  class="h-5 w-5 text-red-600 dark:text-red-400"
+                />
+                <span
+                  class="font-bold text-sm"
+                  :class="llmTestResults.mistral?.status === 'success' ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'"
+                >
+                  Mistral Document AI
+                </span>
+              </div>
+              <p
+                class="text-xs"
+                :class="llmTestResults.mistral?.status === 'success' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'"
+              >
+                {{ llmTestResults.mistral?.status === 'success' ? `${llmTestResults.mistral.pages_returned} pages processed` : llmTestResults.mistral?.error }}
+              </p>
+            </div>
+            <!-- GPT Result -->
+            <div
+              class="p-4 rounded-md border"
+              :class="llmTestResults.gpt?.status === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'"
+            >
+              <div class="flex items-center gap-2 mb-2">
+                <CheckCircleIcon
+                  v-if="llmTestResults.gpt?.status === 'success'"
+                  class="h-5 w-5 text-green-600 dark:text-green-400"
+                />
+                <ExclamationTriangleIcon
+                  v-else
+                  class="h-5 w-5 text-red-600 dark:text-red-400"
+                />
+                <span
+                  class="font-bold text-sm"
+                  :class="llmTestResults.gpt?.status === 'success' ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'"
+                >
+                  GPT-5 Chat
+                </span>
+              </div>
+              <p
+                class="text-xs"
+                :class="llmTestResults.gpt?.status === 'success' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'"
+              >
+                {{ llmTestResults.gpt?.status === 'success' ? llmTestResults.gpt.response : llmTestResults.gpt?.error }}
+              </p>
+            </div>
+          </div>
+          <div
+            v-else
+            class="text-sm text-gray-500 italic"
+          >
+            Click 'Test All LLM Models' to verify deployed AI models.
+          </div>
+        </div>
+
+        <!-- End-to-End Simulation -->
+        <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6 border-t-4 border-green-500">
+          <div class="mb-4">
+            <div class="flex justify-between items-center mb-3">
+              <div>
+                <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+                  End-to-End Flow Simulation
+                </h3>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Generates a dummy PDF, uploads it, and tracks it through the Service Bus, Worker, OCR, and AI Classification pipeline.
+                </p>
+              </div>
+              <button
+                class="inline-flex items-center gap-x-1.5 rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 disabled:opacity-50"
+                :disabled="simLoading"
+                @click="runSimulation"
+              >
+                <PlayIcon
+                  class="-ml-0.5 h-5 w-5"
+                  aria-hidden="true"
+                />
+                {{ simLoading ? 'Running...' : 'Start Simulation' }}
+              </button>
+            </div>
+            <div class="flex items-center">
+              <input
+                id="use_aoai_dev"
+                v-model="useAoaiEnhancement"
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-600 dark:bg-gray-700 dark:border-gray-600"
+              >
+              <label
+                for="use_aoai_dev"
+                class="ml-2 text-sm text-gray-700 dark:text-gray-300"
+              >
+                Enhance with Azure OpenAI GPT-4o analysis
+              </label>
+            </div>
           </div>
 
           <div

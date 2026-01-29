@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
+import MarkdownIt from 'markdown-it'
 import {
   MagnifyingGlassIcon,
   ChevronLeftIcon,
@@ -8,7 +9,6 @@ import {
   ExclamationCircleIcon,
   ClockIcon,
   ArrowDownTrayIcon,
-  QuestionMarkCircleIcon,
   ArrowPathIcon,
   ChatBubbleLeftRightIcon,
   XMarkIcon,
@@ -56,6 +56,8 @@ const chatQuery = ref('')
 const chatLoading = ref(false)
 const chatError = ref(null)
 const chatResponse = ref(null)
+const md = new MarkdownIt({ linkify: true, breaks: true })
+const chatResponseHtml = computed(() => chatResponse.value ? md.render(String(chatResponse.value) || '') : '')
 const viewMode = ref('cards') // 'cards' or 'table'
 const purging = ref(false)
 
@@ -102,14 +104,6 @@ const downloadFile = async (url, filename) => {
         console.error(e)
         alert(e.message) // Simple alert for error feedback
     }
-}
-
-const exportCsv = () => {
-    downloadFile('/api/emails/export', 'emails.csv')
-}
-
-const exportJsonl = (split = 'all') => {
-    downloadFile(`/api/emails/export-finetune-jsonl?anonymize=true&split=${split}`)
 }
 
 const reprocessEmail = async (email) => {
@@ -309,6 +303,16 @@ const getScore = (email) => {
     return Math.max(...intents.map(i => i.confidence || 0)).toFixed(2)
 }
 
+const formatDuration = (email) => {
+    const ms = email?.processing_time_ms
+    if (!ms) return null
+    if (ms < 1000) return `${ms.toFixed(0)} ms`
+    const s = ms / 1000
+    if (s < 60) return `${s.toFixed(1)} s`
+    const m = s / 60
+    return `${m.toFixed(1)} min`
+}
+
 const emit = defineEmits(['open-email'])
 </script>
 
@@ -455,18 +459,20 @@ const emit = defineEmits(['open-email'])
 
   <!-- Filters & Search Toolbar -->
   <div class="flex flex-col gap-4 bg-white dark:bg-gray-800 p-4 shadow rounded-lg">
-    <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <!-- Tab-like Filters -->
-      <div class="flex p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
-        <button
-          v-for="f in filters"
-          :key="f.id"
-          class="px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap"
-          :class="filter === f.id ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
-          @click="filter = f.id"
-        >
-          {{ f.label }}
-        </button>
+      <div class="w-full sm:w-auto overflow-x-auto">
+        <div class="flex p-1 bg-gray-100 dark:bg-gray-700 rounded-lg min-w-max">
+          <button
+            v-for="f in filters"
+            :key="f.id"
+            class="px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap"
+            :class="filter === f.id ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
+            @click="filter = f.id"
+          >
+            {{ f.label }}
+          </button>
+        </div>
       </div>
 
       <!-- Search -->
@@ -480,7 +486,7 @@ const emit = defineEmits(['open-email'])
         <input
           v-model="search"
           type="text"
-          class="block w-full rounded-md border-0 py-2 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:ring-gray-600 dark:text-white dark:placeholder-gray-400"
+          class="block w-full rounded-md border-0 py-2.5 pl-10 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:ring-gray-600 dark:text-white dark:placeholder-gray-400"
           placeholder="Search subject, sender..."
         >
       </div>
@@ -604,17 +610,18 @@ const emit = defineEmits(['open-email'])
   <!-- Cards View -->
   <div
     v-else-if="viewMode === 'cards'"
-    class="grid gap-4 mt-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+    class="grid gap-4 mt-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4"
   >
     <div
       v-for="email in emails"
       :key="email.id"
       :class="[
-        'rounded-lg shadow-sm border hover:shadow-md transition-shadow flex flex-col h-full text-sm group',
+        'rounded-lg shadow-sm border hover:shadow-md transition-shadow flex flex-col h-full text-sm group cursor-pointer',
         email.test_mode
           ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700'
           : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
       ]"
+      @click="emit('open-email', email)"
     >
       <div class="p-3 flex-1 flex flex-col gap-2">
         <!-- Header: Status + Actions -->
@@ -651,22 +658,22 @@ const emit = defineEmits(['open-email'])
           </div>
 
           <!-- Minimal Actions -->
-          <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div class="flex gap-2 opacity-100 transition-opacity">
             <button
               title="View Details"
               class="text-gray-400 hover:text-primary-600"
-              @click="emit('open-email', email)"
+              @click.stop="emit('open-email', email)"
             >
-              <EyeIcon class="h-4 w-4" />
+              <EyeIcon class="h-5 w-5" />
             </button>
             <button
               title="Reprocess"
               :disabled="reprocessingId === email.id"
               class="text-gray-400 hover:text-green-600"
-              @click="reprocessEmail(email)"
+              @click.stop="reprocessEmail(email)"
             >
               <ArrowPathIcon
-                class="h-4 w-4"
+                class="h-5 w-5"
                 :class="{'animate-spin': reprocessingId === email.id}"
               />
             </button>
@@ -686,7 +693,7 @@ const emit = defineEmits(['open-email'])
           </p>
         </div>
 
-        <!-- Footer: ID & Category -->
+        <!-- Footer: ID & Category & Duration -->
         <div class="mt-auto pt-2 flex items-center justify-between gap-2 border-t border-gray-100 dark:border-gray-700/50">
           <div class="text-[10px] text-gray-400 font-mono truncate max-w-[40%]">
             #{{ email.id.slice(0,6) }}
@@ -704,6 +711,13 @@ const emit = defineEmits(['open-email'])
             class="text-[10px] text-gray-400 italic"
           >
             No category
+          </div>
+          <div
+            v-if="formatDuration(email)"
+            class="text-[10px] text-gray-500 dark:text-gray-400 inline-flex items-center gap-0.5"
+            title="Processing time"
+          >
+            ⏱ {{ formatDuration(email) }}
           </div>
         </div>
       </div>
@@ -861,19 +875,25 @@ const emit = defineEmits(['open-email'])
     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
       <thead class="bg-gray-50 dark:bg-gray-900">
         <tr>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
             Subject / Sender
           </th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
             Category
           </th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
             Status
           </th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Date
+          <th class="hidden lg:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            Arrived
           </th>
-          <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          <th class="hidden lg:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            Processed
+          </th>
+          <th class="hidden md:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            Duration
+          </th>
+          <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
             Actions
           </th>
         </tr>
@@ -887,7 +907,7 @@ const emit = defineEmits(['open-email'])
             email.test_mode ? 'bg-amber-50 dark:bg-amber-950/20' : ''
           ]"
         >
-          <td class="px-6 py-4 whitespace-nowrap">
+          <td class="px-3 sm:px-6 py-4">
             <div class="flex items-center gap-2">
               <div
                 v-if="email.test_mode"
@@ -896,12 +916,17 @@ const emit = defineEmits(['open-email'])
                 TEST
               </div>
               <div>
-                <div class="text-sm font-medium text-gray-900 dark:text-white">
-                  {{ email.subject || 'No Subject' }}
-                </div>
-                <div class="text-sm text-gray-500 dark:text-gray-400">
-                  {{ email.sender || 'Unknown Sender' }}
-                </div>
+                <button
+                  class="text-left"
+                  @click="emit('open-email', email)"
+                >
+                  <div class="text-sm font-medium text-gray-900 dark:text-white hover:underline">
+                    {{ email.subject || 'No Subject' }}
+                  </div>
+                  <div class="text-sm text-gray-500 dark:text-gray-400 hover:underline">
+                    {{ email.sender || 'Unknown Sender' }}
+                  </div>
+                </button>
               </div>
             </div>
           </td>
@@ -931,7 +956,7 @@ const emit = defineEmits(['open-email'])
               None
             </span>
           </td>
-          <td class="px-6 py-4 whitespace-nowrap">
+          <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
             <span
               :class="[
                 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
@@ -947,16 +972,33 @@ const emit = defineEmits(['open-email'])
               {{ email.status === 'REVIEW_REQUIRED' ? 'To Review' : email.status === 'PROCESSED' ? 'Processed' : (email.status === 'PENDING' || email.status === 'uploaded') ? 'Processing' : 'Error' }}
             </span>
           </td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+          <td class="hidden lg:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+            {{ email.created_at ? new Date(email.created_at).toLocaleString() : '—' }}
+          </td>
+          <td class="hidden lg:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
             {{ email.updated_at ? new Date(email.updated_at).toLocaleString() : '—' }}
           </td>
-          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <td class="hidden md:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+            {{ formatDuration(email) || '—' }}
+          </td>
+          <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex justify-end gap-3">
             <button
               class="inline-flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:text-primary-900 dark:hover:text-primary-300"
               @click="emit('open-email', email)"
             >
               <EyeIcon class="h-4 w-4" />
               View
+            </button>
+            <button
+              class="inline-flex items-center gap-1 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300"
+              :disabled="reprocessingId === email.id"
+              @click="reprocessEmail(email)"
+            >
+              <ArrowPathIcon
+                class="h-4 w-4"
+                :class="{'animate-spin': reprocessingId === email.id}"
+              />
+              Reprocess
             </button>
           </td>
         </tr>
@@ -1069,9 +1111,10 @@ const emit = defineEmits(['open-email'])
             class="flex justify-start mt-2"
           >
             <div class="bg-white dark:bg-gray-800 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm max-w-[90%]">
-              <div class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
-                {{ chatResponse }}
-              </div>
+              <div
+                class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed prose prose-sm dark:prose-invert max-w-none"
+                v-html="chatResponseHtml"
+              />
               <div class="mt-2 text-[10px] text-gray-400 border-t dark:border-gray-700 pt-1 flex items-center gap-1">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -1104,7 +1147,7 @@ const emit = defineEmits(['open-email'])
             <textarea
               v-model="chatQuery"
               rows="1"
-              class="block w-full rounded-md border-0 py-2 pr-10 pl-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white resize-none"
+              class="block w-full rounded-md border-0 py-2.5 pr-10 pl-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white resize-none"
               placeholder="Type your message..."
               @keydown.enter.exact.prevent="runChatSearch"
             />

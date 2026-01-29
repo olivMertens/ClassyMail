@@ -100,6 +100,18 @@ uv run pytest
 ## 🔄 Après terraform : remplir `secrets.env`
 Utiliser `terraform output` (infra/) pour renseigner `secrets.env` ou `secrets.env.example`.
 
+### Important : Accès Mistral OCR
+Les modèles Mistral (MaaS) nécessitent souvent l'authentification par clé (Local Auth) activée, contrairement aux autres services Azure qui privilégient Entra ID (RBAC).
+Si vous rencontrez des `500 Internal Server Error` sur Mistral OCR, activez l'authentification locale :
+
+```bash
+az resource update \
+  --resource-group email-poc-rg \
+  --name email-poc-aifoundry \
+  --resource-type Microsoft.CognitiveServices/accounts \
+  --set properties.disableLocalAuth=false
+```
+
 Ajouter (ou laisser les valeurs par défaut) pour l’assistant IA :
 ```dotenv
 CHAT_ENDPOINT=... # optionnel, défaut PHI_ENDPOINT

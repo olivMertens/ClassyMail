@@ -26,7 +26,7 @@ Ensure this model is deployed in your Azure AI Foundry / Azure OpenAI resource f
 - **NOT** standard OpenAI Chat Completions API
 - Payload format: `{"model": "...", "document": {"type": "document_url", "document_url": "data:application/pdf;base64,..."}}`
 - Response format: `{"pages": [{"markdown": "...", "images": [...]}, ...]}`
-- **Reference:** [Microsoft Foundry Blog](https://devblogs.microsoft.com/foundry/whats-new-in-azure-ai-foundry-august-2025/)
+- **Reference:** [Mistral Document AI on Azure AI Foundry](https://ai.azure.com/catalog/models/mistral-document-ai-2505)
 
 **Document Size Limits:**
 - **Maximum file size:** 30 MB

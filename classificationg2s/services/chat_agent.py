@@ -16,9 +16,31 @@ from classificationg2s.services.repository import (
     get_stats_summary,
     get_top_intents,
     get_low_confidence_items,
+    get_processing_stats_by_day,
 )
 
 logger = logging.getLogger("classimail.chatbot")
+
+
+def _enrich_with_links(item: dict | None) -> dict | None:
+    if not item or not isinstance(item, dict):
+        return item
+    rid = item.get("id")
+    if rid:
+        links = item.get("_links", {}) or {}
+        links.setdefault("view", f"/email/{rid}")
+        links.setdefault("api", f"/api/emails/{rid}")
+        links.setdefault("ui", "Dashboard > Table/View")
+        item["_links"] = links
+    return item
+
+
+def _enrich_list_with_links(items: list | None) -> list | None:
+    if not items:
+        return items
+    if isinstance(items, list):
+        return [_enrich_with_links(x) for x in items]
+    return items
 
 
 class ChatAgent:
@@ -191,6 +213,20 @@ class ChatAgent:
                         "required": []
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_processing_stats_by_day",
+                    "description": "Get daily processing stats (count, avg_ms, sum_ms) for last N days.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "days": {"type": "integer", "description": "Number of days (max 30)", "default": 7}
+                        },
+                        "required": []
+                    }
+                }
             }
         ]
 
@@ -206,7 +242,9 @@ class ChatAgent:
                 "politely refuse and state that you can only assist with email classification tasks.\n"
                 "2. extensive use of the 'search_emails' tool is encouraged to provide specific details.\n"
                 "3. Never mention or promote competitor brands. Stay focused on this internal system.\n"
-                "4. Be concise and professional."
+                "4. Be concise and professional.\n"
+                "5. When you reference any email by id, include direct links if available (view/api).\n"
+                "6. If asked about throughput or durations, use get_processing_stats_by_day and report per-day count and avg/sum durations in seconds."
             )
             conversation.insert(0, {"role": "system", "content": system_prompt})
 
@@ -241,9 +279,11 @@ class ChatAgent:
                     try:
                         if fname == "search_emails":
                             results = await search_email_records(args.get("query"), limit=5, clients=clients)
+                            results = _enrich_list_with_links(results)
                             content_str = json.dumps(results, default=str)
                         elif fname == "get_email_by_id":
                             result = await get_email_by_id(args.get("id"), clients=clients)
+                            result = _enrich_with_links(result)
                             content_str = json.dumps(result, default=str)
                         elif fname == "search_email_by_text":
                             limit = args.get("limit", 5)
@@ -251,18 +291,21 @@ class ChatAgent:
                             if isinstance(limit, str) and limit.isdigit():
                                 limit = int(limit)
                             results = await search_email_by_text(args.get("query"), limit=limit, clients=clients)
+                            results = _enrich_list_with_links(results)
                             content_str = json.dumps(results, default=str)
                         elif fname == "search_similar_emails":
                             limit = args.get("limit", 5)
                             if isinstance(limit, str) and limit.isdigit():
                                 limit = int(limit)
                             results = await search_similar_emails(args.get("query"), limit=limit, clients=clients)
+                            results = _enrich_list_with_links(results)
                             content_str = json.dumps(results, default=str)
                         elif fname == "get_latest_errors":
                             limit = args.get("limit", 5)
                             if isinstance(limit, str) and limit.isdigit():
                                 limit = int(limit)
                             results = await get_latest_errors(limit=limit, clients=clients)
+                            results = _enrich_list_with_links(results)
                             content_str = json.dumps(results, default=str)
                         elif fname == "get_stats_summary":
                             result = await get_stats_summary(clients=clients)
@@ -278,6 +321,13 @@ class ChatAgent:
                             if isinstance(limit, str) and limit.isdigit():
                                 limit = int(limit)
                             result = await get_low_confidence_items(limit=limit, intent=args.get("intent"), clients=clients)
+                            result = _enrich_list_with_links(result)
+                            content_str = json.dumps(result, default=str)
+                        elif fname == "get_processing_stats_by_day":
+                            days = args.get("days", 7)
+                            if isinstance(days, str) and days.isdigit():
+                                days = int(days)
+                            result = await get_processing_stats_by_day(days=days, clients=clients)
                             content_str = json.dumps(result, default=str)
                         else:
                              content_str = json.dumps({"error": f"Unknown function {fname}"})

@@ -226,7 +226,7 @@ async def search_email_records(q: str, limit: int = 5, clients: Clients | None =
     await clients.ensure_cosmos_container()
     limit = _bound_limit(limit)
     query = (
-        "SELECT c.id, c.status, c.file_url, c.subject, c.error, c.updated_at FROM c "
+        "SELECT c.id, c.status, c.file_url, c.subject, c.error, c.updated_at, c.processing_time_ms FROM c "
         "WHERE CONTAINS(c.id, @q) OR (IS_DEFINED(c.subject) AND CONTAINS(c.subject, @q)) "
         "OFFSET 0 LIMIT @limit"
     )
@@ -254,7 +254,7 @@ async def search_email_by_text(q: str, limit: int = 5, clients: Clients | None =
     await clients.ensure_cosmos_container()
     limit = _bound_limit(limit)
     query = (
-        "SELECT c.id, c.status, c.file_url, c.subject, c.error, c.updated_at FROM c "
+        "SELECT c.id, c.status, c.file_url, c.subject, c.error, c.updated_at, c.processing_time_ms FROM c "
         "WHERE IS_DEFINED(c.search_text) AND CONTAINS(c.search_text, @q) "
         "OFFSET 0 LIMIT @limit"
     )
@@ -279,7 +279,7 @@ async def search_similar_emails(q: str, limit: int = 5, clients: Clients | None 
 
     # Vector Search Query (Cosine Distance)
     query = (
-        "SELECT TOP @limit c.id, c.status, c.file_url, c.subject, c.error, c.updated_at, VectorDistance(c.vector, @vector) as distance "
+        "SELECT TOP @limit c.id, c.status, c.file_url, c.subject, c.error, c.updated_at, c.processing_time_ms, VectorDistance(c.vector, @vector) as distance "
         "FROM c "
         "WHERE IS_DEFINED(c.vector) "
         "ORDER BY VectorDistance(c.vector, @vector) ASC"
@@ -355,10 +355,10 @@ async def get_low_confidence_items(limit: int = 5, intent: str | None = None, cl
     if intent:
         query = (
             "SELECT c.id, c.status, c.subject, c.updated_at, "
-            " (SELECT VALUE MAX(i.confidence) FROM i IN c.classification.detected_intents WHERE i.intent=@intent) AS intent_confidence "
+            " ARRAY_MAX(ARRAY(SELECT VALUE i.confidence FROM i IN c.classification.detected_intents WHERE i.intent=@intent)) AS intent_confidence "
             "FROM c "
             "WHERE c.status='PROCESSED' "
-            " AND IS_DEFINED(c.classification.detected_intents) "
+            " AND ARRAY_LENGTH(c.classification.detected_intents) > 0 "
             " AND EXISTS(SELECT VALUE 1 FROM i IN c.classification.detected_intents WHERE i.intent=@intent) "
             "ORDER BY intent_confidence ASC OFFSET 0 LIMIT @limit"
         )
@@ -369,13 +369,37 @@ async def get_low_confidence_items(limit: int = 5, intent: str | None = None, cl
     else:
         query = (
             "SELECT c.id, c.status, c.subject, c.updated_at, "
-            " (SELECT VALUE MAX(i.confidence) FROM i IN c.classification.detected_intents) AS max_confidence "
+            " ARRAY_MAX(ARRAY(SELECT VALUE i.confidence FROM i IN c.classification.detected_intents)) AS max_confidence "
             "FROM c "
-            "WHERE c.status='PROCESSED' AND IS_DEFINED(c.classification.detected_intents) "
+            "WHERE c.status='PROCESSED' AND ARRAY_LENGTH(c.classification.detected_intents) > 0 "
             "ORDER BY max_confidence ASC OFFSET 0 LIMIT @limit"
         )
         params = [
             {"name": "@limit", "value": limit},
         ]
     items = [x async for x in _query(clients.cosmos_container, query, parameters=params, max_items=limit)]
+    return items
+
+
+async def get_processing_stats_by_day(days: int = 7, clients: Clients | None = None) -> list[dict]:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    days = max(1, min(days, 30))
+    query = (
+        "SELECT STRING(TimestampToDateTime("
+        "   DateTimeToTimestamp(c.updated_at) - (DateTimeToTimestamp(c.updated_at) % 86400)"
+        ")) as day, "
+        " COUNT(1) as count, "
+        " SUM(c.processing_time_ms) as sum_ms, "
+        " AVG(c.processing_time_ms) as avg_ms "
+        "FROM c "
+        "WHERE c.status='PROCESSED' AND IS_DEFINED(c.processing_time_ms) "
+        " AND c.updated_at >= DateTimeAdd('day', -@days, GetCurrentDateTime()) "
+        "GROUP BY STRING(TimestampToDateTime("
+        "   DateTimeToTimestamp(c.updated_at) - (DateTimeToTimestamp(c.updated_at) % 86400)"
+        ")) "
+        "ORDER BY day DESC"
+    )
+    params = [{"name": "@days", "value": days}]
+    items = [x async for x in _query(clients.cosmos_container, query, parameters=params, max_items=days)]
     return items

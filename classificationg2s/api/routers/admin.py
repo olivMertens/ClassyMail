@@ -16,6 +16,7 @@ from classificationg2s.services.repository import (
     get_stats_summary,
     get_top_intents,
     get_low_confidence_items,
+    get_processing_stats_by_day,
 )
 from classificationg2s.services.generator import generate_email_pdf
 from azure.monitor.query.aio import LogsQueryClient
@@ -455,6 +456,13 @@ async def stats_summary(clients: Clients = Depends(get_clients)):
     return StatsSummaryResponse(**summary)
 
 
+@router.get("/stats/processing")
+async def processing_stats(days: int = 7, clients: Clients = Depends(get_clients)):
+    days = max(1, min(days, 30))
+    stats = await get_processing_stats_by_day(days=days, clients=clients)
+    return stats
+
+
 @router.get("/intents/top", response_model=IntentsResponse)
 async def top_intents(limit: int = 5, clients: Clients = Depends(get_clients)):
     limit = min(max(limit, 1), config.COSMOS_QUERY_MAX_LIMIT)
@@ -533,3 +541,143 @@ async def get_app_insights_logs(days: int = 1, limit: int = 50, clients: Clients
         # Return empty list or raise? UI needs robustness.
         # Ensure we don't break the UI panel if creds are wrong.
         return LogsResponse(items=[])
+
+
+@router.get("/test-phi4")
+async def test_phi4_connection(clients: Clients = Depends(get_clients)):
+    """Test Phi-4 model connection"""
+    try:
+        import httpx
+        from classificationg2s.services.azure_clients import auth_headers
+
+        headers = await auth_headers(clients, model_type="openai")
+        endpoint = f"{config.PHI_ENDPOINT}/openai/deployments/{config.PHI_DEPLOYMENT}/chat/completions?api-version={config.AZURE_OPENAI_API_VERSION}"
+
+        payload = {
+            "messages": [{"role": "user", "content": "Say 'Connection OK'"}],
+            "max_tokens": 10,
+            "temperature": 0
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(endpoint, json=payload, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+
+        return {
+            "status": "success",
+            "model": config.PHI_DEPLOYMENT,
+            "response": data.get("choices", [{}])[0].get("message", {}).get("content", ""),
+            "status_code": response.status_code
+        }
+    except Exception as e:
+        logger.error(f"Phi-4 connection test failed: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "model": config.PHI_DEPLOYMENT
+        }
+
+
+@router.get("/blob-info")
+async def blob_info(blob_url: str, clients: Clients = Depends(get_clients)):
+    """Check blob existence, return container/blob info and SAS."""
+    from azure.storage.blob.aio import BlobClient
+    from urllib.parse import urlparse
+
+    parsed = urlparse(blob_url)
+    container = parsed.path.lstrip('/').split('/')[0] if parsed.path else ''
+    blob_name = '/'.join(parsed.path.lstrip('/').split('/')[1:]) if parsed.path else ''
+    exists = False
+    sas_url = None
+    try:
+        blob_client = BlobClient.from_blob_url(blob_url, credential=clients.credential)
+        exists = await blob_client.exists()
+    except Exception as e:
+        return {"error": str(e), "container": container, "blob": blob_name, "exists": exists}
+    try:
+        sas_url = await clients.build_sas_url(blob_url) if hasattr(clients, 'build_sas_url') else None
+    except Exception:
+        sas_url = None
+    return {"container": container, "blob": blob_name, "exists": exists, "sas_url": sas_url}
+
+
+@router.get("/test-mistral-ocr")
+async def test_mistral_ocr_connection(clients: Clients = Depends(get_clients)):
+    """Test Mistral OCR connection"""
+    try:
+        import httpx
+        from classificationg2s.services.azure_clients import auth_headers
+
+        headers = await auth_headers(clients, model_type="mistral")
+        endpoint = f"{config.MISTRAL_ENDPOINT}/providers/mistral/azure/ocr"
+
+# Minimal test payload: 1x1 PNG data URI
+        one_px_png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAuMBg4eM8sYAAAAASUVORK5CYII="
+        payload = {
+            "model": config.MISTRAL_DEPLOYMENT,
+            "document": {
+                "type": "image_url",
+                "image_url": f"data:image/png;base64,{one_px_png}"
+            },
+            "include_image_base64": False
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(endpoint, json=payload, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+
+        return {
+            "status": "success",
+            "model": config.MISTRAL_DEPLOYMENT,
+            "pages_returned": len(data.get("pages", [])),
+            "status_code": response.status_code
+        }
+    except Exception as e:
+        logger.error(f"Mistral OCR connection test failed: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "model": config.MISTRAL_DEPLOYMENT
+        }
+
+
+@router.get("/test-gpt")
+async def test_gpt_connection(clients: Clients = Depends(get_clients)):
+    """Test GPT-5 chat connection (or configured OpenAI model)"""
+    try:
+        import httpx
+        from classificationg2s.services.azure_clients import auth_headers
+
+        # Use PHI_ENDPOINT as fallback if GPT endpoint not configured
+        gpt_endpoint = getattr(config, "GPT_ENDPOINT", config.PHI_ENDPOINT)
+        gpt_deployment = getattr(config, "GPT_DEPLOYMENT", "gpt-4")
+        api_version = getattr(config, "AZURE_OPENAI_API_VERSION", getattr(config, "AI_API_VERSION", "2024-02-15-preview"))
+
+        headers = await auth_headers(clients, model_type="openai")
+        endpoint = f"{gpt_endpoint}/openai/deployments/{gpt_deployment}/chat/completions?api-version={api_version}"
+        payload = {
+            "messages": [{"role": "user", "content": "Say 'GPT Connection OK'"}],
+            "max_tokens": 10,
+            "temperature": 0
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(endpoint, json=payload, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+
+        return {
+            "status": "success",
+            "model": gpt_deployment,
+            "response": data.get("choices", [{}])[0].get("message", {}).get("content", ""),
+            "status_code": response.status_code
+        }
+    except Exception as e:
+        logger.error(f"GPT connection test failed: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "model": getattr(config, "GPT_DEPLOYMENT", "gpt-4")
+        }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 from urllib.parse import urlparse
@@ -15,6 +16,8 @@ from azure.cosmos.aio import CosmosClient
 from azure.cosmos import PartitionKey
 
 from classificationg2s.core import config
+
+logger = logging.getLogger(__name__)
 try:
     from fastapi import Depends, HTTPException, Request
 except Exception:
@@ -39,7 +42,12 @@ class Clients:
 
     async def init(self) -> None:
         # Keep startup resilient: avoid network calls here.
-        self.sb_client = ServiceBusClient(fully_qualified_namespace=config.SERVICE_BUS_FQDN, credential=self.credential)
+        sb_conn_str = os.getenv("AZURE_SERVICE_BUS_CONNECTION_STRING")
+        if sb_conn_str:
+            self.sb_client = ServiceBusClient.from_connection_string(conn_str=sb_conn_str)
+        else:
+            self.sb_client = ServiceBusClient(fully_qualified_namespace=config.SERVICE_BUS_FQDN, credential=self.credential)
+
         self.blob_service_client = BlobServiceClient(account_url=config.BLOB_ACCOUNT_URL, credential=self.credential)
         self.cosmos_client = CosmosClient(
             config.COSMOS_ENDPOINT,
@@ -156,15 +164,27 @@ def get_concurrency_limit(clients: Clients = Depends(get_clients)) -> asyncio.Se
     return clients.concurrency_limit
 
 
-async def auth_headers(clients: Clients | None = None) -> dict:
+async def auth_headers(clients: Clients | None = None, model_type: str = "openai") -> dict:
     # Consistency with ChatAgent: Use API Key if configured (e.g. invalid managed identity context)
     api_key = getattr(config, "AI_API_KEY", None)
     if api_key:
-        return {"api-key": api_key}
+        if model_type == "mistral":
+            # Per user script: Mistral on Azure MaaS often expects Authorization: Bearer {key}
+            return {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            }
+        return {
+            "Content-Type": "application/json",
+            "api-key": api_key
+        }
 
     clients = clients or get_default_clients()
     token = await clients.credential.get_token(config.AI_SCOPE)
-    return {"Authorization": f"Bearer {token.token}"}
+    return {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token.token}"
+    }
 
 
 def blob_id_from_url(blob_url: str) -> str:
@@ -176,11 +196,19 @@ def blob_id_from_url(blob_url: str) -> str:
 
 async def download_blob_as_base64(blob_url: str, return_bytes: bool = False, clients: Clients | None = None) -> str | tuple[str, bytes]:
     clients = clients or get_default_clients()
-    blob_client = BlobClient.from_blob_url(blob_url, credential=clients.credential)
-    stream = await blob_client.download_blob()
-    data = await stream.readall()
-    if not data.startswith(b"%PDF"):
-        raise ValueError("Corrupted PDF: missing PDF header")
+    try:
+        blob_client = BlobClient.from_blob_url(blob_url, credential=clients.credential)
+        parsed = urlparse(blob_url)
+        container = parsed.path.lstrip('/').split('/')[0] if parsed.path else ''
+        blob_name = '/'.join(parsed.path.lstrip('/').split('/')[1:]) if parsed.path else ''
+        stream = await blob_client.download_blob()
+        data = await stream.readall()
+        if not data.startswith(b"%PDF"):
+            raise ValueError("Corrupted PDF: missing PDF header")
+    except Exception as ex:
+        logger.error(f"download_blob_as_base64 failed: {blob_url} container={container} blob={blob_name} :: {ex}")
+        raise
+
     import base64
 
     b64 = base64.b64encode(data).decode()
@@ -228,15 +256,12 @@ async def build_sas_url(blob_url: str, expiry_minutes: int = 60, clients: Client
                 expiry=expiry,
             )
         else:
+            logger.warning(f"build_sas_url: no account_key and no blob_service_client; cannot sign SAS for container={container} blob={blob_name}")
             return blob_url
 
         return f"https://{account}.blob.core.windows.net/{container}/{blob_name}?{sas}"
     except Exception as e:
-        # If generation fails (e.g. invalid permissions), return None or original URL?
-        # Returning None makes the UI handle it (but 404 logic in emails.py might suppress it).
-        # We'll return None to stay consistent with original logic catch block.
-        # But logging it would be good.
-        print(f"Failed to generate SAS: {e}")
+        logger.warning(f"build_sas_url failed: container={locals().get('container','?')} blob={locals().get('blob_name','?')} error={e}")
         return None
 
 
@@ -324,11 +349,23 @@ async def readiness_checks(
 
     async def _check_storage_public(timeout_s: float = 3.0) -> None:
         async def _inner():
-            # Anonymous check to verify Public Access (Container level)
-            from azure.storage.blob.aio import ContainerClient
-            url = f"{config.BLOB_ACCOUNT_URL}/{config.BLOB_CONTAINER_INPUT}".replace("//", "/").replace("https:/", "https://")
-            async with ContainerClient.from_container_url(url) as cc:
-                await cc.get_container_properties()
+            # Check if public access is configured for the container
+            # This requires either:
+            # 1. Container public access level set to "Container" or "Blob"
+            # 2. Or use authenticated client with "Storage Blob Data Reader" role
+            #
+            # Try authenticated access first (more reliable in production)
+            if clients.blob_service_client:
+                container_client = clients.blob_service_client.get_container_client(config.BLOB_CONTAINER_INPUT)
+                # Check if container exists and is accessible
+                await container_client.get_container_properties()
+                return
+            else:
+                # Fallback: try anonymous access (requires public container)
+                from azure.storage.blob.aio import ContainerClient
+                url = f"{config.BLOB_ACCOUNT_URL}/{config.BLOB_CONTAINER_INPUT}".replace("//", "/").replace("https:/", "https://")
+                async with ContainerClient.from_container_url(url) as cc:
+                    await cc.get_container_properties()
 
         await asyncio.wait_for(_inner(), timeout=timeout_s)
 

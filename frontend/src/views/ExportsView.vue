@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import {
   ArrowDownTrayIcon,
   QuestionMarkCircleIcon,
@@ -60,10 +60,7 @@ const exportJsonl = (split = 'all') => {
 const fetchStats = async () => {
     loading.value = true
     try {
-        const res = await fetch(`/api/emails/stats/summary`) // Using correct endpoint? The dashboard used /api/emails?limit=1... effectively.
-        // Actually Dashboard calls /api/emails to get stats. But /api/admin/stats/summary exists too.
-        // Let's use /api/admin/stats/summary which is lighter.
-
+        // Use admin summary endpoint for lightweight stats
         let data = {}
         const res2 = await fetch('/api/admin/stats/summary')
         if (res2.ok) {

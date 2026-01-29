@@ -55,6 +55,10 @@ const purgingDlq = ref(false)
 const connTestLoading = ref(false)
 const connTestResults = ref(null)
 
+// LLM Test State
+const llmTestLoading = ref(false)
+const llmTestResults = ref(null)
+
 // Simulate Flow State
 const simulatingFlow = ref(false)
 const useAoaiEnhancement = ref(false)
@@ -244,6 +248,7 @@ const performDlqPurge = async () => {
     }
 }
 
+// eslint-disable-next-line no-unused-vars
 const runConnectivityTest = async () => {
     connTestLoading.value = true
     connTestResults.value = null
@@ -263,6 +268,36 @@ const runConnectivityTest = async () => {
     }
 }
 
+// eslint-disable-next-line no-unused-vars
+const runLLMTests = async () => {
+    llmTestLoading.value = true
+    llmTestResults.value = null
+    try {
+        const [phi4Res, mistralRes, gptRes] = await Promise.all([
+            fetch('/api/admin/test-phi4'),
+            fetch('/api/admin/test-mistral-ocr'),
+            fetch('/api/admin/test-gpt')
+        ])
+
+        const [phi4Data, mistralData, gptData] = await Promise.all([
+            phi4Res.json(),
+            mistralRes.json(),
+            gptRes.json()
+        ])
+
+        llmTestResults.value = {
+            phi4: phi4Data,
+            mistral: mistralData,
+            gpt: gptData
+        }
+    } catch(e) {
+        alert(`LLM Test Error: ${e.message}`)
+    } finally {
+        llmTestLoading.value = false
+    }
+}
+
+// eslint-disable-next-line no-unused-vars
 const performSimulateFlow = async () => {
     simulatingFlow.value = true
     try {
@@ -562,13 +597,13 @@ onMounted(() => {
         </div>
 
         <div class="mt-6">
-          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">OCR Max Retries</label>
+          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">OCR Max Retries</label>
           <input
             v-model="settings.ocr_max_attempts"
             type="number"
             min="1"
             max="10"
-            class="mt-1 block w-full max-w-xs rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+            class="mt-1 block w-full max-w-xs rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
             :placeholder="defaults.ocr_max_attempts ?? 3"
           >
           <p class="mt-1 text-xs text-gray-500">
@@ -627,40 +662,40 @@ onMounted(() => {
           @submit.prevent="saveSettings"
         >
           <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Phi-4 Input Cost (€ / 1K tokens)</label>
-            <div class="mt-2">
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Phi-4 Input Cost (€ / 1K tokens)</label>
+            <div class="mt-1">
               <input
                 v-model="settings.phi4_input_per_1k"
                 :placeholder="defaults.phi4_input_per_1k ?? ''"
                 type="number"
                 step="0.000001"
-                class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+                class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
               >
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Phi-4 Output Cost (€ / 1K tokens)</label>
-            <div class="mt-2">
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Phi-4 Output Cost (€ / 1K tokens)</label>
+            <div class="mt-1">
               <input
                 v-model="settings.phi4_output_per_1k"
                 :placeholder="defaults.phi4_output_per_1k ?? ''"
                 type="number"
                 step="0.000001"
-                class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+                class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
               >
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Mistral OCR Cost (€ / 1K pages)</label>
-            <div class="mt-2">
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Mistral OCR Cost (€ / 1K pages)</label>
+            <div class="mt-1">
               <input
                 v-model="settings.mistral_per_1k_pages"
                 :placeholder="defaults.mistral_per_1k_pages ?? ''"
                 type="number"
                 step="0.001"
-                class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+                class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
               >
             </div>
           </div>
@@ -803,7 +838,7 @@ onMounted(() => {
                         <input
                           v-model="cat.name"
                           type="text"
-                          class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600"
+                          class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600"
                           @change="updateCategory(idx, 'name', cat.name)"
                         >
                       </div>
@@ -815,7 +850,7 @@ onMounted(() => {
                           v-model="cat.description"
                           rows="3"
                           maxlength="2000"
-                          class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono text-xs"
+                          class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono text-xs"
                           @change="updateCategory(idx, 'description', cat.description)"
                         />
                       </div>
@@ -859,19 +894,19 @@ onMounted(() => {
             >
               <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
                 <div class="sm:col-span-2">
-                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Name</label>
+                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Name</label>
                   <div class="mt-1">
                     <input
                       v-model="newCategory.name"
                       type="text"
-                      class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600"
+                      class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600"
                       placeholder="e.g. Contract Cancellation"
                     >
                   </div>
                 </div>
                 <div class="sm:col-span-4">
                   <div class="flex justify-between">
-                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Description (LLM Context)</label>
+                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Description (LLM Context)</label>
                     <span class="text-xs text-gray-500">{{ newCategory.description?.length || 0 }}/2000</span>
                   </div>
                   <div class="mt-1">
@@ -879,7 +914,7 @@ onMounted(() => {
                       v-model="newCategory.description"
                       rows="3"
                       maxlength="2000"
-                      class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono text-xs"
+                      class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono text-xs"
                       placeholder="Describe the criteria for this category..."
                     />
                   </div>
@@ -1014,136 +1049,16 @@ onMounted(() => {
       <div class="px-4 py-5 sm:p-6">
         <h3 class="text-base font-semibold leading-6 text-red-600 dark:text-red-400 flex items-center gap-2">
           <ExclamationTriangleIcon class="h-5 w-5" />
-          Admin Tools & Diagnostics
+          Danger Zone
         </h3>
         <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
           <p>
-            Advanced administrative operations for testing, troubleshooting, and environment management.
-          </p>
-        </div>
-
-        <!-- Diagnostics Section -->
-        <div class="mt-8">
-          <h4 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-            <ExclamationTriangleIcon class="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            Connectivity & Diagnostics
-          </h4>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Verify that the backend has proper permissions and network connectivity to Azure services.
-          </p>
-          <div class="mt-3 flex flex-col gap-2">
-            <div class="flex gap-2">
-              <a
-                href="/api/admin/diagnostics"
-                target="_blank"
-                class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
-              >
-                View Diagnostics
-              </a>
-              <button
-                type="button"
-                class="inline-flex items-center rounded-md bg-blue-100 px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 disabled:opacity-50"
-                :disabled="connTestLoading"
-                title="Test active read/write operations on Storage, Cosmos DB, and Service Bus"
-                @click="runConnectivityTest"
-              >
-                <ArrowPathIcon
-                  v-if="connTestLoading"
-                  class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
-                  aria-hidden="true"
-                />
-                {{ connTestLoading ? 'Testing...' : 'Run Connectivity Test' }}
-              </button>
-            </div>
-
-            <div
-              v-if="connTestResults"
-              class="mt-4 p-4 rounded-md border text-sm"
-              :class="(!connTestResults.error && connTestResults.storage_upload === 'ok' && connTestResults.cosmos_write === 'ok' && connTestResults.servicebus_connect === 'ok') ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'"
-            >
-              <div
-                v-if="connTestResults.error"
-                class="text-red-600 dark:text-red-400 font-bold mb-2"
-              >
-                Global Error: {{ connTestResults.error }}
-              </div>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <span class="font-bold block text-gray-700 dark:text-gray-300">Storage (Write/Del):</span>
-                  <span :class="connTestResults.storage_upload === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                    {{ connTestResults.storage_upload === 'ok' ? 'PASS' : 'FAIL' }}
-                  </span>
-                </div>
-                <div>
-                  <span class="font-bold block text-gray-700 dark:text-gray-300">Cosmos (Write/Del):</span>
-                  <span :class="connTestResults.cosmos_write === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                    {{ connTestResults.cosmos_write === 'ok' ? 'PASS' : 'FAIL' }}
-                  </span>
-                </div>
-                <div>
-                  <span class="font-bold block text-gray-700 dark:text-gray-300">Service Bus (Link):</span>
-                  <span :class="connTestResults.servicebus_connect === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                    {{ connTestResults.servicebus_connect === 'ok' ? 'PASS' : 'FAIL' }}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Testing Section -->
-        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
-          <h4 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-            <ExclamationTriangleIcon class="h-4 w-4 text-green-600 dark:text-green-400" />
-            End-to-End Testing
-          </h4>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Generate synthetic emails and send them through the complete pipeline for testing.
-          </p>
-
-          <!-- AOAI Enhancement Toggle -->
-          <div class="mt-4 flex items-center">
-            <div class="flex h-6 items-center">
-              <input
-                id="use_aoai"
-                v-model="useAoaiEnhancement"
-                type="checkbox"
-                class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-600 dark:bg-gray-700 dark:border-gray-600"
-              >
-            </div>
-            <div class="ml-3 text-sm leading-6">
-              <label
-                for="use_aoai"
-                class="font-medium text-gray-900 dark:text-white"
-              >Enhance with AOAI</label>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                If enabled and AZURE_OPENAI_ENDPOINT is configured, generates realistic AI-enhanced emails instead of templates.
-              </p>
-            </div>
-          </div>
-
-          <div class="mt-3 flex gap-2">
-            <button
-              type="button"
-              class="inline-flex items-center rounded-md bg-green-100 px-3 py-2 text-sm font-semibold text-green-700 shadow-sm hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50 disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="simulatingFlow"
-              @click="performSimulateFlow"
-            >
-              <ArrowPathIcon
-                v-if="simulatingFlow"
-                class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
-                aria-hidden="true"
-              />
-              {{ simulatingFlow ? 'Generating & Uploading...' : 'Simulate Flow' }}
-            </button>
-          </div>
-          <p class="mt-2 text-xs text-gray-600 dark:text-gray-400">
-            Creates a random email (Attestation, Resignation, Water Damage, etc.) and uploads it to test the full classification pipeline.
+            Destructive operations that cannot be undone. Proceed with caution.
           </p>
         </div>
 
         <!-- Dead Letter Queue Management -->
-        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+        <div class="mt-8">
           <h4 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
             <ExclamationTriangleIcon class="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
             Dead Letter Queue (DLQ) Management

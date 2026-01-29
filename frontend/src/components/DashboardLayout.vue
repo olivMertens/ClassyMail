@@ -13,7 +13,9 @@ import {
   InformationCircleIcon,
   CodeBracketSquareIcon,
   BookOpenIcon,
-  TableCellsIcon // Added icon import
+  TableCellsIcon,
+  CheckCircleIcon,
+  ArrowPathIcon
 } from '@heroicons/vue/24/outline'
 import InfoModal from './InfoModal.vue'
 
@@ -27,8 +29,12 @@ const emit = defineEmits(['change-view'])
 const { t } = useI18n()
 
 const sidebarOpen = ref(false)
+const sidebarCollapsed = ref(false)
 const showInfoModal = ref(false)
+const showConnectionModal = ref(false)
 const isDark = ref(document.documentElement.classList.contains('dark'))
+const connectionStatus = ref(null)
+const checkingConnection = ref(false)
 
 const toggleDarkMode = () => {
   isDark.value = !isDark.value
@@ -38,6 +44,19 @@ const toggleDarkMode = () => {
   } else {
     document.documentElement.classList.remove('dark')
     localStorage.setItem('classimail-dark', 'false')
+  }
+}
+
+const checkConnectivity = async () => {
+  checkingConnection.value = true
+  try {
+    const response = await fetch('/api/health/readyz')
+    const data = await response.json()
+    connectionStatus.value = data
+  } catch (error) {
+    connectionStatus.value = { error: error.message }
+  } finally {
+    checkingConnection.value = false
   }
 }
 
@@ -97,11 +116,37 @@ const navigation = computed(() => [
     </div>
 
     <!-- Desktop sidebar -->
-    <div class="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col shadow-lg z-30">
+    <div
+      class="hidden md:fixed md:inset-y-0 md:flex md:flex-col shadow-lg z-30 transition-all duration-300"
+      :class="sidebarCollapsed ? 'md:w-16' : 'md:w-64'"
+    >
       <div class="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
-        <div class="flex items-center h-16 flex-shrink-0 px-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-          <span class="text-2xl mr-2">📧</span>
-          <span class="text-xl font-bold text-gray-900 dark:text-white">ClassiMail</span>
+        <div class="flex items-center h-16 flex-shrink-0 px-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 justify-between">
+          <div
+            v-if="!sidebarCollapsed"
+            class="flex items-center"
+          >
+            <span class="text-2xl mr-2">📧</span>
+            <span class="text-xl font-bold text-gray-900 dark:text-white">ClassiMail</span>
+          </div>
+          <span
+            v-else
+            class="text-2xl mx-auto"
+          >📧</span>
+          <button
+            class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+            :class="sidebarCollapsed ? 'mx-auto' : ''"
+            @click="sidebarCollapsed = !sidebarCollapsed"
+          >
+            <Bars3Icon
+              v-if="sidebarCollapsed"
+              class="h-6 w-6 text-gray-500 dark:text-gray-400"
+            />
+            <XMarkIcon
+              v-else
+              class="h-6 w-6 text-gray-500 dark:text-gray-400"
+            />
+          </button>
         </div>
         <div class="flex-1 flex flex-col overflow-y-auto">
           <nav class="flex-1 px-2 py-4 space-y-1">
@@ -110,22 +155,35 @@ const navigation = computed(() => [
               :key="item.name"
               href="#"
               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md"
-              :class="[currentView === item.id ? 'bg-primary-50 text-primary-600 dark:bg-gray-700 dark:text-white' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white']"
+              :class="[
+                currentView === item.id ? 'bg-primary-50 text-primary-600 dark:bg-gray-700 dark:text-white' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white',
+                sidebarCollapsed ? 'justify-center' : ''
+              ]"
+              :title="sidebarCollapsed ? item.name : ''"
               @click.prevent="emit('change-view', item.id)"
             >
               <component
                 :is="item.icon"
-                class="mr-3 h-5 w-5 flex-shrink-0"
-                :class="[currentView === item.id ? 'text-primary-600 dark:text-white' : 'text-gray-400 group-hover:text-gray-500 dark:text-gray-400 dark:group-hover:text-gray-300']"
+                class="h-5 w-5 flex-shrink-0"
+                :class="[
+                  currentView === item.id ? 'text-primary-600 dark:text-white' : 'text-gray-400 group-hover:text-gray-500 dark:text-gray-400 dark:group-hover:text-gray-300',
+                  sidebarCollapsed ? '' : 'mr-3'
+                ]"
                 aria-hidden="true"
               />
-              {{ item.name }}
+              <span v-if="!sidebarCollapsed">{{ item.name }}</span>
             </a>
           </nav>
         </div>
         <!-- User/Footer area -->
-        <div class="flex-shrink-0 flex border-t border-gray-200 dark:border-gray-700 p-4">
-          <div class="flex items-center w-full">
+        <div
+          class="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          @click="showConnectionModal = true; checkConnectivity()"
+        >
+          <div
+            v-if="!sidebarCollapsed"
+            class="flex items-center w-full"
+          >
             <div class="ml-3">
               <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
                 Microsoft G2S POC
@@ -135,12 +193,21 @@ const navigation = computed(() => [
               </p>
             </div>
           </div>
+          <div
+            v-else
+            class="flex justify-center"
+          >
+            <InformationCircleIcon class="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Content Area -->
-    <div class="flex flex-col md:pl-64 flex-1 h-screen overflow-hidden">
+    <div
+      class="flex flex-col flex-1 h-screen overflow-hidden transition-all duration-300"
+      :class="sidebarCollapsed ? 'md:pl-16' : 'md:pl-64'"
+    >
       <!-- Top bar -->
       <div class="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white dark:bg-gray-800 shadow dark:shadow-gray-900/20 md:hidden">
         <button
@@ -201,7 +268,7 @@ const navigation = computed(() => [
 
       <!-- Main Content Scroller -->
       <main class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
-        <div class="mx-auto w-full">
+        <div class="mx-auto w-full max-w-[1600px]">
           <slot />
         </div>
       </main>
@@ -211,5 +278,259 @@ const navigation = computed(() => [
       @close="showInfoModal = false"
       @navigate="(view) => { showInfoModal = false; emit('change-view', view) }"
     />
+
+    <!-- Connection Status Modal -->
+    <div
+      v-if="showConnectionModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75 p-4"
+    >
+      <div class="relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl border border-gray-200 dark:border-gray-700">
+        <div class="bg-white dark:bg-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div class="flex justify-between items-center">
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
+              Service Connection Status
+            </h3>
+            <div class="flex gap-2 items-center">
+              <button
+                class="px-4 py-2 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                :disabled="checkingConnection"
+                @click="checkConnectivity"
+              >
+                <span class="flex items-center gap-2">
+                  <ArrowPathIcon
+                    class="h-4 w-4"
+                    :class="{ 'animate-spin': checkingConnection }"
+                  />
+                  Check Connectivity
+                </span>
+              </button>
+              <button
+                class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-200"
+                @click="showConnectionModal = false"
+              >
+                <XMarkIcon class="h-6 w-6" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="px-6 py-4 max-h-[70vh] overflow-y-auto">
+          <div
+            v-if="checkingConnection"
+            class="text-center py-8 text-gray-500 dark:text-gray-400"
+          >
+            <ArrowPathIcon class="h-8 w-8 animate-spin mx-auto mb-2" />
+            Checking connections...
+          </div>
+
+          <div
+            v-else-if="connectionStatus"
+            class="space-y-4"
+          >
+            <!-- Connection Status Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div
+                class="p-4 rounded-lg border"
+                :class="connectionStatus.credential ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="flex-shrink-0">
+                    <CheckCircleIcon
+                      v-if="connectionStatus.credential"
+                      class="h-8 w-8 text-green-600 dark:text-green-400"
+                    />
+                    <XMarkIcon
+                      v-else
+                      class="h-8 w-8 text-red-600 dark:text-red-400"
+                    />
+                  </div>
+                  <div>
+                    <h4
+                      class="text-sm font-semibold"
+                      :class="connectionStatus.credential ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'"
+                    >
+                      Credential Connection
+                    </h4>
+                    <p
+                      class="text-xs"
+                      :class="connectionStatus.credential ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'"
+                    >
+                      {{ connectionStatus.credential ? 'Connected & Authenticated' : 'Error: ' + (connectionStatus.failures?.credential || 'Unknown') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="p-4 rounded-lg border"
+                :class="connectionStatus.servicebus ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="flex-shrink-0">
+                    <CheckCircleIcon
+                      v-if="connectionStatus.servicebus"
+                      class="h-8 w-8 text-green-600 dark:text-green-400"
+                    />
+                    <XMarkIcon
+                      v-else
+                      class="h-8 w-8 text-red-600 dark:text-red-400"
+                    />
+                  </div>
+                  <div>
+                    <h4
+                      class="text-sm font-semibold"
+                      :class="connectionStatus.servicebus ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'"
+                    >
+                      Servicebus Connection
+                    </h4>
+                    <p
+                      class="text-xs"
+                      :class="connectionStatus.servicebus ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'"
+                    >
+                      {{ connectionStatus.servicebus ? 'Connected & Authenticated' : 'Error: ' + (connectionStatus.failures?.servicebus || 'Unknown') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="p-4 rounded-lg border"
+                :class="connectionStatus.storage ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="flex-shrink-0">
+                    <CheckCircleIcon
+                      v-if="connectionStatus.storage"
+                      class="h-8 w-8 text-green-600 dark:text-green-400"
+                    />
+                    <XMarkIcon
+                      v-else
+                      class="h-8 w-8 text-red-600 dark:text-red-400"
+                    />
+                  </div>
+                  <div>
+                    <h4
+                      class="text-sm font-semibold"
+                      :class="connectionStatus.storage ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'"
+                    >
+                      Storage Connection
+                    </h4>
+                    <p
+                      class="text-xs"
+                      :class="connectionStatus.storage ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'"
+                    >
+                      {{ connectionStatus.storage ? 'Connected & Authenticated' : 'Error: ' + (connectionStatus.failures?.storage || 'Unknown') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="p-4 rounded-lg border"
+                :class="connectionStatus.storage_public ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="flex-shrink-0">
+                    <CheckCircleIcon
+                      v-if="connectionStatus.storage_public"
+                      class="h-8 w-8 text-green-600 dark:text-green-400"
+                    />
+                    <XMarkIcon
+                      v-else
+                      class="h-8 w-8 text-red-600 dark:text-red-400"
+                    />
+                  </div>
+                  <div>
+                    <h4
+                      class="text-sm font-semibold"
+                      :class="connectionStatus.storage_public ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'"
+                    >
+                      Storage Public Connection
+                    </h4>
+                    <p
+                      class="text-xs"
+                      :class="connectionStatus.storage_public ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'"
+                    >
+                      {{ connectionStatus.storage_public ? 'Connected & Authenticated' : 'Error: ' + (connectionStatus.failures?.storage_public || 'Unknown') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="p-4 rounded-lg border"
+                :class="connectionStatus.cosmos ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="flex-shrink-0">
+                    <CheckCircleIcon
+                      v-if="connectionStatus.cosmos"
+                      class="h-8 w-8 text-green-600 dark:text-green-400"
+                    />
+                    <XMarkIcon
+                      v-else
+                      class="h-8 w-8 text-red-600 dark:text-red-400"
+                    />
+                  </div>
+                  <div>
+                    <h4
+                      class="text-sm font-semibold"
+                      :class="connectionStatus.cosmos ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'"
+                    >
+                      Cosmos Connection
+                    </h4>
+                    <p
+                      class="text-xs"
+                      :class="connectionStatus.cosmos ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'"
+                    >
+                      {{ connectionStatus.cosmos ? 'Connected & Authenticated' : 'Error: ' + (connectionStatus.failures?.cosmos || 'Unknown') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="p-4 rounded-lg border"
+                :class="connectionStatus.ai ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="flex-shrink-0">
+                    <CheckCircleIcon
+                      v-if="connectionStatus.ai"
+                      class="h-8 w-8 text-green-600 dark:text-green-400"
+                    />
+                    <XMarkIcon
+                      v-else
+                      class="h-8 w-8 text-red-600 dark:text-red-400"
+                    />
+                  </div>
+                  <div>
+                    <h4
+                      class="text-sm font-semibold"
+                      :class="connectionStatus.ai ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'"
+                    >
+                      Ai Connection
+                    </h4>
+                    <p
+                      class="text-xs"
+                      :class="connectionStatus.ai ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'"
+                    >
+                      {{ connectionStatus.ai ? 'Connected & Authenticated' : 'Error: ' + (connectionStatus.failures?.ai || 'Unknown') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-else
+            class="text-center py-8 text-gray-500 dark:text-gray-400"
+          >
+            Click "Check Connectivity" to test connections
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

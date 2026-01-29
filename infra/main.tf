@@ -150,11 +150,19 @@ resource "azapi_resource" "ai_foundry" {
     identity = { type = "SystemAssigned" }
     properties = {
       publicNetworkAccess    = "Enabled"
-      disableLocalAuth       = true
+      disableLocalAuth       = false
       allowProjectManagement = true
       customSubDomainName    = "${var.prefix}-aifoundry"
     }
   })
+}
+
+resource "azapi_resource_action" "ai_foundry_keys" {
+  type                   = "Microsoft.CognitiveServices/accounts@2025-06-01"
+  resource_id            = azapi_resource.ai_foundry.id
+  action                 = "listKeys"
+  method                 = "POST"
+  response_export_values = ["key1"]
 }
 
 # Note: Le déploiement des modèles (Mistral/Phi) se fait souvent manuellement
@@ -375,6 +383,11 @@ output "AZURE_COSMOS_KEY" {
   value     = var.cosmos_use_rbac ? null : azurerm_cosmosdb_account.db.primary_key
   sensitive = true
 }
+
+output "AZURE_AI_KEY" {
+  value     = jsondecode(azapi_resource_action.ai_foundry_keys.output).key1
+  sensitive = true
+}
 variable "container_image" {
   type        = string
   description = "Container image (registry/repo:tag) to deploy to Container Apps (API & worker)."
@@ -461,6 +474,11 @@ resource "azurerm_container_app" "api" {
     identity_ids = [azurerm_user_assigned_identity.app_id.id]
   }
 
+  secret {
+    name  = "azure-ai-key"
+    value = jsondecode(azapi_resource_action.ai_foundry_keys.output).key1
+  }
+
   template {
     container {
       name   = "api"
@@ -471,6 +489,10 @@ resource "azurerm_container_app" "api" {
       env {
         name  = "PORT"
         value = "8000"
+      }
+      env {
+        name        = "AZURE_AI_KEY"
+        secret_name = "azure-ai-key"
       }
       env {
         name  = "AZURE_CLIENT_ID"
@@ -532,7 +554,7 @@ resource "azurerm_container_app" "api" {
       }
       env {
         name  = "MISTRAL_DEPLOYMENT"
-        value = "mistral-document-ai-2505"
+        value = "mistral-ocr-2505"
       }
       env {
         name  = "MISTRAL_MODE"
@@ -644,6 +666,11 @@ resource "azurerm_container_app" "worker" {
     identity_ids = [azurerm_user_assigned_identity.app_id.id]
   }
 
+  secret {
+    name  = "azure-ai-key"
+    value = jsondecode(azapi_resource_action.ai_foundry_keys.output).key1
+  }
+
   template {
     container {
       name    = "worker"
@@ -656,6 +683,10 @@ resource "azurerm_container_app" "worker" {
       env {
         name  = "ENABLE_WORKER"
         value = "true"
+      }
+      env {
+        name        = "AZURE_AI_KEY"
+        secret_name = "azure-ai-key"
       }
       env {
         name  = "AZURE_CLIENT_ID"
@@ -716,7 +747,7 @@ resource "azurerm_container_app" "worker" {
       }
       env {
         name  = "MISTRAL_DEPLOYMENT"
-        value = "mistral-document-ai-2505"
+        value = "mistral-ocr-2505"
       }
       env {
         name  = "AZURE_AI_API_VERSION"

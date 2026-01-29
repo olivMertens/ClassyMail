@@ -56,28 +56,128 @@ def clamp_text_to_token_budget(text: str, max_tokens: int) -> tuple[str, bool]:
     return text[:max_chars], True
 
 
+def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = False, data: dict | None = None) -> tuple[str, list[dict]]:
+    """
+    Combine OCR pages into markdown and log per-page metrics.
+    Logs:
+    - total pages received
+    - per-page markdown length and image count
+    - warnings for empty pages
+    - final combined content stats
+    - raw response preview on empty content error
+    """
+    logger.info(f"[metrics] OCR Response: {len(ocr_pages)} pages received from Mistral Document AI")
+
+    markdown_parts: list[str] = []
+    total_content_chars = 0
+    annotated_images: list[dict] = []
+
+    for page_idx, page in enumerate(ocr_pages):
+        page_md = page.get("markdown", "") or ""
+        page_images = page.get("images", []) or []
+        logger.info(f"[metrics] Page {page_idx}: markdown_length={len(page_md)} chars, images={len(page_images)}")
+        if not page_md.strip() and not page_images:
+            logger.warning(f"[metrics] Page {page_idx}: empty content")
+
+        total_content_chars += len(page_md)
+
+        if page_md:
+            markdown_parts.append(page_md)
+
+        if page_images and enable_vision_enrichment:
+            image_notes = []
+            for img in page_images:
+                summary = img.get("summary")
+                details = img.get("details")
+                img_type = img.get("image_type") or img.get("type")
+                if summary or details:
+                    note = f"> [Visual Content ({img_type or 'image'})]: {summary} | Details: {details}"
+                    image_notes.append(note)
+            if image_notes:
+                markdown_parts.append("\n\n--- Visual Context ---\n" + "\n".join(image_notes) + "\n----------------------\n")
+
+        for img in page_images:
+            annotated_images.append({
+                "id": img.get("id"),
+                "page_index": page_idx,
+                "image_type": img.get("type") or img.get("image_type"),
+                "description": img.get("description") or img.get("summary"),
+                "bbox": img.get("bbox"),
+                "details": img.get("details"),
+                "is_relevant": img.get("is_relevant"),
+            })
+
+    content = "\n\n".join(markdown_parts)
+    logger.info(f"[metrics] OCR Final combined content: {len(content)} chars (from {total_content_chars} chars across {len(ocr_pages)} pages)")
+
+    if not content.strip():
+        logger.error(f"[metrics] OCR Failed: Empty content after combining {len(ocr_pages)} pages. Raw response preview: {str(data)[:500] if data else ''}")
+        raise OCRFailed("Empty OCR content from Mistral Document AI")
+
+    return content, annotated_images
+
+
 async def ocr_with_mistral(
     base64_pdf: str,
     clients: Clients | None = None,
     include_images: bool = False,
     enable_vision_enrichment: bool = False
 ) -> dict:
-    headers = await auth_headers(clients=clients)
+    ocr_pages = []
+    # Use central auth headers helper
+    headers = await auth_headers(clients=clients, model_type="mistral")
 
     settings = load_settings()
     attempts = max(1, min(10, int(settings.get("ocr_max_attempts", getattr(config, "MISTRAL_OCR_MAX_ATTEMPTS", 3)))))
 
     # Mistral Document AI API format (Microsoft Foundry)
-    payload = {
-        "model": config.MISTRAL_DEPLOYMENT,
-        "document": {
-            "type": "document_url",
-            "document_url": f"data:application/pdf;base64,{base64_pdf}"
-        }
-    }
+    # Per user feedback, we use image_url with data: URI.
+    # We also attempt to convert PDF to images for better robustness on Azure.
+    try:
+        import fitz
+        from PIL import Image
+        import io
+        import base64
 
-    if include_images:
-        payload["include_image_base64"] = "true"
+        pdf_data = base64.b64decode(base64_pdf)
+        doc = fitz.open(stream=pdf_data, filetype="pdf")
+
+        # If it's a multi-page PDF, we send it as a list of images if possible,
+        # or combine them depending on the API's capabilities.
+        # For now, let's start with the first page to confirm the path,
+        # but the goal is to support multipage.
+        images_data_uris = []
+        for page_idx in range(len(doc)):
+            page = doc.load_page(page_idx)
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=85)
+            img_b64 = base64.b64encode(buf.getvalue()).decode()
+            images_data_uris.append(f"data:image/jpeg;base64,{img_b64}")
+        doc.close()
+
+        # Mistral OCR supports multiple images in a list
+        image_payload = images_data_uris[0] if len(images_data_uris) == 1 else images_data_uris
+
+        payload = {
+            "model": config.MISTRAL_DEPLOYMENT,
+            "document": {
+                "type": "image_url",
+                "image_url": image_payload
+            },
+            "include_image_base64": include_images
+        }
+    except Exception as e:
+        logger.warning(f"Failed to convert PDF to images, falling back to raw PDF base64: {e}")
+        payload = {
+            "model": config.MISTRAL_DEPLOYMENT,
+            "document": {
+                "type": "image_url",
+                "image_url": f"data:application/pdf;base64,{base64_pdf}"
+            },
+            "include_image_base64": include_images
+        }
 
     if enable_vision_enrichment:
         # Use bbox_annotation to describe images found by OCR
@@ -91,9 +191,18 @@ async def ocr_with_mistral(
     if not config.MISTRAL_ENDPOINT:
         raise RuntimeError("MISTRAL_ENDPOINT not configured.")
 
-    url = config.MISTRAL_ENDPOINT.rstrip('/')
+    base_end = config.MISTRAL_ENDPOINT.rstrip('/')
+    # Strict fallback: if the endpoint doesn't already end with the MaaS OCR path, append it.
+    # We only support /providers/mistral/azure/ocr for MaaS.
+    if base_end.endswith("/providers/mistral/azure/ocr"):
+        url = base_end
+    else:
+        url = f"{base_end}/providers/mistral/azure/ocr"
+
 
     processing_log: list[dict] = []
+    ocr_pages: list = []
+    usage_info: dict = {}
 
     with tracer.start_as_current_span("mistral_document_ai") as span:
         span.set_attribute("gen_ai.system", "mistral")
@@ -123,6 +232,9 @@ async def ocr_with_mistral(
 
                     try:
                         data = resp.json()
+                        # Mistral Document AI returns: {"pages": [{"markdown": "...", "images": [...]}]}
+                        ocr_pages = data.get("pages", [])
+                        usage_info = data.get("usage", {})
                     except json.JSONDecodeError as ex:
                         response_text = resp.text[:1000]
                         headers_snippet = {k: v for k, v in resp.headers.items() if k.lower() in ("content-type", "x-ms-error-code", "date")}
@@ -138,70 +250,23 @@ async def ocr_with_mistral(
                         span.record_exception(ex)
                         raise OCRFailed(f"stage=ocr: Invalid JSON response from Mistral: {ex}", processing_log=processing_log, retryable=True)
 
-                    # Mistral Document AI returns: {"pages": [{"markdown": "...", "images": [...]}]}
-                    pages = data.get("pages", [])
-
-                if not pages:
+                if not ocr_pages:
+                    logger.error(f"[metrics] OCR Failed: No pages in Mistral Document AI response. Raw response preview: {str(data)[:500]}")
                     raise OCRFailed("No pages in Mistral Document AI response")
 
-            # Combine markdown from all pages
-            markdown_parts = []
+                # Success - the loop will exit because no exception was raised in the 'with attempt' block
 
-            for page_idx, page in enumerate(pages):
-                page_md = page.get("markdown", "")
+        content, annotated_images = _combine_ocr_pages(ocr_pages, enable_vision_enrichment=enable_vision_enrichment, data=data)
 
-                # Check for image annotations to enrich context
-                page_images = page.get("images", [])
-                image_notes = []
-                for img in page_images:
-                    # Mistral returns the annotation directly in the image object or under specific keys
-                    # Depending on API version, sometimes it merges the schema fields into the image dict.
-                    # We check for our expected fields.
-                    if enable_vision_enrichment:
-                        # Extract fields defined in ImageDescription
-                        summary = img.get("summary")
-                        details = img.get("details")
-                        img_type = img.get("image_type")
+        pages_count = len(ocr_pages)
 
-                        if summary or details:
-                            note = f"> [Visual Content ({img_type or 'image'})]: {summary} | Details: {details}"
-                            image_notes.append(note)
+        logger.info(f"[metrics] OCR Success: {pages_count} pages processed")
 
-                if page_md:
-                    markdown_parts.append(page_md)
+        span.set_attribute("gen_ai.usage.pages_processed", pages_count)
+        span.set_attribute("gen_ai.usage.input_tokens", usage_info.get("prompt_tokens", 0))
+        span.set_attribute("gen_ai.usage.output_tokens", usage_info.get("completion_tokens", 0))
 
-                if image_notes:
-                    markdown_parts.append("\n\n--- Visual Context ---\n" + "\n".join(image_notes) + "\n----------------------\n")
-
-            content = "\n\n".join(markdown_parts)
-            if not content.strip():
-                raise OCRFailed("Empty OCR content from Mistral Document AI")
-
-            # Extract image annotations if present
-            annotated_images = []
-            for page_idx, page in enumerate(pages):
-                for img in page.get("images", []):
-                    # Basic extraction for returning raw data
-                    annotated_images.append({
-                        "id": img.get("id"),
-                        "page_index": page_idx,
-                        "image_type": img.get("type") or img.get("image_type"), # Handle both standard and annotated key
-                        "description": img.get("description") or img.get("summary"), # Fallback
-                        "bbox": img.get("bbox"),
-                        "details": img.get("details"),
-                        "is_relevant": img.get("is_relevant")
-                    })
-
-            usage_info = data.get("usage", {})
-            pages_count = len(pages)
-
-            logger.info(f"[metrics] OCR Success: {pages_count} pages processed")
-
-            span.set_attribute("gen_ai.usage.pages_processed", pages_count)
-            span.set_attribute("gen_ai.usage.input_tokens", usage_info.get("prompt_tokens", 0))
-            span.set_attribute("gen_ai.usage.output_tokens", usage_info.get("completion_tokens", 0))
-
-            return {"markdown": content, "usage": usage_info, "images": annotated_images}
+        return {"markdown": content, "usage": usage_info, "images": annotated_images}
 
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10), retry=retry_if_exception(retryable_httpx))
