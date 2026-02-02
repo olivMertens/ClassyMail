@@ -23,177 +23,208 @@ const reprocessing = ref(false)
 const intentsJson = ref('[]')
 const availableCategories = ref([])
 const correctionReason = ref('')
-const activeTab = ref('review') // review | history
+const activeTab = ref('review') // review | comparison | history
 
 const pdfUrl = computed(() => email.value?.file_url_proxy || email.value?.file_url_sas || email.value?.file_url || null)
 
 // New Multi-select state
 const selectedCategoryNames = ref([])
 const customCategories = ref([])
+const isComparing = ref(false)
+
+const latestComparison = computed(() => {
+  if (!email.value?.comparison_results || email.value.comparison_results.length === 0) return null
+  return email.value.comparison_results[email.value.comparison_results.length - 1]
+})
 
 const loadSettings = async () => {
-    try {
-        const res = await fetch('/api/settings')
-        if (res.ok) {
-            const data = await res.json()
-            availableCategories.value = data.categories || []
-        }
-    } catch (e) { console.error(e) }
+  try {
+    const res = await fetch('/api/settings')
+    if (res.ok) {
+      const data = await res.json()
+      availableCategories.value = data.categories || []
+    }
+  } catch (e) { console.error(e) }
 }
 
 const loadEmail = async () => {
-    if (!props.emailId) return
-    loading.value = true
-    correctionReason.value = ''
-    selectedCategoryNames.value = []
-    customCategories.value = []
+  if (!props.emailId) return
+  loading.value = true
+  correctionReason.value = ''
+  selectedCategoryNames.value = []
+  customCategories.value = []
+  isComparing.value = false
 
-    try {
-        const res = await fetch(`/api/emails/${props.emailId}`)
-        if (res.ok) {
-            email.value = await res.json()
-            intentsJson.value = JSON.stringify(email.value.classification?.detected_intents || [], null, 2)
-            correctionReason.value = email.value.correction_reason || ''
+  try {
+    const res = await fetch(`/api/emails/${props.emailId}`)
+    if (res.ok) {
+      email.value = await res.json()
+      intentsJson.value = JSON.stringify(email.value.classification?.detected_intents || [], null, 2)
+      correctionReason.value = email.value.correction_reason || ''
 
-            // Populate selection from current intent
-            const currentIntents = email.value.classification?.detected_intents || []
-            currentIntents.forEach(i => {
-                const name = i.intent
-                if (availableCategories.value.find(c => c.name === name)) {
-                    if (!selectedCategoryNames.value.includes(name)) {
-                        selectedCategoryNames.value.push(name)
-                    }
-                } else {
-                    // It's a custom or old category
-                    if (!customCategories.value.includes(name)) {
-                        customCategories.value.push(name)
-                        if (!selectedCategoryNames.value.includes(name)) {
-                            selectedCategoryNames.value.push(name)
-                        }
-                    }
-                }
-            })
+      // Populate selection from current intent
+      const currentIntents = email.value.classification?.detected_intents || []
+      currentIntents.forEach(i => {
+        const name = i.intent
+        if (availableCategories.value.find(c => c.name === name)) {
+          if (!selectedCategoryNames.value.includes(name)) {
+            selectedCategoryNames.value.push(name)
+          }
+        } else {
+          // It's a custom or old category
+          if (!customCategories.value.includes(name)) {
+            customCategories.value.push(name)
+            if (!selectedCategoryNames.value.includes(name)) {
+              selectedCategoryNames.value.push(name)
+            }
+          }
         }
-    } catch (e) {
-        console.error(e)
-    } finally {
-        loading.value = false
+      })
     }
+  } catch (e) {
+    console.error(e)
+  } finally {
+    loading.value = false
+  }
 }
 
 const toggleCategory = (name) => {
-    if (selectedCategoryNames.value.includes(name)) {
-        selectedCategoryNames.value = selectedCategoryNames.value.filter(n => n !== name)
-    } else {
-        selectedCategoryNames.value.push(name)
-    }
+  if (selectedCategoryNames.value.includes(name)) {
+    selectedCategoryNames.value = selectedCategoryNames.value.filter(n => n !== name)
+  } else {
+    selectedCategoryNames.value.push(name)
+  }
 }
 
 const addCustomCategory = () => {
-    const name = prompt("Enter new category name:")
-    if (name) {
-        if (!customCategories.value.includes(name)) {
-            customCategories.value.push(name)
-        }
-        if (!selectedCategoryNames.value.includes(name)) {
-            selectedCategoryNames.value.push(name)
-        }
+  const name = prompt("Enter new category name:")
+  if (name) {
+    if (!customCategories.value.includes(name)) {
+      customCategories.value.push(name)
     }
+    if (!selectedCategoryNames.value.includes(name)) {
+      selectedCategoryNames.value.push(name)
+    }
+  }
+}
+
+const runComparison = async () => {
+  if (!email.value) return
+  isComparing.value = true
+  try {
+    const res = await fetch(`/api/emails/${email.value.id}/reclassify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'both', mode: 'sync' })
+    })
+    if (res.ok) {
+      // Reload email to get updated comparison results
+      await loadEmail()
+      activeTab.value = 'comparison'
+    } else {
+      alert('Error running comparison')
+    }
+  } catch (e) {
+    console.error(e)
+    alert('Error running comparison: ' + e.message)
+  } finally {
+    isComparing.value = false
+  }
 }
 
 const reprocess = async () => {
-    if (!email.value) return
-    reprocessing.value = true
-    try {
-        const res = await fetch(`/api/emails/${email.value.id}/reprocess`, { method: 'POST' })
-        if (res.ok) {
-            alert('Reprocessing started')
-            emit('close')
-        } else {
-            alert('Error reprocessing')
-        }
-    } catch (e) {
-        alert('Error reprocessing')
-    } finally {
-        reprocessing.value = false
+  if (!email.value) return
+  reprocessing.value = true
+  try {
+    const res = await fetch(`/api/emails/${email.value.id}/reprocess`, { method: 'POST' })
+    if (res.ok) {
+      alert('Reprocessing started')
+      emit('close')
+    } else {
+      alert('Error reprocessing')
     }
+  } catch (e) {
+    alert('Error reprocessing')
+  } finally {
+    reprocessing.value = false
+  }
 }
 
 const markAsInvalid = async () => {
-     if (!confirm("Are you sure you want to mark this email as Invalid/Garbage?")) return;
+  if (!confirm("Are you sure you want to mark this email as Invalid/Garbage?")) return;
 
-     if (!correctionReason.value || !correctionReason.value.trim() || correctionReason.value.trim().length < 5) {
-        alert("Please provide a reason or comment for marking this email as Invalid (at least 5 characters).")
-        return
-     }
+  if (!correctionReason.value || !correctionReason.value.trim() || correctionReason.value.trim().length < 5) {
+    alert("Please provide a reason or comment for marking this email as Invalid (at least 5 characters).")
+    return
+  }
 
-     try {
-        const payload = { status: 'INVALID', reason: correctionReason.value }
-        const res = await fetch(`/api/emails/${email.value.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-        if (res.ok) {
-            emit('updated')
-            emit('close')
-        }
-     } catch (e) { alert("Error saving") }
+  try {
+    const payload = { status: 'INVALID', reason: correctionReason.value }
+    const res = await fetch(`/api/emails/${email.value.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (res.ok) {
+      emit('updated')
+      emit('close')
+    }
+  } catch (e) { alert("Error saving") }
 }
 
 const saveIntents = async () => {
-    if (!email.value) return
+  if (!email.value) return
 
-    // Validation: Require correction reason ALWAYS if validating manually
-    // The user requirement is "obligation of a comment for the user" when verifying/reassigning
-    if (!correctionReason.value || !correctionReason.value.trim() || correctionReason.value.trim().length < 5) {
-        alert("Please provide a valid reason or comment for this classification (at least 5 characters). This is required for reinforcement learning.")
-        return
+  // Validation: Require correction reason ALWAYS if validating manually
+  // The user requirement is "obligation of a comment for the user" when verifying/reassigning
+  if (!correctionReason.value || !correctionReason.value.trim() || correctionReason.value.trim().length < 5) {
+    alert("Please provide a valid reason or comment for this classification (at least 5 characters). This is required for reinforcement learning.")
+    return
+  }
+
+  try {
+    // Construct intents from selection
+    // We assume 1.0 confidence for manual selection
+    const newIntents = selectedCategoryNames.value.map(name => ({
+      intent: name,
+      confidence: 1.0,
+      justification: "Manually selected by user"
+    }))
+
+    const payload = { intents: newIntents, reason: correctionReason.value }
+    const res = await fetch(`/api/emails/${email.value.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (res.ok) {
+      emit('updated')
+      emit('close')
     }
-
-    try {
-        // Construct intents from selection
-        // We assume 1.0 confidence for manual selection
-        const newIntents = selectedCategoryNames.value.map(name => ({
-            intent: name,
-            confidence: 1.0,
-            justification: "Manually selected by user"
-        }))
-
-        const payload = { intents: newIntents, reason: correctionReason.value }
-        const res = await fetch(`/api/emails/${email.value.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-        if (res.ok) {
-            emit('updated')
-            emit('close')
-        }
-    } catch (e) {
-        alert('Error Saving')
-    }
+  } catch (e) {
+    alert('Error Saving')
+  }
 }
 
 watch(() => props.isOpen, (newVal) => {
-    if (newVal) {
-        loadSettings().then(loadEmail)
-    } else {
-        email.value = null
-        activeTab.value = 'review'
-    }
+  if (newVal) {
+    loadSettings().then(loadEmail)
+  } else {
+    email.value = null
+    activeTab.value = 'review'
+  }
 })
 
 const parseArrivalDate = (fileUrl) => {
-    if (!fileUrl) return null
-    try {
-        const m = fileUrl.match(/uploads\/(\d{4})\/(\d{2})\/(\d{2})\//)
-        if (m) {
-            const [, y, mo, d] = m
-            return new Date(`${y}-${mo}-${d}T00:00:00Z`)
-        }
-    } catch (e) { /* ignore */ }
-    return null
+  if (!fileUrl) return null
+  try {
+    const m = fileUrl.match(/uploads\/(\d{4})\/(\d{2})\/(\d{2})\//)
+    if (m) {
+      const [, y, mo, d] = m
+      return new Date(`${y}-${mo}-${d}T00:00:00Z`)
+    }
+  } catch (e) { /* ignore */ }
+  return null
 }
 
 const renderMarkdown = (text) => md.render(text || '')
@@ -211,9 +242,13 @@ const renderMarkdown = (text) => md.render(text || '')
 
     <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
       <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-        <div class="relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-900 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-6xl h-[90vh] flex flex-col">
+        <div
+          class="relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-900 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-6xl h-[90vh] flex flex-col"
+        >
           <!-- Header -->
-          <div class="bg-gray-50 dark:bg-gray-800 px-4 py-3 sm:px-6 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
+          <div
+            class="bg-gray-50 dark:bg-gray-800 px-4 py-3 sm:px-6 flex justify-between items-center border-b border-gray-200 dark:border-gray-700"
+          >
             <h3
               id="modal-title"
               class="text-base font-semibold leading-6 text-gray-900 dark:text-white truncate max-w-lg"
@@ -228,7 +263,7 @@ const renderMarkdown = (text) => md.render(text || '')
               >
                 <ArrowPathIcon
                   class="h-4 w-4"
-                  :class="{'animate-spin': reprocessing}"
+                  :class="{ 'animate-spin': reprocessing }"
                 />
                 Reprocess
               </button>
@@ -249,7 +284,9 @@ const renderMarkdown = (text) => md.render(text || '')
           <!-- Content -->
           <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
             <!-- Left: PDF -->
-            <div class="md:w-1/2 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 flex flex-col">
+            <div
+              class="md:w-1/2 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 flex flex-col"
+            >
               <div class="flex-1 flex flex-col">
                 <iframe
                   v-if="pdfUrl"
@@ -282,7 +319,8 @@ const renderMarkdown = (text) => md.render(text || '')
                 v-if="pdfUrl && !email?.file_url_sas"
                 class="px-3 py-2 text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-200 border-t border-amber-200 dark:border-amber-800"
               >
-                Private container: a direct blob URL without SAS returns <code>ResourceNotFound</code>. Use the SAS link when available.
+                Private container: a direct blob URL without SAS returns <code>ResourceNotFound</code>. Use the SAS link
+                when available.
               </div>
             </div>
 
@@ -295,13 +333,19 @@ const renderMarkdown = (text) => md.render(text || '')
                   aria-label="Tabs"
                 >
                   <button
-                    :class="[activeTab === 'review' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400', 'w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm']"
+                    :class="[activeTab === 'review' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400', 'w-1/3 py-4 px-1 text-center border-b-2 font-medium text-sm']"
                     @click="activeTab = 'review'"
                   >
                     Review & Classify
                   </button>
                   <button
-                    :class="[activeTab === 'history' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400', 'w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm']"
+                    :class="[activeTab === 'comparison' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400', 'w-1/3 py-4 px-1 text-center border-b-2 font-medium text-sm']"
+                    @click="activeTab = 'comparison'"
+                  >
+                    Comparison (Adversarial)
+                  </button>
+                  <button
+                    :class="[activeTab === 'history' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400', 'w-1/3 py-4 px-1 text-center border-b-2 font-medium text-sm']"
                     @click="activeTab = 'history'"
                   >
                     History
@@ -328,8 +372,15 @@ const renderMarkdown = (text) => md.render(text || '')
                   <div class="grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400">
                     <div><span class="font-semibold">Subject:</span> {{ email.subject || '—' }}</div>
                     <div><span class="font-semibold">Sender:</span> {{ email.sender || '—' }}</div>
-                    <div><span class="font-semibold">Arrived:</span> {{ email.created_at ? new Date(email.created_at).toLocaleString() : (parseArrivalDate(email.file_url || email.file_url_sas) ? parseArrivalDate(email.file_url || email.file_url_sas).toLocaleString() : '—') }}</div>
-                    <div><span class="font-semibold">Processed:</span> {{ email.updated_at ? new Date(email.updated_at).toLocaleString() : '—' }}</div>
+                    <div>
+                      <span class="font-semibold">Arrived:</span> {{ email.created_at ? new
+                        Date(email.created_at).toLocaleString() : (parseArrivalDate(email.file_url || email.file_url_sas)
+                          ? parseArrivalDate(email.file_url || email.file_url_sas).toLocaleString() : '—') }}
+                    </div>
+                    <div>
+                      <span class="font-semibold">Processed:</span> {{ email.updated_at ? new
+                        Date(email.updated_at).toLocaleString() : '—' }}
+                    </div>
                   </div>
 
                   <!-- Debug URLs -->
@@ -379,7 +430,9 @@ const renderMarkdown = (text) => md.render(text || '')
                     <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                       🧾 OCR Text / Texte OCR
                     </h4>
-                    <div class="prose dark:prose-invert max-w-none text-sm max-h-60 overflow-y-auto border border-gray-100 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+                    <div
+                      class="prose dark:prose-invert max-w-none text-sm max-h-60 overflow-y-auto border border-gray-100 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                    >
                       <!-- eslint-disable-next-line vue/no-v-html -->
                       <div v-html="renderMarkdown(email.markdown)" />
                     </div>
@@ -436,14 +489,16 @@ const renderMarkdown = (text) => md.render(text || '')
                         v-for="i in email.classification.detected_intents.filter(i => i.justification)"
                         :key="i.intent"
                       >
-                        <strong>{{ i.intent }} ({{ Math.round((i.confidence||0)*100) }}%) :</strong> {{ i.justification }}
+                        <strong>{{ i.intent }} ({{ Math.round((i.confidence || 0) * 100) }}%) :</strong> {{ i.justification
+                        }}
                       </li>
                     </ul>
                   </div>
 
                   <!-- Reason -->
                   <div>
-                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Raison / Commentaire</label>
+                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Raison /
+                      Commentaire</label>
                     <textarea
                       v-model="correctionReason"
                       rows="2"
@@ -468,6 +523,149 @@ const renderMarkdown = (text) => md.render(text || '')
                     >
                       Validate & Save
                     </button>
+                  </div>
+                </div>
+
+                <!-- Comparison Tab -->
+                <div
+                  v-else-if="activeTab === 'comparison' && email"
+                  class="space-y-6"
+                >
+                  <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                      Adversarial Model Comparison
+                    </h3>
+                    <button
+                      :disabled="isComparing"
+                      class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 flex items-center gap-2"
+                      @click="runComparison"
+                    >
+                      <ArrowPathIcon
+                        v-if="isComparing"
+                        class="h-4 w-4 animate-spin"
+                      />
+                      {{ isComparing ? 'Running Models...' : 'Run New Comparison' }}
+                    </button>
+                  </div>
+
+                  <div
+                    v-if="latestComparison"
+                    class="space-y-6"
+                  >
+                    <!-- Agreement Banner -->
+                    <div
+                      class="rounded-md p-4 border flex items-center gap-3"
+                      :class="latestComparison.meta?.agreement ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300' : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300'"
+                    >
+                      <div class="text-2xl">
+                        {{ latestComparison.meta?.agreement ? '✅' : '⚠️' }}
+                      </div>
+                      <div>
+                        <h4 class="font-bold">
+                          {{ latestComparison.meta?.agreement ? 'Models Agree' : 'Divergence Detected' }}
+                        </h4>
+                        <p class="text-sm opacity-90">
+                          Confidence Delta: {{ latestComparison.meta?.confidence_delta }} | Execution: {{
+                            latestComparison.meta?.elapsed_ms }}ms
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <!-- Phi-4 Card -->
+                      <div
+                        class="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-800 p-4"
+                      >
+                        <div class="flex justify-between mb-3 border-b border-blue-200 pb-2">
+                          <h4 class="font-bold text-blue-800 dark:text-blue-300">
+                            🔷 Phi-4 (Primary)
+                          </h4>
+                          <span
+                            class="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full dark:bg-blue-900 dark:text-blue-200"
+                          >
+                            {{ latestComparison.phi4?.global_complexity || 'N/A' }}
+                          </span>
+                        </div>
+                        <div class="space-y-3">
+                          <div
+                            v-for="intent in latestComparison.phi4?.detected_intents"
+                            :key="intent.intent"
+                            class="bg-white dark:bg-gray-800 p-3 rounded shadow-sm"
+                          >
+                            <div class="flex justify-between items-start">
+                              <span class="font-semibold text-gray-900 dark:text-white">{{ intent.intent }}</span>
+                              <span class="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">{{
+                                Math.round(intent.confidence * 100) }}%</span>
+                            </div>
+                            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 italic">
+                              {{ intent.justification }}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- GPT-4o-mini Card -->
+                      <div
+                        class="rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-900/10 dark:border-orange-800 p-4"
+                      >
+                        <div class="flex justify-between mb-3 border-b border-orange-200 pb-2">
+                          <h4 class="font-bold text-orange-800 dark:text-orange-300">
+                            🟠 GPT-4o-mini (Audit)
+                          </h4>
+                          <span
+                            class="text-xs text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full dark:bg-orange-900 dark:text-orange-200"
+                          >
+                            {{ latestComparison.gpt4o_mini?.global_complexity || 'N/A' }}
+                          </span>
+                        </div>
+                        <div class="space-y-3">
+                          <div
+                            v-for="intent in latestComparison.gpt4o_mini?.detected_intents"
+                            :key="intent.intent"
+                            class="bg-white dark:bg-gray-800 p-3 rounded shadow-sm"
+                          >
+                            <div class="flex justify-between items-start">
+                              <span class="font-semibold text-gray-900 dark:text-white">{{ intent.intent }}</span>
+                              <span class="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">{{
+                                Math.round(intent.confidence * 100) }}%</span>
+                            </div>
+                            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 italic">
+                              {{ intent.justification }}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="text-xs text-gray-400 text-center">
+                      Comparison run at: {{ new Date(latestComparison.meta?.executed_at).toLocaleString() }}
+                    </div>
+                  </div>
+
+                  <div
+                    v-else
+                    class="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-700"
+                  >
+                    <ClockIcon class="mx-auto h-12 w-12 text-gray-400" />
+                    <h3 class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
+                      No comparison data
+                    </h3>
+                    <p class="mt-1 text-sm text-gray-500">
+                      Run an adversarial check to compare Phi-4 with GPT-4o-mini.
+                    </p>
+                    <div class="mt-6">
+                      <button
+                        type="button"
+                        class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                        @click="runComparison"
+                      >
+                        <ArrowPathIcon
+                          class="-ml-0.5 mr-1.5 h-5 w-5"
+                          aria-hidden="true"
+                        />
+                        Run Comparison
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -496,7 +694,9 @@ const renderMarkdown = (text) => md.render(text || '')
                           />
                           <div class="relative flex space-x-3">
                             <div>
-                              <span class="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center ring-8 ring-white dark:ring-gray-900 dark:bg-gray-800">
+                              <span
+                                class="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center ring-8 ring-white dark:ring-gray-900 dark:bg-gray-800"
+                              >
                                 <ClockIcon
                                   class="h-5 w-5 text-gray-500"
                                   aria-hidden="true"
@@ -506,7 +706,8 @@ const renderMarkdown = (text) => md.render(text || '')
                             <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
                               <div>
                                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                                  Updated by <span class="font-medium text-gray-900 dark:text-white">{{ entry.updated_by }}</span>
+                                  Updated by <span class="font-medium text-gray-900 dark:text-white">{{ entry.updated_by
+                                  }}</span>
                                 </p>
                                 <div class="mt-2 text-sm text-gray-700 dark:text-gray-300">
                                   <p v-if="entry.previous_intents?.length">
@@ -542,7 +743,8 @@ const renderMarkdown = (text) => md.render(text || '')
                                 </div>
                               </div>
                               <div class="whitespace-nowrap text-right text-sm text-gray-500">
-                                <time :datetime="entry.timestamp">{{ new Date(entry.timestamp).toLocaleDateString() }}</time>
+                                <time :datetime="entry.timestamp">{{ new Date(entry.timestamp).toLocaleDateString()
+                                }}</time>
                               </div>
                             </div>
                           </div>

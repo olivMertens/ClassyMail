@@ -58,6 +58,20 @@ Tracks the lifecycle of the classification.
 - **Timeline**: Shows every status change and who performed it (system vs. user).
 - **AI Insights**: If you provided a correction reason, the system ("Phi-4") analyzes it and posts a "Lesson Learned" card in the history, confirming it understood your logic.
 
+### 4. Comparison Tab (Adversarial Mode)
+*Only visible when a secondary model comparison is recorded.*
+
+This tab provides a side-by-side analysis of two models (e.g., **Phi-4** vs **GPT-4o-mini**) running on the same document.
+
+- **Visual Diff**:
+    - **Blue Pill**: Primary Model (Phi-4)
+    - **Orange Pill**: Secondary/Fallback Model (GPT-4o-mini)
+- **Agreement Status**:
+    - ✅ **Match**: Both models found the same intent/category.
+    - ❌ **Conflict**: Models disagree. The UI highlights the discrepancy.
+- **Confidence Score**: Compares the probability scores of both models.
+- **Vote/Selection**: The human reviewer can "Vote" for the best answer, which helps in evaluating model performance for future tuning.
+
 ---
 
 ## Developer Documentation
@@ -79,6 +93,9 @@ The application settings allow customization of the classification engine and en
 ### Developer Tab (Danger Zone)
 This restricted area allows administrators to reset the environment for testing.
 - **Delete All Data**: Completely wipes the database and storage.
-    - **Actions Performed**: Deletes all items in Cosmos DB container, deletes all blobs in `pdf-inputs`.
-    - **Safety**: Requires two confirmations to proceed.
+    - **Atomic Nuke**: Deletes Cosmos DB items and Blob Storage files in a single transactional operation where possible.
+    - **Safety**: Copilot-style confirmation ("I authorize...") required to proceed.
     - **Use Case**: Cleaning up after a POC session or before a new demo run.
+- **Test Connectivity**:
+    - **Test GPT-4o**: Verifies connectivity to the OpenAI endpoint.
+    - **Test New Models**: Validates availability of GPT-5/4.1 deployments if configured.

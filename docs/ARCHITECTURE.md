@@ -15,7 +15,9 @@ Pattern : Event-Driven + Container Apps + AI Foundry (Mistral OCR & Phi‑4)
    *   **Cas 1 (Upload API)** : Le fichier est blobé par l'API, qui crée immédiatement une entrée "PENDING" dans la DB et pousse un message direct dans le Service Bus (Visibilité immédiate).
    *   **Cas 2 (Depôt Portal/FTP)** : Azure Event Grid détecte le fichier (`BlobCreated`) et publie un message dans Service Bus (Visibilité après traitement par le worker).
 3. **OCR (Extraction) :** Le worker (FastAPI) télécharge le PDF et l'envoie au modèle OCR (Mistral) pour obtenir du Markdown.
-4. **Intelligence (Classification) :** Le Markdown est envoyé au modèle LLM (Phi‑4, avec fallback possible) pour produire un JSON strict multi-intents.
+4. **Intelligence (Classification) :**
+   *   **Standard Mode**: Markdown sent to Primary LLM (Phi-4). Fallback to GPT-4o-mini if token budget exceeded.
+   *   **Adversarial Mode**: Markdown sent to BOTH Phi-4 and GPT-4o-mini in parallel. Both results are stored for "Blue/Orange" comparison in UI.
 5. **Stockage :** Le résultat (JSON + usage/coût) est stocké dans Cosmos DB (et export CSV possible côté app).
 
 ```mermaid
@@ -27,10 +29,19 @@ flowchart TD
     EG --> SB[(Service Bus)]
     SB --> W[Worker]
     W --> OCR[Mistral OCR]
-    OCR --> LLM[Phi-4 / gpt-4o-mini]
-    LLM --> Cosmos[(Cosmos DB)]
-    API --> Cosmos
-    API --> UI[Dashboard]
+    OCR --> Check{Token Budget<br/>Decision}
+    Check -->|< 8K| Phi[🔶 Phi-4<br/>Primary]
+    Check -->|≥ 8K| GPT[🟢 gpt-4o-mini<br/>Fallback]
+    OCR --> Comp{Comparison<br/>Enabled?}
+    Comp -->|YES| Dual[🔶 Phi-4 ∥ 🟢 gpt4o-mini<br/>Parallel]
+    Comp -->|NO| Single[Single Model]
+    Phi -->|JSON| API
+    GPT -->|JSON| API
+    Dual -->|Dual Results| API
+    Single -->|Classification| API
+    API --> Cosmos[(Cosmos DB<br/>comparison_results)]
+    Cosmos --> API
+    API --> UI[Dashboard<br/>Comparison Tab]
 ```
 
 ## 2. Séquence de traitement

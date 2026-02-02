@@ -51,6 +51,17 @@ PHI_DEPLOYMENT=phi-4
 
 # Optional fallback
 PHI_FALLBACK_DEPLOYMENT=gpt-4o-mini
+
+# UI Configuration (Optional)
+# Control visibility of "Info" modal/button (Default: true)
+UI_SHOW_INFO_MODAL=true
+# Control visibility of "Developer" tab (Default: true)
+UI_SHOW_DEVELOPER_TAB=true
+
+# Anonymization (Optional)
+ANONYMIZER_DEPLOYMENT=gpt-4o
+ANONYMIZER_MAX_TOKENS=6000
+
 ```
 
 Charger dans la session avant de lancer :

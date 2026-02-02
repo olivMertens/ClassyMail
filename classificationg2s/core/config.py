@@ -51,6 +51,11 @@ CHAT_ENDPOINT = os.getenv("CHAT_ENDPOINT") or PHI_ENDPOINT
 CHAT_DEPLOYMENT = os.getenv("CHAT_DEPLOYMENT", "gpt-5.2-chat")
 CHAT_API_VERSION = os.getenv("CHAT_API_VERSION", AI_API_VERSION)
 
+# Data Zone / Data Residency (EU Central, Global, etc)
+# Used to validate endpoints are in preferred region for compliance
+AZURE_PREFERRED_DATA_ZONE = os.getenv("AZURE_PREFERRED_DATA_ZONE", "eu-central")  # eu-central, eastus, etc
+AZURE_REGION = os.getenv("AZURE_REGION", "eastus")  # Container App region for observability
+
 # Cosmos query guardrail
 COSMOS_QUERY_MAX_LIMIT = int(os.getenv("COSMOS_QUERY_MAX_LIMIT", "20"))
 
@@ -74,3 +79,7 @@ LOG_ANALYTICS_WORKSPACE_ID = os.getenv("LOG_ANALYTICS_WORKSPACE_ID")
 
 # Upload
 MAX_UPLOAD_SIZE = int(os.getenv("UPLOAD_MAX_BYTES", 10 * 1024 * 1024))  # 10MB
+
+# UI Configuration (Feature Flags)
+UI_SHOW_INFO_MODAL = os.getenv("UI_SHOW_INFO_MODAL", "true").lower() == "true"
+UI_SHOW_DEVELOPER_TAB = os.getenv("UI_SHOW_DEVELOPER_TAB", "true").lower() == "true"

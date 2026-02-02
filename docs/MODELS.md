@@ -59,7 +59,7 @@ OCR (Mistral Document AI 25.05):
 
 Primary (existing):
 - `PHI_ENDPOINT`
-- `PHI_DEPLOYMENT`
+- `PHI_DEPLOYMENT` (supports `phi-4`, `gpt-4o`, `gpt-4.1`, `gpt-5-preview`)
 
 Fallback (new):
 - `PHI_FALLBACK_ENDPOINT` (defaults to `PHI_ENDPOINT`)
@@ -69,6 +69,48 @@ Context sizing (new):
 - `PHI_PRIMARY_MAX_INPUT_TOKENS` (example: `8000`)
 - `PHI_FALLBACK_MAX_INPUT_TOKENS` (example: `120000`)
 - `PHI_RESERVED_OUTPUT_TOKENS` (example: `1000`)
+
+## Fine-Tuning & LoRA Compatibility
+
+**LoRA Fine-Tuning Support (Azure AI Foundry):**
+
+The following models support **LoRA (Low-Rank Adaptation)** fine-tuning directly through Azure AI Foundry:
+
+- ✅ **Phi-3** family (all variants)
+- ✅ **Phi-4** (recommended for this project)
+- ✅ **GPT-4o-mini** (Azure OpenAI fine-tuning API)
+
+**LoRA Process:**
+1. Export validated emails to JSONL format (see [FINE_TUNING_DATA.md](FINE_TUNING_DATA.md))
+2. Upload training/validation datasets to Azure AI Foundry
+3. Create fine-tuning job with LoRA adapters (Foundry UI or Azure OpenAI API)
+4. Deploy custom model (e.g., `phi-4-custom`, `gpt-4o-mini-custom`)
+5. Update `PHI_DEPLOYMENT` or `PHI_FALLBACK_DEPLOYMENT` to use the custom deployment
+
+**Models NOT Supporting LoRA:**
+
+- ❌ **GPT-4.1** (uses different fine-tuning approach)
+- ❌ **GPT-5** (theoretical, not yet available)
+- ❌ **Mistral OCR** (optimized for document understanding, not classification tasks)
+
+**Important Notes:**
+- Phi-4 LoRA fine-tuning is the **recommended approach** for this classification pipeline
+- GPT-4o-mini supports fine-tuning but requires Azure OpenAI fine-tuning API (not Foundry LoRA UI)
+- Fine-tuned models maintain the same endpoint compatibility (OpenAI Chat API format)
+- Always test custom models with the fallback mechanism enabled
+
+**References:**
+- Azure AI Foundry Fine-Tuning: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python
+- Phi-4 LoRA Best Practices: https://github.com/microsoft/PhiCookBook
+
+## Future Models (Preview)
+
+The system is ready for next-gen models. You can configure `PHI_DEPLOYMENT` or `PHI_4` env vars to point to these deployments if available in your region:
+
+- **GPT-4.1** (`gpt-4.1-preview`): High intelligence, fast reasoning.
+- **GPT-5** (`gpt-5-preview`): Theoretical placeholder for next-gen reasoning capabilities.
+
+If selected, the UI will reflect the capabilities usage. Ensure your Azure OpenAI quota supports these models.
 
 Cost tracking (configurable):
 - `PHI4_COST_PER_1K_INPUT`, `PHI4_COST_PER_1K_OUTPUT`

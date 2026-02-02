@@ -17,7 +17,9 @@ const { t } = useI18n()
     v-if="show"
     class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75 p-4 sm:p-0"
   >
-    <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+    <div
+      class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+    >
       <div class="bg-white dark:bg-gray-800 px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
         <div class="sm:flex sm:items-start">
           <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
@@ -49,14 +51,18 @@ const { t } = useI18n()
               </p>
 
               <div class="mt-5 space-y-2">
-                <div class="font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-1 mb-2">
+                <div
+                  class="font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-1 mb-2"
+                >
                   {{ t('info.target_title') }}
                 </div>
                 <p class="text-gray-600 dark:text-gray-300">
                   {{ t('info.target_desc') }}
                 </p>
 
-                <div class="font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-1 mb-2 mt-4">
+                <div
+                  class="font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-1 mb-2 mt-4"
+                >
                   {{ t('info.resources_title') }}
                 </div>
                 <ul class="list-disc list-inside space-y-1 ml-1 text-gray-600 dark:text-gray-300">
@@ -65,6 +71,17 @@ const { t } = useI18n()
                   <li>{{ t('info.infra_items.storage') }}</li>
                   <li>{{ t('info.infra_items.ai_foundry') }}</li>
                   <li>{{ t('info.infra_items.container_apps') }}</li>
+                </ul>
+
+                <div
+                  class="font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-1 mb-2 mt-4"
+                >
+                  {{ t('info.features.title') }}
+                </div>
+                <ul class="list-disc list-inside space-y-1 ml-1 text-gray-600 dark:text-gray-300">
+                  <li>{{ t('info.features.adversarial') }}</li>
+                  <li>{{ t('info.features.dark_mode') }}</li>
+                  <li>{{ t('info.features.retail_prices') }}</li>
                 </ul>
 
                 <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">

@@ -526,6 +526,20 @@ resource "azurerm_container_app" "api" {
         value = azurerm_application_insights.appi.connection_string
       }
 
+      # UI Features (optional overrides)
+      env {
+        name  = "UI_SHOW_INFO_MODAL"
+        value = "true"
+      }
+      env {
+        name  = "UI_SHOW_DEVELOPER_TAB"
+        value = "true"
+      }
+      env {
+        name  = "MAX_UPLOAD_SIZE"
+        value = "10"
+      }
+
       liveness_probe {
         transport     = "HTTP"
         port          = 8000
@@ -671,6 +685,20 @@ resource "azurerm_container_app" "worker" {
       env {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         value = azurerm_application_insights.appi.connection_string
+      }
+
+      # UI Features (shared config for consistency)
+      env {
+        name  = "UI_SHOW_INFO_MODAL"
+        value = "true"
+      }
+      env {
+        name  = "UI_SHOW_DEVELOPER_TAB"
+        value = "true"
+      }
+      env {
+        name  = "MAX_UPLOAD_SIZE"
+        value = "10"
       }
     }
 

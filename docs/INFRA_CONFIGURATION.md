@@ -49,7 +49,9 @@ The connection between Blob Storage and Service Bus is established via **Azure E
 flowchart LR
     Blob[Blob Storage<br/>pdf-inputs] -->|BlobCreated Event| EG[Event Grid<br/>System Topic]
     EG -->|Filtered Subscription<br/>.pdf only| SB[Service Bus Queue<br/>pdf-processing-queue]
-    SB -->|KEDA Scaler| Worker[Worker Container App]
+    SB -->|KEDA Scaler<br/>Message count| Worker[Worker Container App]
+    Worker -->|Handles: comparison=true<br/>tag → Dual-model handler| Worker
+    note[Note: Add new subscription for<br/>comparison=true tagged messages<br/>if async comparison queue needed]
 ```
 
 ### Terraform Resources Required

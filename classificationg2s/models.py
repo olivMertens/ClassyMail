@@ -21,6 +21,17 @@ class ClassificationResult(BaseModel):
     raw_response: Optional[dict] = None
 
 
+class ComparisonResult(BaseModel):
+    """Stores dual-model adversarial comparison results"""
+    phi4: Optional[ClassificationResult] = None
+    gpt4o_mini: Optional[ClassificationResult] = None
+    confidence_delta: Optional[float] = None  # Absolute difference in top intent confidence
+    agreement: bool = False  # True if both models detected same top intent
+    executed_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+    mode: str = "sync"  # "sync" or "async"
+    processing_time_ms: Optional[float] = None
+
+
 class HistoryEntry(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     previous_intents: List[ClassificationIntent] = []
@@ -43,6 +54,7 @@ class EmailRecord(BaseModel):
     search_text: Optional[str] = None
     vector: Optional[List[float]] = None
     classification: Optional[ClassificationResult] = None
+    comparison_results: Optional[ComparisonResult] = None  # Adversarial model comparison (dual-model results)
     classification_history: List[HistoryEntry] = []
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

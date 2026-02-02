@@ -15,10 +15,19 @@ flowchart TD
     worker -->|Download PDF| blob
     worker -->|OCR: %PDF -> base64| ocr[Mistral OCR]
     ocr -->|Markdown + usage| worker
-    worker -->|Classify intents (strict JSON)| llm[Phi-4 (primary)\nFallback: gpt-4o-mini]
-    llm -->|JSON + usage| worker
-    worker -->|Upsert| cosmos[(Cosmos DB)]
-    api -->|Read + Dashboard| cosmos
+    worker -->|→ Estimate tokens| check{< 8K tokens?}
+    check -->|Yes| phi4[🔶 Phi-4<br/>Primary 8K]
+    check -->|No| gpt4[🟢 gpt-4o-mini<br/>Fallback 120K]
+    worker -->|Comparison<br/>enabled?| compmode{Adversarial<br/>tag?}
+    compmode -->|Yes| dual[🔶 Phi-4 ∥ 🟢 gpt4o-mini<br/>Parallel Execution]
+    compmode -->|No| single[Single Model]
+    phi4 -->|JSON + usage| worker
+    gpt4 -->|JSON + usage| worker
+    dual -->|Dual results<br/>+ delta| worker
+    single -->|Classification| worker
+    worker -->|Upsert comparison_results| cosmos[(Cosmos DB)]
+    api -->|Read + Compare| cosmos
+    cosmos -->|Comparison Tab| api
     api -->|Serve UI| user
 ```
 

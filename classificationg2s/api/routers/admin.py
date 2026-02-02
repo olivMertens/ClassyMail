@@ -94,6 +94,21 @@ class IntentsResponse(BaseModel):
 class LowConfidenceResponse(BaseModel):
     items: list[dict]
 
+
+class UIConfigResponse(BaseModel):
+    show_info_modal: bool
+    show_developer_tab: bool
+
+
+@router.get("/ui-config", response_model=UIConfigResponse)
+async def get_ui_config():
+    """Returns UI feature flags based on environment variables."""
+    return UIConfigResponse(
+        show_info_modal=config.UI_SHOW_INFO_MODAL,
+        show_developer_tab=config.UI_SHOW_DEVELOPER_TAB
+    )
+
+
 @router.post("/debug/simulate-flow")
 async def simulate_flow(
     request: SimulateFlowRequest,
@@ -646,15 +661,22 @@ async def test_mistral_ocr_connection(clients: Clients = Depends(get_clients)):
 
 
 @router.get("/test-gpt")
-async def test_gpt_connection(clients: Clients = Depends(get_clients)):
-    """Test GPT-5 chat connection (or configured OpenAI model)"""
+async def test_gpt_connection(model: str | None = None, clients: Clients = Depends(get_clients)):
+    """Test GPT connection (defaults to configured fallback, or specific model)"""
     try:
         import httpx
         from classificationg2s.services.azure_clients import auth_headers
 
         # Use PHI_ENDPOINT as fallback if GPT endpoint not configured
         gpt_endpoint = getattr(config, "GPT_ENDPOINT", config.PHI_ENDPOINT)
-        gpt_deployment = getattr(config, "GPT_DEPLOYMENT", "gpt-4")
+
+        # Determine deployment name
+        if model:
+             # trust the caller (admin) to test specific models like gpt5-nano
+            gpt_deployment = model
+        else:
+            gpt_deployment = getattr(config, "GPT_DEPLOYMENT", "gpt-4")
+
         api_version = getattr(config, "AZURE_OPENAI_API_VERSION", getattr(config, "AI_API_VERSION", "2024-02-15-preview"))
 
         headers = await auth_headers(clients, model_type="openai")
@@ -677,9 +699,9 @@ async def test_gpt_connection(clients: Clients = Depends(get_clients)):
             "status_code": response.status_code
         }
     except Exception as e:
-        logger.error(f"GPT connection test failed: {e}")
+        logger.error(f"GPT connection test failed for {model}: {e}")
         return {
             "status": "error",
             "error": str(e),
-            "model": getattr(config, "GPT_DEPLOYMENT", "gpt-4")
+            "model": model or getattr(config, "GPT_DEPLOYMENT", "gpt-4")
         }

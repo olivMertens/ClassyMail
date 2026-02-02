@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   HomeIcon,
@@ -12,7 +12,8 @@ import {
   SunIcon,
   InformationCircleIcon,
   CodeBracketSquareIcon,
-  BookOpenIcon
+  BookOpenIcon,
+  ArrowDownTrayIcon
 } from '@heroicons/vue/24/outline'
 import InfoModal from './InfoModal.vue'
 
@@ -28,6 +29,22 @@ const { t } = useI18n()
 const sidebarOpen = ref(false)
 const showInfoModal = ref(false)
 const isDark = ref(document.documentElement.classList.contains('dark'))
+const uiConfig = ref({ show_info_modal: true, show_developer_tab: true })
+
+const fetchUiConfig = async () => {
+  try {
+    const res = await fetch('/api/admin/ui-config')
+    if (res.ok) {
+      uiConfig.value = await res.json()
+    }
+  } catch (e) {
+    console.error('Failed to fetch UI config', e)
+  }
+}
+
+onMounted(() => {
+  fetchUiConfig()
+})
 
 const toggleDarkMode = () => {
   isDark.value = !isDark.value
@@ -40,14 +57,21 @@ const toggleDarkMode = () => {
   }
 }
 
-const navigation = computed(() => [
-  { name: t('nav.dashboard'), id: 'dashboard', icon: HomeIcon },
-  { name: t('nav.upload'), id: 'upload', icon: CloudArrowUpIcon },
-  { name: t('nav.costs'), id: 'costs', icon: CurrencyDollarIcon },
-  { name: 'Guide', id: 'docs', icon: BookOpenIcon },
-  { name: t('nav.settings'), id: 'settings', icon: Cog6ToothIcon },
-  { name: 'Developer', id: 'developer', icon: CodeBracketSquareIcon },
-])
+const navigation = computed(() => {
+  const items = [
+    { name: t('nav.dashboard'), id: 'dashboard', icon: HomeIcon },
+    { name: t('nav.upload'), id: 'upload', icon: CloudArrowUpIcon },
+    { name: 'Exports', id: 'exports', icon: ArrowDownTrayIcon },
+    { name: t('nav.costs'), id: 'costs', icon: CurrencyDollarIcon },
+    { name: 'Guide', id: 'docs', icon: BookOpenIcon },
+    { name: t('nav.settings'), id: 'settings', icon: Cog6ToothIcon },
+    { name: 'Developer', id: 'developer', icon: CodeBracketSquareIcon },
+  ]
+  if (!uiConfig.value.show_developer_tab) {
+    return items.filter(i => i.id !== 'developer')
+  }
+  return items
+})
 </script>
 
 <template>
@@ -151,6 +175,7 @@ const navigation = computed(() => [
           <span class="font-bold text-gray-900 dark:text-white">ClassiMail</span>
           <div class="flex items-center gap-2">
             <button
+              v-if="uiConfig.show_info_modal"
               class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               @click="showInfoModal = true"
             >
@@ -176,6 +201,7 @@ const navigation = computed(() => [
       <!-- Desktop Top Bar extensions -->
       <header class="hidden md:flex items-center justify-end h-16 px-8 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 gap-2">
         <button
+          v-if="uiConfig.show_info_modal"
           class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
           title="Info"
           @click="showInfoModal = true"
@@ -198,7 +224,7 @@ const navigation = computed(() => [
       </header>
 
       <!-- Main Content Scroller -->
-      <main class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
+      <main class="flex-1 overflow-y-auto p-4 md:p-4 scroll-smooth">
         <div class="mx-auto w-full">
           <slot />
         </div>

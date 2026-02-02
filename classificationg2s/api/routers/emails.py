@@ -301,7 +301,119 @@ async def reprocess_email(item_id: str, cosmos_container=Depends(get_cosmos_cont
         raise HTTPException(status_code=400, detail=str(ex))
 
 
-@router.get("/emails/export")
+@router.post("/emails/{item_id}/reclassify")
+async def reclassify_email(
+    item_id: str,
+    payload: dict,
+    cosmos_container=Depends(get_cosmos_container),
+    sb_client=Depends(get_sb_client),
+    clients: Clients = Depends(get_clients),
+):
+    """
+    Run adversarial classification comparison or force reclassification with specific model.
+
+    Payload:
+    {
+        "model": "phi-4" | "gpt-4o-mini" | "both",  # which model(s) to use
+        "mode": "sync" | "async"  # sync = wait for result, async = enqueue (default: sync)
+    }
+
+    Returns:
+    - If mode="sync": Returns classification result(s) directly
+    - If mode="async": Returns status with job ID for polling
+    """
+    from classificationg2s.services.llm_pipeline import classify_with_phi4, classify_with_both_models
+
+    try:
+        item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
+        markdown = item.get("markdown")
+        if not markdown:
+            raise HTTPException(status_code=400, detail="Item has no markdown content")
+
+        model = payload.get("model", "both")  # default to both models comparison
+        mode = payload.get("mode", "sync")  # default to sync
+
+        # Validate inputs
+        if model not in ("phi-4", "gpt-4o-mini", "both"):
+            raise HTTPException(status_code=400, detail="model must be 'phi-4', 'gpt-4o-mini', or 'both'")
+        if mode not in ("sync", "async"):
+            raise HTTPException(status_code=400, detail="mode must be 'sync' or 'async'")
+
+        # SYNC MODE: Execute classification immediately and return results
+        if mode == "sync":
+            if model == "both":
+                # Run both models in parallel
+                comparison_result = await classify_with_both_models(markdown, clients=clients)
+
+                # Save comparison results to item
+                if not item.get("comparison_results"):
+                    item["comparison_results"] = []
+
+                comparison_record = {
+                    "executed_at": datetime.now(timezone.utc).isoformat(),
+                    "phi4": comparison_result.get("phi4"),
+                    "gpt4o_mini": comparison_result.get("gpt4o_mini"),
+                    "meta": comparison_result.get("comparison_meta"),
+                }
+                item["comparison_results"].append(comparison_record)
+                item["updated_at"] = datetime.now(timezone.utc).isoformat()
+                await cosmos_container.upsert_item(item)
+
+                return {
+                    "status": "completed",
+                    "mode": "sync",
+                    "model": "both",
+                    "result": comparison_result,
+                }
+
+            else:
+                # Single model classification
+                result = await classify_with_phi4(markdown, clients=clients)
+
+                # Update item with new classification
+                item["classification"] = {
+                    "detected_intents": result.get("detected_intents", []),
+                    "global_complexity": result.get("global_complexity"),
+                    "needs_review": False,  # Will be re-evaluated on save
+                }
+                item["status"] = "PROCESSED"
+                item["updated_at"] = datetime.now(timezone.utc).isoformat()
+                item["reclassified_with_model"] = model
+                await cosmos_container.upsert_item(item)
+
+                return {
+                    "status": "completed",
+                    "mode": "sync",
+                    "model": model,
+                    "result": result,
+                }
+
+        # ASYNC MODE: Enqueue message to Service Bus worker
+        else:
+            sender = sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
+            message_data = {
+                "blob_url": item.get("file_url"),
+                "reclassify_mode": "comparison" if model == "both" else "single",
+                "model": model,
+                "item_id": item_id,
+            }
+            async with sender:
+                await sender.send_messages(ServiceBusMessage(json.dumps(message_data)))
+
+            return {
+                "status": "enqueued",
+                "mode": "async",
+                "model": model,
+                "item_id": item_id,
+                "message": f"Reclassification enqueued for {item_id}",
+            }
+
+    except Exception as ex:
+        logger.exception(f"Reclassify failed for {item_id}: {str(ex)}")
+        raise HTTPException(status_code=400, detail=str(ex))
+
+
+
 async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
     import csv
     import io

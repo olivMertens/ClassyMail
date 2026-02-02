@@ -1,22 +1,22 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import {
-    CheckCircleIcon,
-    MoonIcon,
-    SunIcon,
-    PlusIcon,
-    TrashIcon,
-    ExclamationTriangleIcon,
-    SwatchIcon,
-    CpuChipIcon,
-    AdjustmentsHorizontalIcon,
-    QueueListIcon,
-    BanknotesIcon,
-    ArrowPathIcon,
-    QuestionMarkCircleIcon,
-    ChevronDownIcon,
-    ChevronUpIcon,
-    CommandLineIcon
+  CheckCircleIcon,
+  MoonIcon,
+  SunIcon,
+  PlusIcon,
+  TrashIcon,
+  ExclamationTriangleIcon,
+  SwatchIcon,
+  CpuChipIcon,
+  AdjustmentsHorizontalIcon,
+  QueueListIcon,
+  BanknotesIcon,
+  ArrowPathIcon,
+  QuestionMarkCircleIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  CommandLineIcon
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 
@@ -28,21 +28,22 @@ const showStrategyHelp = ref(false)
 
 // Config Data
 const settings = ref({
-    processing_strategy: 'standard',
-    phi4_input_per_1k: null,
-    phi4_output_per_1k: null,
-    mistral_per_1k_pages: null,
-    finetune_min_examples: 50,
-    ocr_max_attempts: 3,
-    review_confidence_threshold: 0.85,
-    categories: []
+  processing_strategy: 'standard',
+  ai_model: 'phi4', // Default
+  phi4_input_per_1k: null,
+  phi4_output_per_1k: null,
+  mistral_per_1k_pages: null,
+  finetune_min_examples: 50,
+  ocr_max_attempts: 3,
+  review_confidence_threshold: 0.85,
+  categories: []
 })
 const defaults = ref({
-    phi4_input_per_1k: null,
-    phi4_output_per_1k: null,
-    mistral_per_1k_pages: null,
-    ocr_max_attempts: 3,
-    review_confidence_threshold: 0.85
+  phi4_input_per_1k: null,
+  phi4_output_per_1k: null,
+  mistral_per_1k_pages: null,
+  ocr_max_attempts: 3,
+  review_confidence_threshold: 0.85
 })
 const loading = ref(false)
 const saved = ref(false)
@@ -77,253 +78,254 @@ const newCategory = ref({ name: '', description: '' })
 const newCategoryExpanded = ref(false)
 
 const sanitizeInput = (str, type) => {
-    if (!str) return ''
-    let cleaned = str
-    cleaned = cleaned.replace(/"""/g, '"').replace(/'''/g, "'")
-    cleaned = cleaned.trim()
+  if (!str) return ''
+  let cleaned = str
+  cleaned = cleaned.replace(/"""/g, '"').replace(/'''/g, "'")
+  cleaned = cleaned.trim()
 
-    if (type === 'name') {
-        cleaned = cleaned.replace(/[\r\n]+/g, ' ')
-        if (cleaned.length > 50) cleaned = cleaned.substring(0, 50)
-    } else {
-        if (cleaned.length > 2000) cleaned = cleaned.substring(0, 2000)
-    }
-    return cleaned
+  if (type === 'name') {
+    cleaned = cleaned.replace(/[\r\n]+/g, ' ')
+    if (cleaned.length > 50) cleaned = cleaned.substring(0, 50)
+  } else {
+    if (cleaned.length > 2000) cleaned = cleaned.substring(0, 2000)
+  }
+  return cleaned
 }
 
 const toggleExpanded = (index) => {
-    if (expandedCategories.value.has(index)) {
-        expandedCategories.value.delete(index)
-    } else {
-        expandedCategories.value.add(index)
-    }
+  if (expandedCategories.value.has(index)) {
+    expandedCategories.value.delete(index)
+  } else {
+    expandedCategories.value.add(index)
+  }
 }
 
 const updateCategory = (index, field, value) => {
-    const cleanValue = sanitizeInput(value, field)
-    settings.value.categories[index][field] = cleanValue
+  const cleanValue = sanitizeInput(value, field)
+  settings.value.categories[index][field] = cleanValue
 }
 
 const addNewCategory = () => {
-    const name = sanitizeInput(newCategory.value.name, 'name')
-    const desc = sanitizeInput(newCategory.value.description, 'description')
+  const name = sanitizeInput(newCategory.value.name, 'name')
+  const desc = sanitizeInput(newCategory.value.description, 'description')
 
-    if (name && desc) {
-        if (!settings.value.categories) settings.value.categories = []
-        settings.value.categories.push({ name, description: desc })
-        newCategory.value = { name: '', description: '' }
-        newCategoryExpanded.value = false
-        saveSettings()
-    }
+  if (name && desc) {
+    if (!settings.value.categories) settings.value.categories = []
+    settings.value.categories.push({ name, description: desc })
+    newCategory.value = { name: '', description: '' }
+    newCategoryExpanded.value = false
+    saveSettings()
+  }
 }
 
 const removeCategory = (index) => {
-    if (confirm('Are you sure you want to remove this category?')) {
-        settings.value.categories.splice(index, 1)
-        expandedCategories.value.delete(index)
-        saveSettings()
-    }
+  if (confirm('Are you sure you want to remove this category?')) {
+    settings.value.categories.splice(index, 1)
+    expandedCategories.value.delete(index)
+    saveSettings()
+  }
 }
 
 // --- API Calls ---
 
 const fetchAppLogs = async () => {
-    loadingLogs.value = true
-    logsError.value = null
-    try {
-        const res = await fetch('/api/admin/telemetry/logs?days=1&limit=100')
-        if (res.ok) {
-            const data = await res.json()
-            appLogs.value = data.items || []
-        } else {
-            logsError.value = 'Failed to fetch logs'
-        }
-    } catch (e) {
-        logsError.value = e.message
-    } finally {
-        loadingLogs.value = false
+  loadingLogs.value = true
+  logsError.value = null
+  try {
+    const res = await fetch('/api/admin/telemetry/logs?days=1&limit=100')
+    if (res.ok) {
+      const data = await res.json()
+      appLogs.value = data.items || []
+    } else {
+      logsError.value = 'Failed to fetch logs'
     }
+  } catch (e) {
+    logsError.value = e.message
+  } finally {
+    loadingLogs.value = false
+  }
 }
 
 const loadDefaults = async () => {
-    try {
-        const res = await fetch('/api/settings/defaults')
-        if (res.ok) {
-            defaults.value = await res.json()
-        }
-    } catch (e) {
-        console.error(e)
+  try {
+    const res = await fetch('/api/settings/defaults')
+    if (res.ok) {
+      defaults.value = await res.json()
     }
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 const loadSettings = async () => {
-    loading.value = true
-    try {
-        await loadDefaults()
-        const res = await fetch('/api/settings')
-        if (res.ok) {
-            settings.value = await res.json()
-        }
-    } catch (e) {
-        console.error(e)
-    } finally {
-        loading.value = false
+  loading.value = true
+  try {
+    await loadDefaults()
+    const res = await fetch('/api/settings')
+    if (res.ok) {
+      settings.value = await res.json()
     }
+  } catch (e) {
+    console.error(e)
+  } finally {
+    loading.value = false
+  }
 }
 
 const saveSettings = async () => {
-    loading.value = true
-    saved.value = false
-    try {
-        const payload = {
-            processing_strategy: settings.value.processing_strategy,
-            phi4_input_per_1k: settings.value.phi4_input_per_1k ? Number(settings.value.phi4_input_per_1k) : undefined,
-            phi4_output_per_1k: settings.value.phi4_output_per_1k ? Number(settings.value.phi4_output_per_1k) : undefined,
-            mistral_per_1k_pages: settings.value.mistral_per_1k_pages ? Number(settings.value.mistral_per_1k_pages) : undefined,
-            finetune_min_examples: settings.value.finetune_min_examples ? Number(settings.value.finetune_min_examples) : 50,
-            ocr_max_attempts: settings.value.ocr_max_attempts ? Number(settings.value.ocr_max_attempts) : 3,
-            review_confidence_threshold: settings.value.review_confidence_threshold ? Number(settings.value.review_confidence_threshold) : 0.85,
-            categories: settings.value.categories
-        }
-
-        await fetch('/api/settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-        localStorage.setItem('classimail-settings', JSON.stringify(payload))
-        saved.value = true
-        setTimeout(() => saved.value = false, 3000)
-    } catch (e) {
-        alert('Failed to save settings')
-    } finally {
-        loading.value = false
+  loading.value = true
+  saved.value = false
+  try {
+    const payload = {
+      processing_strategy: settings.value.processing_strategy,
+      ai_model: settings.value.ai_model,
+      phi4_input_per_1k: settings.value.phi4_input_per_1k ? Number(settings.value.phi4_input_per_1k) : undefined,
+      phi4_output_per_1k: settings.value.phi4_output_per_1k ? Number(settings.value.phi4_output_per_1k) : undefined,
+      mistral_per_1k_pages: settings.value.mistral_per_1k_pages ? Number(settings.value.mistral_per_1k_pages) : undefined,
+      finetune_min_examples: settings.value.finetune_min_examples ? Number(settings.value.finetune_min_examples) : 50,
+      ocr_max_attempts: settings.value.ocr_max_attempts ? Number(settings.value.ocr_max_attempts) : 3,
+      review_confidence_threshold: settings.value.review_confidence_threshold ? Number(settings.value.review_confidence_threshold) : 0.85,
+      categories: settings.value.categories
     }
+
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    localStorage.setItem('classimail-settings', JSON.stringify(payload))
+    saved.value = true
+    setTimeout(() => saved.value = false, 3000)
+  } catch (e) {
+    alert('Failed to save settings')
+  } finally {
+    loading.value = false
+  }
 }
 
 const performReset = async () => {
-    if (!resetConfirm1.value || !resetConfirm2.value) return
-    if (!confirm('FINAL WARNING: This is irreversible. Proceed?')) return
+  if (!resetConfirm1.value || !resetConfirm2.value) return
+  if (!confirm('FINAL WARNING: This is irreversible. Proceed?')) return
 
-    resetting.value = true
-    try {
-        const res = await fetch('/api/admin/reset', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                confirm_1: resetConfirm1.value,
-                confirm_2: resetConfirm2.value
-            })
-        })
-        if (res.ok) {
-            const data = await res.json()
-            alert(`Reset Successful.\nDeleted Blobs: ${data.deleted_blobs}\nDeleted Records: ${data.deleted_records}\nPurged DLQ: ${data.deleted_dlq}`)
-            window.location.reload()
-        } else {
-            alert('Reset Failed')
-        }
-    } catch (e) {
-        alert(`Reset Error: ${e.message}`)
-    } finally {
-        resetting.value = false
+  resetting.value = true
+  try {
+    const res = await fetch('/api/admin/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        confirm_1: resetConfirm1.value,
+        confirm_2: resetConfirm2.value
+      })
+    })
+    if (res.ok) {
+      const data = await res.json()
+      alert(`Reset Successful.\nDeleted Blobs: ${data.deleted_blobs}\nDeleted Records: ${data.deleted_records}\nPurged DLQ: ${data.deleted_dlq}`)
+      window.location.reload()
+    } else {
+      alert('Reset Failed')
     }
+  } catch (e) {
+    alert(`Reset Error: ${e.message}`)
+  } finally {
+    resetting.value = false
+  }
 }
 
 const performDlqPurge = async () => {
-    if (!confirm('Are you sure you want to purge the Service Bus Dead Letter Queue? This cannot be undone.')) return
+  if (!confirm('Are you sure you want to purge the Service Bus Dead Letter Queue? This cannot be undone.')) return
 
-    purgingDlq.value = true
-    try {
-        const res = await fetch('/api/admin/purge-dlq', {
-            method: 'POST',
-        })
-        if (res.ok) {
-            const data = await res.json()
-            alert(`Purge Successful.\nDeleted Messages: ${data.deleted_dlq}`)
-        } else {
-            const err = await res.json()
-            alert(`Purge Failed: ${err.detail || 'Unknown error'}`)
-        }
-    } catch (e) {
-        alert(`Purge Error: ${e.message}`)
-    } finally {
-        purgingDlq.value = false
+  purgingDlq.value = true
+  try {
+    const res = await fetch('/api/admin/purge-dlq', {
+      method: 'POST',
+    })
+    if (res.ok) {
+      const data = await res.json()
+      alert(`Purge Successful.\nDeleted Messages: ${data.deleted_dlq}`)
+    } else {
+      const err = await res.json()
+      alert(`Purge Failed: ${err.detail || 'Unknown error'}`)
     }
+  } catch (e) {
+    alert(`Purge Error: ${e.message}`)
+  } finally {
+    purgingDlq.value = false
+  }
 }
 
 // eslint-disable-next-line no-unused-vars
 const runConnectivityTest = async () => {
-    connTestLoading.value = true
-    connTestResults.value = null
-    try {
-        const res = await fetch('/api/admin/debug/connectivity', { method: 'POST' })
-        if (res.ok) {
-            connTestResults.value = await res.json()
-            alert('Connectivity Test Complete. See results.')
-        } else {
-            const err = await res.json()
-            alert(`Connectivity Test Failed: ${err.detail || 'Request failed'}`)
-        }
-    } catch(e) {
-        alert(`Connectivity Error: ${e.message}`)
-    } finally {
-        connTestLoading.value = false
+  connTestLoading.value = true
+  connTestResults.value = null
+  try {
+    const res = await fetch('/api/admin/debug/connectivity', { method: 'POST' })
+    if (res.ok) {
+      connTestResults.value = await res.json()
+      alert('Connectivity Test Complete. See results.')
+    } else {
+      const err = await res.json()
+      alert(`Connectivity Test Failed: ${err.detail || 'Request failed'}`)
     }
+  } catch (e) {
+    alert(`Connectivity Error: ${e.message}`)
+  } finally {
+    connTestLoading.value = false
+  }
 }
 
 // eslint-disable-next-line no-unused-vars
 const runLLMTests = async () => {
-    llmTestLoading.value = true
-    llmTestResults.value = null
-    try {
-        const [phi4Res, mistralRes, gptRes] = await Promise.all([
-            fetch('/api/admin/test-phi4'),
-            fetch('/api/admin/test-mistral-ocr'),
-            fetch('/api/admin/test-gpt')
-        ])
+  llmTestLoading.value = true
+  llmTestResults.value = null
+  try {
+    const [phi4Res, mistralRes, gptRes] = await Promise.all([
+      fetch('/api/admin/test-phi4'),
+      fetch('/api/admin/test-mistral-ocr'),
+      fetch('/api/admin/test-gpt')
+    ])
 
-        const [phi4Data, mistralData, gptData] = await Promise.all([
-            phi4Res.json(),
-            mistralRes.json(),
-            gptRes.json()
-        ])
+    const [phi4Data, mistralData, gptData] = await Promise.all([
+      phi4Res.json(),
+      mistralRes.json(),
+      gptRes.json()
+    ])
 
-        llmTestResults.value = {
-            phi4: phi4Data,
-            mistral: mistralData,
-            gpt: gptData
-        }
-    } catch(e) {
-        alert(`LLM Test Error: ${e.message}`)
-    } finally {
-        llmTestLoading.value = false
+    llmTestResults.value = {
+      phi4: phi4Data,
+      mistral: mistralData,
+      gpt: gptData
     }
+  } catch (e) {
+    alert(`LLM Test Error: ${e.message}`)
+  } finally {
+    llmTestLoading.value = false
+  }
 }
 
 // eslint-disable-next-line no-unused-vars
 const performSimulateFlow = async () => {
-    simulatingFlow.value = true
-    try {
-        const res = await fetch('/api/admin/debug/simulate-flow', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                use_aoai: useAoaiEnhancement.value
-            })
-        })
-        if (res.ok) {
-            const data = await res.json()
-            const aoaiNote = useAoaiEnhancement.value ? ' (with AOAI enhancement)' : ' (template-based)'
-            alert(`✓ E2E Simulation Complete${aoaiNote}\n\nBlob ID: ${data.item_id}\n\nYou can track this email in the Dashboard.`)
-        } else {
-            const err = await res.json()
-            alert(`Simulation Failed: ${err.detail || 'Unknown error'}`)
-        }
-    } catch (e) {
-        alert(`Simulation Error: ${e.message}`)
-    } finally {
-        simulatingFlow.value = false
+  simulatingFlow.value = true
+  try {
+    const res = await fetch('/api/admin/debug/simulate-flow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        use_aoai: useAoaiEnhancement.value
+      })
+    })
+    if (res.ok) {
+      const data = await res.json()
+      const aoaiNote = useAoaiEnhancement.value ? ' (with AOAI enhancement)' : ' (template-based)'
+      alert(`✓ E2E Simulation Complete${aoaiNote}\n\nBlob ID: ${data.item_id}\n\nYou can track this email in the Dashboard.`)
+    } else {
+      const err = await res.json()
+      alert(`Simulation Failed: ${err.detail || 'Unknown error'}`)
     }
+  } catch (e) {
+    alert(`Simulation Error: ${e.message}`)
+  } finally {
+    simulatingFlow.value = false
+  }
 }
 
 // --- Appearance & Init ---
@@ -333,45 +335,45 @@ const currentTheme = ref('blue')
 const currentLocale = ref('en')
 
 const themes = [
-    { id: 'blue', name: 'Blue', class: 'bg-blue-600' },
-    { id: 'green', name: 'Green', class: 'bg-emerald-600' },
-    { id: 'indigo', name: 'Indigo', class: 'bg-indigo-600' },
-    { id: 'orange', name: 'Orange', class: 'bg-orange-600' }
+  { id: 'blue', name: 'Blue', class: 'bg-blue-600' },
+  { id: 'green', name: 'Green', class: 'bg-emerald-600' },
+  { id: 'indigo', name: 'Indigo', class: 'bg-indigo-600' },
+  { id: 'orange', name: 'Orange', class: 'bg-orange-600' }
 ]
 
 const toggleDarkMode = () => {
-    isDark.value = !isDark.value
-    document.documentElement.classList.toggle('dark', isDark.value)
-    localStorage.setItem('classimail-dark', isDark.value)
+  isDark.value = !isDark.value
+  document.documentElement.classList.toggle('dark', isDark.value)
+  localStorage.setItem('classimail-dark', isDark.value)
 }
 
 const setTheme = (id) => {
-    currentTheme.value = id
-    document.documentElement.setAttribute('data-theme', id)
-    localStorage.setItem('classimail-theme', id)
+  currentTheme.value = id
+  document.documentElement.setAttribute('data-theme', id)
+  localStorage.setItem('classimail-theme', id)
 }
 
 const setLocale = (l) => {
-    currentLocale.value = l
-    locale.value = l
-    localStorage.setItem('classimail-locale', l)
+  currentLocale.value = l
+  locale.value = l
+  localStorage.setItem('classimail-locale', l)
 }
 
 onMounted(() => {
-    loadSettings()
+  loadSettings()
 
-    const savedDark = localStorage.getItem('classimail-dark')
-    isDark.value = savedDark === 'true'
-    if (isDark.value) document.documentElement.classList.add('dark')
+  const savedDark = localStorage.getItem('classimail-dark')
+  isDark.value = savedDark === 'true'
+  if (isDark.value) document.documentElement.classList.add('dark')
 
-    const savedTheme = localStorage.getItem('classimail-theme')
-    if (savedTheme) setTheme(savedTheme)
+  const savedTheme = localStorage.getItem('classimail-theme')
+  if (savedTheme) setTheme(savedTheme)
 
-    const savedLocale = localStorage.getItem('classimail-locale')
-    if (savedLocale) {
-        currentLocale.value = savedLocale
-        locale.value = savedLocale
-    }
+  const savedLocale = localStorage.getItem('classimail-locale')
+  if (savedLocale) {
+    currentLocale.value = savedLocale
+    locale.value = savedLocale
+  }
 })
 </script>
 
@@ -379,7 +381,9 @@ onMounted(() => {
   <div class="w-full space-y-6">
     <div class="md:flex md:items-center md:justify-between">
       <div class="min-w-0 flex-1">
-        <h2 class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">
+        <h2
+          class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight"
+        >
           {{ t('settings.title') }}
         </h2>
       </div>
@@ -456,7 +460,8 @@ onMounted(() => {
         <div class="mt-6 space-y-6">
           <!-- Language -->
           <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('settings.language') }}</label>
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('settings.language')
+            }}</label>
             <div class="mt-2 flex items-center space-x-4">
               <button
                 class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
@@ -508,7 +513,8 @@ onMounted(() => {
 
           <!-- Theme -->
           <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('settings.theme') }}</label>
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('settings.theme')
+            }}</label>
             <div class="mt-2 flex items-center space-x-3">
               <button
                 v-for="theme in themes"
@@ -536,7 +542,7 @@ onMounted(() => {
     >
       <div class="px-4 py-5 sm:p-6">
         <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white flex items-center gap-2">
-          Processing Strategy
+          {{ t('settings.processing.title') }}
           <button
             class="text-gray-400 hover:text-primary-500 transition-colors"
             title="How these strategies work"
@@ -546,8 +552,41 @@ onMounted(() => {
           </button>
         </h3>
         <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
-          <p>Select the AI processing pipeline strategy.</p>
+          <p>{{ t('settings.processing.desc') }}</p>
         </div>
+
+        <!-- Model Selection -->
+        <div class="mt-6 mb-6 pb-6 border-b border-gray-100 dark:border-gray-700">
+          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{
+            t('settings.processing.model_select') }}</label>
+          <div class="mt-2">
+            <select
+              v-model="settings.ai_model"
+              class="block w-full max-w-xs rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+            >
+              <option value="phi4">
+                Phi-4 (Standard)
+              </option>
+              <option value="gpt5-nano">
+                GPT-5 Nano
+              </option>
+              <option value="gpt5-mini">
+                GPT-5 Mini
+              </option>
+              <option value="gpt4.1-nano">
+                GPT-4.1 Nano
+              </option>
+            </select>
+          </div>
+          <div
+            v-if="settings.ai_model !== 'phi4'"
+            class="mt-2 flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm"
+          >
+            <ExclamationTriangleIcon class="h-4 w-4" />
+            <span>{{ t('settings.processing.finetuning_not_supported') }}</span>
+          </div>
+        </div>
+
         <div class="mt-4 space-y-4">
           <div class="flex items-center">
             <input
@@ -562,7 +601,7 @@ onMounted(() => {
               for="strategy-standard"
               class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
             >
-              Standard (Text/OCR Optimized - Default)
+              {{ t('settings.processing.strategy.standard') }}
             </label>
           </div>
           <div class="flex items-center">
@@ -578,7 +617,7 @@ onMounted(() => {
               for="strategy-reasoning"
               class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
             >
-              Reasoning (Deep Reasoning / CoT)
+              {{ t('settings.processing.strategy.reasoning') }}
             </label>
           </div>
           <div class="flex items-center">
@@ -594,13 +633,14 @@ onMounted(() => {
               for="strategy-vision"
               class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
             >
-              Vision (Vision/Image Analysis - Experimental)
+              {{ t('settings.processing.strategy.vision') }}
             </label>
           </div>
         </div>
 
         <div class="mt-6">
-          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">OCR Max Retries</label>
+          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{
+            t('settings.processing.ocr_retries') }}</label>
           <input
             v-model="settings.ocr_max_attempts"
             type="number"
@@ -610,7 +650,7 @@ onMounted(() => {
             :placeholder="defaults.ocr_max_attempts ?? 3"
           >
           <p class="mt-1 text-xs text-gray-500">
-            Number of attempts for OCR (network/transient errors will be retried with exponential backoff).
+            {{ t('settings.processing.ocr_retries_help') }}
           </p>
         </div>
 
@@ -657,7 +697,8 @@ onMounted(() => {
         </div>
 
         <div class="mt-4">
-          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Minimum Samples Required</label>
+          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">Minimum Samples
+            Required</label>
           <div class="mt-2">
             <input
               v-model="settings.finetune_min_examples"
@@ -667,7 +708,8 @@ onMounted(() => {
               class="block w-full max-w-xs rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
             >
             <p class="mt-1 text-xs text-gray-500">
-              Minimum number of reviewed examples required to enable JSONL export. Lowering this allows testing with smaller datasets.
+              Minimum number of reviewed examples required to enable JSONL export. Lowering this allows testing with
+              smaller datasets.
             </p>
           </div>
         </div>
@@ -692,7 +734,8 @@ onMounted(() => {
           @submit.prevent="saveSettings"
         >
           <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Phi-4 Input Cost (€ / 1K tokens)</label>
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Phi-4 Input Cost (€ /
+              1K tokens)</label>
             <div class="mt-1">
               <input
                 v-model="settings.phi4_input_per_1k"
@@ -705,7 +748,8 @@ onMounted(() => {
           </div>
 
           <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Review Confidence Threshold (0-1)</label>
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Review Confidence
+              Threshold (0-1)</label>
             <div class="mt-1">
               <input
                 v-model="settings.review_confidence_threshold"
@@ -723,7 +767,8 @@ onMounted(() => {
           </div>
 
           <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Phi-4 Output Cost (€ / 1K tokens)</label>
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Phi-4 Output Cost (€ /
+              1K tokens)</label>
             <div class="mt-1">
               <input
                 v-model="settings.phi4_output_per_1k"
@@ -736,7 +781,8 @@ onMounted(() => {
           </div>
 
           <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Mistral OCR Cost (€ / 1K pages)</label>
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Mistral OCR Cost (€ /
+              1K pages)</label>
             <div class="mt-1">
               <input
                 v-model="settings.mistral_per_1k_pages"
@@ -784,7 +830,9 @@ onMounted(() => {
     >
       <div class="px-4 py-5 sm:p-6">
         <!-- Warning Banner -->
-        <div class="rounded-md bg-amber-50 dark:bg-amber-900/30 p-4 mb-6 border-l-4 border-amber-400 dark:border-amber-500">
+        <div
+          class="rounded-md bg-amber-50 dark:bg-amber-900/30 p-4 mb-6 border-l-4 border-amber-400 dark:border-amber-500"
+        >
           <div class="flex">
             <div class="flex-shrink-0">
               <ExclamationTriangleIcon
@@ -877,7 +925,9 @@ onMounted(() => {
                   v-if="expandedCategories.has(idx)"
                   class="mt-3 pl-8 pr-2 pb-2"
                 >
-                  <div class="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-md border border-gray-200 dark:border-gray-600">
+                  <div
+                    class="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-md border border-gray-200 dark:border-gray-600"
+                  >
                     <div class="grid grid-cols-1 gap-4">
                       <div>
                         <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
@@ -952,7 +1002,8 @@ onMounted(() => {
                 </div>
                 <div class="sm:col-span-4">
                   <div class="flex justify-between">
-                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Description (LLM Context)</label>
+                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Description
+                      (LLM Context)</label>
                     <span class="text-xs text-gray-500">{{ newCategory.description?.length || 0 }}/2000</span>
                   </div>
                   <div class="mt-1">
@@ -1062,7 +1113,7 @@ onMounted(() => {
                 </td>
                 <td class="whitespace-nowrap px-3 py-2 text-xs">
                   <span
-                    v-if="log.severity_level == 0 || log.type =='AppExceptions'"
+                    v-if="log.severity_level == 0 || log.type == 'AppExceptions'"
                     class="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10 dark:bg-red-400/10 dark:text-red-400"
                   >Error</span>
                   <span
@@ -1110,7 +1161,8 @@ onMounted(() => {
             Dead Letter Queue (DLQ) Management
           </h4>
           <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Service Bus automatically moves processing failures to the DLQ after max retries. Use these tools to investigate and clear them.
+            Service Bus automatically moves processing failures to the DLQ after max retries. Use these tools to
+            investigate and clear them.
           </p>
           <div class="mt-3 flex gap-2">
             <a
@@ -1140,7 +1192,8 @@ onMounted(() => {
             </button>
           </div>
           <p class="mt-2 text-xs text-gray-600 dark:text-gray-400">
-            Messages land in DLQ when processing fails repeatedly. Investigate the cause, then purge to retry or clean up.
+            Messages land in DLQ when processing fails repeatedly. Investigate the cause, then purge to retry or clean
+            up.
           </p>
         </div>
 
@@ -1183,7 +1236,8 @@ onMounted(() => {
                 <label
                   for="confirm_1"
                   class="font-medium text-gray-900 dark:text-white"
-                >I understand this deletes all data permanently.</label>
+                >I understand this deletes all
+                  data permanently.</label>
               </div>
             </div>
             <div class="flex items-start">
@@ -1199,7 +1253,8 @@ onMounted(() => {
                 <label
                   for="confirm_2"
                   class="font-medium text-gray-900 dark:text-white"
-                >I confirm I want to reset the environment.</label>
+                >I confirm I want to reset the
+                  environment.</label>
               </div>
             </div>
 
@@ -1244,7 +1299,9 @@ onMounted(() => {
           class="hidden sm:inline-block sm:align-middle sm:h-screen"
           aria-hidden="true"
         >&#8203;</span>
-        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-gray-200 dark:border-gray-700">
+        <div
+          class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-gray-200 dark:border-gray-700"
+        >
           <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <h3
               id="modal-title"
@@ -1261,9 +1318,13 @@ onMounted(() => {
                 <p class="text-gray-500 dark:text-gray-400 mt-1">
                   Fast and optimized for standard text extraction. Uses zero-shot prompting optimized for cost.
                 </p>
-                <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
-                  <span class="text-indigo-600 dark:text-indigo-400 font-bold">How it works:</span> Passes OCR text directly to the model.<br>
-                  <span class="text-indigo-600 dark:text-indigo-400 font-bold">Example:</span> A clearly typed PDF claiming an "Address Change". The model identifies keywords and classifies instantly.
+                <div
+                  class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs"
+                >
+                  <span class="text-indigo-600 dark:text-indigo-400 font-bold">How it works:</span> Passes OCR text
+                  directly to the model.<br>
+                  <span class="text-indigo-600 dark:text-indigo-400 font-bold">Example:</span> A clearly typed PDF
+                  claiming an "Address Change". The model identifies keywords and classifies instantly.
                 </div>
               </div>
 
@@ -1273,11 +1334,17 @@ onMounted(() => {
                   Reasoning (CoT)
                 </h4>
                 <p class="text-gray-500 dark:text-gray-400 mt-1">
-                  Forces a "Chain-of-Thought" (Step-by-step) analysis. Essential for subtle intents or complex narratives.
+                  Forces a "Chain-of-Thought" (Step-by-step) analysis. Essential for subtle intents or complex
+                  narratives.
                 </p>
-                <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
-                  <span class="text-purple-600 dark:text-purple-400 font-bold">How it works:</span> Injects system instruction: <em>"Analyze context first, then deduce intents step-by-step."</em><br>
-                  <span class="text-purple-600 dark:text-purple-400 font-bold">Example:</span> An email telling a story about a storm without explicitly saying "claim". The model deduces "Bad Weather" -> "Damage" -> "Claim Intent".
+                <div
+                  class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs"
+                >
+                  <span class="text-purple-600 dark:text-purple-400 font-bold">How it works:</span> Injects system
+                  instruction: <em>"Analyze context first, then deduce intents step-by-step."</em><br>
+                  <span class="text-purple-600 dark:text-purple-400 font-bold">Example:</span> An email telling a story
+                  about a storm without explicitly saying "claim". The model deduces "Bad Weather" -> "Damage" -> "Claim
+                  Intent".
                 </div>
               </div>
 
@@ -1288,12 +1355,19 @@ onMounted(() => {
                 </h4>
                 <p class="text-gray-500 dark:text-gray-400 mt-1">
                   Integrates visual context from OCR (photos, diagrams, signatures) into the decision process.<br>
-                  <strong>Scope:</strong> Only images rendered from PDF pages by OCR are used (inline/page visuals). Attachments not embedded in the PDF pages are ignored.
+                  <strong>Scope:</strong> Only images rendered from PDF pages by OCR are used (inline/page visuals).
+                  Attachments not embedded in the PDF pages are ignored.
                 </p>
-                <div class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs">
-                  <span class="text-green-600 dark:text-green-400 font-bold">How it works:</span> Uses Mistral BBox Annotation capability per page image.<br>
-                  <span class="text-green-600 dark:text-green-400 font-bold">Annotation:</span> Extracts structured descriptions for visual elements. <em>Note: Annotations are currently experimental. If not supported by the model/region (422 error), the system automatically falls back to Standard strategy.</em><br>
-                  <span class="text-green-600 dark:text-green-400 font-bold">Enrichment:</span> These descriptions are injected into the Markdown before classification, allowing the AI to "see" the page visuals.
+                <div
+                  class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs"
+                >
+                  <span class="text-green-600 dark:text-green-400 font-bold">How it works:</span> Uses Mistral BBox
+                  Annotation capability per page image.<br>
+                  <span class="text-green-600 dark:text-green-400 font-bold">Annotation:</span> Extracts structured
+                  descriptions for visual elements. <em>Note: Annotations are currently experimental. If not supported
+                    by the model/region (422 error), the system automatically falls back to Standard strategy.</em><br>
+                  <span class="text-green-600 dark:text-green-400 font-bold">Enrichment:</span> These descriptions are
+                  injected into the Markdown before classification, allowing the AI to "see" the page visuals.
                 </div>
               </div>
             </div>

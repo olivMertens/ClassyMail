@@ -333,15 +333,22 @@ async def ocr_with_mistral(
     return {"markdown": content, "usage": usage_info, "images": annotated_images}
 
 
-@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10), retry=retry_if_exception(retryable_httpx))
-async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False, strategy: str = "standard", clients: Clients | None = None) -> dict:
-    if not config.PHI_ENDPOINT:
-        raise RuntimeError("PHI_ENDPOINT is not set")
-    if not config.PHI_FALLBACK_ENDPOINT:
-        raise RuntimeError("PHI_FALLBACK_ENDPOINT is not set")
+async def _classify_with_single_model(
+    text_markdown: str,
+    *,
+    endpoint: str,
+    deployment: str,
+    strategy: str = "standard",
+    clients: Clients | None = None,
+) -> dict:
+    """
+    Internal generic function to classify with a specific model endpoint/deployment.
+    Used by both classify_with_phi4() and comparison logic.
+    """
+    if not endpoint:
+        raise RuntimeError(f"Endpoint not configured for {deployment}")
 
     headers = await auth_headers(clients=clients)
-
     categories_text = get_categories_prompt_text()
 
     extra_instructions = ""
@@ -389,23 +396,17 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
     overhead_tokens = 200
     user_tokens_est = estimate_tokens_rough(text_markdown or "")
 
-    max_user_primary = max(
-        500,
-        config.PHI_PRIMARY_MAX_INPUT_TOKENS - config.PHI_RESERVED_OUTPUT_TOKENS - system_tokens - overhead_tokens,
-    )
-    max_user_fallback = max(
-        500,
-        config.PHI_FALLBACK_MAX_INPUT_TOKENS - config.PHI_RESERVED_OUTPUT_TOKENS - system_tokens - overhead_tokens,
-    )
+    # Determine token budget based on deployment
+    if deployment == config.PHI_FALLBACK_DEPLOYMENT:
+        max_user = config.PHI_FALLBACK_MAX_INPUT_TOKENS - config.PHI_RESERVED_OUTPUT_TOKENS - system_tokens - overhead_tokens
+    else:
+        max_user = config.PHI_PRIMARY_MAX_INPUT_TOKENS - config.PHI_RESERVED_OUTPUT_TOKENS - system_tokens - overhead_tokens
 
-    use_fallback = force_fallback or (user_tokens_est > max_user_primary)
-    chosen_endpoint = config.PHI_FALLBACK_ENDPOINT if use_fallback else config.PHI_ENDPOINT
-    chosen_deployment = config.PHI_FALLBACK_DEPLOYMENT if use_fallback else config.PHI_DEPLOYMENT
-    user_budget = max_user_fallback if use_fallback else max_user_primary
-    user_content, truncated = clamp_text_to_token_budget(text_markdown or "", user_budget)
+    max_user = max(500, max_user)
+    user_content, truncated = clamp_text_to_token_budget(text_markdown or "", max_user)
 
     payload = {
-        "model": chosen_deployment,
+        "model": deployment,
         "response_format": {"type": "json_object"},
         "messages": [
             {"role": "system", "content": system_prompt},
@@ -415,19 +416,18 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
         "max_tokens": config.PHI_RESERVED_OUTPUT_TOKENS,
     }
 
-    url = f"{chosen_endpoint.rstrip('/')}/openai/deployments/{chosen_deployment}/chat/completions?api-version={config.AI_API_VERSION}"
+    url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={config.AI_API_VERSION}"
 
-    logger.info(f"[metrics] Classify Request: {chosen_deployment} strategy={strategy} fallback={use_fallback}")
+    logger.info(f"[metrics] Classify Request: {deployment} strategy={strategy}")
     logger.info(f"[metrics] Token Estimate: system={system_tokens} user={user_tokens_est} truncated={truncated}")
 
-    with tracer.start_as_current_span("phi4_classify") as span:
+    with tracer.start_as_current_span(f"classify_{deployment}") as span:
         span.set_attribute("gen_ai.system", "azure_openai")
         span.set_attribute("gen_ai.operation", "chat.completions")
-        span.set_attribute("gen_ai.request.model", chosen_deployment)
-        span.set_attribute("app.fallback_used", bool(use_fallback))
+        span.set_attribute("gen_ai.request.model", deployment)
         span.set_attribute("app.context_truncated", bool(truncated))
         span.set_attribute("app.estimated.user_tokens", int(user_tokens_est))
-        span.set_attribute("app.user_budget_tokens", int(user_budget))
+        span.set_attribute("app.user_budget_tokens", int(max_user))
 
         async with httpx.AsyncClient(timeout=60) as client:
             try:
@@ -436,24 +436,14 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
             except httpx.HTTPStatusError as ex:
                 status = ex.response.status_code if ex.response is not None else None
                 body = ex.response.text if ex.response is not None else ""
-
-                logger.error(f"[metrics] Classify Failed: {status} - {body}")
-
-                if (
-                    (not use_fallback)
-                    and status in (400, 413)
-                    and ("context" in body.lower() or "token" in body.lower() or "length" in body.lower())
-                ):
-                    logger.warning("[metrics] Token limit reached! Retrying with fallback model.")
-                    return await classify_with_phi4(text_markdown, force_fallback=True)
+                logger.error(f"[metrics] Classify Failed ({deployment}): {status} - {body}")
                 raise
 
             data = resp.json()
             content = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
             usage = data.get("usage", {})
 
-            logger.info(f"[metrics] Classify Success: {usage.get('total_tokens', 0)} tokens used")
-            # Log the first 100 chars of content just to see if it looks like JSON
+            logger.info(f"[metrics] Classify Success ({deployment}): {usage.get('total_tokens', 0)} tokens used")
             logger.info(f"[metrics] Response preview: {content[:100]}...")
 
             span.set_attribute("gen_ai.usage.input_tokens", usage.get("prompt_tokens", 0))
@@ -462,11 +452,165 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
 
             payload_dict = json.loads(content)
             payload_dict["usage"] = usage
-            payload_dict["model"] = chosen_deployment
-            payload_dict["fallback_used"] = bool(use_fallback)
+            payload_dict["model"] = deployment
             payload_dict["context_truncated"] = bool(truncated)
             payload_dict["estimated_user_tokens"] = int(user_tokens_est)
             return payload_dict
+
+
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10), retry=retry_if_exception(retryable_httpx))
+async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False, strategy: str = "standard", clients: Clients | None = None) -> dict:
+    """
+    Classify email with Phi-4 (or fallback to gpt-4o-mini if token budget exceeded).
+
+    Args:
+        text_markdown: Email content in markdown format
+        force_fallback: Force use of fallback model (gpt-4o-mini)
+        strategy: "standard", "reasoning", or "vision" - affects system prompt
+        clients: Optional pre-configured clients (for testing/DI)
+
+    Returns:
+        Classification result dict with intents, complexity, usage, model info
+    """
+    if not config.PHI_ENDPOINT:
+        raise RuntimeError("PHI_ENDPOINT is not set")
+    if not config.PHI_FALLBACK_ENDPOINT:
+        raise RuntimeError("PHI_FALLBACK_ENDPOINT is not set")
+
+    # Determine which model to use based on token budget
+    system_prompt_rough = "Tu es un assistant expert en classification d'emails d'assurance."
+    system_tokens = estimate_tokens_rough(system_prompt_rough)
+    overhead_tokens = 200
+    user_tokens_est = estimate_tokens_rough(text_markdown or "")
+
+    max_user_primary = max(
+        500,
+        config.PHI_PRIMARY_MAX_INPUT_TOKENS - config.PHI_RESERVED_OUTPUT_TOKENS - system_tokens - overhead_tokens,
+    )
+
+    use_fallback = force_fallback or (user_tokens_est > max_user_primary)
+    chosen_endpoint = config.PHI_FALLBACK_ENDPOINT if use_fallback else config.PHI_ENDPOINT
+    chosen_deployment = config.PHI_FALLBACK_DEPLOYMENT if use_fallback else config.PHI_DEPLOYMENT
+
+    logger.info(f"[metrics] Classify Request: {chosen_deployment} strategy={strategy} fallback={use_fallback}")
+
+    try:
+        result = await _classify_with_single_model(
+            text_markdown,
+            endpoint=chosen_endpoint,
+            deployment=chosen_deployment,
+            strategy=strategy,
+            clients=clients,
+        )
+        result["fallback_used"] = bool(use_fallback)
+        return result
+    except httpx.HTTPStatusError as ex:
+        status = ex.response.status_code if ex.response is not None else None
+        body = ex.response.text if ex.response is not None else ""
+
+        # If primary model fails due to token limit, retry with fallback
+        if (
+            (not use_fallback)
+            and status in (400, 413)
+            and ("context" in body.lower() or "token" in body.lower() or "length" in body.lower())
+        ):
+            logger.warning("[metrics] Token limit exceeded! Retrying with fallback model.")
+            return await classify_with_phi4(text_markdown, force_fallback=True, strategy=strategy, clients=clients)
+        raise
+
+
+async def classify_with_both_models(
+    text_markdown: str,
+    *,
+    strategy: str = "standard",
+    clients: Clients | None = None,
+) -> dict:
+    """
+    Adversarial comparison: Classify with both Phi-4 and gpt-4o-mini in parallel.
+
+    Returns:
+        {
+            "phi4": {...classification result...},
+            "gpt4o_mini": {...classification result...},
+            "comparison_meta": {
+                "executed_at": "2026-02-02T...",
+                "confidence_delta": 0.05,  # abs(phi4.score - gpt4o.score)
+                "agreement": true/false,  # Both selected same primary intent
+                "error": null or error message
+            }
+        }
+    """
+    if not config.PHI_ENDPOINT or not config.PHI_FALLBACK_ENDPOINT:
+        raise RuntimeError("Both PHI_ENDPOINT and PHI_FALLBACK_ENDPOINT required for comparison")
+
+    import time
+    from datetime import datetime
+
+    start_time = time.time()
+
+    try:
+        # Run both models in parallel
+        phi4_task = _classify_with_single_model(
+            text_markdown,
+            endpoint=config.PHI_ENDPOINT,
+            deployment=config.PHI_DEPLOYMENT,
+            strategy=strategy,
+            clients=clients,
+        )
+        gpt4o_task = _classify_with_single_model(
+            text_markdown,
+            endpoint=config.PHI_FALLBACK_ENDPOINT,
+            deployment=config.PHI_FALLBACK_DEPLOYMENT,
+            strategy=strategy,
+            clients=clients,
+        )
+
+        phi4_result, gpt4o_result = await asyncio.gather(phi4_task, gpt4o_task)
+
+        # Calculate comparison metrics
+        phi4_intents = phi4_result.get("detected_intents", [])
+        gpt4o_intents = gpt4o_result.get("detected_intents", [])
+
+        phi4_scores = [i.get("confidence", 0) for i in phi4_intents]
+        gpt4o_scores = [i.get("confidence", 0) for i in gpt4o_intents]
+
+        phi4_primary_score = max(phi4_scores) if phi4_scores else 0
+        gpt4o_primary_score = max(gpt4o_scores) if gpt4o_scores else 0
+
+        confidence_delta = abs(phi4_primary_score - gpt4o_primary_score)
+
+        phi4_primary_intent = phi4_intents[0]["intent"] if phi4_intents else None
+        gpt4o_primary_intent = gpt4o_intents[0]["intent"] if gpt4o_intents else None
+        agreement = phi4_primary_intent == gpt4o_primary_intent if phi4_primary_intent and gpt4o_primary_intent else False
+
+        elapsed_ms = int((time.time() - start_time) * 1000)
+
+        return {
+            "phi4": phi4_result,
+            "gpt4o_mini": gpt4o_result,
+            "comparison_meta": {
+                "executed_at": datetime.utcnow().isoformat(),
+                "confidence_delta": round(confidence_delta, 3),
+                "agreement": agreement,
+                "phi4_primary_intent": phi4_primary_intent,
+                "gpt4o_primary_intent": gpt4o_primary_intent,
+                "elapsed_ms": elapsed_ms,
+                "error": None,
+            },
+        }
+    except Exception as e:
+        logger.error(f"[metrics] Model comparison failed: {str(e)}", exc_info=True)
+        return {
+            "phi4": None,
+            "gpt4o_mini": None,
+            "comparison_meta": {
+                "executed_at": datetime.utcnow().isoformat(),
+                "error": str(e),
+            },
+        }
+
+
+
 
 
 def process_agent_response(agent_response: dict) -> dict:

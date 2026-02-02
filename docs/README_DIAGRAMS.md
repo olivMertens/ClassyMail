@@ -4,11 +4,13 @@ Tous les diagrammes Mermaid de cette documentation sont interactifs et incluent 
 
 ## Fonctionnalités
 
-Sous chaque diagramme, vous trouverez 3 boutons :
+Survolez un diagramme pour faire apparaître la barre d'outils flottante (en haut à droite) :
 
-- 🔍 **Zoom** : Affiche le diagramme en plein écran avec zoom
-- 📥 **SVG** : Télécharge le diagramme au format vectoriel (redimensionnable)
-- 📥 **PNG** : Télécharge le diagramme en haute résolution (2x)
+- ⤢ **Plein écran & Zoom** : Ouvre le diagramme dans un modal interactif
+    - **Pan** : Cliquer-glisser pour déplacer
+    - **Zoom** : Molette souris ou boutons (+ / -)
+- **SVG** : Télécharge le diagramme au format vectoriel (transparent)
+- **PNG** : Télécharge le diagramme en haute résolution (3x, fond blanc)
 
 ## Utilisation dans les viewers Markdown
 

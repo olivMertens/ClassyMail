@@ -46,7 +46,7 @@ Selon ton objectif :
 
 - **Je veux builder/déployer**
     - [docs/DEV_LOCAL_BUILD.md](docs/DEV_LOCAL_BUILD.md) — build/push image, déploiement ACA sans CI
-    - [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) / [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md) — CI/CD
+    - [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md)
 
 ### Référence (liste complète)
 
@@ -56,7 +56,6 @@ Selon ton objectif :
 - [docs/MODELS.md](docs/MODELS.md)
 - [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md)
 - [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md)
-- [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md)
 - [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md)
 - [docs/DEV_LOCAL_BUILD.md](docs/DEV_LOCAL_BUILD.md)
 - [docs/SCENARIO_E2E.md](docs/SCENARIO_E2E.md)
@@ -82,17 +81,34 @@ The new frontend provides a dark-mode enabled dashboard to:
 
 ```mermaid
 flowchart TD
-    user[User] -->|Upload PDF / Review| ui["SPA (Vue 3 + Tailwind)"]
-    ui -->|API calls| api[FastAPI API]
-    api -->|Download PDF| blob[(Blob Storage)]
-    blob -->|Event Grid| sbq[Service Bus Queue]
-    sbq -->|Worker| api
-    api -->|OCR document_base64| ocr[Mistral OCR]
-    ocr -->|Markdown| api
-    api -->|Classify intents| llm["Phi-4 (primary)<br/>Fallback: gpt-4o-mini"]
-    llm -->|JSON| api
-    api -->|Persist| cosmos[(Cosmos DB)]
+    user[User] -->|Upload PDF| ui["SPA Vue 3 + Tailwind"]
+    ui -->|API| api["FastAPI API<br/>(model selection)"]
 
+    api -->|GET| blob[(Blob Storage)]
+    blob -->|Event Grid| sbq["Service Bus Queue"]
+    sbq -->|Worker| worker["Worker<br/>(async processor)"]
+
+    worker -->|Download| blob
+    api -->|OCR with document_base64| ocr["🔷 Mistral OCR<br/>(2505)"]
+    ocr -->|Markdown| api
+
+    api -->|→ Estimate tokens| tokencheck{Content tokens<br/>< 8K?}
+    tokencheck -->|YES<br/>Fast| phi4["🔶 Phi-4<br/>(Primary,8K)"]
+    tokencheck -->|NO<br/>fallback| gpt["🟢 gpt-4o-mini<br/>(120K context)"]
+
+    api -->|Comparison<br/>enabled?| compcheck{Adversarial<br/>mode ON?}
+    compcheck -->|YES| dual["🔶 Phi-4 ∥ 🟢 gpt4o-mini<br/>(Parallel, both models)"]
+    compcheck -->|NO| primary["Use selected<br/>primary model"]
+
+    phi4 -->|JSON| api
+    gpt -->|JSON| api
+    dual -->|Dual results<br/>+ delta| api
+    primary -->|Classification| api
+
+    api -->|Store both<br/>or single| cosmos["📊 Cosmos DB<br/>(comparison_results)"]
+    cosmos -->|Query + compare| ui
+    ui -->|Review, correct<br/>or rerun| user
+```
 
 ## 🔧 Installation & Exécution (aperçu)
 
@@ -103,10 +119,107 @@ uv sync
 uv run uvicorn main:app --reload
 ```
 
+## ⚖️ Adversarial Model Comparison
+
+The system supports **dual-model comparison** for advanced evaluation and fine-tuning, allowing you to run classification with two models simultaneously and compare their outputs.
+
+### Available Models for Comparison
+
+**Primary Model (Configurable via `PHI_DEPLOYMENT`):**
+- 🔶 **Phi-4** (default, recommended)
+- 🔶 **Phi-3** (if deployed)
+- 🟠 **GPT-4o** (if deployed)
+- 🟠 **GPT-4.1 Nano** (experimental, if available)
+
+**Fallback/Audit Model (Configurable via `PHI_FALLBACK_DEPLOYMENT`):**
+- 🟢 **gpt-4o-mini** (default, 120K token context)
+- 🟢 **gpt-4o** (if deployed)
+
+**Comparison Behavior:**
+- **Automatic Fallback**: When content > 8K tokens → Uses fallback model automatically
+- **Manual Comparison**: You can trigger comparison mode to run **both models in parallel** on any email
+- **Results**: Side-by-side comparison shows both classifications with confidence scores and agreement indicators
+
+### Enable Comparison Mode
+
+#### Via Settings (UI)
+Navigate to **Settings** → **Advanced** → check **"Enable Model Comparison"**. This enables comparison for all future classifications.
+
+#### Per-Email (API)
+```bash
+# Sync comparison (wait for results, ~20-30s)
+curl -X POST http://localhost:8000/api/emails/{id}/reclassify \
+  -H "Content-Type: application/json" \
+  -d '{"model": "both", "mode": "sync"}'
+
+# Async comparison (returns 202, processes in background)
+curl -X POST http://localhost:8000/api/emails/{id}/reclassify \
+  -H "Content-Type: application/json" \
+  -d '{"model": "both", "mode": "async"}'
+```
+
+### Why Compare Models?
+
+1. **Validation**: Verify Phi-4 results against gpt-4o-mini
+2. **Fine-Tuning Data**: Collect disagreement cases for model refinement
+3. **Confidence Analysis**: Compare confidence scores (higher delta = less certain)
+4. **Safety Net**: Ensure fallback model agrees on critical classifications
+
+### Comparison Results
+
+Results include:
+- **Phi-4 classification**: Primary result
+- **gpt-4o-mini classification**: Fallback result
+- **Confidence delta**: Absolute difference in top intent confidence (0.0–1.0)
+- **Agreement**: `true` if both models detected same intent
+- **Execution time**: Total time for dual-model execution (ms)
+
+View results in the **Comparison** tab of the email detail view.
+
+**UI Color Legend:**
+- **🔷 Blue Card**: Phi-4 (Primary Model)
+- **🟠 Orange Card**: GPT-4o-mini (Audit/Challenger Model)
+- **✅ Green Banner**: Consensus reached (Models agree)
+- **⚠️ Red Banner**: Divergence detected (Models disagree)
+
+---
+
 ## 🤖 Modèles & Data Residency
 
-Les modèles utilisés (Mistral Large, Phi-4) sont compatibles avec la **Data Zone Europe**.
-Voir la documentation Azure : [Models sold directly by Azure](https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-models/concepts/models-sold-directly-by-azure?view=foundry-classic&tabs=global-standard-aoai%2Cdata-zone-standard&pivots=azure-direct-others#mistral-models-sold-directly-by-azure).
+### Model Selection Strategy
+
+**Primary Model Selection** (via Settings/Env):
+- **Phi-4** (Standard, Default): Fast, cost-effective, 8K token context.
+- **GPT-5 Nano / Mini**: Next-gen small models (Experimental).
+- **GPT-4.1 Nano**: Optimized low-latency model.
+
+**Token-Based Fallback** (Automatic):
+- If content > 8K tokens estimated → use 🟢 gpt-4o-mini (120K context)
+- Otherwise → use selected primary model (default: 🔶 Phi-4)
+
+**Environment Variable** (Override):
+- `MODEL_SELECTION=phi4` → Always use Phi-4
+- `MODEL_SELECTION=gpt4o-mini` → Always use gpt-4o-mini
+- `MODEL_SELECTION=auto` (default) → Token-based fallback
+
+### Data Zone Europe Compliance
+
+All models used are compatible with **EU Central (Data Zone Europe)**:
+
+| Model | EU Central | US East | Availability |
+|-------|----------|---------|--------------|
+| 🔶 Phi-4 (Foundry) | ✅ | ✅ | [Link](https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-models/) |
+| 🟢 gpt-4o-mini | ✅ | ✅ | [Link](https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-models/) |
+| 🟦 Mistral OCR 2505 | ✅ | ✅ | [Link](https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-models/) |
+
+**Configuration**:
+```env
+# Set preferred region for compliance validation (optional warning logs)
+AZURE_PREFERRED_DATA_ZONE=eu-central
+AZURE_REGION=eastus
+```
+
+See [docs/RBAC_AUDIT.md](docs/RBAC_AUDIT.md) for identity and role configuration.
 
 CI/CD : [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md)
 
@@ -239,8 +352,6 @@ Le projet inclut une application frontend moderne dans le dossier `frontend/`.
     - Dark mode natif.
 - **Build** : `npm run build` génère les assets dans `static/dist/`. FastAPI sert `index.html` comme point d'entrée SPA.
 
-Ancien frontend (legacy) : `templates/index.html` (remplacé).
-
 ---
 
 ## 🔧 Installation & Exécution
@@ -283,27 +394,56 @@ uvicorn main:app --reload
 Les valeurs proviennent des outputs Terraform (voir `terraform output`).
 
 ```dotenv
-AI_ENDPOINT=https://<aifoundry>.cognitiveservices.azure.com/
+# --- Services Azure (Terraform outputs) ---
 AZURE_SERVICE_BUS_FQDN=<namespace>.servicebus.windows.net
 AZURE_SERVICE_BUS_QUEUE=pdf-processing-queue
+
 AZURE_STORAGE_ACCOUNT_URL=https://<storage>.blob.core.windows.net/
 AZURE_STORAGE_CONTAINER=pdf-inputs
+
 AZURE_COSMOS_ENDPOINT=https://<cosmos>.documents.azure.com:443/
 AZURE_COSMOS_DB=emailsdb
 AZURE_COSMOS_CONTAINER=emails
 
-# If Cosmos RBAC is enabled (recommended), do NOT set AZURE_COSMOS_KEY.
-# AZURE_COSMOS_KEY=
+# Cosmos key (uniquement si RBAC data-plane est désactivé)
+# AZURE_COSMOS_KEY=<cosmos-primary-key>
 
-MISTRAL_ENDPOINT=$AI_ENDPOINT
-PHI_ENDPOINT=$AI_ENDPOINT
+# --- Identité (Azure Container Apps / Local) ---
+# Si l'app tourne avec une User Assigned Managed Identity, définissez AZURE_CLIENT_ID
+# (cf. Terraform output: APP_ID_CLIENT_ID)
+# AZURE_CLIENT_ID=<identity-client-id>
+
+# --- Azure AI Foundry / Azure OpenAI compatible endpoint ---
+# Terraform output: AI_ENDPOINT
+AZURE_AI_ENDPOINT=https://<aifoundry>.cognitiveservices.azure.com/
+
+# Endpoints des modèles (par défaut pointe vers l'endpoint Foundry)
+MISTRAL_ENDPOINT=${AZURE_AI_ENDPOINT}
+MISTRAL_DEPLOYMENT=mistral-ocr-2505
+MISTRAL_MODE=maas
+
+PHI_ENDPOINT=${AZURE_AI_ENDPOINT}
+PHI_DEPLOYMENT=phi-4
+
+# Fallback model (long-context safety net)
+PHI_FALLBACK_DEPLOYMENT=gpt-4o-mini
+
+# --- Coûts (visibles dans l'UI) ---
+PHI4_COST_PER_1K_INPUT=0.000107
+PHI4_COST_PER_1K_OUTPUT=0.00043
+MISTRAL_OCR_COST_PER_1K_PAGES=1.0
+
+# --- Observabilité ---
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
+
+# Log Analytics Workspace ID (pour querying Application Insights logs)
+# LOG_ANALYTICS_WORKSPACE_ID=<workspace-uuid>
 ```
 
 ### CI/CD
 
 CI/CD setup lives in:
 - GitHub Actions: [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md)
-- GitLab CI: [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md)
 
 See the docs for the full YAML examples, authentication options (OIDC vs secrets), and recommended environment protections.
 
@@ -419,31 +559,98 @@ uv run --env-file secrets.env uvicorn main:app --reload
 
 ## 🔐 Variables d’environnement
 
-| Variable | Description |
-| --- | --- |
-| `AZURE_SERVICE_BUS_FQDN` | Namespace Service Bus (ex: `myns.servicebus.windows.net`) |
-| `AZURE_SERVICE_BUS_QUEUE` | Nom de la queue (défaut: `pdf-processing-queue`) |
-| `AZURE_STORAGE_ACCOUNT_URL` | URL compte storage (ex: `https://acct.blob.core.windows.net`) |
-| `AZURE_STORAGE_CONTAINER` | Container des PDFs (défaut: `pdf-inputs`) |
-| `AZURE_STORAGE_ACCOUNT_KEY` | (Optionnel) clé pour générer des SAS |
-| `AZURE_COSMOS_ENDPOINT` | Endpoint Cosmos DB |
-| `AZURE_COSMOS_KEY` | (Optionnel si MSI) clé Cosmos |
-| `AZURE_COSMOS_DB` | DB Cosmos (défaut: `emailsdb`) |
-| `AZURE_COSMOS_CONTAINER` | Container Cosmos (défaut: `emails`) |
-| `MISTRAL_ENDPOINT` | Endpoint Mistral MaaS |
-| `MISTRAL_DEPLOYMENT` | Nom du déploiement Mistral |
-| `PHI_ENDPOINT` | Endpoint Phi MaaS |
-| `PHI_DEPLOYMENT` | Nom du déploiement Phi |
-| `PHI_FALLBACK_ENDPOINT` | Endpoint du modèle fallback (défaut: `PHI_ENDPOINT`) |
-| `PHI_FALLBACK_DEPLOYMENT` | Déploiement fallback (ex: `gpt-4o-mini`) |
-| `PHI_PRIMARY_MAX_INPUT_TOKENS` | Budget tokens prompt (modèle principal) |
-| `PHI_FALLBACK_MAX_INPUT_TOKENS` | Budget tokens prompt (fallback long-contexte) |
-| `PHI_RESERVED_OUTPUT_TOKENS` | Tokens réservés pour la réponse JSON |
-| `AZURE_AI_KEY` | (Optionnel) Clé API modèle |
-| `AZURE_AI_SCOPE` | Scope token (défaut `https://cognitiveservices.azure.com/.default`) |
-| `AZURE_AI_API_VERSION` | API version (défaut `2024-08-01-preview`) |
-| `FALLBACK_COST_PER_1K_INPUT` | Prix input/1K tokens (fallback) (configurable) |
-| `FALLBACK_COST_PER_1K_OUTPUT` | Prix output/1K tokens (fallback) (configurable) |
+### Services Azure (Core)
+
+| Variable | Description | Par défaut |
+| --- | --- | --- |
+| `AZURE_SERVICE_BUS_FQDN` | Namespace Service Bus (ex: `myns.servicebus.windows.net`) | ✓ requis |
+| `AZURE_SERVICE_BUS_QUEUE` | Nom de la queue | `pdf-processing-queue` |
+| `AZURE_STORAGE_ACCOUNT_URL` | URL compte storage (ex: `https://acct.blob.core.windows.net`) | ✓ requis |
+| `AZURE_STORAGE_CONTAINER` | Container des PDFs | `pdf-inputs` |
+| `AZURE_COSMOS_ENDPOINT` | Endpoint Cosmos DB | ✓ requis |
+| `AZURE_COSMOS_KEY` | Clé Cosmos (optionnel si MSI/RBAC) | — |
+| `AZURE_COSMOS_DB` | DB Cosmos | `emailsdb` |
+| `AZURE_COSMOS_CONTAINER` | Container Cosmos | `emails` |
+
+### Azure AI / Foundry Models
+
+| Variable | Description | Par défaut |
+| --- | --- | --- |
+| `AZURE_AI_ENDPOINT` | Endpoint Foundry / Azure OpenAI | ✓ requis |
+| `AZURE_AI_KEY` | Clé API (optionnel, préférer DefaultAzureCredential) | — |
+| `AZURE_AI_API_VERSION` | API version | `2024-08-01-preview` |
+| `AZURE_AI_SCOPE` | OAuth scope | `https://cognitiveservices.azure.com/.default` |
+
+### Classification (Phi-4 + Fallback)
+
+| Variable | Description | Par défaut |
+| --- | --- | --- |
+| `PHI_ENDPOINT` | Endpoint Phi (défaut: `AZURE_AI_ENDPOINT`) | ✓ requis |
+| `PHI_DEPLOYMENT` | Déploiement Phi-4 | `phi-4` |
+| `PHI_FALLBACK_ENDPOINT` | Endpoint fallback long-contexte (défaut: `PHI_ENDPOINT`) | — |
+| `PHI_FALLBACK_DEPLOYMENT` | Déploiement fallback (ex: `gpt-4o-mini`) | `gpt-4o-mini` |
+| `PHI_PRIMARY_MAX_INPUT_TOKENS` | Budget tokens prompt (Phi-4) | `8000` |
+| `PHI_FALLBACK_MAX_INPUT_TOKENS` | Budget tokens prompt (fallback) | `120000` |
+| `PHI_RESERVED_OUTPUT_TOKENS` | Tokens réservés réponse JSON | `1000` |
+
+### OCR (Mistral)
+
+| Variable | Description | Par défaut |
+| --- | --- | --- |
+| `MISTRAL_ENDPOINT` | Endpoint Mistral (défaut: `AZURE_AI_ENDPOINT`) | ✓ requis |
+| `MISTRAL_DEPLOYMENT` | Déploiement Mistral OCR | `mistral-ocr-2505` |
+| `MISTRAL_MODE` | Mode MaaS (`maas` ou `inference`) | `maas` |
+| `MISTRAL_OCR_MAX_ATTEMPTS` | Tentatives OCR avant abandon | `3` |
+
+### Anonymization & Embeddings (Optional)
+
+| Variable | Description | Par défaut |
+| --- | --- | --- |
+| `ANONYMIZER_ENDPOINT` | Endpoint anonymisation (défaut: `PHI_ENDPOINT`) | — |
+| `ANONYMIZER_DEPLOYMENT` | Déploiement anonymisation | `gpt-4o` |
+| `ANONYMIZER_PROMPT_VERSION` | Version prompt anonym. | `v1` |
+| `EMBEDDING_ENDPOINT` | Endpoint embeddings (défaut: `PHI_ENDPOINT`) | — |
+| `EMBEDDING_DEPLOYMENT` | Déploiement embeddings | `text-embedding-3-small` |
+| `VISION_ENDPOINT` | Endpoint vision (défaut: `PHI_ENDPOINT`) | — |
+| `VISION_DEPLOYMENT` | Déploiement vision | `gpt-4o` |
+| `CHAT_ENDPOINT` | Endpoint chat (défaut: `PHI_ENDPOINT`) | — |
+| `CHAT_DEPLOYMENT` | Déploiement chat | `gpt-5.2-chat` |
+
+### Pricing & Thresholds
+
+| Variable | Description | Par défaut |
+| --- | --- | --- |
+| `PHI4_COST_PER_1K_INPUT` | Prix Phi-4 input/1K tokens (USD) | `0.000107` |
+| `PHI4_COST_PER_1K_OUTPUT` | Prix Phi-4 output/1K tokens (USD) | `0.00043` |
+| `MISTRAL_OCR_COST_PER_1K_PAGES` | Prix Mistral OCR / 1K pages (USD) | `1.0` |
+| `FALLBACK_COST_PER_1K_INPUT` | Prix fallback input/1K tokens (USD) | `0` |
+| `FALLBACK_COST_PER_1K_OUTPUT` | Prix fallback output/1K tokens (USD) | `0` |
+| `REVIEW_CONFIDENCE_THRESHOLD` | Score confiance min. pour review | `0.85` |
+
+### Observabilité & Monitoring
+
+| Variable | Description | Par défaut |
+| --- | --- | --- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint OpenTelemetry (ex: `http://localhost:4318`) | — |
+| `OTEL_SERVICE_NAME` | Nom du service telemetry | `classificationg2s-api` |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | App Insights connection string | — |
+| `LOG_ANALYTICS_WORKSPACE_ID` | Workspace ID pour logs | — |
+
+### Interface Utilisateur (Features)
+
+| Variable | Description | Par défaut |
+| --- | --- | --- |
+| `UI_SHOW_INFO_MODAL` | Afficher la modal d'information au démarrage | `true` |
+| `UI_SHOW_DEVELOPER_TAB` | Afficher l'onglet Developer dans le dashboard | `true` |
+| `MAX_UPLOAD_SIZE` | Taille max upload (MB, interface) | `10` |
+
+### Autres
+
+| Variable | Description | Par défaut |
+| --- | --- | --- |
+| `AZURE_CLIENT_ID` | Client ID identité managée | — |
+| `COSMOS_QUERY_MAX_LIMIT` | Limite pagination Cosmos | `20` |
+| `UPLOAD_MAX_BYTES` | Taille max upload (bytes) | `10485760` (10MB) |
 
 > Tous les services utilisent **DefaultAzureCredential** par défaut. Accorder les rôles nécessaires :
 > - Storage: `Storage Blob Data Contributor`

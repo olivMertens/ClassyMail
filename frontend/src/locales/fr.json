@@ -16,6 +16,45 @@
         "language": "Langue",
         "costs_title": "Surcharge des Coûts",
         "costs_desc": "Modifier la tarification par défaut pour le calcul des coûts. Laisser vide pour utiliser les défauts.",
+        "telemetry_title": "Télémétrie Application Insights",
+        "tabs": {
+            "processing": "Traitement",
+            "finetuning": "Fine-tuning",
+            "general": "Général & Coûts",
+            "logs": "Logs",
+            "danger": "Danger"
+        },
+        "processing": {
+            "title": "Stratégie de Traitement",
+            "desc": "Sélectionnez le pipeline et le modèle IA pour le traitement des emails.",
+            "model_select": "Modèle IA",
+            "finetuning_not_supported": "Le Fine-tuning n'est pas disponible pour ce modèle.",
+            "strategy": {
+                "standard": "Standard (Optimisé Texte/OCR - Défaut)",
+                "reasoning": "Raisonnement (CoT / Analyse Profonde)",
+                "vision": "Vision (Analyse Visuelle - Expérimental)"
+            },
+            "ocr_retries": "Tentatives Max OCR",
+            "ocr_retries_help": "Nombre de tentatives OCR (retry exponentiel sur erreur réseau)."
+        },
+        "finetuning": {
+            "title": "Configuration Fine-tuning",
+            "desc": "Paramètres pour la génération de datasets d'entraînement.",
+            "min_samples": "Échantillons Minimum Requis",
+            "min_samples_help": "Nombre minimum de validations manuelles pour activer l'export JSONL."
+        },
+        "danger": {
+            "title": "Zone Danger",
+            "desc": "Opérations destructrices irréversibles. Procédez avec prudence.",
+            "dlq_title": "Gestion Dead Letter Queue (DLQ)",
+            "dlq_help": "Le Service Bus déplace les échecs ici après max retries.",
+            "dlq_desc": "Les messages échoués atterrissent ici. Analysez la cause puis purgez.",
+            "view_dlq": "Voir Messages DLQ",
+            "purge_dlq": "Purger DLQ",
+            "reset_title": "Réinitialisation Atomique",
+            "reset_desc": "Supprime TOUTES les données de cet environnement.",
+            "reset_warning_title": "Cette action va :"
+        },
         "strategy_standard_help": "Rapide & Efficace. Idéal pour les textes dactylographiés standard et emails clairs.",
         "strategy_reasoning_help": "Analyse Profonde. Utilise le 'Chain-of-Thought' pour justifier avant de classifier. Utile pour les cas ambigus.",
         "strategy_vision_help": "Multimodal. Analyse les éléments visuels (images, mise en page). Idéal pour les documents avec photos ou structures complexes."
@@ -98,7 +137,18 @@
             "infra": "Infra (queue/storage)"
         },
         "disclaimer": "*Tarifs indicatifs, dépendants de la région et de l'usage réel.",
-        "close": "OK"
+        "close": "OK",
+        "target_title": "Objectif",
+        "target_desc": "Démonstrateur technique pour la classification d'emails complexes (Multi-intention, Pièces jointes visuelles) utilisant l'IA générative (Phi-4 / GPT-4).",
+        "resources_title": "Architecture Azure/Foundry",
+        "guide_prompt": "Pour plus de détails, consultez le",
+        "guide_link": "Guide Utilisateur / Documentation",
+        "features": {
+            "title": "Nouveautés (Adversarial Update)",
+            "adversarial": "Mode Comparaison : Phi-4 vs Modèles Alternatifs",
+            "dark_mode": "Support du Mode Sombre & Thèmes",
+            "retail_prices": "Estimation des Coûts via Azure Retail Prices"
+        }
     },
     "guide": {
         "title": "Documentation de l'Application",
