@@ -585,6 +585,54 @@ onMounted(() => {
             <ExclamationTriangleIcon class="h-4 w-4" />
             <span>{{ t('settings.processing.finetuning_not_supported') }}</span>
           </div>
+
+          <!-- Cost/Quality Trade-off Info -->
+          <div class="mt-3 rounded-md bg-blue-50 dark:bg-blue-900/20 p-3 border border-blue-200 dark:border-blue-800">
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <QuestionMarkCircleIcon
+                  class="h-5 w-5 text-blue-400"
+                  aria-hidden="true"
+                />
+              </div>
+              <div class="ml-3 flex-1 text-sm">
+                <p class="font-medium text-blue-800 dark:text-blue-300 mb-1">
+                  Model Comparison (Azure Foundry Benchmarks)
+                </p>
+                <div class="text-blue-700 dark:text-blue-200 space-y-1">
+                  <div class="flex items-center justify-between">
+                    <span><strong>Phi-4 (fine-tuned):</strong> Quality ~0.80, Cost ~$15/10K emails</span>
+                    <span
+                      v-if="settings.ai_model === 'phi4'"
+                      class="text-green-600 dark:text-green-400"
+                    >✓ Selected</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span><strong>gpt-5-mini:</strong> Quality 0.89 ⭐, Cost ~$70/10K emails</span>
+                    <span
+                      v-if="settings.ai_model === 'gpt5-mini'"
+                      class="text-green-600 dark:text-green-400"
+                    >✓ Selected</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span><strong>gpt-4.1-nano:</strong> Quality 0.69, Cost ~$17/10K emails</span>
+                    <span
+                      v-if="settings.ai_model === 'gpt4.1-nano'"
+                      class="text-green-600 dark:text-green-400"
+                    >✓ Selected</span>
+                  </div>
+                  <p class="mt-2 text-xs italic border-t border-blue-200 dark:border-blue-700 pt-2">
+                    💡 <strong>Strategy:</strong> Use gpt-5-mini for highest quality, or fine-tune Phi-4 for cost-efficiency at high volume (>5K/month).
+                    See <a
+                      href="https://github.com/olivMertens/classimail-agent/blob/main/docs/MODELS.md#cost-benefit-analysis-fine-tuned-vs-pre-trained-models"
+                      target="_blank"
+                      class="underline"
+                    >detailed analysis</a>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="mt-4 space-y-4">

@@ -627,6 +627,11 @@ uv run --env-file secrets.env uvicorn main:app --reload
 | `FALLBACK_COST_PER_1K_OUTPUT` | Prix fallback output/1K tokens (USD) | `0` |
 | `REVIEW_CONFIDENCE_THRESHOLD` | Score confiance min. pour review | `0.85` |
 
+**💡 Cost-Benefit Insight:** See [docs/MODELS.md](docs/MODELS.md#cost-benefit-analysis-fine-tuned-vs-pre-trained-models) for detailed analysis comparing:
+- Fine-tuned Phi-4 (~$15-20/month for 10K emails)
+- gpt-5-mini baseline (~$70-80/month, +0.09 quality score)
+- Hybrid strategy recommendations based on volume
+
 ### Observabilité & Monitoring
 
 | Variable | Description | Par défaut |

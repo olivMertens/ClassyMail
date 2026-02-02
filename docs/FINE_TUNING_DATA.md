@@ -39,7 +39,13 @@ Ce repo recommande **Phi-4 avec LoRA** comme approche principale pour le fine-tu
 - **Coûts d'entraînement** : $0.17/1M tokens (throughput élevé)
 - **Déploiement** : `gpt-4_1-nano-custom`
 
-**Recommandation** : Commencer avec **Phi-4 LoRA** pour la rapidité d'itération, puis comparer avec gpt-4o-mini si nécessaire.
+**Recommandation** : Commencer avec **Phi-4 LoRA** pour la rapidité d'itération, puis **comparer avec gpt-5-mini** (non fine-tunable mais qualité supérieure : 0.89) en mode adversarial pour identifier les cas limites et améliorer vos données d'entraînement.
+
+**Stratégie de validation :**
+- Fine-tune Phi-4 sur vos données validées
+- Activer le mode comparaison avec gpt-5-mini comme "oracle"
+- Les désaccords entre Phi-4 fine-tuné et gpt-5-mini = excellent signal pour améliorer le dataset
+- gpt-5-mini (score qualité 0.89) sert de référence pour évaluer les progrès du fine-tuning
 
 ## Boucle de renforcement humain → export JSONL anonymisé
 

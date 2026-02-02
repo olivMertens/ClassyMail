@@ -57,18 +57,49 @@ Recommended default fallback: **gpt-4o-mini** (configure as an Azure OpenAI depl
 OCR (Mistral Document AI 25.05):
 - `MISTRAL_DEPLOYMENT` (default: `mistral-document-ai-2505`)
 
-Primary (existing):
+Primary (fine-tunable):
 - `PHI_ENDPOINT`
-- `PHI_DEPLOYMENT` (supports `phi-4`, `gpt-4o`, `gpt-4.1`, `gpt-5-preview`)
+- `PHI_DEPLOYMENT` (supports `phi-4`, `gpt-4o`, `gpt-4.1-nano`)
 
-Fallback (new):
+Fallback/Audit (high quality):
 - `PHI_FALLBACK_ENDPOINT` (defaults to `PHI_ENDPOINT`)
-- `PHI_FALLBACK_DEPLOYMENT` (example: `gpt-4o-mini`)
+- `PHI_FALLBACK_DEPLOYMENT` (recommended: `gpt-5-mini` for adversarial comparison)
 
-Context sizing (new):
-- `PHI_PRIMARY_MAX_INPUT_TOKENS` (example: `8000`)
-- `PHI_FALLBACK_MAX_INPUT_TOKENS` (example: `120000`)
+Context sizing:
+- `PHI_PRIMARY_MAX_INPUT_TOKENS` (example: `8000` for Phi-4)
+- `PHI_FALLBACK_MAX_INPUT_TOKENS` (example: `200000` for gpt-5-mini)
 - `PHI_RESERVED_OUTPUT_TOKENS` (example: `1000`)
+
+## Adversarial Comparison Strategy
+
+**Recommended Configuration:**
+
+```env
+# Primary: Phi-4 (fine-tune with your domain data)
+PHI_DEPLOYMENT=phi-4-custom
+PHI_PRIMARY_MAX_INPUT_TOKENS=8000
+
+# Audit: gpt-5-mini (high quality, general intelligence)
+PHI_FALLBACK_DEPLOYMENT=gpt-5-mini
+PHI_FALLBACK_MAX_INPUT_TOKENS=200000
+```
+
+**Why gpt-5-mini for adversarial comparison?**
+
+Based on Azure AI Foundry benchmarks (Feb 2026):
+- **Quality: 0.89** (vs 0.72 for gpt-4o-mini, 0.69 for gpt-4.1-nano)
+- **Throughput: 127** (highest among compared models)
+- **Safety: 0.53** (balanced)
+- Even without fine-tuning, provides superior baseline detection
+- Acts as "oracle" to validate fine-tuned Phi-4 classifications
+
+**Workflow:**
+1. Phi-4 (fine-tuned) processes emails → Your taxonomy
+2. Enable comparison mode → gpt-5-mini also processes same emails
+3. Compare results:
+   - **Agreement** → High confidence, mark as validated
+   - **Disagreement** → Review case, excellent training data for next iteration
+4. gpt-5-mini's higher quality often reveals edge cases Phi-4 missed
 
 ## Fine-Tuning & LoRA Compatibility
 
@@ -127,6 +158,69 @@ The code logs which model was used and stores usage + estimated cost in Cosmos.
 ## Cost display
 
 Pricing changes by region/tenant and can differ between Azure AI Foundry vs Azure OpenAI. This repo treats prices as configuration (env vars). Set them from your Azure pricing page/portal so the per-email costs stay accurate.
+
+## Cost-Benefit Analysis: Fine-Tuned vs Pre-Trained Models
+
+### Scenario: Should you fine-tune Phi-4 or just use gpt-5-mini?
+
+**Based on Azure AI Foundry Benchmarks (Feb 2026):**
+
+| Model | Quality Score | Estimated Cost | Fine-Tuning | Total Cost (10K emails) |
+|-------|---------------|----------------|-------------|-------------------------|
+| **Phi-4 (base)** | 0.72 | ~$0.10/1K tokens | N/A | ~$10-15 |
+| **Phi-4 (fine-tuned)** | 0.78-0.85* | ~$0.10/1K tokens | $0.05/1M training | ~$15-20 (incl. training) |
+| **gpt-4o-mini** | 0.72 | $0.26/1K tokens | $0.69/1M training | ~$26-35 |
+| **gpt-5-mini** | **0.89** ⭐ | **$0.69/1K tokens** | ❌ Not available | ~$69-80 |
+| **GPT-4.1 Nano** | 0.69 | **$0.17/1K tokens** | $0.17/1M training | ~$17-22 |
+
+*Quality improvement estimate based on typical fine-tuning gains
+
+### Key Insights:
+
+**1. Quality vs Cost Trade-off:**
+- **gpt-5-mini** offers the highest quality (0.89) but at 685% the cost of fine-tuned Phi-4
+- **Fine-tuned Phi-4** can reach 0.78-0.85 quality at the lowest ongoing cost
+- Break-even point: ~5K emails (fine-tuning amortized)
+
+**2. When to choose gpt-5-mini:**
+- ✅ **Low volume** (<1K emails/month): Upfront fine-tuning cost not justified
+- ✅ **High stakes**: Need maximum accuracy out-of-the-box
+- ✅ **POC/Demo**: Quick results without training data collection
+- ✅ **Adversarial validation**: Use as "oracle" to validate fine-tuned Phi-4
+
+**3. When to fine-tune Phi-4:**
+- ✅ **High volume** (>5K emails/month): Lower inference cost pays off
+- ✅ **Domain-specific**: Your taxonomy differs from general patterns
+- ✅ **Iteration**: Continuous improvement with human feedback loop
+- ✅ **Cost-sensitive**: Budget constraints favor lower ongoing costs
+
+**4. Hybrid Strategy (Recommended):**
+```
+Primary: Phi-4 fine-tuned → Handle 90% of emails at low cost
+Audit: gpt-5-mini → Validate edge cases and improve training data
+```
+
+**Cost Breakdown Example (10K emails/month):**
+- Phi-4 fine-tuned: $15/month ongoing + $50 one-time fine-tuning = **$15-20/month amortized**
+- gpt-5-mini only: **$70-80/month** (no fine-tuning)
+- **Savings**: ~$50-60/month after first year (~75% reduction)
+
+**Quality Comparison:**
+- Phi-4 fine-tuned: ~0.80-0.85 (after training on your data)
+- gpt-5-mini baseline: 0.89 (out-of-the-box)
+- **Gap**: ~5-10% quality difference
+
+### Recommendation:
+
+**Start with gpt-5-mini** for initial deployment and data collection, then **switch to fine-tuned Phi-4** once you have:
+1. 50-200 validated examples
+2. Stable taxonomy/requirements
+3. Volume justifying fine-tuning investment (~5K+ emails)
+
+**Keep gpt-5-mini** as adversarial validator to:
+- Catch edge cases Phi-4 misses
+- Continuously improve training data
+- Ensure quality doesn't degrade over time
 
 ## References
 
