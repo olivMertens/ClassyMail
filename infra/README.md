@@ -1,6 +1,6 @@
 # Infra folder
 
-Terraform and deployment documentation lives in [docs/TERRAFORM.md](../docs/TERRAFORM.md).
+Terraform and deployment documentation lives in [docs/INFRASTRUCTURE.md](../docs/INFRASTRUCTURE.md).
 
 Quick deploy from the repo root:
 

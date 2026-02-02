@@ -35,30 +35,32 @@ Selon ton objectif :
 
 - **Je veux tester le système E2E** (recommandé pour débuter)
     1. [docs/SCENARIO_E2E.md](docs/SCENARIO_E2E.md) — scénario complet (PDF → Blob → Event Grid → Service Bus → Worker → Cosmos → UI), en local et sur Azure
-    2. [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md) — exécution locale, variables `secrets.env`, upload/trigger
-    3. [docs/TERRAFORM.md](docs/TERRAFORM.md) — provisionner l’infra Azure + récupérer les outputs
+    2. [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) — exécution locale, variables `secrets.env`, upload/trigger
+    3. [docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md) — provisionner l'infra Azure + récupérer les outputs
 
 - **Je veux comprendre l’architecture** (deep dive)
-    1. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — composants, RBAC, scaling
-    2. [docs/PIPELINE.md](docs/PIPELINE.md) — logique de traitement (OCR → LLM → persistance), formats de messages
-    3. [docs/MODELS.md](docs/MODELS.md) — endpoints, deployments, contraintes tokens, pricing config
+    1. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — composants, RBAC, scaling, pipeline de traitement
+    2. [docs/MODELS.md](docs/MODELS.md) — endpoints, deployments, contraintes tokens, config
+    3. [docs/COSTS_LOGIC.md](docs/COSTS_LOGIC.md) — analyse de coûts et comparaison de modèles
     4. [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md) — boucle de review + export JSONL + fine-tune
 
 - **Je veux builder/déployer**
-    - [docs/DEV_LOCAL_BUILD.md](docs/DEV_LOCAL_BUILD.md) — build/push image, déploiement ACA sans CI
+    - [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) — build/push image, déploiement ACA sans CI
+    - [docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md) — déploiement Terraform complet
     - [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md)
 
 ### Référence (liste complète)
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- [docs/PIPELINE.md](docs/PIPELINE.md)
-- [docs/TERRAFORM.md](docs/TERRAFORM.md)
-- [docs/MODELS.md](docs/MODELS.md)
-- [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md)
-- [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md)
-- [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md)
-- [docs/DEV_LOCAL_BUILD.md](docs/DEV_LOCAL_BUILD.md)
-- [docs/SCENARIO_E2E.md](docs/SCENARIO_E2E.md)
+📊 **Voir [docs/INDEX.md](docs/INDEX.md) pour la navigation complète et organisée**
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — Architecture système, RBAC, pipeline
+- [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) — Setup local, build, testing
+- [docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md) — Terraform, Azure config, Event Grid
+- [docs/MODELS.md](docs/MODELS.md) — Configuration des modèles AI
+- [docs/COSTS_LOGIC.md](docs/COSTS_LOGIC.md) — Analyse et optimisation des coûts
+- [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md) — Fine-tuning workflow
+- [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) — CI/CD GitHub Actions
+- [docs/SCENARIO_E2E.md](docs/SCENARIO_E2E.md) — Tests end-to-end
 
 ## 🔗 References
 
@@ -112,7 +114,7 @@ flowchart TD
 
 ## 🔧 Installation & Exécution (aperçu)
 
-Voir [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md) pour toutes les options (uv/poetry/pip) et le chargement de `secrets.env`.
+Voir [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) pour toutes les options (uv/poetry/pip) et le chargement de `secrets.env`.
 
 ```bash
 uv sync
@@ -223,7 +225,7 @@ See [docs/RBAC_AUDIT.md](docs/RBAC_AUDIT.md) for identity and role configuration
 
 CI/CD : [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md)
 
-Tests rapides : voir [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md#lancer-lappli)
+Tests rapides : voir [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md)
 1. **UI** : validation/correction (FastAPI Dashboard)
 2. **Golden Dataset** : `classification.needs_review=false`, `reviewed=true`
 3. **Export Foundry** : JSONL hebdomadaire
@@ -647,6 +649,7 @@ uv run --env-file secrets.env uvicorn main:app --reload
 | --- | --- | --- |
 | `UI_SHOW_INFO_MODAL` | Afficher la modal d'information au démarrage | `true` |
 | `UI_SHOW_DEVELOPER_TAB` | Afficher l'onglet Developer dans le dashboard | `true` |
+| `ORGANIZATION_NAME` | Nom organisation affiché dans l'UI (branding) | `ClassiMail` |
 | `MAX_UPLOAD_SIZE` | Taille max upload (MB, interface) | `10` |
 
 ### Autres

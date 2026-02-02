@@ -43,6 +43,12 @@ variable "cosmos_use_rbac" {
   default     = true
 }
 
+variable "organization_name" {
+  type        = string
+  description = "Organization/destination name displayed in the UI (e.g., G2S, Groupama, ClassiMail)"
+  default     = "ClassiMail"
+}
+
 variable "location" { default = "swedencentral" } # Région recommandée pour disponibilité Mistral/Phi
 variable "prefix" { default = "email-poc" }
 
@@ -534,6 +540,10 @@ resource "azurerm_container_app" "api" {
       env {
         name  = "UI_SHOW_DEVELOPER_TAB"
         value = "true"
+      }
+      env {
+        name  = "ORGANIZATION_NAME"
+        value = var.organization_name
       }
       env {
         name  = "MAX_UPLOAD_SIZE"

@@ -16,3 +16,7 @@
 
 # Recommended in policy-driven tenants (disables Cosmos local auth + uses Cosmos SQL RBAC)
 # cosmos_use_rbac = true
+
+# Optional: organization/destination name for UI branding
+# organization_name = "G2S"
+# organization_name = "Groupama"

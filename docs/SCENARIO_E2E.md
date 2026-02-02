@@ -64,13 +64,11 @@ flowchart LR
   W -->|8b) ≥ 8K| GPT
   Phi -->|JSON intents| W
   GPT -->|JSON intents| W
-  rect Adversarial Comparison Path
-    W -->|Optional: POST<br/>model=both| API
-    API -->|Parallel call| Phi
-    API -->|Parallel call| GPT
-    Phi -->|Result 1| API
-    GPT -->|Result 2| API
-  end
+  W -->|Optional: POST<br/>model=both| API
+  API -->|Parallel call| Phi
+  API -->|Parallel call| GPT
+  Phi -->|Result 1| API
+  GPT -->|Result 2| API
   W -->|9) Upsert<br/>comparison_results| C
   API -->|10) Read results| C
   C -->|Dual results| API

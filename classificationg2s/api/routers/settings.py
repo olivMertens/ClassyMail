@@ -23,6 +23,12 @@ async def get_settings_defaults():
     }
 
 
+@router.get("/settings/organization")
+async def get_organization():
+    """Get the organization/destination name for branding"""
+    return {"name": config.ORGANIZATION_NAME}
+
+
 
 @router.post("/settings")
 async def set_settings(payload: dict, clients: Clients = Depends(get_clients)):

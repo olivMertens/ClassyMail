@@ -1,18 +1,56 @@
 import asyncio
 import logging
-import os
 import argparse
 import base64
-from classificationg2s.services.azure_clients import Clients, set_default_clients, build_sas_url, auth_headers
+import json
+from classificationg2s.services.azure_clients import Clients, set_default_clients
 from classificationg2s.services.llm_pipeline import ocr_with_mistral, classify_with_phi4
 from classificationg2s.core import config
+from classificationg2s.cli import ensure_cosmos_container, cosmos_container, close_cosmos
 from dotenv import load_dotenv
 
 # Configure logging to see all steps
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-async def run_diagnostics(pdf_path: str = None, blob_url: str = None):
+
+async def show_error_records(limit: int = 5, include_processing_log: bool = True):
+    """Query and display recent ERROR records from Cosmos DB."""
+    print("\n=== ERROR RECORDS FROM COSMOS DB ===\n")
+
+    await ensure_cosmos_container()
+    query = "SELECT * FROM c WHERE c.status = 'ERROR' ORDER BY c.updated_at DESC"
+    items = []
+    it = cosmos_container.query_items(query)
+    async for item in it:
+        items.append(item)
+        if len(items) >= limit:
+            break
+
+    if not items:
+        print("✅ No ERROR records found.")
+        await close_cosmos()
+        return
+
+    for idx, item in enumerate(items, 1):
+        print(f"[{idx}] id={item.get('id')} status={item.get('status')} error_stage={item.get('error_stage')}")
+        print(f"error: {item.get('error')}")
+        if include_processing_log:
+            plog = item.get('processing_log')
+            if plog:
+                print("processing_log:")
+                for entry in plog:
+                    print(json.dumps(entry, ensure_ascii=False, indent=2))
+            else:
+                print("processing_log: <none>")
+        print("-" * 80)
+
+    await close_cosmos()
+    print(f"\n=== Total ERROR records shown: {len(items)} ===\n")
+
+
+async def run_diagnostics(pdf_path: str = None):
+    """Run pipeline diagnostics with OCR and classification testing."""
     print("--- 1. Initialize Clients ---")
     clients = Clients()
     set_default_clients(clients)
@@ -27,128 +65,70 @@ async def run_diagnostics(pdf_path: str = None, blob_url: str = None):
         print(f"EMBEDDING_ENDPOINT: {config.EMBEDDING_ENDPOINT}")
         print(f"STORAGE_ACCOUNT_URL: {config.BLOB_ACCOUNT_URL}")
 
-        pdf_b64 = None
+        if not pdf_path:
+            print("\n⚠️  No PDF provided. Use --pdf to test OCR/Classification pipeline.")
+            return
 
-        if blob_url:
-            print("\n--- 3. Testing Blob URL Access & SAS Generation ---")
-            print(f"Target Blob: {blob_url}")
+        print(f"\n--- 3. Reading Local PDF: {pdf_path} ---")
+        with open(pdf_path, "rb") as f:
+            pdf_bytes = f.read()
+            pdf_b64 = base64.b64encode(pdf_bytes).decode('utf-8')
+        print(f"✅ PDF loaded. Size: {len(pdf_bytes)} bytes")
 
-            # 3.1 Test SAS Generation
-            sas_url = await build_sas_url(blob_url, clients=clients)
-            print(f"Generated SAS URL: {sas_url}")
+        print("\n--- 4. Testing OCR (Mistral) ---")
+        try:
+            ocr_result = await ocr_with_mistral(pdf_b64, clients=clients)
+            print("✅ OCR Success!")
+            markdown_text = ocr_result.get("markdown", "")
+            print(f"Markdown length: {len(markdown_text)} chars")
+            print(f"Pages processed: {ocr_result.get('usage', {}).get('pages_processed')}")
 
-            if not sas_url or sas_url == blob_url:
-                print("⚠️  Warning: SAS URL is identical to input or empty. User Delegation SAS might have failed if no account key is present.")
-            else:
-                 print("✅ SAS URL generated (assumed valid format).")
+            print("\n--- 5. Testing Classification (Phi-4) ---")
+            classification = await classify_with_phi4(markdown_text, clients=clients)
+            print("✅ Classification Success!")
+            print(json.dumps(classification, indent=2))
 
-        if pdf_path:
-            print(f"\n--- 4. Reading Local PDF: {pdf_path} ---")
-            with open(pdf_path, "rb") as f:
-                pdf_bytes = f.read()
-                pdf_b64 = base64.b64encode(pdf_bytes).decode('utf-8')
-            print(f"✅ PDF loaded. Size: {len(pdf_bytes)} bytes")
-
-            print("\n--- 5. Testing CLI OCR (Mistral) ---")
-
-            # Helper to try paths
-            import httpx
-            import json
-
-            async def try_path(suffix, test_payload):
-                try:
-                    t_url = config.MISTRAL_ENDPOINT.rstrip('/') + suffix
-                    print(f"Testing URL: {t_url}")
-
-                    api_key = os.environ.get("AZURE_AI_KEY")
-                    if api_key:
-                        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-                    else:
-                        headers = await auth_headers(clients)
-
-                    async with httpx.AsyncClient(timeout=10) as client:
-                        resp = await client.post(t_url, json=test_payload, headers=headers)
-                        print(f"Status: {resp.status_code}")
-                        if resp.status_code < 300:
-                            print(f"✅ Success on {suffix}!")
-                            print(f"Response: {resp.text[:200]}...")
-                            return True
-                        else:
-                            print(f"Response: {resp.text[:200]}")
-                            return False
-                except Exception as e:
-                    print(f"Error: {e}")
-                return False
-
-            paths_to_test = [
-                "/providers/mistral/azure/ocr",
-                "/v1/ocr",
-                "/ocr"
-            ]
-
-            payloads_to_test = [
-                {
-                    "model": config.MISTRAL_DEPLOYMENT,
-                    "document": {
-                        "type": "image_url",
-                        "image_url": f"data:application/pdf;base64,{pdf_b64}"
-                    },
-                    "include_image_base64": True
-                },
-                {
-                    "model": config.MISTRAL_DEPLOYMENT,
-                    "document": {
-                        "type": "image_url",
-                        "image_url": "https://mw1.google.com/mw-earth-vectordb/kml-samples/gp/seattle/gigapxl/google-earth-touchup.jpg"
-                    }
-                }
-            ]
-
-            success = False
-            for p in paths_to_test:
-                 for pl in payloads_to_test:
-                     print(f"\n--- Testing Path: {p} with payload type: {pl['document']['type']} ---")
-                     if await try_path(p, pl):
-                         success = True
-                         # We don't break yet, let's see which ones work
-
-            if not success:
-                print("\n❌ All paths/payloads failed. Checking control plane...")
-
-            # Original call if one succeeded or just to show trace
-            try:
-                print("\n--- 5.1 Final attempt with library code ---")
-                ocr_result = await ocr_with_mistral(pdf_b64, clients=clients)
-                print("✅ OCR Success!")
-                markdown_text = ocr_result.get("markdown", "")
-                print(f"Markdown length: {len(markdown_text)} chars")
-                print(f"Pages processed: {ocr_result.get('usage', {}).get('pages_processed')}")
-
-                print("\n--- 6. Testing Classification (Phi-4) ---")
-                classification = await classify_with_phi4(markdown_text, clients=clients)
-                import json
-                print("✅ Classification Success!")
-                print(json.dumps(classification, indent=2))
-
-            except Exception as e:
-                print(f"❌ Error during pipeline execution: {e}")
-                import traceback
-                traceback.print_exc()
+        except Exception as e:
+            print(f"❌ Error during pipeline execution: {e}")
+            import traceback
+            traceback.print_exc()
 
     except Exception as ex:
         print(f"❌ Global Error: {ex}")
+        import traceback
+        traceback.print_exc()
     finally:
         await clients.close()
         print("\n--- Diagnostic Complete ---")
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Diagnostics for PDF processing pipeline")
+    parser = argparse.ArgumentParser(
+        description="Diagnostics for PDF processing pipeline and Cosmos DB errors",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Test OCR/Classification pipeline with local PDF
+  python scripts/diagnose_pipeline.py --pdf dataset/pdf/test.pdf
+
+  # Show recent ERROR records from Cosmos DB
+  python scripts/diagnose_pipeline.py --show-errors
+
+  # Show 10 ERROR records without processing logs
+  python scripts/diagnose_pipeline.py --show-errors --limit 10 --no-log
+"""
+    )
     parser.add_argument("--pdf", help="Path to local PDF file to test OCR/Classification")
-    parser.add_argument("--blob", help="Blob URL to test valid SAS generation")
+    parser.add_argument("--show-errors", action="store_true", help="Query and display recent ERROR records from Cosmos DB")
+    parser.add_argument("--limit", type=int, default=5, help="Number of ERROR records to show (default: 5)")
+    parser.add_argument("--no-log", action="store_true", help="Do not show processing_log in error records")
 
     args = parser.parse_args()
 
     # Load env vars from .env if present
     load_dotenv()
 
-    asyncio.run(run_diagnostics(pdf_path=args.pdf, blob_url=args.blob))
+    if args.show_errors:
+        asyncio.run(show_error_records(limit=args.limit, include_processing_log=not args.no_log))
+    else:
+        asyncio.run(run_diagnostics(pdf_path=args.pdf))

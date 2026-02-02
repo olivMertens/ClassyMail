@@ -30,6 +30,7 @@ const sidebarOpen = ref(false)
 const showInfoModal = ref(false)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 const uiConfig = ref({ show_info_modal: true, show_developer_tab: true })
+const organizationName = ref('ClassiMail')
 
 const fetchUiConfig = async () => {
   try {
@@ -42,8 +43,21 @@ const fetchUiConfig = async () => {
   }
 }
 
+const fetchOrganizationName = async () => {
+  try {
+    const res = await fetch('/api/settings/organization')
+    if (res.ok) {
+      const data = await res.json()
+      organizationName.value = data.name || 'ClassiMail'
+    }
+  } catch (e) {
+    console.error('Failed to fetch organization name', e)
+  }
+}
+
 onMounted(() => {
   fetchUiConfig()
+  fetchOrganizationName()
 })
 
 const toggleDarkMode = () => {
@@ -91,7 +105,7 @@ const navigation = computed(() => {
       <div class="flex items-center justify-between px-4 py-5 border-b border-gray-200 dark:border-gray-700">
         <div class="flex items-center gap-2">
           <span class="text-2xl">📧</span>
-          <span class="text-xl font-bold text-gray-900 dark:text-white">ClassiMail</span>
+          <span class="text-xl font-bold text-gray-900 dark:text-white">{{ organizationName }}</span>
         </div>
         <button
           class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -123,7 +137,7 @@ const navigation = computed(() => {
       <div class="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
         <div class="flex items-center h-16 flex-shrink-0 px-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
           <span class="text-2xl mr-2">📧</span>
-          <span class="text-xl font-bold text-gray-900 dark:text-white">ClassiMail</span>
+          <span class="text-xl font-bold text-gray-900 dark:text-white">{{ organizationName }}</span>
         </div>
         <div class="flex-1 flex flex-col overflow-y-auto">
           <nav class="flex-1 px-2 py-4 space-y-1">
@@ -150,7 +164,7 @@ const navigation = computed(() => {
           <div class="flex items-center w-full">
             <div class="ml-3">
               <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Microsoft G2S POC
+                {{ organizationName }}
               </p>
               <p class="text-xs font-medium text-gray-400 dark:text-gray-500">
                 Février 2026
@@ -172,7 +186,7 @@ const navigation = computed(() => {
           <Bars3Icon class="h-6 w-6" />
         </button>
         <div class="flex-1 px-4 flex justify-between items-center">
-          <span class="font-bold text-gray-900 dark:text-white">ClassiMail</span>
+          <span class="font-bold text-gray-900 dark:text-white">{{ organizationName }}</span>
           <div class="flex items-center gap-2">
             <button
               v-if="uiConfig.show_info_modal"

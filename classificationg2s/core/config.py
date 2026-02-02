@@ -83,3 +83,6 @@ MAX_UPLOAD_SIZE = int(os.getenv("UPLOAD_MAX_BYTES", 10 * 1024 * 1024))  # 10MB
 # UI Configuration (Feature Flags)
 UI_SHOW_INFO_MODAL = os.getenv("UI_SHOW_INFO_MODAL", "true").lower() == "true"
 UI_SHOW_DEVELOPER_TAB = os.getenv("UI_SHOW_DEVELOPER_TAB", "true").lower() == "true"
+
+# Organization / Branding
+ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME", "ClassiMail")

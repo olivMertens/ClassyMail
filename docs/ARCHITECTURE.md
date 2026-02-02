@@ -157,6 +157,42 @@ Pour isoler totalement le système d'Internet (VNet Injection), l'architecture c
 - Push : `az acr login --name <acr>; docker push <acr>.azurecr.io/classimail-agent:local`
 - ACA : `az containerapp update --name classimail-agent --resource-group <rg> --image <acr>.azurecr.io/classimail-agent:local`
 
+## 6. Pipeline Processing Details
+
+> 📊 **Interactive Diagrams**: Zoom and download controls available. See [README_DIAGRAMS.md](./README_DIAGRAMS.md).
+
+This section explains the end-to-end processing pipeline (PDF → OCR → classification → dashboard), plus assumptions, design decisions, and improvement ideas.
+
+### Assumptions
+
+- PDFs are uploaded into a known container (default: `pdf-inputs`).
+- PDFs ≥ 30 pages are split into 30-page chunks; each chunk is sent as `document_url` to Mistral OCR and merged.
+- Event Grid emits a `BlobCreated` event. The worker supports either:
+    - our internal message: `{ "blob_url": "https://..." }` (e.g. via `/webhook/ingest`)
+    - raw Event Grid event payload delivered to Service Bus (it extracts `data.url`).
+- Worker can fetch the blob using Entra ID (RBAC), without Shared Key.
+- OCR output is Markdown (can be large), and classification expects a strict JSON result.
+- "Correct" classification is represented as a multi-intent list with confidence + justification.
+
+### Key decisions (and why)
+
+- **Service Bus queue as buffer**: isolates ingestion bursts from OCR/LLM rate limits; provides retries + DLQ.
+- **Two-step AI (OCR then classifier)**: keeps classification prompts structured; avoids expensive multimodal token costs.
+- **Strict JSON output**: simplifies post-processing, validation, and storage; enables consistent fine-tuning datasets.
+- **Fallback model**: long OCR markdown can exceed the primary model's context window; fallback keeps the pipeline resilient.
+- **RBAC-first (no keys)**: aligns with common enterprise policies (Storage OAuth-only, Service Bus local auth disabled, Cosmos RBAC).
+- **Bounded OCR payloads**: chunk PDFs ≥ 30 pages into 30-page parts to stay within service limits.
+- **Idempotent storage (upsert)**: repeated processing should not create duplicates; enables safe retries.
+
+### Improvement ideas
+
+- **Message de-duplication**: store a hash of `blob_url` or file ETag to avoid reprocessing duplicates.
+- **Chunking strategy**: for very long OCR markdown, classify per section/page then merge.
+- **Retry policy by error type**: retry only transient errors; DLQ for validation errors (bad PDF, malformed OCR).
+- **Human-in-the-loop loop closure**: persist corrections as "golden labels" for fine-tuning export.
+- **Metrics**: per-step latency (download/OCR/LLM), tokens/pages, error rates, DLQ depth.
+- **Data retention**: TTL policies in Cosmos for raw OCR markdown if not required long-term.
+
 ## 7. Pourquoi cette architecture est efficiente ?
 
 - **OCR** spécialisé (Mistral) facturé **1 €/1K pages** vs multimodal tokens coûteux.
@@ -210,19 +246,6 @@ flowchart LR
 **Ancien (mono-process):** API + worker dans le même process, scaling couplé et clients globaux vieillissants.
 
 ## 4. Nouveau découpage API + Worker (ACA)
-
-```mermaid
-flowchart LR
-  Client -->|HTTP| API[API Container App]
-  API --> SBQ[Service Bus Queue]
-  SBQ --> Worker[Worker Container App]
-  API --> Cosmos[(Cosmos DB)]
-  Worker --> Cosmos
-  API --> Storage[(Blob Storage)]
-  Worker --> Storage
-  API --> Foundry[Azure AI Foundry]
-  Worker --> Foundry
-```
 
 - API expose `/healthz` `/readyz` (alias `/health` `/ready`).
 - Worker scale via KEDA (azure-servicebus, managed identity).
