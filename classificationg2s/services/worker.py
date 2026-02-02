@@ -70,25 +70,62 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
         payload = {"blob_url": None, "raw": body_bytes.decode(errors="ignore")}
 
     blob_url = extract_blob_url(payload)
-    if not blob_url:
-        logger.warning("[msg:%s] No blob_url found in message, dead-lettering", message_id)
-        await receiver.dead_letter_message(msg, reason="NoBlobUrl")
+    item_id = payload.get("item_id")
+    reclassify_mode = payload.get("reclassify_mode")
+
+    if not blob_url and not item_id:
+        logger.warning("[msg:%s] No blob_url or item_id found in message, dead-lettering", message_id)
+        await receiver.dead_letter_message(msg, reason="InvalidPayload")
         return
 
-    logger.info("[msg:%s] → Processing blob: %s", message_id, blob_url)
+    target_ref = item_id or blob_url
+    logger.info("[msg:%s] → Processing ref: %s (Mode: %s)", message_id, target_ref, reclassify_mode or "Ingestion")
 
     try:
-        settings = get_settings()
-        if inspect.iscoroutine(settings):
-            settings = await settings
+        result = None
         with ProcessingTimer() as timer:
-            logger.info("[msg:%s] Starting classification pipeline", message_id)
-            result = await run_classification_pipeline(blob_url, settings=settings, clients=clients)
-            logger.info("[msg:%s] Pipeline completed in %.0fms", message_id, timer.duration_ms)
+            if reclassify_mode:
+                # Reclassification Branch
+                models = payload.get("models")
+                # Legacy support
+                if not models:
+                    m = payload.get("model")
+                    if m == "both":
+                        models = ["phi-4", "gpt-4o-mini"]
+                    elif m:
+                        models = [m]
 
-        arrival_time = getattr(msg, "enqueued_time_utc", datetime.now(timezone.utc))
-        result.created_at = arrival_time
-        result.processing_time_ms = timer.duration_ms
+                from classificationg2s.services.pipeline import run_reclassification_pipeline
+                result = await run_reclassification_pipeline(item_id or blob_id_from_url(blob_url), models=models, clients=clients)
+
+            else:
+                # Standard Ingestion Branch
+                if not blob_url:
+                     raise ValueError("Ingestion mode requires blob_url")
+
+                settings = get_settings()
+                if inspect.iscoroutine(settings):
+                    settings = await settings
+                logger.info("[msg:%s] Starting classification pipeline", message_id)
+                result = await run_classification_pipeline(blob_url, settings=settings, clients=clients)
+
+            logger.info("[msg:%s] Pipeline/Task completed in %.0fms", message_id, timer.duration_ms)
+
+        # Update metadata
+        # Only overwrite created_at if it's ingestion (fresh processing)
+        if not reclassify_mode:
+            arrival_time = getattr(msg, "enqueued_time_utc", datetime.now(timezone.utc))
+            result.created_at = arrival_time
+
+        # Always track processing time of this operation (though purely additive for history??)
+        # Using a transient field or updating the record?
+        # EmailRecord logic usually strictly defines schema.
+        # For reclassification, we appended to comparison_results. We shouldn't necessarily overwrite the root processing_time_ms
+        # unless it represents the *latest* operation.
+        # But let's keep it simple: we update what we have.
+        if not reclassify_mode:
+             result.processing_time_ms = timer.duration_ms
+
         logger.info("[msg:%s] Saving result to Cosmos DB (ID: %s)", message_id, result.id)
         await save_to_cosmos(result)
         logger.info("[msg:%s] ✓ Processing complete for %s", message_id, result.id)

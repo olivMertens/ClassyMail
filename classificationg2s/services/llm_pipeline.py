@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import asyncio
+from datetime import datetime
 
 import httpx
 from opentelemetry import trace
@@ -11,7 +12,7 @@ from pydantic import BaseModel
 from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential, retry_if_exception, retry
 
 from classificationg2s.core import config
-from classificationg2s.models import OCRFailed
+from classificationg2s.models import OCRFailed, BusinessEntities
 from classificationg2s.services.azure_clients import auth_headers, Clients
 from classificationg2s.services.settings_store import get_categories_prompt_text, load_settings
 from classificationg2s.services.annotations import ImageDescription
@@ -20,6 +21,120 @@ logger = logging.getLogger(__name__)
 
 tracer = trace.get_tracer(__name__)
 
+# --- Start Entity Extraction Logic ---
+
+async def extract_business_entities(
+    text_markdown: str,
+    *,
+    clients: Clients | None = None,
+    config_deployment: str | None = None, # Allow override for specific model
+    config_endpoint: str | None = None
+) -> dict:
+    """
+    Extracts structured business entities (people, orgs, dates, amounts, etc.) from text.
+    Uses the configured Phi-4 (or fallback) model.
+    Returns a dict that conforms to BusinessEntities schema (but as dict via json_object mode).
+    """
+
+    # Defaults to Phi-4 config if not specified
+    deployment = config_deployment or config.PHI_DEPLOYMENT
+    endpoint = config_endpoint or config.PHI_ENDPOINT or config.AI_ENDPOINT
+
+    if not endpoint or not deployment:
+         # Fallback to pure regex or empty if no LLM (not implemented here, returning empty)
+         logger.warning("No LLM endpoint available for entity extraction. Returning empty entities.")
+         return BusinessEntities().model_dump()
+
+    system_prompt_entities = """
+You are an expert data extractor. Your task is to extract specific business entities from the document text.
+Extract ALL occurrences of the following categories into a JSON object:
+- people: Full names of individuals (e.g., John Smith, Marie Curie).
+- organizations: Company names, institutions, banks, insurers.
+- dates: Specific dates discovered in text. Prefer 'YYYY-MM-DD' if clear, otherwise keep original string.
+- monetary_amounts: Currency values found (e.g., "$500", "1000 EUR", "50€").
+- reference_numbers: Any unique identifiers like Policy numbers, Claim IDs, Invoice numbers, weird tracking codes.
+
+If nothing is found for a category, return an empty list.
+
+Example JSON Output:
+{
+  "people": ["Alice Bob"],
+  "organizations": ["Contoso Insurance"],
+  "dates": ["2023-12-05"],
+  "monetary_amounts": ["$120.50"],
+  "reference_numbers": ["POL-999-XYZ"]
+}
+"""
+
+    # Helper function re-use logic
+    # We re-use _classify_with_single_model logic but need custom system prompt.
+    # To avoid strict code duplication, we inline the call logic for this distinct task.
+    # Token estimation
+    # system_tokens = estimate_tokens_rough(system_prompt_entities)
+    # overhead_tokens = 200
+    # Use fallback sizing just in case, aiming for speed/safety
+    max_user = config.PHI_FALLBACK_MAX_INPUT_TOKENS - 1000
+
+    user_content, truncated = clamp_text_to_token_budget(text_markdown or "", max_user)
+
+    headers = await auth_headers(clients=clients)
+
+    url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={config.AI_API_VERSION}"
+
+    payload = {
+        "model": deployment,
+        "response_format": {"type": "json_object"},
+        "messages": [
+            {"role": "system", "content": system_prompt_entities},
+            {"role": "user", "content": user_content},
+        ],
+        "temperature": 0.1,
+        "max_tokens": 1500, # Enough for a long list of entities
+    }
+
+    with tracer.start_as_current_span(f"extract_entities_{deployment}") as span:
+        span.set_attribute("gen_ai.system", "azure_openai")
+        span.set_attribute("gen_ai.operation", "extract.entities")
+
+        async with httpx.AsyncClient(timeout=45) as client:
+            try:
+                resp = await client.post(url, json=payload, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+                content = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+                usage = data.get("usage", {})
+
+                logger.info(f"[metrics] Entity Extraction Success: {usage.get('total_tokens', 0)} tokens")
+
+                # Parse JSON
+                entities_raw = json.loads(content)
+
+                # Validate with Pydantic (leniently)
+                # Ensure all fields exist and are lists
+                validated = BusinessEntities(
+                    people=entities_raw.get("people", []) or [],
+                    organizations=entities_raw.get("organizations", []) or [],
+                    dates=entities_raw.get("dates", []) or [],
+                    monetary_amounts=entities_raw.get("monetary_amounts", []) or [],
+                    reference_numbers=entities_raw.get("reference_numbers", []) or []
+                )
+
+                return {
+                    "entities": validated.model_dump(),
+                    "usage": usage
+                }
+
+            except Exception as ex:
+                logger.error(f"Entity extraction failed: {ex}")
+                span.record_exception(ex)
+                # Return empty compliant structure on failure, don't crash pipeline
+                return {
+                    "entities": BusinessEntities().model_dump(),
+                    "usage": {},
+                    "error": str(ex)
+                }
+
+# --- End Entity Extraction Logic ---
 
 def pydantic_to_mistral_schema(model: type[BaseModel]) -> dict:
     """
@@ -108,12 +223,23 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
                 markdown_parts.append("\n\n---\n**Visual Elements Detected:**\n" + "\n".join(image_notes) + "\n---\n")
 
         for img in page_images:
+            # Normalize bounding box from various Mistral formats to standard {x_min, y_min, x_max, y_max}
+            bbox = img.get("bbox")
+            if not bbox and "top_left_x" in img:
+                # Handle flattened coordinates often returned by Mistral
+                bbox = {
+                    "x_min": img.get("top_left_x", 0),
+                    "y_min": img.get("top_left_y", 0),
+                    "x_max": img.get("bottom_right_x", 0),
+                    "y_max": img.get("bottom_right_y", 0)
+                }
+
             annotated_images.append({
                 "id": img.get("id"),
                 "page_index": page_idx,
                 "image_type": img.get("type") or img.get("image_type"),
-                "description": img.get("description") or img.get("summary"),
-                "bbox": img.get("bbox"),
+                "summary": img.get("summary") or img.get("description"),
+                "bbox": bbox,
                 "details": img.get("details"),
                 "is_relevant": img.get("is_relevant"),
             })
@@ -519,6 +645,115 @@ async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False
         raise
 
 
+def resolve_model_config(model_key: str) -> tuple[str, str]:
+    """
+    Resolves a model key/name to an (endpoint, deployment) tuple.
+    """
+    k = model_key.lower().strip()
+    if k in ("phi-4", "phi4", "standard", "primary"):
+        return config.PHI_ENDPOINT, config.PHI_DEPLOYMENT
+    if k in ("gpt-4o-mini", "gpt4o-mini", "gpt4o_mini", "fallback", "audit"):
+        return config.PHI_FALLBACK_ENDPOINT, config.PHI_FALLBACK_DEPLOYMENT
+
+    # Fallback/Generic: Assume the key is the deployment name on the primary endpoint
+    # This supports 'gpt5-nano', 'gpt4.1-nano' etc. if they are deployed on the same resource
+    return config.PHI_ENDPOINT, model_key
+
+
+async def classify_comparison(
+    text_markdown: str,
+    *,
+    models: list[str],
+    strategy: str = "standard",
+    clients: Clients | None = None,
+) -> dict:
+    """
+    Compare classification across multiple models.
+    Args:
+        models: List of model keys/deployment names (e.g. ['phi-4', 'gpt5-nano'])
+    """
+    if not models or len(models) < 1:
+        raise ValueError("At least one model must be specified for comparison")
+
+    import time
+    start_time = time.time()
+
+    tasks = []
+    resolved_names = []
+
+    for m in models:
+        endpoint, deployment = resolve_model_config(m)
+        if not endpoint:
+             logger.warning(f"No endpoint found for model '{m}', skipping")
+             continue
+
+        resolved_names.append(m)
+        tasks.append(_classify_with_single_model(
+            text_markdown,
+            endpoint=endpoint,
+            deployment=deployment,
+            strategy=strategy,
+            clients=clients
+        ))
+
+    if not tasks:
+        return {
+            "model_results": {},
+            "comparison_meta": {
+                "executed_at": datetime.utcnow().isoformat(),
+                "error": "No valid models configured for comparison",
+                "elapsed_ms": 0
+            }
+        }
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Assemble results
+    model_results = {}
+    valid_intents = []
+
+    for name, res in zip(resolved_names, results):
+        if isinstance(res, Exception):
+            logger.error(f"Model {name} failed: {res}")
+            model_results[name] = {
+                "detected_intents": [],
+                "error": str(res),
+                "needs_review": True
+            }
+        else:
+            model_results[name] = res
+            if res.get("detected_intents"):
+                valid_intents.append(res["detected_intents"][0]["intent"])
+
+    # Calculate agreement (simplistic: all top intents match)
+    agreement = False
+    if valid_intents:
+        agreement = all(i == valid_intents[0] for i in valid_intents)
+        # Verify confidence delta if exactly 2 models (legacy support)
+        # Note: Delta is less meaningful for n > 2, but we could calc max-min
+
+    elapsed_ms = int((time.time() - start_time) * 1000)
+
+    # Legacy Backward Compat if exactly 2 specific models used
+    # This ensures older UI or consumers don't break immediately
+    legacy_phi4 = model_results.get("phi-4") or model_results.get("phi4")
+    legacy_gpt4o = model_results.get("gpt-4o-mini") or model_results.get("gpt4o_mini")
+
+    return {
+        "model_results": model_results,
+        "comparison_meta": {
+            "executed_at": datetime.utcnow().isoformat(),
+            "agreement": agreement,
+            "models_executed": resolved_names,
+            "elapsed_ms": elapsed_ms,
+            "error": None,
+        },
+        # Legacy Top-level keys
+        "phi4": legacy_phi4,
+        "gpt4o_mini": legacy_gpt4o
+    }
+
+
 async def classify_with_both_models(
     text_markdown: str,
     *,
@@ -526,88 +761,15 @@ async def classify_with_both_models(
     clients: Clients | None = None,
 ) -> dict:
     """
-    Adversarial comparison: Classify with both Phi-4 and gpt-4o-mini in parallel.
-
-    Returns:
-        {
-            "phi4": {...classification result...},
-            "gpt4o_mini": {...classification result...},
-            "comparison_meta": {
-                "executed_at": "2026-02-02T...",
-                "confidence_delta": 0.05,  # abs(phi4.score - gpt4o.score)
-                "agreement": true/false,  # Both selected same primary intent
-                "error": null or error message
-            }
-        }
+    DEPRECATED: Use classify_comparison
+    Maintains backward compatibility for adversarial comparison (Phi-4 vs GPT-4o-mini).
     """
-    if not config.PHI_ENDPOINT or not config.PHI_FALLBACK_ENDPOINT:
-        raise RuntimeError("Both PHI_ENDPOINT and PHI_FALLBACK_ENDPOINT required for comparison")
-
-    import time
-    from datetime import datetime
-
-    start_time = time.time()
-
-    try:
-        # Run both models in parallel
-        phi4_task = _classify_with_single_model(
-            text_markdown,
-            endpoint=config.PHI_ENDPOINT,
-            deployment=config.PHI_DEPLOYMENT,
-            strategy=strategy,
-            clients=clients,
-        )
-        gpt4o_task = _classify_with_single_model(
-            text_markdown,
-            endpoint=config.PHI_FALLBACK_ENDPOINT,
-            deployment=config.PHI_FALLBACK_DEPLOYMENT,
-            strategy=strategy,
-            clients=clients,
-        )
-
-        phi4_result, gpt4o_result = await asyncio.gather(phi4_task, gpt4o_task)
-
-        # Calculate comparison metrics
-        phi4_intents = phi4_result.get("detected_intents", [])
-        gpt4o_intents = gpt4o_result.get("detected_intents", [])
-
-        phi4_scores = [i.get("confidence", 0) for i in phi4_intents]
-        gpt4o_scores = [i.get("confidence", 0) for i in gpt4o_intents]
-
-        phi4_primary_score = max(phi4_scores) if phi4_scores else 0
-        gpt4o_primary_score = max(gpt4o_scores) if gpt4o_scores else 0
-
-        confidence_delta = abs(phi4_primary_score - gpt4o_primary_score)
-
-        phi4_primary_intent = phi4_intents[0]["intent"] if phi4_intents else None
-        gpt4o_primary_intent = gpt4o_intents[0]["intent"] if gpt4o_intents else None
-        agreement = phi4_primary_intent == gpt4o_primary_intent if phi4_primary_intent and gpt4o_primary_intent else False
-
-        elapsed_ms = int((time.time() - start_time) * 1000)
-
-        return {
-            "phi4": phi4_result,
-            "gpt4o_mini": gpt4o_result,
-            "comparison_meta": {
-                "executed_at": datetime.utcnow().isoformat(),
-                "confidence_delta": round(confidence_delta, 3),
-                "agreement": agreement,
-                "phi4_primary_intent": phi4_primary_intent,
-                "gpt4o_primary_intent": gpt4o_primary_intent,
-                "elapsed_ms": elapsed_ms,
-                "error": None,
-            },
-        }
-    except Exception as e:
-        logger.error(f"[metrics] Model comparison failed: {str(e)}", exc_info=True)
-        return {
-            "phi4": None,
-            "gpt4o_mini": None,
-            "comparison_meta": {
-                "executed_at": datetime.utcnow().isoformat(),
-                "error": str(e),
-            },
-        }
+    return await classify_comparison(
+        text_markdown,
+        models=[config.PHI_DEPLOYMENT or "phi-4", config.PHI_FALLBACK_DEPLOYMENT or "gpt-4o-mini"],
+        strategy=strategy,
+        clients=clients
+    )
 
 
 

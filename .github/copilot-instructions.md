@@ -6,3 +6,8 @@
 - Health/ready endpoints: `/healthz` `/readyz` (aliases `/health` `/ready`).
 - Avoid modifying `main.py` except to delegate to `classificationg2s.app:app`.
 - Default to Python 3.12.
+
+## Azure Architecture Documentation Standards
+
+- **Visuals**: Enforce strict usage of **CAE Icons (Flat Design)** in all diagrams.
+- **Code Linking**: Use the `#` nomenclature to link descriptive text or diagrams to code (e.g., `#infra/main.tf` or `#src/app.py`).

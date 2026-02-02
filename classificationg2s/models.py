@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from pydantic import BaseModel, Field
 
@@ -22,14 +22,16 @@ class ClassificationResult(BaseModel):
 
 
 class ComparisonResult(BaseModel):
-    """Stores dual-model adversarial comparison results"""
-    phi4: Optional[ClassificationResult] = None
-    gpt4o_mini: Optional[ClassificationResult] = None
+    """Stores multi-model adversarial comparison results"""
+    model_results: Dict[str, ClassificationResult] = Field(default_factory=dict)
     confidence_delta: Optional[float] = None  # Absolute difference in top intent confidence
-    agreement: bool = False  # True if both models detected same top intent
+    agreement: bool = False  # True if all/both models detected same top intent
     executed_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
     mode: str = "sync"  # "sync" or "async"
     processing_time_ms: Optional[float] = None
+    # Legacy fields for backward compatibility
+    phi4: Optional[ClassificationResult] = None
+    gpt4o_mini: Optional[ClassificationResult] = None
 
 
 class HistoryEntry(BaseModel):
@@ -39,6 +41,15 @@ class HistoryEntry(BaseModel):
     updated_by: Optional[str] = "user"
     correction_reason: Optional[str] = None
     llm_feedback: Optional[str] = None
+
+
+class BusinessEntities(BaseModel):
+    """Broad entity extraction (Forgiving Schema)"""
+    people: List[str] = Field(default_factory=list)
+    organizations: List[str] = Field(default_factory=list)
+    dates: List[str] = Field(default_factory=list)
+    monetary_amounts: List[str] = Field(default_factory=list)
+    reference_numbers: List[str] = Field(default_factory=list, description="IDs, Policy #, Invoice #, etc.")
 
 
 class EmailRecord(BaseModel):
@@ -54,7 +65,8 @@ class EmailRecord(BaseModel):
     search_text: Optional[str] = None
     vector: Optional[List[float]] = None
     classification: Optional[ClassificationResult] = None
-    comparison_results: Optional[ComparisonResult] = None  # Adversarial model comparison (dual-model results)
+    entities: Optional[BusinessEntities] = None  # Auto-extracted entities
+    comparison_results: List[ComparisonResult] = Field(default_factory=list)  # Adversarial model comparison (dual-model results)
     classification_history: List[HistoryEntry] = []
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

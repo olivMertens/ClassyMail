@@ -34,8 +34,59 @@ const customCategories = ref([])
 const isComparing = ref(false)
 
 const latestComparison = computed(() => {
-  if (!email.value?.comparison_results || email.value.comparison_results.length === 0) return null
-  return email.value.comparison_results[email.value.comparison_results.length - 1]
+  const results = email.value?.comparison_results
+  if (!results) return null
+  // Handle if it's an array (legacy) or single object (current Pydantic model)
+  if (Array.isArray(results)) {
+    return results.length > 0 ? results[results.length - 1] : null
+  }
+  return results
+})
+
+const getModelStyles = (modelName) => {
+  const n = (modelName || '').toLowerCase()
+  if (n.includes('phi')) {
+    return {
+      displayName: 'Phi-4 (Primary)',
+      card: 'border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-800',
+      text: 'text-blue-800 dark:text-blue-300',
+      border: 'border-blue-200',
+      badge: 'text-blue-600 bg-blue-100 dark:bg-blue-900 dark:text-blue-200'
+    }
+  }
+  if (n.includes('gpt')) {
+    return {
+      displayName: 'GPT-4o-mini (Audit)',
+      card: 'border-orange-200 bg-orange-50 dark:bg-orange-900/10 dark:border-orange-800',
+      text: 'text-orange-800 dark:text-orange-300',
+      border: 'border-orange-200',
+      badge: 'text-orange-600 bg-orange-100 dark:bg-orange-900 dark:text-orange-200'
+    }
+  }
+  // Default generic
+  return {
+    displayName: modelName,
+    card: 'border-indigo-200 bg-indigo-50 dark:bg-indigo-900/10 dark:border-indigo-800',
+    text: 'text-indigo-800 dark:text-indigo-300',
+    border: 'border-indigo-200',
+    badge: 'text-indigo-600 bg-indigo-100 dark:bg-indigo-900 dark:text-indigo-200'
+  }
+}
+
+const parsedComparisonResults = computed(() => {
+  const comp = latestComparison.value
+  if (!comp) return {}
+
+  // New format: model_results exists and has keys
+  if (comp.model_results && Object.keys(comp.model_results).length > 0) {
+    return comp.model_results
+  }
+
+  // Legacy format fallback
+  const res = {}
+  if (comp.phi4) res['phi-4'] = comp.phi4
+  if (comp.gpt4o_mini) res['gpt-4o-mini'] = comp.gpt4o_mini
+  return res
 })
 
 const loadSettings = async () => {
@@ -332,13 +383,6 @@ const renderMarkdown = (text) => md.render(text || '')
                   Open PDF
                 </a>
               </div>
-              <div
-                v-if="pdfUrl && !email?.file_url_sas"
-                class="px-3 py-2 text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-200 border-t border-amber-200 dark:border-amber-800"
-              >
-                Private container: a direct blob URL without SAS returns <code>ResourceNotFound</code>. Use the SAS link
-                when available.
-              </div>
             </div>
 
             <!-- Right: Data -->
@@ -589,23 +633,32 @@ const renderMarkdown = (text) => md.render(text || '')
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <!-- Phi-4 Card -->
                       <div
-                        class="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-800 p-4"
+                        v-for="(result, modelName) in parsedComparisonResults"
+                        :key="modelName"
+                        class="rounded-lg border p-4"
+                        :class="getModelStyles(modelName).card"
                       >
-                        <div class="flex justify-between mb-3 border-b border-blue-200 pb-2">
-                          <h4 class="font-bold text-blue-800 dark:text-blue-300">
-                            🔷 Phi-4 (Primary)
+                        <div
+                          class="flex justify-between mb-3 border-b pb-2"
+                          :class="getModelStyles(modelName).border"
+                        >
+                          <h4
+                            class="font-bold"
+                            :class="getModelStyles(modelName).text"
+                          >
+                            {{ getModelStyles(modelName).displayName }}
                           </h4>
                           <span
-                            class="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full dark:bg-blue-900 dark:text-blue-200"
+                            class="text-xs px-2 py-0.5 rounded-full"
+                            :class="getModelStyles(modelName).badge"
                           >
-                            {{ latestComparison.phi4?.global_complexity || 'N/A' }}
+                            {{ result.global_complexity || 'N/A' }}
                           </span>
                         </div>
                         <div class="space-y-3">
                           <div
-                            v-for="intent in latestComparison.phi4?.detected_intents"
+                            v-for="intent in result.detected_intents"
                             :key="intent.intent"
                             class="bg-white dark:bg-gray-800 p-3 rounded shadow-sm"
                           >
@@ -618,37 +671,14 @@ const renderMarkdown = (text) => md.render(text || '')
                               {{ intent.justification }}
                             </p>
                           </div>
-                        </div>
-                      </div>
-
-                      <!-- GPT-4o-mini Card -->
-                      <div
-                        class="rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-900/10 dark:border-orange-800 p-4"
-                      >
-                        <div class="flex justify-between mb-3 border-b border-orange-200 pb-2">
-                          <h4 class="font-bold text-orange-800 dark:text-orange-300">
-                            🟠 GPT-4o-mini (Audit)
-                          </h4>
-                          <span
-                            class="text-xs text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full dark:bg-orange-900 dark:text-orange-200"
-                          >
-                            {{ latestComparison.gpt4o_mini?.global_complexity || 'N/A' }}
-                          </span>
-                        </div>
-                        <div class="space-y-3">
                           <div
-                            v-for="intent in latestComparison.gpt4o_mini?.detected_intents"
-                            :key="intent.intent"
-                            class="bg-white dark:bg-gray-800 p-3 rounded shadow-sm"
+                            v-if="!result.detected_intents?.length"
+                            class="text-xs text-gray-500 italic"
                           >
-                            <div class="flex justify-between items-start">
-                              <span class="font-semibold text-gray-900 dark:text-white">{{ intent.intent }}</span>
-                              <span class="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">{{
-                                Math.round(intent.confidence * 100) }}%</span>
+                            No intents detected.
+                            <div v-if="result.classification_reason">
+                              Reason: {{ result.classification_reason }}
                             </div>
-                            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 italic">
-                              {{ intent.justification }}
-                            </p>
                           </div>
                         </div>
                       </div>

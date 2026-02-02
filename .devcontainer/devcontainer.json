@@ -1,0 +1,40 @@
+{
+	"name": "ClassificationG2S Dev Container",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"features": {
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "20"
+		},
+		"ghcr.io/devcontainers/features/terraform:1": {
+			"version": "latest",
+			"tflint": "latest"
+		},
+		"ghcr.io/devcontainers/features/azure-cli:1": {
+			"version": "latest"
+		}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"charliermarsh.ruff",
+				"Vue.volar",
+				"hashicorp.terraform",
+				"ms-azuretools.vscode-azureterraformer",
+				"ms-vscode.azure-account",
+				"tamasfe.even-better-toml",
+				"editorconfig.editorconfig"
+			],
+			"settings": {
+				"python.defaultInterpreterPath": ".venv/bin/python",
+				"python.terminal.activateEnvironment": true
+			}
+		}
+	},
+	// Compatible with Docker and Podman (Podman users should configure --userns=keep-id in their global settings)
+	"remoteUser": "vscode",
+	"postCreateCommand": "uv sync && bash scripts/fetch_vue_runtime.sh && cd frontend && npm install"
+}

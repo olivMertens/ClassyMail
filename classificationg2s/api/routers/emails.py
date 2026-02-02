@@ -314,7 +314,8 @@ async def reclassify_email(
 
     Payload:
     {
-        "model": "phi-4" | "gpt-4o-mini" | "both",  # which model(s) to use
+        "model": "phi-4" | "gpt-4o-mini" | "both",  # Legacy single/dual selection
+        "models": ["phi-4", "gpt5-nano"],  # List of specific models to compare
         "mode": "sync" | "async"  # sync = wait for result, async = enqueue (default: sync)
     }
 
@@ -322,7 +323,7 @@ async def reclassify_email(
     - If mode="sync": Returns classification result(s) directly
     - If mode="async": Returns status with job ID for polling
     """
-    from classificationg2s.services.llm_pipeline import classify_with_phi4, classify_with_both_models
+    from classificationg2s.services.llm_pipeline import classify_with_phi4, classify_comparison
 
     try:
         item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
@@ -330,30 +331,49 @@ async def reclassify_email(
         if not markdown:
             raise HTTPException(status_code=400, detail="Item has no markdown content")
 
-        model = payload.get("model", "both")  # default to both models comparison
-        mode = payload.get("mode", "sync")  # default to sync
+        model = payload.get("model")
+        models = payload.get("models")
+        mode = payload.get("mode", "sync")
 
-        # Validate inputs
-        if model not in ("phi-4", "gpt-4o-mini", "both"):
-            raise HTTPException(status_code=400, detail="model must be 'phi-4', 'gpt-4o-mini', or 'both'")
+        # Determine operation mode
+        is_comparison = False
+        target_models = []
+
+        if models and isinstance(models, list) and len(models) > 0:
+            is_comparison = True
+            target_models = models
+        elif model == "both":
+            is_comparison = True
+            target_models = ["phi-4", "gpt-4o-mini"]
+        elif not model:
+            # Default to comparison if nothing specified
+            is_comparison = True
+            target_models = ["phi-4", "gpt-4o-mini"]
+
         if mode not in ("sync", "async"):
             raise HTTPException(status_code=400, detail="mode must be 'sync' or 'async'")
 
         # SYNC MODE: Execute classification immediately and return results
         if mode == "sync":
-            if model == "both":
-                # Run both models in parallel
-                comparison_result = await classify_with_both_models(markdown, clients=clients)
+            if is_comparison:
+                # Run generic comparison
+                comparison_result = await classify_comparison(markdown, models=target_models, clients=clients)
 
                 # Save comparison results to item
                 if not item.get("comparison_results"):
                     item["comparison_results"] = []
 
+                meta = comparison_result.get("comparison_meta", {})
                 comparison_record = {
-                    "executed_at": datetime.now(timezone.utc).isoformat(),
+                    "executed_at": meta.get("executed_at", datetime.now(timezone.utc).isoformat()),
+                    "model_results": comparison_result.get("model_results"),
+                    "agreement": meta.get("agreement"),
+                    "confidence_delta": meta.get("confidence_delta"),
+                    "processing_time_ms": meta.get("elapsed_ms"),
+                    "mode": "sync",
+                    # Legacy fields mapping for backward compatibility if older UI accesses them directly
                     "phi4": comparison_result.get("phi4"),
-                    "gpt4o_mini": comparison_result.get("gpt4o_mini"),
-                    "meta": comparison_result.get("comparison_meta"),
+                    "gpt4o_mini": comparison_result.get("gpt4o_mini")
                 }
                 item["comparison_results"].append(comparison_record)
                 item["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -362,12 +382,14 @@ async def reclassify_email(
                 return {
                     "status": "completed",
                     "mode": "sync",
-                    "model": "both",
+                    "models": target_models,
                     "result": comparison_result,
                 }
 
             else:
                 # Single model classification
+                # Note: Currently restricts to configured Phi-4 logic for "single" mode overwrite
+                # To support generic single model overwrite, we would need to adapt classify_with_phi4 logic
                 result = await classify_with_phi4(markdown, clients=clients)
 
                 # Update item with new classification
@@ -393,8 +415,9 @@ async def reclassify_email(
             sender = sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
             message_data = {
                 "blob_url": item.get("file_url"),
-                "reclassify_mode": "comparison" if model == "both" else "single",
-                "model": model,
+                "reclassify_mode": "comparison" if is_comparison else "single",
+                "model": model, # Legacy field
+                "models": target_models, # New field
                 "item_id": item_id,
             }
             async with sender:
@@ -403,7 +426,7 @@ async def reclassify_email(
             return {
                 "status": "enqueued",
                 "mode": "async",
-                "model": model,
+                "models": target_models,
                 "item_id": item_id,
                 "message": f"Reclassification enqueued for {item_id}",
             }

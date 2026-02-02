@@ -96,7 +96,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="max-w-4xl mx-auto space-y-6">
+  <div class="w-full mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
     <div>
       <h2 class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">
         Data Exports
@@ -106,7 +106,7 @@ onMounted(() => {
       </p>
     </div>
 
-    <div class="grid gap-6 md:grid-cols-2">
+    <div class="grid gap-6 grid-cols-1">
       <!-- Human Reporting -->
       <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
         <div class="px-4 py-5 sm:px-6 bg-gray-50 dark:bg-gray-700/50">
