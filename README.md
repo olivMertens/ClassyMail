@@ -82,7 +82,7 @@ The new frontend provides a dark-mode enabled dashboard to:
 
 ```mermaid
 flowchart TD
-    user[User] -->|Upload PDF / Review| ui[SPA (Vue 3 + Tailwind)]
+    user[User] -->|Upload PDF / Review| ui["SPA (Vue 3 + Tailwind)"]
     ui -->|API calls| api[FastAPI API]
     api -->|Download PDF| blob[(Blob Storage)]
     blob -->|Event Grid| sbq[Service Bus Queue]
@@ -103,7 +103,12 @@ uv sync
 uv run uvicorn main:app --reload
 ```
 
-CI/CD : [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) | GitLab : [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md)
+## 🤖 Modèles & Data Residency
+
+Les modèles utilisés (Mistral Large, Phi-4) sont compatibles avec la **Data Zone Europe**.
+Voir la documentation Azure : [Models sold directly by Azure](https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-models/concepts/models-sold-directly-by-azure?view=foundry-classic&tabs=global-standard-aoai%2Cdata-zone-standard&pivots=azure-direct-others#mistral-models-sold-directly-by-azure).
+
+CI/CD : [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md)
 
 Tests rapides : voir [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md#lancer-lappli)
 1. **UI** : validation/correction (FastAPI Dashboard)
@@ -448,7 +453,7 @@ uv run --env-file secrets.env uvicorn main:app --reload
 
 ---
 
-## 🔄 Mécaniques de reprise / erreurs
+##
 
 1. **Corruption PDF** : vérification `%PDF` → `ValueError`. Le message est abandonné, retry automatique Service Bus. Après `maxDeliveryCount`, message en DLQ.
 2. **Erreurs IA (Mistral/Phi)** : exceptions httpx → abandon message → retry. Mettre des alertes sur DLQ.
@@ -457,7 +462,7 @@ uv run --env-file secrets.env uvicorn main:app --reload
 
 ---
 
-## 🛠 Déploiement
+##
 
 1.  **Terraform** : `cd infra && terraform apply`
 2.  **App** : Deployer le conteneur Docker sur l'instance Container App créée.
@@ -467,7 +472,7 @@ uv run --env-file secrets.env uvicorn main:app --reload
 
 Voir `.github/workflows/deploy.yml`.
 
-Secrets requis :
+
 - `AZURE_CREDENTIALS` : JSON service principal (Azure login)
 - `AZURE_SUBSCRIPTION_ID` : Subscription ID
 - `AZURE_RESOURCE_GROUP` : RG cible
@@ -479,7 +484,7 @@ Déploiement : `azure/container-apps-deploy-action@v2` ingress externe, port 800
 
 ---
 
-## 🧪 Tests rapides
+##
 
 ```bash
 uv run uvicorn main:app --reload
@@ -489,7 +494,7 @@ curl -X POST http://localhost:8000/webhook/ingest -H "Content-Type: application/
 
 ---
 
-## 📦 Outils
+##
 
 - `pyproject.toml` (Poetry/uv)
 - `requirements.txt`
