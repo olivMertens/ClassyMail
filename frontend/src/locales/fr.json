@@ -57,7 +57,14 @@
         },
         "strategy_standard_help": "Rapide & Efficace. Idéal pour les textes dactylographiés standard et emails clairs.",
         "strategy_reasoning_help": "Analyse Profonde. Utilise le 'Chain-of-Thought' pour justifier avant de classifier. Utile pour les cas ambigus.",
-        "strategy_vision_help": "Multimodal. Analyse les éléments visuels (images, mise en page). Idéal pour les documents avec photos ou structures complexes."
+        "strategy_vision_help": "Multimodal. Analyse les éléments visuels (images, mise en page). Idéal pour les documents avec photos ou structures complexes.",
+        "categories": {
+            "warning_title": "⚠️ Avertissement Comportement Système",
+            "warning_text": "Modifier les catégories change la façon dont l'IA classifie tous les futurs emails. Les emails existants conservent leur classification d'origine. Les changements sont appliqués immédiatement après la sauvegarde.",
+            "managed_title": "Catégories de Classification Gérées",
+            "current_categories": "Définir les catégories d'intention que l'IA utilisera pour la classification.",
+            "save_button": "Enregistrer dans le Système"
+        }
     },
     "upload": {
         "title": "Importer des documents",

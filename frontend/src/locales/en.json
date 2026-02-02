@@ -16,9 +16,36 @@
         "language": "Language",
         "costs_title": "Cost Overrides",
         "costs_desc": "Override the default pricing used for cost calculations. Leave blank to use defaults.",
+        "tabs": {
+            "processing": "Processing",
+            "finetuning": "Fine-tuning",
+            "general": "General & Costs",
+            "logs": "Logs",
+            "danger": "Danger Zone"
+        },
+        "processing": {
+            "title": "Processing Strategy",
+            "desc": "Select the AI pipeline and model for email processing.",
+            "model_select": "AI Model",
+            "finetuning_not_supported": "Fine-tuning is not available for this model.",
+            "strategy": {
+                "standard": "Standard (Text/OCR Optimized - Default)",
+                "reasoning": "Reasoning (CoT / Deep Analysis)",
+                "vision": "Vision (Visual Analysis - Experimental)"
+            },
+            "ocr_retries": "Max OCR Attempts",
+            "ocr_retries_help": "Number of OCR retry attempts (exponential backoff on network errors)."
+        },
         "strategy_standard_help": "Fast & Efficient. Best for standard typed text documents and clear emails.",
         "strategy_reasoning_help": "Deep Analysis. Uses Chain-of-Thought to justify decisions before classifying. Useful for ambiguous cases.",
-        "strategy_vision_help": "Multimodal. Analyzes visual elements (images, layouts) in addition to text. Best for documents with photos or complex structures."
+        "strategy_vision_help": "Multimodal. Analyzes visual elements (images, layouts) in addition to text. Best for documents with photos or complex structures.",
+        "categories": {
+            "warning_title": "⚠️ System Behavior Warning",
+            "warning_text": "Modifying categories changes how the AI classifies all future emails. Existing emails keep their original classification. Changes are applied immediately after saving.",
+            "managed_title": "Managed Classification Categories",
+            "current_categories": "Define the intent categories that the AI will use for classification.",
+            "save_button": "Save Changes to System"
+        }
     },
     "upload": {
         "title": "Upload Documents",
