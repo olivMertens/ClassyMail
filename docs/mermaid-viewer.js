@@ -3,7 +3,7 @@
  * Usage: Add this script to markdown viewers that support Mermaid
  */
 
-(function() {
+(function () {
     'use strict';
 
     // CSS Styles
@@ -124,9 +124,9 @@
         const svgBlob = new Blob([svg.outerHTML], { type: 'image/svg+xml;charset=utf-8' });
         const url = URL.createObjectURL(svgBlob);
 
-        img.onload = function() {
+        img.onload = function () {
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            canvas.toBlob(function(blob) {
+            canvas.toBlob(function (blob) {
                 const pngUrl = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = pngUrl;
