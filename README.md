@@ -23,6 +23,19 @@ Il sert à valider rapidement :
     - Classification via **Phi‑4** (avec fallback possible) → JSON
 4) Le résultat est **persisté dans Cosmos DB** (statut, classification, usage/coûts), puis visible dans le **dashboard**.
 
+### Stratégie de Traitement ("Broad Net" & Vision)
+
+Le pipeline applique une **stratégie "Broad Net" (Filet Large)** pour maximiser la précision des Small Language Models (SLM) comme Phi-4 :
+
+1. **Vision à 3 Niveaux (Mistral)** :
+   - **Texte** : OCR Markdown standard.
+   - **Structure** : Normalisation spatiale via Bounding Boxes.
+   - **Enrichissement** : Description générative des images (Alt-Text) pour que le modèle "voie" le contenu non-textuel.
+
+2. **Extraction d'Entités** :
+   - Avant de classifier, nous rayons large pour extraire les faits (Noms, Dates, Montants).
+   - **Pourquoi ?** Cela déleste le modèle de la recherche d'information. Il reçoit les faits structurés + les définitions de catégories, et peut se concentrer purement sur le **matching d'intention** (le "best possible understanding").
+
 Pour les détails (RBAC, variables, exécution, CI/CD) : voir la section Documentation ci-dessous.
 
 ## 📚 Documentation
@@ -125,6 +138,8 @@ uv run uvicorn main:app --reload
 
 The system supports **dual-model comparison** for advanced evaluation and fine-tuning, allowing you to run classification with two models simultaneously and compare their outputs.
 
+**IMPORTANT:** For adversarial comparison to work, you must configure **two different models**. Comparing a model against itself provides no value. The system will block comparison if `PHI_DEPLOYMENT` and `PHI_FALLBACK_DEPLOYMENT` are identical.
+
 ### Available Models for Comparison
 
 **Primary Model (Configurable via `PHI_DEPLOYMENT`):**
@@ -133,7 +148,7 @@ The system supports **dual-model comparison** for advanced evaluation and fine-t
 - 🟢 **gpt-4o-mini** (cost-effective, 128K token context, ✅ fine-tuning supported)
 - 🔶 **Phi-4** (8K context, ✅ fine-tuning supported, if deployed)
 
-**Fallback/Audit Model (Configurable via `PHI_FALLBACK_DEPLOYMENT`):**
+**Fallback/Challenger Model (Configurable via `PHI_FALLBACK_DEPLOYMENT`):**
 - 🟢 **gpt-4o-mini** (default, 128K token context)
 - 🟠 **gpt-4o** (200K token context, if deployed)
 
@@ -194,15 +209,20 @@ View results in the **Comparison** tab of the email detail view.
 - **Phi-4** (Standard, Default): Fast, cost-effective, 8K token context.
 - **GPT-5 Nano / Mini**: Next-gen small models (Experimental).
 - **GPT-4.1 Nano**: Optimized low-latency model.
+- **Custom Model**: You can configure any Azure OpenAI compatible model as primary via `PHI_DEPLOYMENT`.
+
+Phi-4 is the default "Standard" model, but the architecture allows users to select different models for the "Reasoning" or "Classification" tasks. This selection is configurable:
+- **Environment Variable**: `PHI_DEPLOYMENT` (at startup)
+- **Runtime Settings**: Via the UI Settings panel (Hot-swap capable)
 
 **Token-Based Fallback** (Automatic):
 - If content > 8K tokens estimated → use 🟢 gpt-4o-mini (120K context)
 - Otherwise → use selected primary model (default: 🔶 Phi-4)
 
 **Environment Variable** (Override):
-- `MODEL_SELECTION=phi4` → Always use Phi-4
-- `MODEL_SELECTION=gpt4o-mini` → Always use gpt-4o-mini
-- `MODEL_SELECTION=auto` (default) → Token-based fallback
+- `MODEL_SELECTION=phi4` → Always use Phi-4.
+- `MODEL_SELECTION=gpt4o-mini` → Always use gpt-4o-mini.
+- `MODEL_SELECTION=auto` (default) → Token-based fallback.
 
 ### Data Zone Europe Compliance
 
@@ -554,7 +574,7 @@ uv run --env-file secrets.env uvicorn main:app --reload
 
 | Principal | Ressource | Rôle |
 | --- | --- | --- |
-| Identité managée ACA | Storage Account | Storage Blob Data Reader |
+| Identité managée ACA | Storage Account | Storage Blob Data Contributor |
 | Identité managée ACA | Service Bus Namespace | Azure Service Bus Data Receiver/Sender |
 | Identité managée ACA | Cosmos DB (SQL) | Cosmos SQL Built-in Data Contributor (RBAC) |
 | Identité managée ACA | AI Foundry (AIServices) | Cognitive Services User |
@@ -570,12 +590,12 @@ uv run --env-file secrets.env uvicorn main:app --reload
 
 **Deployed Configuration (email-poc-rg):**
 - **Managed Identity**: `email-poc-id`
-- **Client ID**: `3ae24af5-97c6-437f-a4d2-521fbd5524d4`
-- **Principal ID**: `fdf02fa5-2cd5-42f9-9b78-5cb7905d94d0`
+- **Client ID**: `3ae24af5-97c6-437f-a4d2-521fbd5524d4` (Exemple aléatoire - sera différent sur votre souscription)
+- **Principal ID**: `fdf02fa5-2cd5-42f9-9b78-5cb7905d94d0` (Exemple aléatoire - sera différent sur votre souscription)
 
 **Required RBAC Role Assignments:**
 - ✅ **Service Bus**: `Azure Service Bus Data Sender`, `Azure Service Bus Data Receiver`
-- ✅ **Storage**: `Storage Blob Data Contributor`, `Storage Blob Data Reader`
+- ✅ **Storage**: `Storage Blob Data Contributor` (Reader is insufficient for uploads)
 - ✅ **Cosmos DB**: `Cosmos DB Built-in Data Contributor` (database scope: `emailsdb`)
 - ✅ **AI Foundry**: `Cognitive Services User`
 - ✅ **Container Registry**: `AcrPull`

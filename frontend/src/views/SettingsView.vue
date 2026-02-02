@@ -1402,20 +1402,33 @@ onMounted(() => {
                   Vision (Visual Analysis)
                 </h4>
                 <p class="text-gray-500 dark:text-gray-400 mt-1">
-                  Integrates visual context from OCR (photos, diagrams, signatures) into the decision process.<br>
-                  <strong>Scope:</strong> Only images rendered from PDF pages by OCR are used (inline/page visuals).
-                  Attachments not embedded in the PDF pages are ignored.
+                  Integrates visual context (photos, diagrams, signatures) into the decision process using Mistral's advanced BBox capabilities.<br>
+                  <strong>Mechanism (3-Layer Analysis):</strong>
                 </p>
                 <div
                   class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs"
                 >
-                  <span class="text-green-600 dark:text-green-400 font-bold">How it works:</span> Uses Mistral BBox
-                  Annotation capability per page image.<br>
-                  <span class="text-green-600 dark:text-green-400 font-bold">Annotation:</span> Extracts structured
-                  descriptions for visual elements. <em>Note: Annotations are currently experimental. If not supported
-                    by the model/region (422 error), the system automatically falls back to Standard strategy.</em><br>
-                  <span class="text-green-600 dark:text-green-400 font-bold">Enrichment:</span> These descriptions are
-                  injected into the Markdown before classification, allowing the AI to "see" the page visuals.
+                  <ul class="list-disc list-inside space-y-1">
+                    <li><span class="text-green-600 dark:text-green-400 font-bold">1. Text:</span> Standard Markdown extraction.</li>
+                    <li><span class="text-green-600 dark:text-green-400 font-bold">2. BBox Layout:</span> Spatial normalization of elements (bounding boxes) to understand document structure.</li>
+                    <li><span class="text-green-600 dark:text-green-400 font-bold">3. Visual Enrichment:</span> Generates descriptive "Alt-Text" for images/charts using the Vision model, allowing the LLM to "read" non-text elements.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Broad Net Strategy -->
+              <div class="border-l-4 border-amber-500 pl-4">
+                <h4 class="font-bold text-gray-900 dark:text-white text-base">
+                  "Broad Net" Entity Extraction
+                </h4>
+                <p class="text-gray-500 dark:text-gray-400 mt-1">
+                  Applied automatically before Classification. We cast a "Broad Net" to extract structured facts (Names, Dates, Amounts, IDs) first.
+                </p>
+                <div
+                  class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs"
+                >
+                  <span class="text-amber-600 dark:text-amber-400 font-bold">Why?</span> Small Language Models (SLMs) like Phi-4 perform better when facts are pre-extracted.<br>
+                  <span class="text-amber-600 dark:text-amber-400 font-bold">How it aids capability:</span> By presenting the model with <em class="text-gray-600 dark:text-gray-400">"Here are the facts involved"</em> alongside the <em class="text-gray-600 dark:text-gray-400">"Category Descriptions"</em>, we ensure the best possible understanding foundation. The model focuses on <strong>matching intent</strong> rather than searching for data.
                 </div>
               </div>
             </div>
