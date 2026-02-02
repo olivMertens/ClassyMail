@@ -210,7 +210,7 @@ resource "azapi_resource" "deployment_mistral_ocr" {
 }
 
 # RBAC Assignments
-resource "azurerm_role_assignment" "aca_storage_reader" {
+resource "azurerm_role_assignment" "aca_storage_contrib" {
   scope                = azurerm_storage_account.st.id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azurerm_user_assigned_identity.app_id.principal_id
