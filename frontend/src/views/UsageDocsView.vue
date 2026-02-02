@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import { ArrowPathIcon, WrenchScrewdriverIcon, BookOpenIcon, CpuChipIcon, ShieldCheckIcon, EyeIcon } from '@heroicons/vue/24/outline'
+import { BookOpenIcon, CpuChipIcon, ShieldCheckIcon, EyeIcon } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 import mermaid from 'mermaid'
 
@@ -23,16 +23,9 @@ const initMermaid = async () => {
         element.removeAttribute('data-processed')
         element.innerHTML = diagram
     }
-    try {
-        await mermaid.run({
-            nodes: document.querySelectorAll('.mermaid-graph')
-        })
-    } catch (e) {
-        console.warn('Mermaid rendering failed:', e)
-        if (element) {
-            element.innerHTML = '<div class="text-red-500 text-xs p-2">Diagram Error</div>'
-        }
-    }
+    await mermaid.run({
+        nodes: document.querySelectorAll('.mermaid-graph')
+    })
 }
 
 onMounted(() => {
@@ -61,26 +54,27 @@ onUnmounted(() => {
 
 const diagram = `
 graph LR
-    Input['Email Input'] --> OCR['OCR Process']
+    Input[Email Input] --> OCR
 
-    subgraph Analysis ['OCR & Content Extraction']
+    subgraph Analysis [OCR & Content Extraction]
         direction TB
-        OCR --> Text['Text Layer']
-        OCR --> Img['Image Layer']
-        Img -->|Image-to-Text| Desc['Image Description']
-        Text --> Markdown['Markdown']
+        OCR --> Text[Text Layer]
+        OCR --> Img[Image Layer]
+        Img -->|Image-to-Text| Desc["[Image: Dented Bumper]"]
+        Text --> Markdown
         Desc --> Markdown
     end
 
-    Markdown --> PII['PII Check']
-    PII --> Classify['AI Classification']
+    Markdown --> PII[PII Check]
+    PII --> Classify[AI Classification]
 
-    Classify -->|Confidence > 85%| Auto['Auto Process']
-    Classify -->|Confidence < 85%| Review['Human Review']
+    Classify -->|Confidence > 85%| Auto[Auto Process]
+    Classify -->|Confidence < 85%| Review[Human Review]
 
-    style Img fill:#ff9,stroke:#333,color:#333
-    style Desc fill:#f9f,stroke:#333,color:#333
+    style Img fill:#ff9,stroke:#333
+    style Desc fill:#f9f,stroke:#333
 `
+
 </script>
 
 <template>
@@ -105,28 +99,6 @@ graph LR
         <div class="mermaid-graph w-full flex justify-center">
           {{ diagram }}
         </div>
-      </div>
-    </div>
-
-    <!-- Workflow & Updates -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg px-4 py-5 sm:p-6">
-        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white flex items-center gap-2">
-          <WrenchScrewdriverIcon class="h-5 w-5 text-gray-500" />
-          {{ t('guide.workflow.title') }}
-        </h3>
-        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          {{ t('guide.workflow.desc') }}
-        </p>
-      </div>
-      <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg px-4 py-5 sm:p-6">
-        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white flex items-center gap-2">
-          <ArrowPathIcon class="h-5 w-5 text-blue-500" />
-          {{ t('guide.updates.title') }}
-        </h3>
-        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          {{ t('guide.updates.desc') }}
-        </p>
       </div>
     </div>
 
@@ -242,12 +214,9 @@ graph LR
             <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">
               {{ t('guide.exports.jsonl_desc') }}
             </p>
-            <div class="bg-gray-900 text-gray-200 p-2 rounded text-xs font-mono overflow-x-auto whitespace-pre mb-2">
+            <div class="bg-gray-900 text-gray-200 p-2 rounded text-xs font-mono overflow-x-auto whitespace-pre">
               {{ `{"messages": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "{\\"intents\\": [...]}"}]}` }}
             </div>
-            <p class="text-[10px] text-gray-500 italic">
-              * Requires {{ 50 }} reviewed examples (configurable in Settings).
-            </p>
           </div>
         </div>
       </div>
@@ -270,43 +239,6 @@ graph LR
             <span>{{ t('guide.privacy.li2') }}</span>
           </li>
         </ul>
-      </div>
-    </div>
-
-    <!-- Interface & Filters -->
-    <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg px-4 py-5 sm:p-6">
-      <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white flex items-center gap-2">
-        <EyeIcon class="h-5 w-5 text-indigo-500" />
-        {{ t('guide.filters.title') }}
-      </h3>
-      <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-        {{ t('guide.filters.desc') }}
-      </p>
-      <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="border border-gray-200 dark:border-gray-700 rounded p-3">
-          <h5 class="font-medium text-sm text-gray-900 dark:text-white">
-            {{ t('guide.filters.category_title') }}
-          </h5>
-          <p class="text-xs text-gray-500 mt-1">
-            {{ t('guide.filters.category_desc') }}
-          </p>
-        </div>
-        <div class="border border-gray-200 dark:border-gray-700 rounded p-3">
-          <h5 class="font-medium text-sm text-gray-900 dark:text-white">
-            {{ t('guide.filters.confidence_title') }}
-          </h5>
-          <p class="text-xs text-gray-500 mt-1">
-            {{ t('guide.filters.confidence_desc') }}
-          </p>
-        </div>
-        <div class="border border-gray-200 dark:border-gray-700 rounded p-3 bg-indigo-50 dark:bg-indigo-900/10">
-          <h5 class="font-medium text-sm text-gray-900 dark:text-white">
-            {{ t('guide.filters.quality_title') }}
-          </h5>
-          <p class="text-xs text-gray-500 mt-1">
-            {{ t('guide.filters.quality_desc') }}
-          </p>
-        </div>
       </div>
     </div>
 

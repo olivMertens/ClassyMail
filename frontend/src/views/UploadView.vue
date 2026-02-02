@@ -32,49 +32,24 @@ const handleFileSelect = (e) => {
 }
 
 const addFiles = (newFiles) => {
-    // FILE VALIDATION RULES (enforced on client & backend)
-    // ─────────────────────────────────────────────────
-    // 1. Format: PDF only (MIME type: application/pdf)
-    // 2. Size: Max 10MB per file (enforced on frontend & backend)
-    // 3. Count: Max 10 files per batch
-    // Note: Backend also enforces Mistral OCR limits (30 pages, 30MB total)
-
+    // Filter by type (PDF) and size (max 10MB)
     const MAX_SIZE = 10 * 1024 * 1024 // 10MB
-    const MAX_FILES = 10
 
     const validFiles = newFiles
-        .filter(f => {
-            // Filter by type (PDF) and provide feedback for non-PDFs
-            if (f.type !== 'application/pdf') {
-                // Could add error notification here
-                return false
-            }
-            return true
-        })
-        .slice(0, MAX_FILES - files.value.length)
+        .filter(f => f.type === 'application/pdf')
+        .slice(0, 10 - files.value.length)
 
     validFiles.forEach(f => {
-        if (files.value.length < MAX_FILES) {
+        if (files.value.length < 10) {
             const isTooLarge = f.size > MAX_SIZE
             files.value.push({
                 file: f,
                 id: Math.random().toString(36).substring(7),
                 status: isTooLarge ? 'error' : 'pending',
-                message: isTooLarge ? t('upload.error_size') : ''
+                message: isTooLarge ? 'File exceeds 10MB limit' : ''
             })
         }
     })
-
-    // Provide feedback if user exceeded file count limit
-    const rejectedByCount = newFiles.length - validFiles.length
-    const rejectedByType = newFiles.filter(f => f.type !== 'application/pdf').length
-
-    if (rejectedByType > 0) {
-        // Silent rejection for non-PDFs (already filtered above)
-    }
-    if (files.value.length >= MAX_FILES && rejectedByCount > 0) {
-        // Queue is full notification would go here
-    }
 }
 
 const removeFile = (id) => {
@@ -133,7 +108,6 @@ const uploadFiles = async () => {
 
 <template>
   <div class="max-w-3xl mx-auto space-y-6">
-    <!-- Upload Card -->
     <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
       <div class="px-4 py-5 sm:p-6">
         <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
@@ -175,39 +149,10 @@ const uploadFiles = async () => {
                 {{ t('upload.drop_text') }}
               </p>
             </div>
-            <p class="text-xs leading-5 text-gray-600 dark:text-gray-400 mt-3 px-4">
+            <p class="text-xs leading-5 text-gray-600 dark:text-gray-400">
               {{ t('upload.limits') }}
             </p>
-            <!-- File count indicator -->
-            <p
-              v-if="files.length > 0"
-              class="text-xs mt-2 font-medium"
-              :class="[files.length >= 10 ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400']"
-            >
-              {{ files.length }}/10 {{ t('upload.files_selected') }}
-            </p>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Storage Organization Info Card -->
-    <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800/50 shadow sm:rounded-lg">
-      <div class="px-4 py-5 sm:p-6">
-        <h4 class="text-sm font-semibold text-blue-900 dark:text-blue-100">
-          {{ t('upload.storage_title') }}
-        </h4>
-        <div class="mt-3 space-y-2 text-sm text-blue-800 dark:text-blue-200">
-          <p>{{ t('upload.storage_path') }}</p>
-          <code class="block bg-blue-100 dark:bg-blue-900 px-3 py-2 rounded font-mono text-xs text-blue-900 dark:text-blue-100 border border-blue-300 dark:border-blue-700">
-            {{ t('upload.storage_format') }}
-          </code>
-          <p class="text-xs italic">
-            {{ t('upload.storage_example') }}
-          </p>
-          <p class="text-xs mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
-            {{ t('upload.storage_benefits') }}
-          </p>
         </div>
       </div>
     </div>

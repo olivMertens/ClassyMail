@@ -3,9 +3,7 @@
         "dashboard": "Tableau de bord",
         "upload": "Importer",
         "costs": "Coûts",
-        "guide": "Guide",
-        "settings": "Paramètres",
-        "developer": "Développeur"
+        "settings": "Paramètres"
     },
     "settings": {
         "title": "Paramètres de l'application",
@@ -20,38 +18,14 @@
         "costs_desc": "Modifier la tarification par défaut pour le calcul des coûts. Laisser vide pour utiliser les défauts.",
         "strategy_standard_help": "Rapide & Efficace. Idéal pour les textes dactylographiés standard et emails clairs.",
         "strategy_reasoning_help": "Analyse Profonde. Utilise le 'Chain-of-Thought' pour justifier avant de classifier. Utile pour les cas ambigus.",
-        "strategy_vision_help": "Multimodal. Analyse les éléments visuels (images, mise en page). Idéal pour les documents avec photos ou structures complexes.",
-        "tabs": {
-            "categories": "Catégories",
-            "processing": "Stratégie de Traitement",
-            "finetuning": "Fine-tuning",
-            "general": "Général & Coûts",
-            "logs": "Journaux Télémétrie",
-            "danger": "Zone Dangereuse"
-        },
-        "categories": {
-            "warning_title": "Configuration Critique",
-            "warning_text": "La modification des catégories change radicalement la façon dont l AI classe les emails entrants. Les changements se propagent au Prompt Système immédiatement. Les descriptions sont essentielles pour le contexte du LLM.",
-            "managed_title": "Catégories Gérées",
-            "save_button": "Enregistrer les Changements Système",
-            "current_categories": "Catégories actives actuelles extraites par le LLM."
-        }
+        "strategy_vision_help": "Multimodal. Analyse les éléments visuels (images, mise en page). Idéal pour les documents avec photos ou structures complexes."
     },
     "upload": {
         "title": "Importer des documents",
-        "subtitle": "Importer des documents PDF pour lancer le pipeline de classification.",
+        "subtitle": "Importer des documents PDF (max 10 fichiers) pour lancer la classification.",
         "drop_text": "ou glisser-déposer",
         "select": "Choisir un fichier",
-        "limits": "PDF uniquement • Max 10MB par fichier • Max 10 fichiers par lot",
-        "error_type": "Seuls les fichiers PDF sont autorisés",
-        "error_size": "Le fichier dépasse la limite de 10MB",
-        "error_count": "Maximum 10 fichiers par import",
-        "files_selected": "fichiers sélectionnés",
-        "storage_title": "Organisation du Stockage",
-        "storage_path": "Les fichiers sont stockés dans Azure Blob :",
-        "storage_format": "uploads/[AAAA]/[MM]/[JJ]/[UUID]-[nom-du-fichier]",
-        "storage_example": "Exemple : uploads/2026/01/28/a1b2c3d4-reclamation-assurance.pdf",
-        "storage_benefits": "Partitionnement par date pour archivage facile • UUID évite les collisions • Structure lisible et requêtable",
+        "limits": "PDF jusqu'à 10MB",
         "start": "Lancer l'import",
         "uploading": "Envoi..."
     },
@@ -124,24 +98,11 @@
             "infra": "Infra (queue/storage)"
         },
         "disclaimer": "*Tarifs indicatifs, dépendants de la région et de l'usage réel.",
-        "close": "OK",
-        "version": "Version"
+        "close": "OK"
     },
     "guide": {
         "title": "Documentation de l'Application",
         "subtitle": "Guide d'utilisation de ClassiMail, compréhension des capacités IA et gestion de la confidentialité.",
-        "exports": {
-            "title": "Exports de Données & Fine-Tuning",
-            "desc": "Exportez vos données traitées pour le reporting ou pour entraîner de meilleurs modèles IA.",
-            "csv_title": "Export CSV (Reporting)",
-            "csv_desc": "Téléchargez une liste complète de tous les emails traités avec leur statut, coûts et métadonnées.",
-            "csv_streaming": "Support Streaming : Cet export génère les données à la volée, permettant le téléchargement de très grands jeux de données (10k+ lignes) sans plantage serveur.",
-            "csv_columns": "Inclus : ID, Statut, Intentions Détectées, Scores de Confiance, Coûts d'Usage IA (USD), et Temps de Traitement.",
-            "jsonl_title": "Export JSONL (Fine-Tuning)",
-            "jsonl_desc": "Exportez un jeu de données 'Reinforcement Learning' conçu pour le fine-tuning Azure OpenAI / Phi-4.",
-            "jsonl_format": "Format : JSON Lines (JSONL), compatible avec Azure AI Foundry.",
-            "jsonl_requirements": "* Nécessite {n} exemples validés (configurable dans les Paramètres)."
-        },
         "usage": {
             "title": "Comment utiliser",
             "step1_title": "1. Tableau de bord & Monitoring",
@@ -160,16 +121,6 @@
             "step4_desc": "Personnalisez le comportement du moteur dans l'onglet Paramètres.",
             "step4_li1": "Catégories : Définissez les noms d'intention exacts. Les changements s'appliquent immédiatement.",
             "step4_li2": "Stratégie de Traitement : Basculez entre les modes Standard, Raisonnement ou Vision."
-        },
-        "filters": {
-            "title": "Filtrage & Statistiques",
-            "desc": "Le tableau de bord offre des capacités de filtrage avancées pour vous aider à prioriser votre travail et analyser la performance.",
-            "category_title": "Filtre par Catégorie",
-            "category_desc": "Isolez les emails par intention spécifique (ex: 'Changement d'adresse'). Utile pour des revues ciblées ou valider un type d'intention précis.",
-            "confidence_title": "Filtre de Confiance",
-            "confidence_desc": "Concentrez-vous sur les éléments à faible confiance (< 50%) pour corriger les erreurs, ou à haute confiance pour vérifier la performance de l'IA.",
-            "quality_title": "Qualité Moyenne",
-            "quality_desc": "La carte globale 'Qualité Moy.' suit le score de confiance moyen sur tous les emails traités, donnant une vue haut niveau de la santé du modèle."
         },
         "ai": {
             "title": "Complexité Globale & Raisonnement",
@@ -192,14 +143,6 @@
             "vision_title": "Scans vs Images Utiles",
             "vision_desc": "Le système distingue intelligemment une 'page scannée' (traitée comme source de texte) des 'images porteuses de sens' (ex: photo d'accident). Les descriptions redondantes de la page elle-même sont supprimées."
         },
-        "flow_title": "Flux de Traitement",
-        "workflow": {
-            "title": "Choix du Workflow",
-            "desc": "L'application utilise une approche hybride : OCR pour l'extraction de texte, suivi d'une analyse LLM (Phi-4). Cela garantit à la fois une capacité de données structurées et une compréhension sémantique, tout en maintenant les coûts bas."
-        },
-        "updates": {
-            "title": "Mises à jour et Corrections",
-            "desc": "Les utilisateurs peuvent corriger les classifications dans l'interface de Revue. Les corrections sont stockées et utilisées pour calculer la métrique de 'Précision' et améliorer les futurs modèles via le fine-tuning."
-        }
+        "flow_title": "Flux de Traitement"
     }
 }

@@ -4,21 +4,15 @@
 **Author:** Olivier Mertens — olmertens@microsoft.com
 **Update:** Février 2026 (POC Refonte UI & Infra)
 
-> **⚠️ Important Update (Jan 2026):** Fixed Mistral Document AI to use Microsoft Foundry endpoint directly (no path suffix needed).
-> This is NOT the standard OpenAI Chat Completions API. See [docs/MODELS.md](docs/MODELS.md) for details.
-
-## TL;DR
-- Upload PDF → Event Grid → Service Bus → Worker → OCR (Mistral) → Classify (Phi-4) → Cosmos → UI
-- **Vision**: OCR-rendered page images only; PDFs ≥30 pages chunked (30-page parts via `document_url`)
-- Infra: Terraform (ACA, SB, Blob, Cosmos), DI with `Clients`, Python 3.12, `uv` workflows
-- Quickstart: `uv sync && uv run uvicorn main:app --reload` (+ `secrets.env`)
-
 ## Pourquoi ce POC ?
-POC “agent + pipeline” pour emails/PDFs volumineux : latence stable, coûts traçables, review humaine, fine-tuning.
-- Architecture événementielle (Blob → Event Grid → Service Bus → Worker)
-- Dashboard review + export (CSV/JSONL)
-- Déploiement Azure (Terraform + ACA), exécution locale simple
-- Dark mode, Danger Zone, filtres, assistant IA
+
+Ce repo est un **POC “agent + pipeline”** pour traiter des emails/PDFs **à fort volume**, avec un objectif de **latence stable** et de **coûts observables**.
+Il sert à valider rapidement :
+
+- Une architecture **événementielle découplée** (ingestion vs traitement) pour absorber des pics (ex: 10k fichiers).
+- Un workflow de **review humaine** (dashboard interactif) + boucle de **reinforcement / fine-tuning**.
+- Un mode de déploiement cloud **prod-ready** (Terraform + Azure Container Apps) et une exécution locale simple.
+- **Nouveau (Fév 2026)** : Interface "Dark Mode" native, Danger Zone (Reset complet), et support Azure Retail Prices API.
 
 ## Comment ça marche (vue d’ensemble)
 
@@ -42,8 +36,7 @@ Selon ton objectif :
 - **Je veux tester le système E2E** (recommandé pour débuter)
     1. [docs/SCENARIO_E2E.md](docs/SCENARIO_E2E.md) — scénario complet (PDF → Blob → Event Grid → Service Bus → Worker → Cosmos → UI), en local et sur Azure
     2. [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md) — exécution locale, variables `secrets.env`, upload/trigger
-    3. [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md) — commandes locales rapides (build, run, tests, diagnostics)
-    4. [docs/TERRAFORM.md](docs/TERRAFORM.md) — provisionner l’infra Azure + récupérer les outputs
+    3. [docs/TERRAFORM.md](docs/TERRAFORM.md) — provisionner l’infra Azure + récupérer les outputs
 
 - **Je veux comprendre l’architecture** (deep dive)
     1. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — composants, RBAC, scaling
@@ -52,8 +45,8 @@ Selon ton objectif :
     4. [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md) — boucle de review + export JSONL + fine-tune
 
 - **Je veux builder/déployer**
-  - [docs/DEV_LOCAL_BUILD.md](docs/DEV_LOCAL_BUILD.md) — build/push image, déploiement ACA sans CI
-  - [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) — CI/CD GitHub Actions
+    - [docs/DEV_LOCAL_BUILD.md](docs/DEV_LOCAL_BUILD.md) — build/push image, déploiement ACA sans CI
+    - [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) / [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md) — CI/CD
 
 ### Référence (liste complète)
 
@@ -63,35 +56,17 @@ Selon ton objectif :
 - [docs/MODELS.md](docs/MODELS.md)
 - [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md)
 - [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md)
+- [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md)
 - [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md)
 - [docs/DEV_LOCAL_BUILD.md](docs/DEV_LOCAL_BUILD.md)
 - [docs/SCENARIO_E2E.md](docs/SCENARIO_E2E.md)
-- [docs/USER_INTERFACE.md](docs/USER_INTERFACE.md)
 
 ## 🔗 References
 
-- **Mistral Document AI Catalog:** <https://ai.azure.com/catalog/models/mistral-document-ai-2505>
-- Pricing (Azure AI Foundry models): <https://azure.microsoft.com/fr-fr/pricing/details/ai-foundry-models/microsoft/>
-- Fine-tuning (Azure AI Foundry / Azure OpenAI): <https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python>
-- Phi Cookbook (community): <https://github.com/microsoft/PhiCookBookfin>
-- Running Phi-4 locally (Foundry Local guide): <https://techcommunity.microsoft.com/blog/educatordeveloperblog/running-phi-4-locally-with-microsoft-foundry-local-a-step-by-step-guide/4466304>
-
-## ⚠️ Mistral Document AI Limitations
-
-**Document Size Limits:**
-
-- **Maximum file size:** 30 MB
-- **Maximum pages (OCR):** 30 pages
-- **Maximum pages (Annotations):** 8 pages
-- **Supported formats:** PDF, PPTX, DOCX, PNG, JPEG/JPG, AVIF
-
-**Important Notes:**
-
-- Pure OCR processes efficiently and quickly
-- Annotation processes can be slower and may result in timeouts
-- Content safety is applied for annotations only, not enforced for OCR outputs
-
-For more details, see [docs/MODELS.md](docs/MODELS.md).
+- Pricing (Azure AI Foundry models): https://azure.microsoft.com/fr-fr/pricing/details/ai-foundry-models/microsoft/
+- Fine-tuning (Azure AI Foundry / Azure OpenAI): https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python
+- Phi Cookbook (community): https://github.com/microsoft/PhiCookBookfin
+- Running Phi-4 locally (Foundry Local guide): https://techcommunity.microsoft.com/blog/educatordeveloperblog/running-phi-4-locally-with-microsoft-foundry-local-a-step-by-step-guide/4466304
 
 Ce projet implémente un pipeline de classification d'emails à haut volume et faible latence, capable de gérer des pics de charge (10k fichiers simultanés) grâce à une architecture événementielle découplée, avec un backend FastAPI et un frontend SPA (Vue 3 + Tailwind).
 
@@ -99,26 +74,24 @@ Ce projet implémente un pipeline de classification d'emails à haut volume et f
 <!-- (Note: add a screenshot to docs/assets if available, otherwise just text description below) -->
 
 The new frontend provides a dark-mode enabled dashboard to:
-
-- Monitor email processing metrics (including "Avg. Quality").
+- Monitor email processing metrics.
 - Upload/drag-and-drop PDF files directly.
-- Filter emails by **Category name** and **Confidence score** (e.g. "< 50%").
-- Export data to **CSV** (direct download) or **JSONL** (for fine-tuning).
 - Review and correct classifications with a side-by-side PDF viewer and markdown preview.
 - Analyze costs and usage.
-- Configure settings (Strategies including "Vision" or "Reasoning", Prices, and Fine-tune thresholds).
-- **Danger Zone**: Reset environment (Blob/Cosmos) for clean demos.
+- Configure settings.
 
 ```mermaid
 flowchart TD
-    U[User] --> UI[SPA (Vue 3 + Tailwind)]
-    UI --> API[FastAPI]
-    API --> BLOB[(Blob Storage)]
-    BLOB --> SBQ[Service Bus]
-    SBQ --> WORKER[Worker]
-    WORKER --> OCR[Mistral OCR]
-    OCR --> LLM[Phi-4 / gpt-4o-mini]
-    LLM --> COSMOS[(Cosmos DB)]
+    user[User] -->|Upload PDF / Review| ui[SPA (Vue 3 + Tailwind)]
+    ui -->|API calls| api[FastAPI API]
+    api -->|Download PDF| blob[(Blob Storage)]
+    blob -->|Event Grid| sbq[Service Bus Queue]
+    sbq -->|Worker| api
+    api -->|OCR document_base64| ocr[Mistral OCR]
+    ocr -->|Markdown| api
+    api -->|Classify intents| llm["Phi-4 (primary)<br/>Fallback: gpt-4o-mini"]
+    llm -->|JSON| api
+    api -->|Persist| cosmos[(Cosmos DB)]
 
 
 ## 🔧 Installation & Exécution (aperçu)
@@ -133,7 +106,6 @@ uv run uvicorn main:app --reload
 CI/CD : [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) | GitLab : [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md)
 
 Tests rapides : voir [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md#lancer-lappli)
-
 1. **UI** : validation/correction (FastAPI Dashboard)
 2. **Golden Dataset** : `classification.needs_review=false`, `reviewed=true`
 3. **Export Foundry** : JSONL hebdomadaire
@@ -142,17 +114,81 @@ Tests rapides : voir [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md#lancer-lappli)
 
 ---
 
-## 🧪 Génération de données
-Voir [docs/TESTING_EMAIL_GENERATION.md](docs/TESTING_EMAIL_GENERATION.md)
+## 🧪 Génération de données (POC / Demo)
 
-## 🧩 Backend FastAPI
-Voir [docs/PIPELINE.md](docs/PIPELINE.md) et [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md)
+Pour démontrer le POC (stress OCR + classification + boucle de review/fine-tuning), le repo inclut un générateur de PDFs « email-like » volontairement bruités :
 
-## 💻 Frontend SPA
-Voir [docs/USER_INTERFACE.md](docs/USER_INTERFACE.md)
+- Script: [scripts/generate_dummy_pdfs.py](scripts/generate_dummy_pdfs.py)
+- Objectif: produire 50–100 emails aléatoires, souvent longs (~300 mots), avec bruit (FR/EN/ES, argot, SMS, typos, forwards, multi-sujets…)
 
-## ⚙️ Configuration
-Voir [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md) et [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+Exemples:
+
+```bash
+# Dépendance du générateur PDF (uniquement pour ce script)
+pip install fpdf2
+
+# Générer 1 PDF (pratique pour vérifier le nom unique/id) — le script affiche le chemin du fichier
+python scripts/generate_dummy_pdfs.py --count 1 --out dataset/pdf
+
+python scripts/generate_dummy_pdfs.py --count 75 --target-words 300
+python scripts/generate_dummy_pdfs.py --count 100 --target-words 320 --out dataset/pdf
+```
+
+Notes:
+- Les fichiers sont nommés avec un suffixe unique (timestamp + UUID court), par ex:
+    `sample_001_<categorie>_<timestamp>_<id>.pdf`
+- Quand `--count <= 3`, le script affiche le chemin complet des fichiers générés.
+
+### Simuler un PDF corrompu (end-to-end)
+
+Objectif: vérifier que le pipeline détecte un PDF illisible dès l'étape 1 (download) et que l'UI affiche clairement l'erreur.
+
+Pré-requis:
+- App démarrée (local ou ACA)
+- Variables Storage configurées (`AZURE_STORAGE_ACCOUNT_URL`, `AZURE_STORAGE_CONTAINER`)
+
+Exemples:
+
+```bash
+# Local
+python scripts/simulate_corrupted_pdf.py --base-url http://localhost:8000
+
+# ACA (remplacer l'URL)
+python scripts/simulate_corrupted_pdf.py --base-url https://<your-app>.<region>.azurecontainerapps.io
+```
+
+Résultat attendu:
+- Un item `status=ERROR` apparaît dans l'onglet `⚠ Erreurs`, avec `error_stage=download` + un petit `processing_log`.
+
+### Option LLM (Azure OpenAI / Foundry compatible)
+
+Le script peut générer/étendre le contenu via un LLM avant de créer les PDFs.
+
+Variables d'environnement:
+
+- `AZURE_OPENAI_ENDPOINT` (obligatoire)
+- `AZURE_OPENAI_DEPLOYMENT` (optionnel, défaut: `gpt-4o-mini`)
+- `AZURE_OPENAI_API_VERSION` (optionnel, défaut: `2024-10-01-preview`)
+- `AZURE_OPENAI_TIMEOUT` (optionnel)
+
+Exemple PowerShell:
+
+```powershell
+$env:AZURE_OPENAI_ENDPOINT = "https://<resource>.openai.azure.com"
+$env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o-mini"
+# Optionnel (si auth par key)
+$env:AZURE_OPENAI_API_KEY = "<key>"
+```
+
+Authentification (fallback automatique):
+
+- **API key**: définir `AZURE_OPENAI_API_KEY`
+- **Entra ID (recommandé)**: ne pas définir la key, et s'authentifier via `DefaultAzureCredential` (ex: `az login`).
+- Scope configurable via `AZURE_OPENAI_SCOPE` (défaut: `https://cognitiveservices.azure.com/.default`).
+
+```bash
+python scripts/generate_dummy_pdfs.py --count 75 --target-words 300 --use-aoai
+```
 
 ## 🧩 Backend FastAPI
 
@@ -164,7 +200,6 @@ Voir [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md) et [docs/ARCHITECTURE.md](docs/ARCHI
 - `PATCH /api/emails/{id}` : Validation (`intents` array, status=PROCESSED).
 
 ### Observability & Coûts
-
 - **OpenTelemetry** (OTLP) via `OTEL_EXPORTER_OTLP_ENDPOINT`
 - **Usage & coûts** stockés par email (`usage.phi4.usage`, `usage.phi4_cost_usd`, `usage.mistral.estimated_pages`, `usage.mistral.cost_usd`)
 
@@ -192,11 +227,11 @@ Le projet inclut une application frontend moderne dans le dossier `frontend/`.
 
 - **Stack** : Vue 3, Vite, Tailwind CSS, Headless UI.
 - **Features** :
-  - Dashboard analytique (KPIs, graphes).
-  - Vue liste avec filtres (statut, recherche full-text, dates).
-  - Vue détail optimisée pour la review (PDF split-screen, Markdown, formulaire JSON).
-  - Upload Drag & Drop.
-  - Dark mode natif.
+    - Dashboard analytique (KPIs, graphes).
+    - Vue liste avec filtres (statut, recherche full-text, dates).
+    - Vue détail optimisée pour la review (PDF split-screen, Markdown, formulaire JSON).
+    - Upload Drag & Drop.
+    - Dark mode natif.
 - **Build** : `npm run build` génère les assets dans `static/dist/`. FastAPI sert `index.html` comme point d'entrée SPA.
 
 Ancien frontend (legacy) : `templates/index.html` (remplacé).
@@ -216,7 +251,6 @@ npm run dev
 L'URL locale sera typiquement `http://localhost:5173`. Configurez le proxy Vite ou CORS si nécessaire pour taper sur l'API Python (`http://localhost:8000`).
 
 ### Setup Backend (uv)
-
 ```bash
 uv lock
 uv sync
@@ -229,21 +263,18 @@ Entrypoint historique (si besoin): `uvicorn main:app --reload`
 Note: Python 3.11/3.12 recommended (Azure SDK support on 3.13 may lag).
 
 ### Avec Poetry
-
 ```bash
 poetry install
 poetry run uvicorn main:app --reload
 ```
 
 ### Avec pip
-
 ```bash
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
 ### Remplir `secrets.env` après Terraform
-
 Les valeurs proviennent des outputs Terraform (voir `terraform output`).
 
 ```dotenv
@@ -261,14 +292,13 @@ AZURE_COSMOS_CONTAINER=emails
 
 MISTRAL_ENDPOINT=$AI_ENDPOINT
 PHI_ENDPOINT=$AI_ENDPOINT
-ANONYMIZER_ENDPOINT=$AI_ENDPOINT
-VISION_ENDPOINT=$AI_ENDPOINT
 ```
 
 ### CI/CD
 
 CI/CD setup lives in:
 - GitHub Actions: [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md)
+- GitLab CI: [docs/CICD_GITLAB.md](docs/CICD_GITLAB.md)
 
 See the docs for the full YAML examples, authentication options (OIDC vs secrets), and recommended environment protections.
 
@@ -276,19 +306,18 @@ See the docs for the full YAML examples, authentication options (OIDC vs secrets
 ---
 
 ## ✨ Fonctionnalités Clés
-
 - Ingestion Event Grid → Service Bus → Worker async (`Semaphore(5)`).
-- OCR Mistral (`document_base64`), fallback inference `{deployment}:ocr`.
+- OCR Mistral (`/v1/ocr` MaaS, `document_base64`), fallback inference `{deployment}:ocr`.
 - Classification Phi‑4 multi-intentions (JSON strict) + `needs_review` (seuil 0.9).
 - Fallback automatique vers un modèle long-contexte (ex: `gpt-4o-mini`) si le markdown OCR dépasse la fenêtre de contexte du modèle principal.
 - Coûts & usage par email (pages, tokens, €), visibles UI + export CSV.
 - Observabilité OpenTelemetry (HTTPx, spans custom `gen_ai.*`).
 - CI/CD GitHub Actions (uv, ACR, Azure Container Apps).
-- Terraform Foundry (Hub + Project + Deployments + RBAC `Cognitive Services User`).- **Large PDFs**: PDFs ≥ 30 pages are **automatically chunked** into 30-page parts and sent via `document_url` to Mistral OCR; results are merged transparently.
+- Terraform Foundry (Hub + Project + Deployments + RBAC `Cognitive Services User`).
+
 Pour les détails (variables, logique, pricing), voir [docs/MODELS.md](docs/MODELS.md).
 
 ## 📄 Format RFAT (JSON)
-
 ```json
 {
     "id": "pdf-inputs/2025/01/mail123.pdf",
@@ -310,7 +339,6 @@ Pour les détails (variables, logique, pricing), voir [docs/MODELS.md](docs/MODE
 ```
 
 ## 🛠 Fine-tuning Phi‑4 (LoRA) & GPT‑4o-mini (Azure)
-
 Voir [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md) pour les détails (anonymisation, format JSONL, split train/validation).
 
 1. **Collecte** : `needs_review=false` (validations humaines) dans Cosmos DB.
@@ -328,12 +356,11 @@ Voir [docs/FINE_TUNING_DATA.md](docs/FINE_TUNING_DATA.md) pour les détails (ano
 5. **Configuration** : `PHI_DEPLOYMENT=phi-4-custom` (ou fallback `gpt-4o-mini-custom`), `PHI_ENDPOINT` = endpoint Foundry.
 
 Références :
-- Doc fine-tuning Azure AI Foundry/Azure OpenAI : <https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python>
-- Tutoriel officiel (GPT-4o-mini, end-to-end) : <https://learn.microsoft.com/en-us/azure/ai-foundry/openai/tutorials/fine-tune?view=foundry-classic&tabs=command-line>
+- Doc fine-tuning Azure AI Foundry/Azure OpenAI : https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python
+- Tutoriel officiel (GPT-4o-mini, end-to-end) : https://learn.microsoft.com/en-us/azure/ai-foundry/openai/tutorials/fine-tune?view=foundry-classic&tabs=command-line
 
 ## 🧱 Terraform (Foundry)
-
-- `infra/main.tf` : crée **Foundry** (AIServices), **Project**, **Deployments** (`phi-4`, `mistral-document-ai-2505`), **RBAC** `Cognitive Services User` pour l'identité `app_id`.
+- `infra/main.tf` : crée **Foundry** (AIServices), **Project**, **Deployments** (`phi-4`, `mistral-ocr-2505`), **RBAC** `Cognitive Services User` pour l'identité `app_id`.
 - Commandes :
     ```bash
     terraform init -upgrade
@@ -342,10 +369,8 @@ Références :
     ```
 
 ## 🔐 Lancement local (uv)
-
 Créer `secrets.env` :
-
-```dotenv
+```
 AZURE_SERVICE_BUS_FQDN=...
 AZURE_SERVICE_BUS_QUEUE=pdf-processing-queue
 AZURE_STORAGE_ACCOUNT_URL=...
@@ -353,22 +378,12 @@ AZURE_STORAGE_CONTAINER=pdf-inputs
 AZURE_COSMOS_ENDPOINT=...
 AZURE_COSMOS_KEY=...
 MISTRAL_ENDPOINT=...
-MISTRAL_DEPLOYMENT=mistral-document-ai-2505
+MISTRAL_DEPLOYMENT=mistral-ocr-2505
 MISTRAL_MODE=maas
-MISTRAL_OCR_MAX_ATTEMPTS=3
 PHI_ENDPOINT=...
 PHI_DEPLOYMENT=phi-4
 PHI_FALLBACK_ENDPOINT=...
 PHI_FALLBACK_DEPLOYMENT=gpt-4o-mini
-CHAT_ENDPOINT=... # (optionnel, défaut PHI_ENDPOINT)
-CHAT_DEPLOYMENT=gpt-5.2-chat
-CHAT_API_VERSION=2024-08-01-preview
-ANONYMIZER_ENDPOINT=...
-ANONYMIZER_DEPLOYMENT=gpt-4o-mini
-ANONYMIZER_API_VERSION=2024-10-01-preview
-VISION_ENDPOINT=...
-VISION_DEPLOYMENT=gpt-4o
-VISION_API_VERSION=2024-10-01-preview
 PHI_PRIMARY_MAX_INPUT_TOKENS=8000
 PHI_FALLBACK_MAX_INPUT_TOKENS=120000
 PHI_RESERVED_OUTPUT_TOKENS=1000
@@ -378,7 +393,6 @@ FALLBACK_COST_PER_1K_INPUT=0
 FALLBACK_COST_PER_1K_OUTPUT=0
 MISTRAL_OCR_COST_PER_1K_PAGES=1.0
 OTEL_EXPORTER_OTLP_ENDPOINT=...
-UPLOAD_MAX_BYTES=31457280
 ```
 
 ```bash
@@ -388,24 +402,14 @@ uv run --env-file secrets.env uvicorn main:app --reload
 
 ## 📜 Rôles & Accès (RBAC)
 
-Le système utilise **Zero Trust** (via Managed Identity). Voici les rôles précis requis :
-
 | Principal | Ressource | Rôle |
 | --- | --- | --- |
-| Identité managée ACA | Storage Account | **Storage Blob Data Contributor** (write) / **Storage Blob Data Reader** (read-only streaming) |
-
-```bash
-az role assignment create \
-  --assignee <ACA_MANAGED_IDENTITY_CLIENT_ID> \
-  --role "Storage Blob Data Reader" \
-  --scope $(az storage account show --name <storage> --query id -o tsv)
-```
-| Identité managée ACA | Service Bus Namespace | **Azure Service Bus Data Receiver** (Worker) & **Sender** (API) |
-| Identité managée ACA | Cosmos DB (SQL) | **Cosmos DB Built-in Data Contributor** (Role `00000000-0000-0000-0000-000000000002`) |
-| Identité managée ACA | AI Foundry (AIServices) | **Cognitive Services User** |
-| ACA (System) | Azure Container Registry | **AcrPull** |
-
-Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#3-sécurité--accés-rbac) pour la matrice détaillée et les IDs de rôles.
+| Identité managée ACA | Storage Account | Storage Blob Data Reader |
+| Identité managée ACA | Service Bus Namespace | Azure Service Bus Data Receiver/Sender |
+| Identité managée ACA | Cosmos DB (SQL) | Cosmos SQL Built-in Data Contributor (RBAC) |
+| Identité managée ACA | AI Foundry (AIServices) | Cognitive Services User |
+| Event Grid | Service Bus Queue | Event delivery via system topic subscription |
+| ACA (pull image) | Azure Container Registry | AcrPull |
 
 
 ## 🔐 Variables d’environnement
@@ -416,6 +420,7 @@ Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#3-sécurité--accés-rbac) pour
 | `AZURE_SERVICE_BUS_QUEUE` | Nom de la queue (défaut: `pdf-processing-queue`) |
 | `AZURE_STORAGE_ACCOUNT_URL` | URL compte storage (ex: `https://acct.blob.core.windows.net`) |
 | `AZURE_STORAGE_CONTAINER` | Container des PDFs (défaut: `pdf-inputs`) |
+| `AZURE_STORAGE_ACCOUNT_KEY` | (Optionnel) clé pour générer des SAS |
 | `AZURE_COSMOS_ENDPOINT` | Endpoint Cosmos DB |
 | `AZURE_COSMOS_KEY` | (Optionnel si MSI) clé Cosmos |
 | `AZURE_COSMOS_DB` | DB Cosmos (défaut: `emailsdb`) |
@@ -432,13 +437,8 @@ Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#3-sécurité--accés-rbac) pour
 | `AZURE_AI_KEY` | (Optionnel) Clé API modèle |
 | `AZURE_AI_SCOPE` | Scope token (défaut `https://cognitiveservices.azure.com/.default`) |
 | `AZURE_AI_API_VERSION` | API version (défaut `2024-08-01-preview`) |
-| `CHAT_ENDPOINT` | Endpoint du modèle de chat (défaut: `PHI_ENDPOINT`) |
-| `CHAT_DEPLOYMENT` | Déploiement du modèle de chat (défaut: `gpt-5.2-chat`) |
-| `CHAT_API_VERSION` | Version API du modèle de chat (défaut: `2024-08-01-preview`) |
-| `COSMOS_QUERY_MAX_LIMIT` | Limite max résultats par requête Cosmos (défaut: `20`) |
 | `FALLBACK_COST_PER_1K_INPUT` | Prix input/1K tokens (fallback) (configurable) |
-| `APPLICATIONINSIGHTS_CONNECTION_STRING` | (Optional) Log traces to App Insights |
-| `LOG_ANALYTICS_WORKSPACE_ID` | (Optional) Configure Telemetry Logs tab in Dashboard |
+| `FALLBACK_COST_PER_1K_OUTPUT` | Prix output/1K tokens (fallback) (configurable) |
 
 > Tous les services utilisent **DefaultAzureCredential** par défaut. Accorder les rôles nécessaires :
 > - Storage: `Storage Blob Data Contributor`
@@ -459,9 +459,9 @@ Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#3-sécurité--accés-rbac) pour
 
 ## 🛠 Déploiement
 
-1. **Terraform** : `cd infra && terraform apply`
-2. **App** : Deployer le conteneur Docker sur l'instance Container App créée.
-3. **Configuration** : Identité Managée de l'App avec droits `Cognitive Services User`, `Service Bus Data Receiver/Sender`, `Storage Blob Data Contributor`, `Cosmos DB Data Contributor`.
+1.  **Terraform** : `cd infra && terraform apply`
+2.  **App** : Deployer le conteneur Docker sur l'instance Container App créée.
+3.  **Configuration** : Identité Managée de l'App avec droits `Cognitive Services User`, `Service Bus Data Receiver/Sender`, `Storage Blob Data Contributor`, `Cosmos DB Data Contributor`.
 
 ### CI/CD GitHub Actions (uv + Azure Container Apps)
 

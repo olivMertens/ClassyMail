@@ -1,9 +1,8 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 
-const props = defineProps({
+defineProps({
   show: {
     type: Boolean,
     default: false
@@ -11,22 +10,6 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'navigate'])
 const { t } = useI18n()
-const version = ref(null)
-const versionDisplay = computed(() => version.value ? version.value.slice(-7) : '')
-
-watch(() => props.show, async (val) => {
-  if (val) {
-    try {
-      const res = await fetch('/api/admin/version')
-      if (res.ok) {
-        const data = await res.json()
-        version.value = data.version
-      }
-    } catch (e) {
-      version.value = null
-    }
-  }
-})
 </script>
 
 <template>
@@ -71,12 +54,6 @@ watch(() => props.show, async (val) => {
                 </div>
                 <p class="text-gray-600 dark:text-gray-300">
                   {{ t('info.target_desc') }}
-                </p>
-                <p
-                  v-if="version"
-                  class="mt-2 text-xs text-gray-500 dark:text-gray-400"
-                >
-                  {{ t('info.version') }} : {{ versionDisplay }}
                 </p>
 
                 <div class="font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-1 mb-2 mt-4">

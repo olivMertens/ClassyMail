@@ -3,9 +3,7 @@
         "dashboard": "Dashboard",
         "upload": "Upload",
         "costs": "Costs",
-        "guide": "Guide",
-        "settings": "Settings",
-        "developer": "Developer"
+        "settings": "Settings"
     },
     "settings": {
         "title": "Application Settings",
@@ -20,38 +18,14 @@
         "costs_desc": "Override the default pricing used for cost calculations. Leave blank to use defaults.",
         "strategy_standard_help": "Fast & Efficient. Best for standard typed text documents and clear emails.",
         "strategy_reasoning_help": "Deep Analysis. Uses Chain-of-Thought to justify decisions before classifying. Useful for ambiguous cases.",
-        "strategy_vision_help": "Multimodal. Analyzes visual elements (images, layouts) in addition to text. Best for documents with photos or complex structures.",
-        "tabs": {
-            "categories": "Categories",
-            "processing": "Processing Strategy",
-            "finetuning": "Fine-tuning",
-            "general": "General & Costs",
-            "logs": "Telemetry Logs",
-            "danger": "Danger Zone"
-        },
-        "categories": {
-            "warning_title": "Critical Configuration",
-            "warning_text": "Modifying categories radically changes how the AI classifies incoming emails. Changes propagate to the System Prompt immediately. Descriptions are essential for LLM context.",
-            "managed_title": "Managed Categories",
-            "save_button": "Save System Changes",
-            "current_categories": "Current active categories extracted by the LLM."
-        }
+        "strategy_vision_help": "Multimodal. Analyzes visual elements (images, layouts) in addition to text. Best for documents with photos or complex structures."
     },
     "upload": {
         "title": "Upload Documents",
-        "subtitle": "Upload PDF documents to trigger the classification pipeline.",
+        "subtitle": "Upload PDF documents (max 10 files) to trigger the classification pipeline.",
         "drop_text": "or drag and drop",
         "select": "Upload a file",
-        "limits": "PDF only • Max 10MB per file • Max 10 files per batch",
-        "error_type": "Only PDF files are allowed",
-        "error_size": "File exceeds 10MB limit",
-        "error_count": "Maximum 10 files per upload",
-        "files_selected": "files selected",
-        "storage_title": "Storage Organization",
-        "storage_path": "Files are stored in Azure Blob as:",
-        "storage_format": "uploads/[YYYY]/[MM]/[DD]/[UUID]-[filename]",
-        "storage_example": "Example: uploads/2026/01/28/a1b2c3d4-insurance-claim.pdf",
-        "storage_benefits": "Date-based partitioning for easy archival • UUID prevents collisions • Human-readable & queryable structure",
+        "limits": "PDF up to 10MB",
         "start": "Start Upload",
         "uploading": "Uploading..."
     },
@@ -145,8 +119,7 @@
             "csv_columns": "Includes: ID, Status, Detected Intents, Confidence Scores, AI Usage Costs (USD), and Processing Time.",
             "jsonl_title": "JSONL Export (Fine-Tuning)",
             "jsonl_desc": "Export a 'Reinforcement Learning' dataset designed for Azure OpenAI / Phi-4 fine-tuning.",
-            "jsonl_format": "Format: JSON Lines (JSONL), compatible with Azure AI Foundry.",
-            "jsonl_requirements": "* Requires {n} reviewed examples (configurable in Settings)."
+            "jsonl_format": "Format: JSON Lines (JSONL), compatible with Azure AI Foundry."
         },
         "usage": {
             "title": "How to Use",
@@ -167,16 +140,6 @@
             "step4_li1": "Categories: Define exact intent names. Changes apply immediately.",
             "step4_li2": "Processing Strategy: Switch between Standard, Reasoning, or Vision modes."
         },
-        "filters": {
-            "title": "Filtering & Stats",
-            "desc": "The dashboard offers advanced filtering capabilities to help you prioritize your work and analyze performance.",
-            "category_title": "Category Filter",
-            "category_desc": "Isolate emails by specific intent (e.g., 'Address Change'). Useful for targeted reviews or validating a specific intent type.",
-            "confidence_title": "Confidence Filter",
-            "confidence_desc": "Focus on low-confidence items (< 50%) to fix errors, or high-confidence items to spot-check the AI's performance.",
-            "quality_title": "Average Quality",
-            "quality_desc": "The global 'Avg. Quality' card tracks the mean confidence score across all processed emails, providing a global view of model performance."
-        },
         "ai": {
             "title": "Global Complexity & Reasoning",
             "desc": "The system determines complexity based on:",
@@ -191,21 +154,13 @@
             "li2": "Anonymization: When exporting data for fine-tuning, the system automatically scrubs names, emails, and dates using a dedicated anonymizer model."
         },
         "vision": {
-            "title": "Smart Vision & Annotation (Mistral Document AI)",
-            "desc": "The system now uses Mistral's BBox Annotation capability (via Schema) to extract structured insights from visual elements.",
-            "standard_title": "Vision Enrichment",
-            "standard_desc": "When 'Vision' strategy is active, the system generates structured descriptions (Summary, Business Details) for every visual element (charts, photos) found in the PDF. This context is fed to the Classifier.",
-            "vision_title": "Structured Annotations",
-            "vision_desc": "Using a strict JSON Schema, the Vision model categorizes images and decides if they are 'relevant' to the business process, ignoring decorative elements."
+            "title": "Smart Vision (Mistral Document AI)",
+            "desc": "The system leverages Mistral's advanced Layout Analysis to intelligently handle visual content.",
+            "standard_title": "Hybrid Processing",
+            "standard_desc": "The pipeline is 'Content Aware': Text documents are OCR'd normally. However, if visual elements (photos, diagrams) are detected *inside* the document, they are automatically captioned by the Vision model.",
+            "vision_title": "Full Page Scans vs. Images",
+            "vision_desc": "The system intelligently distinguishes between a 'scanned page' (treated as text source) and 'meaningful images' (e.g. car crash photos). Redundant descriptions of the page itself are suppressed."
         },
-        "flow_title": "Processing Flow",
-        "workflow": {
-            "title": "Workflow Choices",
-            "desc": "The application uses a hybrid approach: OCR for text extraction, followed by LLM analysis (Phi-4). This ensures both structured data capability and semantic understanding, while keeping costs low by using smaller specialized models."
-        },
-        "updates": {
-            "title": "Updates & Corrections",
-            "desc": "Users can correct classifications in the Review interface. Corrections are stored and used to calculate the 'Accuracy' metric and improve future models via fine-tuning."
-        }
+        "flow_title": "Processing Flow"
     }
 }

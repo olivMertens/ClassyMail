@@ -17,8 +17,6 @@ locals {
   }
 }
 
-data "azurerm_client_config" "current" {}
-
 provider "azurerm" {
   features {}
   subscription_id     = local.subscription_id != "" ? local.subscription_id : null
@@ -75,7 +73,7 @@ resource "azurerm_storage_account" "st" {
   shared_access_key_enabled       = false
   default_to_oauth_authentication = true
 
-  allow_nested_items_to_be_public = true
+  allow_nested_items_to_be_public = false
   local_user_enabled              = false
 }
 
@@ -96,8 +94,7 @@ resource "azurerm_servicebus_namespace" "sb" {
 
   # Beaucoup d'environnements (policies) désactivent l'auth locale (SAS keys).
   # Le provider peut lire une valeur différente de la valeur par défaut, ce qui crée du drift.
-  # Pour Event Grid, l'authentification locale est requise pour envoyer des messages à Service Bus.
-  local_auth_enabled = true
+  local_auth_enabled = false
 }
 
 resource "azurerm_servicebus_queue" "q" {
@@ -150,19 +147,11 @@ resource "azapi_resource" "ai_foundry" {
     identity = { type = "SystemAssigned" }
     properties = {
       publicNetworkAccess    = "Enabled"
-      disableLocalAuth       = false
+      disableLocalAuth       = true
       allowProjectManagement = true
       customSubDomainName    = "${var.prefix}-aifoundry"
     }
   })
-}
-
-resource "azapi_resource_action" "ai_foundry_keys" {
-  type                   = "Microsoft.CognitiveServices/accounts@2025-06-01"
-  resource_id            = azapi_resource.ai_foundry.id
-  action                 = "listKeys"
-  method                 = "POST"
-  response_export_values = ["key1"]
 }
 
 # Note: Le déploiement des modèles (Mistral/Phi) se fait souvent manuellement
@@ -214,30 +203,10 @@ resource "azapi_resource" "deployment_mistral_ocr" {
   })
 }
 
-resource "azapi_resource" "deployment_embedding" {
-  count     = var.enable_model_deployments ? 1 : 0
-  type      = "Microsoft.CognitiveServices/accounts/deployments@2023-05-01"
-  name      = "text-embedding-3-small"
-  parent_id = azapi_resource.ai_foundry.id
-  body = jsonencode({
-    sku = { name = "Standard", capacity = 120 }
-    properties = {
-      model = { format = "OpenAI", name = "text-embedding-3-small", version = "1" }
-    }
-  })
-}
-
 # RBAC Assignments
 resource "azurerm_role_assignment" "aca_storage_reader" {
   scope                = azurerm_storage_account.st.id
   role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
-}
-
-# Optional: explicit read role (useful for read-only API streaming)
-resource "azurerm_role_assignment" "aca_storage_reader_read" {
-  scope                = azurerm_storage_account.st.id
-  role_definition_name = "Storage Blob Data Reader"
   principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
@@ -250,13 +219,6 @@ resource "azurerm_role_assignment" "aca_sb_receiver" {
 resource "azurerm_role_assignment" "aca_sb_sender" {
   scope                = azurerm_servicebus_namespace.sb.id
   role_definition_name = "Azure Service Bus Data Sender"
-  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
-}
-
-# Log Analytics Reader for querying telemetry logs
-resource "azurerm_role_assignment" "aca_log_analytics_reader" {
-  scope                = azurerm_log_analytics_workspace.log.id
-  role_definition_name = "Log Analytics Reader"
   principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
@@ -292,8 +254,7 @@ resource "azurerm_cosmosdb_account" "db" {
   # Beaucoup de tenants désactivent l'auth locale (clé) par policy.
   # On aligne le comportement Terraform avec ce mode; vous pouvez forcer cosmos_use_rbac=false uniquement si vous avez le droit d'activer l'auth locale.
   local_authentication_disabled = var.cosmos_use_rbac
-  capabilities { name = "EnableServerless" }        # Mode économique pour POC
-  capabilities { name = "EnableNoSQLVectorSearch" } # Vector Search capability
+  capabilities { name = "EnableServerless" } # Mode économique pour POC
   geo_location {
     location          = var.location
     failover_priority = 0
@@ -312,8 +273,6 @@ resource "azurerm_cosmosdb_sql_role_assignment" "aca_cosmos_sql_contrib" {
   # Format attendu par l'API dans ce tenant: un préfixe ARM (subscriptions/.../databaseAccounts/...) + segments data-plane (dbs/.../colls/...).
   # IMPORTANT: db-scope is required in some tenants for metadata access (readMetadata).
   scope = "${azurerm_cosmosdb_account.db.id}/dbs/${azurerm_cosmosdb_sql_database.sql.name}"
-
-  depends_on = [azurerm_cosmosdb_sql_database.sql]
 }
 
 resource "azurerm_cosmosdb_sql_database" "sql" {
@@ -381,10 +340,6 @@ resource "azurerm_role_assignment" "rbac_ai" {
 output "SERVICEBUS_NAMESPACE" { value = azurerm_servicebus_namespace.sb.name }
 output "AI_ENDPOINT" { value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, null) }
 output "APP_ID_CLIENT_ID" { value = azurerm_user_assigned_identity.app_id.client_id }
-output "APP_ID_PRINCIPAL_ID" {
-  description = "Principal ID de l'identité managée (pour RBAC)"
-  value       = azurerm_user_assigned_identity.app_id.principal_id
-}
 
 output "AZURE_SERVICE_BUS_FQDN" { value = "${azurerm_servicebus_namespace.sb.name}.servicebus.windows.net" }
 output "AZURE_SERVICE_BUS_QUEUE" { value = azurerm_servicebus_queue.q.name }
@@ -397,29 +352,8 @@ output "AZURE_COSMOS_ENDPOINT" { value = azurerm_cosmosdb_account.db.endpoint }
 output "AZURE_COSMOS_DB" { value = azurerm_cosmosdb_sql_database.sql.name }
 output "AZURE_COSMOS_CONTAINER" { value = azurerm_cosmosdb_sql_container.container.name }
 
-output "LOG_ANALYTICS_WORKSPACE_ID" {
-  description = "Workspace ID pour Log Analytics (LOG_ANALYTICS_WORKSPACE_ID)"
-  value       = azurerm_log_analytics_workspace.log.workspace_id
-}
-
-output "APPLICATION_INSIGHTS_CONNECTION_STRING" {
-  description = "Connection string Application Insights"
-  value       = azurerm_application_insights.appi.connection_string
-  sensitive   = true
-}
-
-output "API_URL" {
-  description = "URL publique de l'API"
-  value       = "https://${azurerm_container_app.api.ingress[0].fqdn}"
-}
-
 output "AZURE_COSMOS_KEY" {
   value     = var.cosmos_use_rbac ? null : azurerm_cosmosdb_account.db.primary_key
-  sensitive = true
-}
-
-output "AZURE_AI_KEY" {
-  value     = jsondecode(azapi_resource_action.ai_foundry_keys.output).key1
   sensitive = true
 }
 variable "container_image" {
@@ -430,12 +364,6 @@ variable "container_image" {
     condition     = var.container_image != ""
     error_message = "container_image must be set (e.g., via terraform.tfvars)."
   }
-}
-
-variable "app_version" {
-  type        = string
-  description = "Optional application version (commit SHA). If empty, container_image is used."
-  default     = ""
 }
 
 variable "acr_name" {
@@ -514,11 +442,6 @@ resource "azurerm_container_app" "api" {
     identity_ids = [azurerm_user_assigned_identity.app_id.id]
   }
 
-  secret {
-    name  = "azure-ai-key"
-    value = jsondecode(azapi_resource_action.ai_foundry_keys.output).key1
-  }
-
   template {
     container {
       name   = "api"
@@ -529,10 +452,6 @@ resource "azurerm_container_app" "api" {
       env {
         name  = "PORT"
         value = "8000"
-      }
-      env {
-        name        = "AZURE_AI_KEY"
-        secret_name = "azure-ai-key"
       }
       env {
         name  = "AZURE_CLIENT_ID"
@@ -573,14 +492,6 @@ resource "azurerm_container_app" "api" {
         value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
       }
       env {
-        name  = "EMBEDDING_ENDPOINT"
-        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
-      }
-      env {
-        name  = "EMBEDDING_DEPLOYMENT"
-        value = "text-embedding-3-small"
-      }
-      env {
         name  = "PHI_ENDPOINT"
         value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
       }
@@ -594,7 +505,7 @@ resource "azurerm_container_app" "api" {
       }
       env {
         name  = "MISTRAL_DEPLOYMENT"
-        value = "mistral-ocr-2505"
+        value = "mistral-document-ai-2505"
       }
       env {
         name  = "MISTRAL_MODE"
@@ -603,34 +514,6 @@ resource "azurerm_container_app" "api" {
       env {
         name  = "AZURE_AI_API_VERSION"
         value = "2024-08-01-preview"
-      }
-      env {
-        name  = "CHAT_ENDPOINT"
-        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
-      }
-      env {
-        name  = "CHAT_DEPLOYMENT"
-        value = "gpt-5.2-chat"
-      }
-      env {
-        name  = "CHAT_API_VERSION"
-        value = "2024-08-01-preview"
-      }
-      env {
-        name  = "AZURE_SUBSCRIPTION_ID"
-        value = coalesce(var.subscription_id, data.azurerm_client_config.current.subscription_id)
-      }
-      env {
-        name  = "AZURE_TENANT_ID"
-        value = data.azurerm_client_config.current.tenant_id
-      }
-      env {
-        name  = "AZURE_RESOURCE_GROUP"
-        value = azurerm_resource_group.rg.name
-      }
-      env {
-        name  = "APP_VERSION"
-        value = var.app_version != "" ? var.app_version : var.container_image
       }
 
       # Telemetry
@@ -641,10 +524,6 @@ resource "azurerm_container_app" "api" {
       env {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         value = azurerm_application_insights.appi.connection_string
-      }
-      env {
-        name  = "LOG_ANALYTICS_WORKSPACE_ID"
-        value = azurerm_log_analytics_workspace.log.workspace_id
       }
 
       liveness_probe {
@@ -710,11 +589,6 @@ resource "azurerm_container_app" "worker" {
     identity_ids = [azurerm_user_assigned_identity.app_id.id]
   }
 
-  secret {
-    name  = "azure-ai-key"
-    value = jsondecode(azapi_resource_action.ai_foundry_keys.output).key1
-  }
-
   template {
     container {
       name    = "worker"
@@ -727,10 +601,6 @@ resource "azurerm_container_app" "worker" {
       env {
         name  = "ENABLE_WORKER"
         value = "true"
-      }
-      env {
-        name        = "AZURE_AI_KEY"
-        secret_name = "azure-ai-key"
       }
       env {
         name  = "AZURE_CLIENT_ID"
@@ -770,14 +640,6 @@ resource "azurerm_container_app" "worker" {
         value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
       }
       env {
-        name  = "EMBEDDING_ENDPOINT"
-        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
-      }
-      env {
-        name  = "EMBEDDING_DEPLOYMENT"
-        value = "text-embedding-3-small"
-      }
-      env {
         name  = "PHI_ENDPOINT"
         value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
       }
@@ -791,27 +653,15 @@ resource "azurerm_container_app" "worker" {
       }
       env {
         name  = "MISTRAL_DEPLOYMENT"
-        value = "mistral-ocr-2505"
+        value = "mistral-document-ai-2505"
+      }
+      env {
+        name  = "MISTRAL_MODE"
+        value = "maas"
       }
       env {
         name  = "AZURE_AI_API_VERSION"
         value = "2024-08-01-preview"
-      }
-      env {
-        name  = "AZURE_SUBSCRIPTION_ID"
-        value = coalesce(var.subscription_id, data.azurerm_client_config.current.subscription_id)
-      }
-      env {
-        name  = "AZURE_TENANT_ID"
-        value = data.azurerm_client_config.current.tenant_id
-      }
-      env {
-        name  = "AZURE_RESOURCE_GROUP"
-        value = azurerm_resource_group.rg.name
-      }
-      env {
-        name  = "APP_VERSION"
-        value = var.app_version != "" ? var.app_version : var.container_image
       }
 
       env {
@@ -821,10 +671,6 @@ resource "azurerm_container_app" "worker" {
       env {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         value = azurerm_application_insights.appi.connection_string
-      }
-      env {
-        name  = "LOG_ANALYTICS_WORKSPACE_ID"
-        value = azurerm_log_analytics_workspace.log.workspace_id
       }
     }
 
