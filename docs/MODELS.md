@@ -72,36 +72,42 @@ Context sizing (new):
 
 ## Fine-Tuning & LoRA Compatibility
 
-**LoRA Fine-Tuning Support (Azure AI Foundry):**
+**Fine-Tuning Support (Azure AI Foundry / Azure OpenAI):**
 
-The following models support **LoRA (Low-Rank Adaptation)** fine-tuning directly through Azure AI Foundry:
+The following models support fine-tuning for custom classification tasks:
 
-- ✅ **Phi-3** family (all variants)
-- ✅ **Phi-4** (recommended for this project)
-- ✅ **GPT-4o-mini** (Azure OpenAI fine-tuning API)
+- ✅ **Phi-4** (LoRA via Azure AI Foundry, 8K context, **recommended for this project**)
+- ✅ **Phi-3** family (LoRA via Azure AI Foundry, all variants)
+- ✅ **gpt-4o-mini** (Azure OpenAI fine-tuning API, 128K context, cost-effective)
+- ✅ **GPT-4.1 Nano** (Azure AI Foundry fine-tuning, 1M+ context, optimized throughput)
 
-**LoRA Process:**
+**Models NOT Supporting Fine-Tuning:**
+
+- ❌ **GPT-5 Mini** (future preview model, fine-tuning not yet available as of Feb 2026)
+- ❌ **Mistral OCR** (specialized for document understanding, not for classification fine-tuning)
+
+**Fine-Tuning Process:**
 1. Export validated emails to JSONL format (see [FINE_TUNING_DATA.md](FINE_TUNING_DATA.md))
 2. Upload training/validation datasets to Azure AI Foundry
-3. Create fine-tuning job with LoRA adapters (Foundry UI or Azure OpenAI API)
-4. Deploy custom model (e.g., `phi-4-custom`, `gpt-4o-mini-custom`)
+3. Create fine-tuning job with LoRA adapters (Foundry UI or Azure OpenAI CLI/SDK)
+4. Deploy custom model (e.g., `phi-4-custom`, `gpt-4o-mini-custom`, `gpt-4_1-nano-custom`)
 5. Update `PHI_DEPLOYMENT` or `PHI_FALLBACK_DEPLOYMENT` to use the custom deployment
 
-**Models NOT Supporting LoRA:**
-
-- ❌ **GPT-4.1** (uses different fine-tuning approach)
-- ❌ **GPT-5** (theoretical, not yet available)
-- ❌ **Mistral OCR** (optimized for document understanding, not classification tasks)
+**Recommended Fine-Tuning Strategy:**
+- **Primary (Recommended)**: Fine-tune **Phi-4** with LoRA (fast iteration, lower cost, good results)
+- **Cost-Optimized Alternative**: Fine-tune **gpt-4o-mini** (training cost: $0.69/1M tokens, best supported)
+- **Performance-Optimized**: Fine-tune **GPT-4.1 Nano** (training cost: $0.17/1M tokens, highest throughput)
 
 **Important Notes:**
-- Phi-4 LoRA fine-tuning is the **recommended approach** for this classification pipeline
-- GPT-4o-mini supports fine-tuning but requires Azure OpenAI fine-tuning API (not Foundry LoRA UI)
+- **Phi-4 LoRA** is the recommended approach for this classification pipeline (fast, cost-effective)
 - Fine-tuned models maintain the same endpoint compatibility (OpenAI Chat API format)
 - Always test custom models with the fallback mechanism enabled
+- gpt-4o-mini has the most mature fine-tuning pipeline as of Feb 2026
 
 **References:**
 - Azure AI Foundry Fine-Tuning: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python
 - Phi-4 LoRA Best Practices: https://github.com/microsoft/PhiCookBook
+- Azure OpenAI Fine-Tuning Guide: https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/fine-tuning
 
 ## Future Models (Preview)
 

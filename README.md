@@ -126,17 +126,17 @@ The system supports **dual-model comparison** for advanced evaluation and fine-t
 ### Available Models for Comparison
 
 **Primary Model (Configurable via `PHI_DEPLOYMENT`):**
-- 🔶 **Phi-4** (default, recommended)
-- 🔶 **Phi-3** (if deployed)
-- 🟠 **GPT-4o** (if deployed)
-- 🟠 **GPT-4.1 Nano** (experimental, if available)
+- � **GPT-4.1 Nano** (fast, optimized, 1M+ token context, ✅ fine-tuning supported)
+- 🟣 **GPT-5 Mini** (next-gen, 200K token context, ❌ fine-tuning not yet available)
+- 🟢 **gpt-4o-mini** (cost-effective, 128K token context, ✅ fine-tuning supported)
+- 🔶 **Phi-4** (8K context, ✅ fine-tuning supported, if deployed)
 
 **Fallback/Audit Model (Configurable via `PHI_FALLBACK_DEPLOYMENT`):**
-- 🟢 **gpt-4o-mini** (default, 120K token context)
-- 🟢 **gpt-4o** (if deployed)
+- 🟢 **gpt-4o-mini** (default, 128K token context)
+- 🟠 **gpt-4o** (200K token context, if deployed)
 
 **Comparison Behavior:**
-- **Automatic Fallback**: When content > 8K tokens → Uses fallback model automatically
+- **Automatic Fallback**: When content > configured primary model context → Uses fallback model automatically
 - **Manual Comparison**: You can trigger comparison mode to run **both models in parallel** on any email
 - **Results**: Side-by-side comparison shows both classifications with confidence scores and agreement indicators
 

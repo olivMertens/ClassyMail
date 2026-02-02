@@ -6,9 +6,44 @@ Ce document répond aux questions suivantes :
 - à quoi ressemble un bon dataset JSON/JSONL pour fine-tuner un classifieur
 - comment gérer la confidentialité (PII) et l'anonymisation du contenu email + markdown OCR
 
+## Modèles supportés pour le fine-tuning
+
+Ce repo recommande **Phi-4 avec LoRA** comme approche principale pour le fine-tuning de la classification. Plusieurs options sont disponibles :
+
+### Option 1 : Phi-4 avec LoRA (Recommandée) ✅
+
+- **Contexte** : 8K tokens
+- **Méthode** : LoRA (Low-Rank Adaptation) via Azure AI Foundry
+- **Coûts** : Faibles (petit modèle, itération rapide)
+- **Performances** : Excellent pour la classification d'emails
+- **Support** : Stable, bien documenté
+- **Déploiement** : `phi-4-custom` (même endpoint OpenAI Chat API)
+
+**Pourquoi LoRA ?**
+- Itération rapide (entraînement plus rapide)
+- Réduction des coûts de stockage et d'inference
+- Qualité comparable au fine-tuning complet pour les tâches de classification
+
+### Option 2 : gpt-4o-mini (Alternative coût-optimisée)
+
+- **Contexte** : 128K tokens
+- **Méthode** : Fine-tuning via API Azure OpenAI
+- **Coûts d'entraînement** : $0.69/1M tokens
+- **Support** : Pipeline le plus mature (fév. 2026)
+- **Déploiement** : `gpt-4o-mini-custom`
+
+### Option 3 : GPT-4.1 Nano (Performance maximale)
+
+- **Contexte** : 1M+ tokens
+- **Méthode** : Fine-tuning via Azure AI Foundry
+- **Coûts d'entraînement** : $0.17/1M tokens (throughput élevé)
+- **Déploiement** : `gpt-4_1-nano-custom`
+
+**Recommandation** : Commencer avec **Phi-4 LoRA** pour la rapidité d'itération, puis comparer avec gpt-4o-mini si nécessaire.
+
 ## Boucle de renforcement humain → export JSONL anonymisé
 
-Ce repo supporte un flux “validé par humain + anonymisé” pour générer des données de fine-tuning Phi.
+Ce repo supporte un flux "validé par humain + anonymisé" pour générer des données de fine-tuning compatible avec Phi-4, gpt-4o-mini, et GPT-4.1 Nano.
 
 Flux de données :
 
@@ -216,6 +251,78 @@ PY
 
 Ensuite, utilisez `data/training_set.jsonl` et `data/validation_set.jsonl` dans Foundry/Azure OpenAI (upload + job de fine-tune).
 
+## Lancer un job de fine-tuning Phi-4 avec LoRA
+
+### Via Azure AI Foundry (Interface graphique)
+
+1. **Créer les datasets** :
+   - Dans Foundry, naviguer vers votre projet
+   - Sélectionner "Fine-tuning" > "Datasets"
+   - Uploader `training_set.jsonl` et `validation_set.jsonl`
+
+2. **Configurer le job LoRA** :
+   - Modèle de base : `Phi-4`
+   - Méthode : `LoRA`
+   - Paramètres recommandés :
+     - `lora_rank`: 8 ou 16 (8 pour commencer)
+     - `epochs`: 3-5 (3 pour commencer)
+     - `batch_size`: 4-8
+     - `learning_rate`: 1e-4 ou 2e-5
+
+3. **Lancer l'entraînement** :
+   - La durée dépend du nombre d'exemples (~10-30 min pour 50-200 exemples)
+   - Surveiller les métriques de validation (accuracy, loss)
+
+4. **Déployer le modèle custom** :
+   - Une fois terminé, déployer vers un endpoint
+   - Nom de déploiement : `phi-4-custom` (ou votre choix)
+   - Mettre à jour `PHI_DEPLOYMENT=phi-4-custom` dans votre config
+
+### Via Azure CLI / SDK (Automatisation)
+
+```bash
+# Créer un job de fine-tuning
+az ml job create --file fine-tune-job.yml --workspace-name <workspace> --resource-group <rg>
+```
+
+Exemple de fichier `fine-tune-job.yml` :
+```yaml
+type: fine_tuning
+model: Phi-4
+method: lora
+training_data: azureml:training_set:1
+validation_data: azureml:validation_set:1
+hyperparameters:
+  lora_rank: 8
+  epochs: 3
+  batch_size: 4
+  learning_rate: 1e-4
+```
+
+### Comparaison avec gpt-4o-mini fine-tuning
+
+Si vous voulez comparer les performances :
+
+```python
+# Fine-tuning gpt-4o-mini via Azure OpenAI SDK
+from openai import AzureOpenAI
+
+client = AzureOpenAI(
+    azure_endpoint="https://<resource>.openai.azure.com",
+    api_version="2024-08-01-preview"
+)
+
+job = client.fine_tuning.jobs.create(
+    training_file="file-abc123",  # ID du fichier uploadé
+    validation_file="file-def456",
+    model="gpt-4o-mini",
+    hyperparameters={
+        "n_epochs": 3,
+        "batch_size": 4
+    }
+)
+```
+
 ## Confidentialité & anonymisation
 
 ### Est-ce un problème si l'email doit être totalement anonyme ?
@@ -237,7 +344,21 @@ Approche recommandée :
 - Utiliser une redaction déterministe (même token → même placeholder) pour garder la cohérence intra-exemple.
 - Conserver une table de mapping séparée si vous avez besoin de réversibilité (souvent non nécessaire).
 
-## Références Phi‑4 / Foundry
+## Références Fine-Tuning
 
-- Phi Cookbook (community) : https://github.com/microsoft/PhiCookBookfin
+### Phi-4 & LoRA
+- Phi Cookbook (community) : https://github.com/microsoft/PhiCookBook
 - Guide Foundry Local (Phi‑4 local) : https://techcommunity.microsoft.com/blog/educatordeveloperblog/running-phi-4-locally-with-microsoft-foundry-local-a-step-by-step-guide/4466304
+- LoRA Paper : https://arxiv.org/abs/2106.09685
+
+### Azure AI Foundry & Azure OpenAI
+- Fine-Tuning Guide (officiel) : https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python
+- Tutoriel End-to-End (gpt-4o-mini) : https://learn.microsoft.com/en-us/azure/ai-foundry/openai/tutorials/fine-tune?view=foundry-classic&tabs=command-line
+- Azure OpenAI Fine-Tuning : https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/fine-tuning
+
+### Best Practices
+- Data Quality > Data Quantity (50-200 exemples bien validés suffisent souvent)
+- Toujours anonymiser les données sensibles (PII)
+- Maintenir un validation set fixe pour comparer les runs
+- Monitorer les métriques de validation (overfitting si train >> val)
+- Tester le modèle fine-tuné avec le fallback activé (sécurité)
