@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon } from '@heroicons/vue/24/outline'
+import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
 
 const props = defineProps({
@@ -24,6 +24,7 @@ const intentsJson = ref('[]')
 const availableCategories = ref([])
 const correctionReason = ref('')
 const activeTab = ref('review') // review | comparison | history
+const isFullWidth = ref(false)
 
 const pdfUrl = computed(() => email.value?.file_url_proxy || email.value?.file_url_sas || email.value?.file_url || null)
 
@@ -243,7 +244,8 @@ const renderMarkdown = (text) => md.render(text || '')
     <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
       <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
         <div
-          class="relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-900 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-6xl h-[90vh] flex flex-col"
+          class="relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-900 text-left shadow-xl transition-all sm:my-8 h-[90vh] flex flex-col"
+          :class="isFullWidth ? 'sm:w-full sm:max-w-[95vw]' : 'sm:w-full sm:max-w-6xl'"
         >
           <!-- Header -->
           <div
@@ -256,6 +258,21 @@ const renderMarkdown = (text) => md.render(text || '')
               {{ email?.subject || 'Loading...' }}
             </h3>
             <div class="flex gap-2">
+              <button
+                type="button"
+                class="rounded-md bg-white dark:bg-gray-800 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 mr-2"
+                :title="isFullWidth ? 'Minimize width' : 'Full width'"
+                @click="isFullWidth = !isFullWidth"
+              >
+                <ArrowsPointingInIcon
+                  v-if="isFullWidth"
+                  class="h-5 w-5"
+                />
+                <ArrowsPointingOutIcon
+                  v-else
+                  class="h-5 w-5"
+                />
+              </button>
               <button
                 :disabled="reprocessing"
                 class="text-amber-600 hover:text-amber-500 dark:text-amber-400 font-medium text-sm flex items-center gap-1"
