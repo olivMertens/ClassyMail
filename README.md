@@ -413,7 +413,7 @@ AZURE_COSMOS_CONTAINER=emails
 # --- Identité (Azure Container Apps / Local) ---
 # Si l'app tourne avec une User Assigned Managed Identity, définissez AZURE_CLIENT_ID
 # (cf. Terraform output: APP_ID_CLIENT_ID)
-# AZURE_CLIENT_ID=<identity-client-id>
+AZURE_CLIENT_ID=3ae24af5-97c6-437f-a4d2-521fbd5524d4
 
 # --- Azure AI Foundry / Azure OpenAI compatible endpoint ---
 # Terraform output: AI_ENDPOINT
@@ -439,7 +439,10 @@ MISTRAL_OCR_COST_PER_1K_PAGES=1.0
 # OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
 
 # Log Analytics Workspace ID (pour querying Application Insights logs)
-# LOG_ANALYTICS_WORKSPACE_ID=<workspace-uuid>
+LOG_ANALYTICS_WORKSPACE_ID=9f225d73-351d-471e-9371-c15d265e9bd4
+
+# Application Insights connection string (Terraform output)
+# APPLICATIONINSIGHTS_CONNECTION_STRING=InstrumentationKey=...;IngestionEndpoint=https://...
 ```
 
 ### CI/CD
@@ -561,16 +564,35 @@ uv run --env-file secrets.env uvicorn main:app --reload
 
 ## 🔐 Variables d’environnement
 
+### Managed Identity & Security (Recommended)
+
+**🔐 Best Practice:** Use Azure Managed Identity for authentication to Azure services (no keys/secrets required).
+
+**Deployed Configuration (email-poc-rg):**
+- **Managed Identity**: `email-poc-id`
+- **Client ID**: `3ae24af5-97c6-437f-a4d2-521fbd5524d4`
+- **Principal ID**: `fdf02fa5-2cd5-42f9-9b78-5cb7905d94d0`
+
+**Required RBAC Role Assignments:**
+- ✅ **Service Bus**: `Azure Service Bus Data Sender`, `Azure Service Bus Data Receiver`
+- ✅ **Storage**: `Storage Blob Data Contributor`, `Storage Blob Data Reader`
+- ✅ **Cosmos DB**: `Cosmos DB Built-in Data Contributor` (database scope: `emailsdb`)
+- ✅ **AI Foundry**: `Cognitive Services User`
+- ✅ **Container Registry**: `AcrPull`
+
+**⚠️ Security Note:** Avoid using `AZURE_AI_KEY` and `AZURE_COSMOS_KEY` in production. Rely on Managed Identity (`DefaultAzureCredential`) for all Azure service authentication.
+
 ### Services Azure (Core)
 
 | Variable | Description | Par défaut |
 | --- | --- | --- |
+| `AZURE_CLIENT_ID` | Client ID identité managée (requis pour ACA) | `3ae24af5-97c6-437f-a4d2-521fbd5524d4` |
 | `AZURE_SERVICE_BUS_FQDN` | Namespace Service Bus (ex: `myns.servicebus.windows.net`) | ✓ requis |
 | `AZURE_SERVICE_BUS_QUEUE` | Nom de la queue | `pdf-processing-queue` |
 | `AZURE_STORAGE_ACCOUNT_URL` | URL compte storage (ex: `https://acct.blob.core.windows.net`) | ✓ requis |
 | `AZURE_STORAGE_CONTAINER` | Container des PDFs | `pdf-inputs` |
 | `AZURE_COSMOS_ENDPOINT` | Endpoint Cosmos DB | ✓ requis |
-| `AZURE_COSMOS_KEY` | Clé Cosmos (optionnel si MSI/RBAC) | — |
+| `AZURE_COSMOS_KEY` | Clé Cosmos (**non recommandé**, préférer MSI/RBAC) | — |
 | `AZURE_COSMOS_DB` | DB Cosmos | `emailsdb` |
 | `AZURE_COSMOS_CONTAINER` | Container Cosmos | `emails` |
 
@@ -579,7 +601,7 @@ uv run --env-file secrets.env uvicorn main:app --reload
 | Variable | Description | Par défaut |
 | --- | --- | --- |
 | `AZURE_AI_ENDPOINT` | Endpoint Foundry / Azure OpenAI | ✓ requis |
-| `AZURE_AI_KEY` | Clé API (optionnel, préférer DefaultAzureCredential) | — |
+| `AZURE_AI_KEY` | Clé API (**non recommandé**, préférer `DefaultAzureCredential` + role `Cognitive Services User`) | — |
 | `AZURE_AI_API_VERSION` | API version | `2024-08-01-preview` |
 | `AZURE_AI_SCOPE` | OAuth scope | `https://cognitiveservices.azure.com/.default` |
 
@@ -639,9 +661,9 @@ uv run --env-file secrets.env uvicorn main:app --reload
 | Variable | Description | Par défaut |
 | --- | --- | --- |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint OpenTelemetry (ex: `http://localhost:4318`) | — |
-| `OTEL_SERVICE_NAME` | Nom du service telemetry | `classificationg2s-api` |
-| `APPLICATIONINSIGHTS_CONNECTION_STRING` | App Insights connection string | — |
-| `LOG_ANALYTICS_WORKSPACE_ID` | Workspace ID pour logs | — |
+| `OTEL_SERVICE_NAME` | Nom du service telemetry (API: `classificationg2s-api`, Worker: `classificationg2s-worker`) | `classificationg2s-api` |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | App Insights connection string | ✓ requis (Azure) |
+| `LOG_ANALYTICS_WORKSPACE_ID` | Workspace ID pour logs (ex: `9f225d73-351d-471e-9371-c15d265e9bd4`) | ✓ requis (Azure) |
 
 ### Interface Utilisateur (Features)
 
@@ -656,15 +678,18 @@ uv run --env-file secrets.env uvicorn main:app --reload
 
 | Variable | Description | Par défaut |
 | --- | --- | --- |
-| `AZURE_CLIENT_ID` | Client ID identité managée | — |
 | `COSMOS_QUERY_MAX_LIMIT` | Limite pagination Cosmos | `20` |
 | `UPLOAD_MAX_BYTES` | Taille max upload (bytes) | `10485760` (10MB) |
+| `ENABLE_WORKER` | Active le mode worker (traitement Service Bus) | `false` (API), `true` (Worker) |
 
-> Tous les services utilisent **DefaultAzureCredential** par défaut. Accorder les rôles nécessaires :
-> - Storage: `Storage Blob Data Contributor`
-> - Cosmos (RBAC recommandé): rôles data-plane Cosmos SQL (contributor) + pas de clé
-> - Service Bus: `Service Bus Data Receiver/Sender`
-> - AI MaaS: `Cognitive Services User`
+> **💡 DefaultAzureCredential Configuration:** Tous les services utilisent **DefaultAzureCredential** pour l'authentification (pas de clés/secrets). Accorder les rôles RBAC nécessaires à l'identité managée :
+> - **Service Bus**: `Azure Service Bus Data Sender` + `Azure Service Bus Data Receiver`
+> - **Storage**: `Storage Blob Data Contributor` + `Storage Blob Data Reader`
+> - **Cosmos DB**: `Cosmos DB Built-in Data Contributor` (scope: database `emailsdb`)
+> - **AI Foundry**: `Cognitive Services User`
+> - **Container Registry**: `AcrPull` (pour déploiement ACA)
+>
+> **Sécurité**: Ne pas utiliser `AZURE_AI_KEY` ni `AZURE_COSMOS_KEY` en production. Les identités managées assurent une authentification plus sécurisée.
 
 ---
 
@@ -681,7 +706,12 @@ uv run --env-file secrets.env uvicorn main:app --reload
 
 1.  **Terraform** : `cd infra && terraform apply`
 2.  **App** : Deployer le conteneur Docker sur l'instance Container App créée.
-3.  **Configuration** : Identité Managée de l'App avec droits `Cognitive Services User`, `Service Bus Data Receiver/Sender`, `Storage Blob Data Contributor`, `Cosmos DB Data Contributor`.
+3.  **Configuration** : Identité Managée (`email-poc-id`) de l'App avec droits :
+    - `Cognitive Services User` (AI Foundry)
+    - `Azure Service Bus Data Sender` + `Azure Service Bus Data Receiver` (Service Bus)
+    - `Storage Blob Data Contributor` + `Storage Blob Data Reader` (Storage)
+    - `Cosmos DB Built-in Data Contributor` (Cosmos DB, database scope)
+    - `AcrPull` (Container Registry)
 
 ### CI/CD GitHub Actions (uv + Azure Container Apps)
 

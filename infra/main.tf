@@ -531,6 +531,10 @@ resource "azurerm_container_app" "api" {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         value = azurerm_application_insights.appi.connection_string
       }
+      env {
+        name  = "LOG_ANALYTICS_WORKSPACE_ID"
+        value = azurerm_log_analytics_workspace.log.workspace_id
+      }
 
       # UI Features (optional overrides)
       env {
@@ -696,19 +700,9 @@ resource "azurerm_container_app" "worker" {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         value = azurerm_application_insights.appi.connection_string
       }
-
-      # UI Features (shared config for consistency)
       env {
-        name  = "UI_SHOW_INFO_MODAL"
-        value = "true"
-      }
-      env {
-        name  = "UI_SHOW_DEVELOPER_TAB"
-        value = "true"
-      }
-      env {
-        name  = "MAX_UPLOAD_SIZE"
-        value = "10"
+        name  = "LOG_ANALYTICS_WORKSPACE_ID"
+        value = azurerm_log_analytics_workspace.log.workspace_id
       }
     }
 

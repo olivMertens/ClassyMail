@@ -88,6 +88,7 @@ Some AzureRM provider versions don't auto-detect subscription from Azure CLI. Th
 
 | Variable | Description | Example |
 |----------|-------------|---------|
+| `AZURE_CLIENT_ID` | Managed Identity Client ID | `3ae24af5-97c6-437f-a4d2-521fbd5524d4` |
 | `AZURE_SERVICE_BUS_FQDN` | Service Bus Hostname | `email-poc-sbus.servicebus.windows.net` |
 | `AZURE_SERVICE_BUS_QUEUE` | Queue Name | `pdf-processing-queue` |
 | `AZURE_STORAGE_ACCOUNT_URL` | Blob Storage Endpoint | `https://emailpocst.blob.core.windows.net` |
@@ -96,17 +97,23 @@ Some AzureRM provider versions don't auto-detect subscription from Azure CLI. Th
 | `AZURE_COSMOS_DB` | Database Name | `emailsdb` |
 | `AZURE_COSMOS_CONTAINER` | Container Name | `emails` |
 | `AZURE_AI_ENDPOINT` | Azure AI Foundry Endpoint | `https://email-poc-aifoundry.cognitiveservices.azure.com/` |
-| `AZURE_CLIENT_ID` | Managed Identity Client ID | `3ae24af5-97c6-437f...` |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | App Insights telemetry | `InstrumentationKey=...;IngestionEndpoint=...` |
+| `LOG_ANALYTICS_WORKSPACE_ID` | Log Analytics Workspace ID | `9f225d73-351d-471e-9371-c15d265e9bd4` |
+| `OTEL_SERVICE_NAME` | OpenTelemetry service name | `classificationg2s-api` |
 | `ENABLE_WORKER` | Enable background processing? | `false` (API only) |
 | `ORGANIZATION_NAME` | UI branding/destination name | `G2S`, `Groupama`, or `ClassiMail` (default) |
 | `UI_SHOW_INFO_MODAL` | Show info modal button | `true` (default) |
 | `UI_SHOW_DEVELOPER_TAB` | Show developer tab | `true` (default) |
+| `MAX_UPLOAD_SIZE` | Max upload size (MB) | `10` (default) |
+
+**⚠️ Security Note:** Do NOT set `AZURE_AI_KEY` in production. Use Managed Identity authentication (`DefaultAzureCredential`) with the `Cognitive Services User` role.
 
 #### Worker Service (`-worker`)
 
 | Variable | Description | Example |
 |----------|-------------|---------|
 | **`ENABLE_WORKER`** | **MANDATORY** | `true` |
+| `AZURE_CLIENT_ID` | Managed Identity Client ID | `3ae24af5-97c6-437f-a4d2-521fbd5524d4` |
 | `AZURE_SERVICE_BUS_FQDN` | Service Bus Hostname | `email-poc-sbus.servicebus.windows.net` |
 | `AZURE_SERVICE_BUS_QUEUE` | Queue Name | `pdf-processing-queue` |
 | `AZURE_STORAGE_ACCOUNT_URL` | Blob Storage Endpoint | `https://emailpocst.blob.core.windows.net` |
@@ -115,9 +122,17 @@ Some AzureRM provider versions don't auto-detect subscription from Azure CLI. Th
 | `AZURE_COSMOS_DB` | Database Name | `emailsdb` |
 | `AZURE_COSMOS_CONTAINER` | Container Name | `emails` |
 | `AZURE_AI_ENDPOINT` | Azure AI Foundry Endpoint | `https://email-poc-aifoundry.cognitiveservices.azure.com/` |
-| `PHI_DEPLOYMENT` | Model Deployment Name | `phi-4` |
+| `PHI_DEPLOYMENT` | Classification Model Deployment Name | `Phi-4` |
 | `MISTRAL_DEPLOYMENT` | OCR Model Deployment | `mistral-document-ai-2505` |
-| `AZURE_CLIENT_ID` | Managed Identity Client ID | `3ae24af5-97c6-437f...` |
+| `MISTRAL_MODE` | Mistral API mode | `maas` |
+| `EMBEDDING_DEPLOYMENT` | Embeddings Model Deployment | `text-embedding-3-small` |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | App Insights telemetry | `InstrumentationKey=...;IngestionEndpoint=...` |
+| `LOG_ANALYTICS_WORKSPACE_ID` | Log Analytics Workspace ID | `9f225d73-351d-471e-9371-c15d265e9bd4` |
+| `OTEL_SERVICE_NAME` | OpenTelemetry service name | `classificationg2s-worker` |
+
+**⚠️ Security Note:** Do NOT set `AZURE_AI_KEY` in production. Use Managed Identity authentication (`DefaultAzureCredential`) with the `Cognitive Services User` role.
+
+**💡 Worker Configuration:** The Worker container does NOT need UI configuration variables (`UI_SHOW_INFO_MODAL`, `UI_SHOW_DEVELOPER_TAB`, `MAX_UPLOAD_SIZE`, `ORGANIZATION_NAME`) since it doesn't serve the web interface.
 
 > **Note:** Keep `MISTRAL_DEPLOYMENT` consistent across Terraform, config defaults, and AI Foundry deployment (`mistral-document-ai-2505`).
 
@@ -205,17 +220,28 @@ resource "azurerm_servicebus_namespace" "sb" {
 
 ## RBAC & Managed Identity
 
-### Role Assignment Matrix
+### Deployed Configuration (email-poc-rg)
 
-The Container Apps use a **User-Assigned Managed Identity** requiring the following roles:
+**Managed Identity Details:**
+- **Name**: `email-poc-id`
+- **Client ID**: `3ae24af5-97c6-437f-a4d2-521fbd5524d4`
+- **Principal ID**: `fdf02fa5-2cd5-42f9-9b78-5cb7905d94d0`
+- **Resource Group**: `email-poc-rg`
+- **Location**: `swedencentral`
 
-| Azure Resource | Role Name | Role Definition ID | Scope |
-|----------------|-----------|-------------------|-------|
-| **Blob Storage** | Storage Blob Data Contributor | `ba92f5b4-2d11-453d-a403-e96b0029c9fe` | Storage Account |
-| **Service Bus** | Azure Service Bus Data Sender | `69a216fc-b8fb-44d8-bc22-1f3c2cd27a39` | Service Bus Namespace |
-| **Service Bus** | Azure Service Bus Data Receiver | `4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0` | Service Bus Namespace |
-| **Cosmos DB** | Cosmos DB Built-in Data Contributor | `00000000-0000-0000-0000-000000000002` | Cosmos DB Account |
-| **AI Foundry** | Cognitive Services OpenAI User | `5e0bd9bd-7b93-4f28-af87-19fc36ad61bd` | AI Services Account |
+### Role Assignment Matrix (Verified)
+
+The Container Apps use a **User-Assigned Managed Identity** with the following role assignments verified in Azure:
+
+| Azure Resource | Role Name | Role Definition ID | Scope | Status |
+|----------------|-----------|-------------------|-------|--------|
+| **Blob Storage** | Storage Blob Data Contributor | `ba92f5b4-2d11-453d-a403-e96b0029c9fe` | Storage Account (`emailpocst`) | ✅ Verified |
+| **Blob Storage** | Storage Blob Data Reader | `2a2b9908-6ea1-4ae2-8e65-a410df84e7d1` | Storage Account (`emailpocst`) | ✅ Verified |
+| **Service Bus** | Azure Service Bus Data Sender | `69a216fc-b8fb-44d8-bc22-1f3c2cd27a39` | Service Bus Namespace (`email-poc-sbus`) | ✅ Verified |
+| **Service Bus** | Azure Service Bus Data Receiver | `4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0` | Service Bus Namespace (`email-poc-sbus`) | ✅ Verified |
+| **Cosmos DB** | Cosmos DB Built-in Data Contributor | `00000000-0000-0000-0000-000000000002` | Database Scope (`/dbs/emailsdb`) | ✅ Verified |
+| **AI Foundry** | Cognitive Services User | `a97b65f3-24c7-4388-baec-2e87135dc908` | AI Services Account (`email-poc-aifoundry`) | ✅ Verified |
+| **Container Registry** | AcrPull | `7f951dda-4ed3-4680-a7ca-43fe172d538d` | ACR (`emailpocacrxr0bjv`) | ✅ Verified |
 
 ### Terraform Configuration
 
@@ -253,14 +279,34 @@ resource "azurerm_cosmosdb_sql_role_assignment" "cosmos_contributor" {
 # AI Foundry User
 resource "azurerm_role_assignment" "ai_user" {
   scope                = azurerm_cognitive_account.ai.id
-  role_definition_name = "Cognitive Services OpenAI User"
+  role_definition_name = "Cognitive Services User"
   principal_id         = azurerm_user_assigned_identity.aca_identity.principal_id
 }
 ```
 
-### Cosmos DB RBAC (Data-Plane)
+### Cosmos DB RBAC (Data-Plane) - Database Scope Assignment
 
-This project uses **Cosmos SQL data-plane RBAC** (`azurerm_cosmosdb_sql_role_assignment`). On some tenants, assigning the built-in role at the collection scope is insufficient for metadata operations (`Forbidden` on `readMetadata`). We assign **Cosmos DB Built-in Data Contributor** at the **database scope** (`/dbs/<db>`).
+This project uses ** Cosmos SQL data-plane RBAC** (`azurerm_cosmosdb_sql_role_assignment`).
+
+**Important:** The Cosmos DB role assignment is configured at the **database scope** (`/dbs/emailsdb`), not at the account level. This is intentional to:
+- Follow principle of least privilege
+- Avoid granting excessive permissions to other databases in the same account
+- Ensure metadata operations (`readMetadata`) work correctly
+
+**Deployed Configuration:**
+```plaintext
+Principal ID: fdf02fa5-2cd5-42f9-9b78-5cb7905d94d0
+Role: Cosmos DB Built-in Data Contributor (00000000-0000-0000-0000-000000000002)
+Scope: /subscriptions/ec8bd34d-34d2-4b35-a587-2904775884b1/resourceGroups/email-poc-rg/providers/Microsoft.DocumentDB/databaseAccounts/email-poc-cosmos/dbs/emailsdb
+```
+
+**Verification Command:**
+```bash
+az cosmosdb sql role assignment list \
+  --account-name email-poc-cosmos \
+  --resource-group email-poc-rg \
+  --query "[?principalId=='fdf02fa5-2cd5-42f9-9b78-5cb7905d94d0']"
+```
 
 ### Policy-Compatible Defaults
 

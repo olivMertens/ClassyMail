@@ -57,6 +57,7 @@ Create `secrets.env` in the project root (NOT committed):
 
 ```dotenv
 # Azure Services (Terraform outputs)
+AZURE_CLIENT_ID=3ae24af5-97c6-437f-a4d2-521fbd5524d4  # Managed Identity Client ID
 AZURE_SERVICE_BUS_FQDN=<namespace>.servicebus.windows.net
 AZURE_SERVICE_BUS_QUEUE=pdf-processing-queue
 AZURE_STORAGE_ACCOUNT_URL=https://<storage>.blob.core.windows.net/
@@ -69,18 +70,30 @@ AZURE_COSMOS_CONTAINER=emails
 AZURE_AI_ENDPOINT=https://<aifoundry>.cognitiveservices.azure.com/
 MISTRAL_ENDPOINT=${AZURE_AI_ENDPOINT}
 MISTRAL_DEPLOYMENT=mistral-document-ai-2505
+MISTRAL_MODE=maas
 PHI_ENDPOINT=${AZURE_AI_ENDPOINT}
-PHI_DEPLOYMENT=phi-4
+PHI_DEPLOYMENT=Phi-4
 PHI_FALLBACK_DEPLOYMENT=gpt-4o-mini
+EMBEDDING_DEPLOYMENT=text-embedding-3-small
+CHAT_DEPLOYMENT=gpt-5.2-chat
+
+# Observability (Azure)
+APPLICATIONINSIGHTS_CONNECTION_STRING=InstrumentationKey=...;IngestionEndpoint=https://...
+LOG_ANALYTICS_WORKSPACE_ID=9f225d73-351d-471e-9371-c15d265e9bd4
+OTEL_SERVICE_NAME=classificationg2s-api
 
 # UI Configuration (Optional)
 UI_SHOW_INFO_MODAL=true
 UI_SHOW_DEVELOPER_TAB=true
 ORGANIZATION_NAME=G2S  # or Groupama, ClassiMail (default)
+MAX_UPLOAD_SIZE=10  # MB
 
 # Optional: Anonymization
 ANONYMIZER_DEPLOYMENT=gpt-4o
 ANONYMIZER_MAX_TOKENS=6000
+
+# Security Note: Do NOT set AZURE_AI_KEY or AZURE_COSMOS_KEY in production
+# Use DefaultAzureCredential with Managed Identity for authentication
 ```
 
 ### 2. Load Environment Variables
