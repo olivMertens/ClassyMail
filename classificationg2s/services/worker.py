@@ -9,6 +9,7 @@ import inspect
 
 from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ResourceNotFoundError
 from azure.servicebus.aio import AutoLockRenewer
+from classificationg2s.core import config
 from classificationg2s.services.azure_clients import Clients
 from classificationg2s.services.pipeline import run_classification_pipeline
 from classificationg2s.services.repository import save_to_cosmos
@@ -91,7 +92,7 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
                 if not models:
                     m = payload.get("model")
                     if m == "both":
-                        models = ["phi-4", "gpt-4o-mini"]
+                        models = [config.PHI_DEPLOYMENT, config.PHI_FALLBACK_DEPLOYMENT]
                     elif m:
                         models = [m]
 

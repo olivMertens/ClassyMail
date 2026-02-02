@@ -7,6 +7,7 @@ from classificationg2s.models import EmailRecord, ClassificationResult
 from classificationg2s.services.azure_clients import download_blob_as_base64, blob_id_from_url, Clients
 from classificationg2s.services.llm_pipeline import ocr_with_mistral, classify_with_phi4, process_agent_response, generate_embedding, extract_business_entities, classify_comparison
 from classificationg2s.services.costing import compute_cost_llm, compute_cost_mistral
+from classificationg2s.core import config
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ async def run_reclassification_pipeline(
     Reads existing markdown from Cosmos, runs comparison, updates record.
     """
     if models is None:
-        models = ["phi-4", "gpt-4o-mini"]
+        models = [config.PHI_DEPLOYMENT, config.PHI_FALLBACK_DEPLOYMENT]
 
     logger.info(f"[pipeline] -> Starting reclassification for item: {item_id} with models={models}")
 

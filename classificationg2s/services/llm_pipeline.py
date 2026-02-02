@@ -32,11 +32,11 @@ async def extract_business_entities(
 ) -> dict:
     """
     Extracts structured business entities (people, orgs, dates, amounts, etc.) from text.
-    Uses the configured Phi-4 (or fallback) model.
+    Uses the configured primary (or fallback) model.
     Returns a dict that conforms to BusinessEntities schema (but as dict via json_object mode).
     """
 
-    # Defaults to Phi-4 config if not specified
+    # Defaults to primary config if not specified
     deployment = config_deployment or config.PHI_DEPLOYMENT
     endpoint = config_endpoint or config.PHI_ENDPOINT or config.AI_ENDPOINT
 
@@ -587,11 +587,11 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10), retry=retry_if_exception(retryable_httpx))
 async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False, strategy: str = "standard", clients: Clients | None = None) -> dict:
     """
-    Classify email with Phi-4 (or fallback to gpt-4o-mini if token budget exceeded).
+    Classify email with Primary LLM (or fallback to secondary if token budget exceeded).
 
     Args:
         text_markdown: Email content in markdown format
-        force_fallback: Force use of fallback model (gpt-4o-mini)
+        force_fallback: Force use of fallback model
         strategy: "standard", "reasoning", or "vision" - affects system prompt
         clients: Optional pre-configured clients (for testing/DI)
 
@@ -650,6 +650,14 @@ def resolve_model_config(model_key: str) -> tuple[str, str]:
     Resolves a model key/name to an (endpoint, deployment) tuple.
     """
     k = model_key.lower().strip()
+
+    # Direct match with configured deployments (preferred)
+    if config.PHI_DEPLOYMENT and k == config.PHI_DEPLOYMENT.lower():
+         return config.PHI_ENDPOINT, config.PHI_DEPLOYMENT
+    if config.PHI_FALLBACK_DEPLOYMENT and k == config.PHI_FALLBACK_DEPLOYMENT.lower():
+         return config.PHI_FALLBACK_ENDPOINT, config.PHI_FALLBACK_DEPLOYMENT
+
+    # Aliases
     if k in ("phi-4", "phi4", "standard", "primary"):
         return config.PHI_ENDPOINT, config.PHI_DEPLOYMENT
     if k in ("gpt-4o-mini", "gpt4o-mini", "gpt4o_mini", "fallback", "audit"):
