@@ -1300,6 +1300,58 @@ onMounted(() => {
           </p>
         </div>
 
+        <!-- Connectivity Tests -->
+        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+          <h4 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+            <CommandLineIcon class="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            Diagnostics & Connectivity
+          </h4>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Run on-demand tests to verify connections to Azure Services and LLMs.
+          </p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600"
+              :disabled="connTestLoading"
+              @click="runConnectivityTest"
+            >
+              <ArrowPathIcon
+                v-if="connTestLoading"
+                class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
+                aria-hidden="true"
+              />
+              Test Service Connectivity
+            </button>
+            <button
+              type="button"
+              class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600"
+              :disabled="llmTestLoading"
+              @click="runLLMTests"
+            >
+              <ArrowPathIcon
+                v-if="llmTestLoading"
+                class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
+                aria-hidden="true"
+              />
+              Test LLM Models
+            </button>
+          </div>
+
+          <div
+            v-if="connTestResults"
+            class="mt-4 p-3 bg-gray-50 dark:bg-gray-900 rounded text-xs font-mono overflow-auto max-h-40"
+          >
+            <pre>{{ JSON.stringify(connTestResults, null, 2) }}</pre>
+          </div>
+          <div
+            v-if="llmTestResults"
+            class="mt-4 p-3 bg-gray-50 dark:bg-gray-900 rounded text-xs font-mono overflow-auto max-h-40"
+          >
+            <pre>{{ JSON.stringify(llmTestResults, null, 2) }}</pre>
+          </div>
+        </div>
+
         <!-- Reset Section -->
         <div class="mt-8 border-t border-red-200 dark:border-red-900 pt-6">
           <h3 class="text-sm font-semibold leading-6 text-red-600 dark:text-red-400 flex items-center gap-2">

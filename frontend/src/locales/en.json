@@ -133,6 +133,17 @@
             "infra": "Infra (queue/storage)"
         },
         "disclaimer": "*Indicative rates, dependent on region and actual usage.",
+        "features": {
+            "title": "Features",
+            "model_phi4": "Phi-4 (SLM)",
+            "model_desc": "Cost-effective, high-speed classification.",
+            "serverless": "Serverless",
+            "serverless_desc": "Azure Container Apps & Cosmos DB (Scale to Zero).",
+            "privacy": "Privacy First",
+            "privacy_desc": "PII Anonymization for fine-tuning exports.",
+            "adversarial": "Adversarial",
+            "adversarial_desc": "Multi-model comparison."
+        },
         "close": "Close"
     },
     "guide": {
