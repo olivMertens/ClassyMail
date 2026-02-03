@@ -591,7 +591,8 @@ const renderMarkdown = (text) => md.render(text || '')
                         v-for="i in email.classification.detected_intents.filter(i => i.justification)"
                         :key="i.intent"
                       >
-                        <strong>{{ i.intent }} ({{ Math.round((i.confidence || 0) * 100) }}%) :</strong> {{ i.justification
+                        <strong>{{ i.intent }} ({{ Math.round((i.confidence || 0) * 100) }}%) :</strong> {{
+                          i.justification
                         }}
                       </li>
                     </ul>
@@ -669,9 +670,7 @@ const renderMarkdown = (text) => md.render(text || '')
                       class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
                     >
                       <!-- Comparison Header -->
-                      <div
-                        class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
-                      >
+                      <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                         <div class="flex justify-between items-center">
                           <div class="flex items-center gap-3">
                             <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">
@@ -694,7 +693,8 @@ const renderMarkdown = (text) => md.render(text || '')
                             </span>
                           </div>
                           <div class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ comparison.meta?.executed_at ? new Date(comparison.meta.executed_at).toLocaleString() : 'Unknown' }}
+                            {{ comparison.meta?.executed_at ? new Date(comparison.meta.executed_at).toLocaleString() :
+                              'Unknown' }}
                           </div>
                         </div>
                         <!-- Models badges -->

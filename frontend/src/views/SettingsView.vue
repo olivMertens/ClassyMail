@@ -616,7 +616,8 @@ onMounted(() => {
               </select>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              ⚠️ <strong>Requirement:</strong> Selected models must be deployed in the <strong>same</strong> Microsoft Foundry project for direct comparison.
+              ⚠️ <strong>Requirement:</strong> Selected models must be deployed in the <strong>same</strong> Microsoft
+              Foundry project for direct comparison.
             </p>
           </div>
 
@@ -639,45 +640,53 @@ onMounted(() => {
                     <span
                       v-if="settings.ai_model === 'gpt4o'"
                       class="text-green-600 dark:text-green-400"
-                    >✓ Selected</span>
+                    >✓
+                      Selected</span>
                   </div>
                   <div class="flex items-center justify-between">
                     <span><strong>gpt-5-mini:</strong> Quality 0.89 ⭐, Cost ~$70/10K emails</span>
                     <span
                       v-if="settings.ai_model === 'gpt5-mini'"
                       class="text-green-600 dark:text-green-400"
-                    >✓ Selected</span>
+                    >✓
+                      Selected</span>
                   </div>
                   <div class="flex items-center justify-between">
                     <span><strong>Phi-4 (base):</strong> Quality 0.82, Cost ~$12/10K emails</span>
                     <span
                       v-if="settings.ai_model === 'phi4'"
                       class="text-green-600 dark:text-green-400"
-                    >✓ Selected</span>
+                    >✓
+                      Selected</span>
                   </div>
                   <div class="flex items-center justify-between">
                     <span><strong>Phi-4 (fine-tuned):</strong> Quality ~0.85, Cost ~$15/10K emails</span>
                     <span
                       v-if="settings.ai_model === 'phi4-finetuned'"
                       class="text-green-600 dark:text-green-400"
-                    >✓ Selected</span>
+                    >✓
+                      Selected</span>
                   </div>
                   <div class="flex items-center justify-between">
                     <span><strong>gpt-4o-mini:</strong> Quality 0.84, Cost ~$22/10K emails</span>
                     <span
                       v-if="settings.ai_model === 'gpt4o-mini'"
                       class="text-green-600 dark:text-green-400"
-                    >✓ Selected</span>
+                    >✓
+                      Selected</span>
                   </div>
                   <div class="flex items-center justify-between">
                     <span><strong>gpt-4.1-nano:</strong> Quality 0.69, Cost ~$17/10K emails</span>
                     <span
                       v-if="settings.ai_model === 'gpt4.1-nano'"
                       class="text-green-600 dark:text-green-400"
-                    >✓ Selected</span>
+                    >✓
+                      Selected</span>
                   </div>
                   <p class="mt-2 text-xs italic border-t border-blue-200 dark:border-blue-700 pt-2">
-                    💡 <strong>Strategy:</strong> Use <strong>gpt-4o</strong> for highest quality, <strong>gpt-4o-mini</strong> for balanced quality/cost, or <strong>Phi-4</strong> (base or fine-tuned) for cost-efficiency at high volume (>5K/month).
+                    💡 <strong>Strategy:</strong> Use <strong>gpt-4o</strong> for highest quality,
+                    <strong>gpt-4o-mini</strong> for balanced quality/cost, or <strong>Phi-4</strong> (base or
+                    fine-tuned) for cost-efficiency at high volume (>5K/month).
                     See <a
                       href="https://github.com/olivMertens/classimail-agent/blob/main/docs/MODELS.md#cost-benefit-analysis-fine-tuned-vs-pre-trained-models"
                       target="_blank"
@@ -1544,16 +1553,27 @@ onMounted(() => {
                   Vision (Visual Analysis)
                 </h4>
                 <p class="text-gray-500 dark:text-gray-400 mt-1">
-                  Integrates visual context (photos, diagrams, signatures) into the decision process using Mistral's advanced BBox capabilities.<br>
+                  Integrates visual context (photos, diagrams, signatures) into the decision process using Mistral's
+                  advanced BBox capabilities.<br>
                   <strong>Mechanism (3-Layer Analysis):</strong>
                 </p>
                 <div
                   class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs"
                 >
                   <ul class="list-disc list-inside space-y-1">
-                    <li><span class="text-green-600 dark:text-green-400 font-bold">1. Text:</span> Standard Markdown extraction.</li>
-                    <li><span class="text-green-600 dark:text-green-400 font-bold">2. BBox Layout:</span> Spatial normalization of elements (bounding boxes) to understand document structure.</li>
-                    <li><span class="text-green-600 dark:text-green-400 font-bold">3. Visual Enrichment:</span> Generates descriptive "Alt-Text" for images/charts using the Vision model, allowing the LLM to "read" non-text elements.</li>
+                    <li>
+                      <span class="text-green-600 dark:text-green-400 font-bold">1. Text:</span> Standard Markdown
+                      extraction.
+                    </li>
+                    <li>
+                      <span class="text-green-600 dark:text-green-400 font-bold">2. BBox Layout:</span> Spatial
+                      normalization of elements (bounding boxes) to understand document structure.
+                    </li>
+                    <li>
+                      <span class="text-green-600 dark:text-green-400 font-bold">3. Visual Enrichment:</span>
+                      Generates descriptive "Alt-Text" for images/charts using the Vision model, allowing the LLM to
+                      "read" non-text elements.
+                    </li>
                   </ul>
                 </div>
               </div>
@@ -1564,13 +1584,19 @@ onMounted(() => {
                   "Broad Net" Entity Extraction
                 </h4>
                 <p class="text-gray-500 dark:text-gray-400 mt-1">
-                  Applied automatically before Classification. We cast a "Broad Net" to extract structured facts (Names, Dates, Amounts, IDs) first.
+                  Applied automatically before Classification. We cast a "Broad Net" to extract structured facts (Names,
+                  Dates, Amounts, IDs) first.
                 </p>
                 <div
                   class="mt-2 bg-gray-50 dark:bg-gray-900 p-3 rounded text-gray-800 dark:text-gray-300 font-mono text-xs"
                 >
-                  <span class="text-amber-600 dark:text-amber-400 font-bold">Why?</span> Small Language Models (SLMs) like Phi-4 perform better when facts are pre-extracted.<br>
-                  <span class="text-amber-600 dark:text-amber-400 font-bold">How it aids capability:</span> By presenting the model with <em class="text-gray-600 dark:text-gray-400">"Here are the facts involved"</em> alongside the <em class="text-gray-600 dark:text-gray-400">"Category Descriptions"</em>, we ensure the best possible understanding foundation. The model focuses on <strong>matching intent</strong> rather than searching for data.
+                  <span class="text-amber-600 dark:text-amber-400 font-bold">Why?</span> Small Language Models (SLMs)
+                  like Phi-4 perform better when facts are pre-extracted.<br>
+                  <span class="text-amber-600 dark:text-amber-400 font-bold">How it aids capability:</span> By
+                  presenting the model with <em class="text-gray-600 dark:text-gray-400">"Here are the facts
+                    involved"</em> alongside the <em class="text-gray-600 dark:text-gray-400">"Category
+                    Descriptions"</em>, we ensure the best possible understanding foundation. The model focuses on
+                  <strong>matching intent</strong> rather than searching for data.
                 </div>
               </div>
             </div>

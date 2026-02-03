@@ -206,6 +206,132 @@ async def get_stats(clients: Clients = Depends(get_clients)):
     }
 
 
+@router.get("/emails/export")
+async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
+    import csv
+    import io
+
+    # Count total emails first for filename
+    count_query = "SELECT VALUE COUNT(1) FROM c"
+    count_result = cosmos_container.query_items(count_query)
+    total_emails = 0
+    async for count in count_result:
+        total_emails = count
+        break
+
+    # Generate dynamic filename with timestamp and count
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"classimail_export_{timestamp}_{total_emails}emails.csv"
+
+    async def row_iter():
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(
+            [
+                "id",
+                "text_ocr",
+                "category_detected",
+                "processing_time",
+                "precision",
+                "model_name",
+                "explanation"
+            ]
+        )
+        yield buffer.getvalue()
+        buffer.seek(0)
+        buffer.truncate(0)
+
+        query = "SELECT * FROM c ORDER BY c._ts DESC"
+        it = cosmos_container.query_items(query)
+        async for item in it:
+            # ID cleaning: filename without pdf
+            file_url = item.get("file_url", "")
+            clean_id = file_url.split("/")[-1].replace(".pdf", "") if file_url else item.get("id")
+
+            # Classification info
+            classification = item.get("classification") or {}
+            intents = classification.get("detected_intents") or []
+            if intents:
+                top_intent = intents[0].get("intent")
+                confidence = intents[0].get("confidence")
+                explanation = intents[0].get("justification")
+            else:
+                top_intent = "Unknown"
+                confidence = 0.0
+                explanation = classification.get("classification_reason", "")
+
+            # Processing Time
+            proc_time_ms = item.get("processing_time_ms")
+            proc_time_str = f"{proc_time_ms / 1000:.2f}s" if proc_time_ms else "N/A"
+
+            # Model Used (default to phi4 if not recorded)
+            model = item.get("reclassified_with_model") or "phi4"
+
+            writer.writerow(
+                [
+                    clean_id,
+                    item.get("markdown", ""),
+                    top_intent,
+                    proc_time_str,
+                    confidence,
+                    model,
+                    explanation
+                ]
+            )
+            yield buffer.getvalue()
+            buffer.seek(0)
+            buffer.truncate(0)
+
+    return StreamingResponse(
+        row_iter(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/emails/export-finetune-jsonl")
+async def export_emails_finetune_jsonl(
+    anonymize: bool = Query(True),
+    include_unreviewed: bool = Query(False),
+    max_examples: Optional[int] = Query(None, ge=1),
+    taxonomy_version: str = Query("v1"),
+    include_metadata: bool = Query(False),
+    min_required: Optional[int] = Query(None, ge=1),
+    split: str = Query("all", pattern="^(all|train|test)$"),
+    test_split_ratio: float = Query(0.2, ge=0.0, le=1.0),
+    clients: Clients = Depends(get_clients),
+):
+    settings = load_settings()
+    finetune_min_required = min_required or settings.get("finetune_min_examples", 50)
+
+    finetune_reviewed_ready = await count_reviewed_ready_items(clients=clients)
+    if not include_unreviewed and finetune_reviewed_ready < finetune_min_required:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Not enough reviewed examples to export fine-tuning dataset.",
+                "reviewed_ready": finetune_reviewed_ready,
+                "min_required": finetune_min_required,
+            },
+        )
+
+    filename = f"fine_tune_{split}_{taxonomy_version}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
+    return StreamingResponse(
+        export_finetune_jsonl_iter(
+            clients=clients,
+            anonymize=anonymize,
+            include_unreviewed=include_unreviewed,
+            max_examples=max_examples,
+            taxonomy_version=taxonomy_version,
+            include_metadata=include_metadata,
+            split_mode=split,
+            test_ratio=test_split_ratio
+        ),
+        media_type="application/jsonl",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 @router.get("/emails/{item_id}", response_model=EmailRecord)
 async def get_email(item_id: str, cosmos_container=Depends(get_cosmos_container), clients: Clients = Depends(get_clients)):
 
@@ -441,90 +567,6 @@ async def reclassify_email(
         raise HTTPException(status_code=400, detail=str(ex))
 
 
-
-@router.get("/emails/export")
-async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
-    import csv
-    import io
-
-    # Count total emails first for filename
-    count_query = "SELECT VALUE COUNT(1) FROM c"
-    count_result = cosmos_container.query_items(count_query)
-    total_emails = 0
-    async for count in count_result:
-        total_emails = count
-        break
-
-    # Generate dynamic filename with timestamp and count
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
-    filename = f"classimail_export_{timestamp}_{total_emails}emails.csv"
-
-    async def row_iter():
-        buffer = io.StringIO()
-        writer = csv.writer(buffer)
-        writer.writerow(
-            [
-                "id",
-                "text_ocr",
-                "category_detected",
-                "processing_time",
-                "precision",
-                "model_name",
-                "explanation"
-            ]
-        )
-        yield buffer.getvalue()
-        buffer.seek(0)
-        buffer.truncate(0)
-
-        query = "SELECT * FROM c ORDER BY c._ts DESC"
-        it = cosmos_container.query_items(query)
-        async for item in it:
-            # ID cleaning: filename without pdf
-            file_url = item.get("file_url", "")
-            clean_id = file_url.split("/")[-1].replace(".pdf", "") if file_url else item.get("id")
-
-            # Classification info
-            classification = item.get("classification") or {}
-            intents = classification.get("detected_intents") or []
-            if intents:
-                top_intent = intents[0].get("intent")
-                confidence = intents[0].get("confidence")
-                explanation = intents[0].get("justification")
-            else:
-                top_intent = "Unknown"
-                confidence = 0.0
-                explanation = classification.get("classification_reason", "")
-
-            # Processing Time
-            proc_time_ms = item.get("processing_time_ms")
-            proc_time_str = f"{proc_time_ms / 1000:.2f}s" if proc_time_ms else "N/A"
-
-            # Model Used (default to phi4 if not recorded)
-            model = item.get("reclassified_with_model") or "phi4"
-
-            writer.writerow(
-                [
-                    clean_id,
-                    item.get("markdown", ""),
-                    top_intent,
-                    proc_time_str,
-                    confidence,
-                    model,
-                    explanation
-                ]
-            )
-            yield buffer.getvalue()
-            buffer.seek(0)
-            buffer.truncate(0)
-
-    return StreamingResponse(
-        row_iter(),
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
-
-
 @router.get("/emails/{item_id}/file")
 async def download_email_file(item_id: str, clients: Clients = Depends(get_clients)):
     """Proxy endpoint to stream PDF files using Managed Identity authentication."""
@@ -573,46 +615,3 @@ async def download_email_file(item_id: str, clients: Clients = Depends(get_clien
     except Exception as e:
         logger.exception(f"[PDF Proxy] Unexpected error for item_id={item_id}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/emails/export-finetune-jsonl")
-async def export_emails_finetune_jsonl(
-    anonymize: bool = Query(True),
-    include_unreviewed: bool = Query(False),
-    max_examples: Optional[int] = Query(None, ge=1),
-    taxonomy_version: str = Query("v1"),
-    include_metadata: bool = Query(False),
-    min_required: Optional[int] = Query(None, ge=1),
-    split: str = Query("all", pattern="^(all|train|test)$"),
-    test_split_ratio: float = Query(0.2, ge=0.0, le=1.0),
-    clients: Clients = Depends(get_clients),
-):
-    settings = load_settings()
-    finetune_min_required = min_required or settings.get("finetune_min_examples", 50)
-
-    finetune_reviewed_ready = await count_reviewed_ready_items(clients=clients)
-    if not include_unreviewed and finetune_reviewed_ready < finetune_min_required:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "message": "Not enough reviewed examples to export fine-tuning dataset.",
-                "reviewed_ready": finetune_reviewed_ready,
-                "min_required": finetune_min_required,
-            },
-        )
-
-    filename = f"fine_tune_{split}_{taxonomy_version}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
-    return StreamingResponse(
-        export_finetune_jsonl_iter(
-            clients=clients,
-            anonymize=anonymize,
-            include_unreviewed=include_unreviewed,
-            max_examples=max_examples,
-            taxonomy_version=taxonomy_version,
-            include_metadata=include_metadata,
-            split_mode=split,
-            test_ratio=test_split_ratio
-        ),
-        media_type="application/jsonl",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )

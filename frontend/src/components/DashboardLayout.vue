@@ -122,7 +122,9 @@ const navigation = computed(() => {
     <!-- Desktop sidebar -->
     <div class="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col shadow-lg z-30">
       <div class="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
-        <div class="flex items-center h-16 flex-shrink-0 px-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div
+          class="flex items-center h-16 flex-shrink-0 px-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
+        >
           <span class="text-2xl mr-2">📧</span>
           <span class="text-xl font-bold text-gray-900 dark:text-white">{{ organizationName }}</span>
         </div>
@@ -165,7 +167,9 @@ const navigation = computed(() => {
     <!-- Content Area -->
     <div class="flex flex-col md:pl-64 flex-1 h-screen overflow-hidden">
       <!-- Top bar -->
-      <div class="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white dark:bg-gray-800 shadow dark:shadow-gray-900/20 md:hidden">
+      <div
+        class="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white dark:bg-gray-800 shadow dark:shadow-gray-900/20 md:hidden"
+      >
         <button
           class="px-4 border-r border-gray-200 dark:border-gray-700 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 md:hidden"
           @click="sidebarOpen = true"
@@ -200,7 +204,9 @@ const navigation = computed(() => {
       </div>
 
       <!-- Desktop Top Bar extensions -->
-      <header class="hidden md:flex items-center justify-end h-16 px-8 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 gap-2">
+      <header
+        class="hidden md:flex items-center justify-end h-16 px-8 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 gap-2"
+      >
         <button
           v-if="uiConfig.show_info_modal"
           class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
