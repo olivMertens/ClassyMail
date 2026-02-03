@@ -4,7 +4,8 @@
 **Author:** Olivier Mertens — olmertens@microsoft.com
 **Update:** Février 2026 (POC Refonte UI & Infra)
 
-![Dashboard UI](https://raw.githubusercontent.com/olivMertens/classimail-agent/main/docs/assets/dashboard_preview.png)
+[![Dashboard UI](https://raw.githubusercontent.com/olivMertens/classimail-agent/main/docs/assets/dashboard_preview.png)](https://raw.githubusercontent.com/olivMertens/classimail-agent/main/docs/assets/dashboard_preview.png)
+*Click image to view full size*
 
 ## Pourquoi ce POC ?
 
