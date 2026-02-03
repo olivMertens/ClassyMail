@@ -6,7 +6,7 @@
 **Author:** Olivier Mertens — olmertens@microsoft.com
 **Update:** Février 2026 (POC Refonte UI & Infra)
 
-[![Dashboard UI](https://raw.githubusercontent.com/olivMertens/classimail-agent/main/docs/assets/dashboard_preview.png)](https://raw.githubusercontent.com/olivMertens/classimail-agent/main/docs/assets/dashboard_preview.png)
+[![Dashboard UI](docs/assets/dashboard_preview.png)](docs/assets/dashboard_preview.png)
 *Click image to view full size*
 
 ## Pourquoi ClassyMail ?
@@ -33,13 +33,13 @@ Il sert à valider rapidement :
 Le pipeline applique une **stratégie "Broad Net" (Filet Large)** pour maximiser la précision des Small Language Models (SLM) comme Phi-4 :
 
 1. **Vision à 3 Niveaux (Mistral)** :
-   - **Texte** : OCR Markdown standard.
-   - **Structure** : Normalisation spatiale via Bounding Boxes.
-   - **Enrichissement** : Description générative des images (Alt-Text) pour que le modèle "voie" le contenu non-textuel.
+   - **Texte** : Extraction OCR standard en Markdown.
+   - **Structure** : Normalisation spatiale via Bounding Boxes pour préserver la mise en page.
+   - **Enrichissement** : Génération de descriptions (Alt-Text) pour les images et graphiques, permettant au modèle de "voir" le contenu non textuel.
 
 2. **Extraction d'Entités** :
-   - Avant de classifier, nous rayons large pour extraire les faits (Noms, Dates, Montants).
-   - **Pourquoi ?** Cela déleste le modèle de la recherche d'information. Il reçoit les faits structurés + les définitions de catégories, et peut se concentrer purement sur le **matching d'intention** (le "best possible understanding").
+   - Avant de classifier, le système effectue un **balayage large** pour extraire les données factuelles (Noms, Dates, Montants).
+   - **Pourquoi ?** Cette pré-extraction structure l'information en amont. Le modèle reçoit ainsi des faits clairs associés aux définitions de catégories, lui permettant de se concentrer exclusivement sur la **détection d'intention** (matching) et garantissant une compréhension optimale.
 
 Pour les détails (RBAC, variables, exécution, CI/CD) : voir la section Documentation ci-dessous.
 
