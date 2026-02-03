@@ -1,4 +1,5 @@
 <script setup>
+import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 
@@ -10,6 +11,23 @@ defineProps({
 })
 const emit = defineEmits(['close', 'navigate'])
 const { t } = useI18n()
+const organizationName = ref('ClassiMail')
+
+const fetchOrganizationName = async () => {
+  try {
+    const response = await fetch('/api/settings/organization')
+    if (response.ok) {
+      const data = await response.json()
+      organizationName.value = data.name || 'ClassiMail'
+    }
+  } catch (error) {
+    console.error('Failed to fetch organization name:', error)
+  }
+}
+
+onMounted(() => {
+  fetchOrganizationName()
+})
 </script>
 
 <template>
@@ -28,7 +46,7 @@ const { t } = useI18n()
                 id="modal-title"
                 class="text-xl font-semibold leading-6 text-gray-900 dark:text-white"
               >
-                {{ t('info.title') }}
+                POC - {{ organizationName }} ({{ t('info.date') }})
               </h3>
               <button
                 class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-200"
