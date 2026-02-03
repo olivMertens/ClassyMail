@@ -114,22 +114,6 @@ const getModelStyles = (modelName) => {
   }
 }
 
-const parsedComparisonResults = computed(() => {
-  const comp = latestComparison.value
-  if (!comp) return {}
-
-  // New format: model_results exists and has keys
-  if (comp.model_results && Object.keys(comp.model_results).length > 0) {
-    return comp.model_results
-  }
-
-  // Legacy format fallback
-  const res = {}
-  if (comp.phi4) res['phi-4'] = comp.phi4
-  if (comp.gpt4o_mini) res['gpt-4o-mini'] = comp.gpt4o_mini
-  return res
-})
-
 const loadSettings = async () => {
   try {
     const res = await fetch('/api/settings')
