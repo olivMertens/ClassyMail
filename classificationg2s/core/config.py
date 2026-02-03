@@ -48,7 +48,7 @@ VISION_API_VERSION = os.getenv("VISION_API_VERSION", AI_API_VERSION)
 
 # Chatbot model
 CHAT_ENDPOINT = os.getenv("CHAT_ENDPOINT") or PHI_ENDPOINT
-CHAT_DEPLOYMENT = os.getenv("CHAT_DEPLOYMENT", "gpt-5.2-chat")
+CHAT_DEPLOYMENT = os.getenv("CHAT_DEPLOYMENT", "gpt-4o")
 CHAT_API_VERSION = os.getenv("CHAT_API_VERSION", AI_API_VERSION)
 
 # Data Zone / Data Residency (EU Central, Global, etc)

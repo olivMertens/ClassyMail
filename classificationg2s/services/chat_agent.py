@@ -247,7 +247,8 @@ class ChatAgent:
                 "6. Be concise and professional.\n"
                 "7. When you reference any email by id, include direct links if available (view/api).\n"
                 "8. If asked about throughput or durations, use get_processing_stats_by_day and report per-day count and avg/sum durations in seconds.\n"
-                "9. NEVER output raw JSON in the final response. If you use a tool, do not repeat its arguments in the output."
+                "9. NEVER output raw JSON or internal reasoning in the final response. If you use a tool, do not repeat its arguments or explain your decision process. Just provide the final answer.\n"
+                "10. CRITICAL: Do not expose your internal thinking process (e.g., 'I need to call function', 'Let me try', etc.). Only output the final user-facing response."
             )
             conversation.insert(0, {"role": "system", "content": system_prompt})
 
