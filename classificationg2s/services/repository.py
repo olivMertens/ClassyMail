@@ -143,7 +143,7 @@ async def export_finetune_jsonl_iter(
     if not include_unreviewed:
         where.append("(IS_DEFINED(c.reviewed) AND c.reviewed = true)")
 
-    query = "SELECT c.id, c.markdown, c.classification, c.updated_at FROM c WHERE " + " AND ".join(where)
+    query = "SELECT c.id, c.markdown, c.classification, c.updated_at, c.reviewed, c.correction_reason, c.classification_history FROM c WHERE " + " AND ".join(where)
     it = clients.cosmos_container.query_items(query)
 
     system_prompt = os.getenv(
@@ -207,13 +207,30 @@ async def export_finetune_jsonl_iter(
             ]
         }
         if include_metadata:
+            # Track if this is a human-corrected example (reinforcement learning signal)
+            is_corrected = item.get("reviewed", False) and item.get("classification_history")
+            correction_metadata = None
+
+            if is_corrected:
+                history = item.get("classification_history", [])
+                if history:
+                    # Get the latest correction entry
+                    latest = history[-1]
+                    correction_metadata = {
+                        "was_corrected": True,
+                        "correction_reason": item.get("correction_reason") or latest.get("correction_reason"),
+                        "llm_feedback": latest.get("llm_feedback"),
+                        "correction_timestamp": latest.get("timestamp"),
+                    }
+
             example["metadata"] = {
                 "example_id": item.get("id"),
                 "taxonomy_version": taxonomy_version,
-                "source": "human_review",
+                "source": "human_corrected" if is_corrected else "auto_classified",
                 "updated_at": item.get("updated_at"),
                 "anonymized": bool(anonymize),
                 "anonymization": anonymization_meta,
+                "correction": correction_metadata,
                 "hash": hashlib.sha256((user_markdown + assistant_content).encode("utf-8")).hexdigest(),
             }
 

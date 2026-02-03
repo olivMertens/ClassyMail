@@ -348,17 +348,23 @@ class ChatAgent:
                 # Second turn
                 final_response = await self._call_llm(conversation)
                 if "choices" in final_response and final_response["choices"]:
+                    content = final_response["choices"][0]["message"]["content"]
+                    # Strip reasoning traces from o1/reasoning models
+                    content = self._extract_final_answer(content)
                     return {
                         "role": "assistant",
-                        "content": final_response["choices"][0]["message"]["content"]
+                        "content": content
                     }
                 else:
                     return {"role": "assistant", "content": "I processed the data but received an empty response."}
 
             # Simple message response
+            content = message["content"]
+            # Strip reasoning traces from o1/reasoning models
+            content = self._extract_final_answer(content)
             return {
                 "role": "assistant",
-                "content": message["content"]
+                "content": content
             }
 
         except Exception as e:
@@ -387,6 +393,57 @@ class ChatAgent:
                 logger.error(f"Chat LLM Failed: {ex.response.status_code} - {ex.response.text}")
                 raise
             return resp.json()
+
+    def _extract_final_answer(self, content: str) -> str:
+        """
+        Extract final answer from reasoning models that expose CoT.
+        Reasoning models (o1, o3, gpt-5.x-chat) may prefix responses with thinking traces.
+        Heuristic: Look for common markers like final answer section or clean up verbose reasoning.
+        """
+        if not content:
+            return content
+
+        # Common patterns in reasoning model outputs
+        markers = [
+            "\n\nFinal Answer:",
+            "\n\nAnswer:",
+            "\n\n---\n\n",
+            "\n\nLet me provide the results:",
+        ]
+
+        for marker in markers:
+            if marker in content:
+                parts = content.split(marker, 1)
+                if len(parts) > 1:
+                    return parts[1].strip()
+
+        # If content starts with obvious reasoning traces, try to extract the substantive part
+        lines = content.split("\n")
+        # Filter out lines that look like internal reasoning
+        reasoning_keywords = [
+            "I need to call",
+            "Let's do.",
+            "I'll call",
+            "Let me try",
+            "Actually tools not listed",
+            "I think function name is",
+            "Oops I need function",
+            "This is going nowhere",
+            "Given issue",
+        ]
+
+        filtered_lines = []
+        for line in lines:
+            if not any(keyword.lower() in line.lower() for keyword in reasoning_keywords):
+                filtered_lines.append(line)
+
+        filtered_content = "\n".join(filtered_lines).strip()
+
+        # Only return filtered if it's substantially different and not empty
+        if filtered_content and len(filtered_content) > 10:
+            return filtered_content
+
+        return content
 
 # Global instance
 agent = ChatAgent()
