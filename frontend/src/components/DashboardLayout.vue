@@ -30,7 +30,7 @@ const sidebarOpen = ref(false)
 const showInfoModal = ref(false)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 const uiConfig = ref({ show_info_modal: true, show_developer_tab: true })
-const organizationName = ref('ClassiMail')
+const organizationName = 'ClassyMail'
 
 const fetchUiConfig = async () => {
   try {
@@ -43,21 +43,8 @@ const fetchUiConfig = async () => {
   }
 }
 
-const fetchOrganizationName = async () => {
-  try {
-    const res = await fetch('/api/settings/organization')
-    if (res.ok) {
-      const data = await res.json()
-      organizationName.value = data.name || 'ClassiMail'
-    }
-  } catch (e) {
-    console.error('Failed to fetch organization name', e)
-  }
-}
-
 onMounted(() => {
   fetchUiConfig()
-  fetchOrganizationName()
 })
 
 const toggleDarkMode = () => {
