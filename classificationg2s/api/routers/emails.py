@@ -277,6 +277,11 @@ async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
             else:
                 explanation = ""
 
+            # Ensure header fields are also sanitized against line breaks
+            clean_id = str(clean_id).replace("\n", " ").replace("\r", " ")
+            top_intent = str(top_intent).replace("\n", " ").replace("\r", " ")
+            model = str(model).replace("\n", " ").replace("\r", " ")
+
             writer.writerow(
                 [
                     clean_id,
