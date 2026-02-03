@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 import httpx
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
@@ -248,7 +249,8 @@ class ChatAgent:
                 "7. When you reference any email by id, include direct links if available (view/api).\n"
                 "8. If asked about throughput or durations, use get_processing_stats_by_day and report per-day count and avg/sum durations in seconds.\n"
                 "9. NEVER output raw JSON or internal reasoning in the final response. If you use a tool, do not repeat its arguments or explain your decision process. Just provide the final answer.\n"
-                "10. CRITICAL: Do not expose your internal thinking process (e.g., 'I need to call function', 'Let me try', etc.). Only output the final user-facing response."
+                "10. CRITICAL: Do not expose your internal thinking process. Only output the final user-facing response.\n"
+                "11. NEVER output a raw JSON object as your final answer. If you want to perform a search, you MUST use the provided tools (function calling) instead of writing the JSON parameters in the text."
             )
             conversation.insert(0, {"role": "system", "content": system_prompt})
 
@@ -263,6 +265,27 @@ class ChatAgent:
 
             # Handle tool calls
             tool_calls = message.get("tool_calls")
+            content = message.get("content")
+
+            # HEURISTIC FIX: If model outputs raw JSON tool args as content instead of using tool_calls
+            if not tool_calls and content and content.strip().startswith("{") and "query" in content:
+                try:
+                    _ = json.loads(content.strip())
+                    # It parses as JSON. Assume it's a hallucinated tool call for search_email_by_text (primary search)
+                    # We construct a fake tool_call and inject it into the flow.
+                    logger.warning("Chatbot recovered from hallucinated JSON tool call in content.")
+                    tool_calls = [{
+                        "id": f"call_{uuid.uuid4()}",
+                        "type": "function",
+                        "function": {
+                            "name": "search_email_by_text",
+                            "arguments": content.strip()
+                        }
+                    }]
+                except Exception:
+                    # Not valid JSON or parsing failed, verify if it was reasoning text starting with {
+                    pass
+
             if tool_calls:
                 conversation.append(message)  # Add assistant's request to history
 
