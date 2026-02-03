@@ -1338,6 +1338,41 @@ onMounted(() => {
             </button>
           </div>
 
+          <div class="mt-4 flex items-center gap-4 border-t border-gray-100 dark:border-gray-700 pt-4">
+            <div class="flex items-center">
+              <input
+                id="use-aoai"
+                v-model="useAoaiEnhancement"
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+              >
+              <label
+                for="use-aoai"
+                class="ml-2 block text-xs text-gray-700 dark:text-gray-300"
+              >
+                Enhance with AOAI (Realistic Content)
+              </label>
+            </div>
+            <button
+              type="button"
+              class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-indigo-600 shadow-sm ring-1 ring-inset ring-indigo-300 hover:bg-indigo-50 dark:bg-gray-800 dark:text-indigo-400 dark:ring-indigo-900 dark:hover:bg-indigo-900/20"
+              :disabled="simulatingFlow"
+              @click="performSimulateFlow"
+            >
+              <CpuChipIcon
+                v-if="!simulatingFlow"
+                class="-ml-0.5 mr-1.5 h-5 w-5"
+                aria-hidden="true"
+              />
+              <ArrowPathIcon
+                v-else
+                class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
+                aria-hidden="true"
+              />
+              {{ simulatingFlow ? 'Simulating...' : 'Simulate E2E Flow' }}
+            </button>
+          </div>
+
           <div
             v-if="connTestResults"
             class="mt-4 p-3 bg-gray-50 dark:bg-gray-900 rounded text-xs font-mono overflow-auto max-h-40"
