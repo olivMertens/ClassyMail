@@ -30,6 +30,7 @@ const showStrategyHelp = ref(false)
 const settings = ref({
   processing_strategy: 'standard',
   ai_model: 'phi4', // Default
+  adversarial_model: null,
   phi4_input_per_1k: null,
   phi4_output_per_1k: null,
   mistral_per_1k_pages: null,
@@ -179,6 +180,7 @@ const saveSettings = async () => {
     const payload = {
       processing_strategy: settings.value.processing_strategy,
       ai_model: settings.value.ai_model,
+      adversarial_model: settings.value.adversarial_model || null,
       phi4_input_per_1k: settings.value.phi4_input_per_1k ? Number(settings.value.phi4_input_per_1k) : undefined,
       phi4_output_per_1k: settings.value.phi4_output_per_1k ? Number(settings.value.phi4_output_per_1k) : undefined,
       mistral_per_1k_pages: settings.value.mistral_per_1k_pages ? Number(settings.value.mistral_per_1k_pages) : undefined,
@@ -584,6 +586,38 @@ onMounted(() => {
           >
             <ExclamationTriangleIcon class="h-4 w-4" />
             <span>{{ t('settings.processing.finetuning_not_supported') }}</span>
+          </div>
+
+          <!-- Adversarial Model Selection -->
+          <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">
+              Adversarial Model (Optional Comparison)
+            </label>
+            <div class="mt-2">
+              <select
+                v-model="settings.adversarial_model"
+                class="block w-full max-w-xs rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+              >
+                <option :value="null">
+                  None (Single Model)
+                </option>
+                <option value="gpt-4o">
+                  GPT-4o (Standard)
+                </option>
+                <option value="gpt-4o-mini">
+                  GPT-4o-Mini
+                </option>
+                <option value="gpt5-nano">
+                  GPT-5 Nano
+                </option>
+                <option value="gpt-4.1-nano">
+                  GPT-4.1 Nano
+                </option>
+              </select>
+            </div>
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              ⚠️ <strong>Requirement:</strong> Selected models must be deployed in the <strong>same</strong> Microsoft Foundry project for direct comparison.
+            </p>
           </div>
 
           <!-- Cost/Quality Trade-off Info -->

@@ -246,7 +246,8 @@ class ChatAgent:
                 "5. Never mention or promote competitor brands. Stay focused on this internal system.\n"
                 "6. Be concise and professional.\n"
                 "7. When you reference any email by id, include direct links if available (view/api).\n"
-                "8. If asked about throughput or durations, use get_processing_stats_by_day and report per-day count and avg/sum durations in seconds."
+                "8. If asked about throughput or durations, use get_processing_stats_by_day and report per-day count and avg/sum durations in seconds.\n"
+                "9. NEVER output raw JSON in the final response. If you use a tool, do not repeat its arguments in the output."
             )
             conversation.insert(0, {"role": "system", "content": system_prompt})
 

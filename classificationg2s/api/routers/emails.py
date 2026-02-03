@@ -437,6 +437,7 @@ async def reclassify_email(
 
 
 
+@router.get("/export")
 async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
     import csv
     import io
@@ -447,43 +448,53 @@ async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
         writer.writerow(
             [
                 "id",
-                "file_url",
-                "status",
-                "intents",
-                "needs_review",
-                "global_complexity",
-                "phi4_cost_usd",
-                "mistral_cost_usd",
-                "subject",
-                "sender",
-                "processing_time_ms"
+                "text_ocr",
+                "category_detected",
+                "processing_time",
+                "precision",
+                "model_name",
+                "explanation"
             ]
         )
         yield buffer.getvalue()
         buffer.seek(0)
         buffer.truncate(0)
 
-        query = "SELECT c.id, c.file_url, c.status, c.classification FROM c"
+        query = "SELECT * FROM c ORDER BY c._ts DESC"
         it = cosmos_container.query_items(query)
         async for item in it:
+            # ID cleaning: filename without pdf
+            file_url = item.get("file_url", "")
+            clean_id = file_url.split("/")[-1].replace(".pdf", "") if file_url else item.get("id")
+
+            # Classification info
             classification = item.get("classification") or {}
             intents = classification.get("detected_intents") or []
-            intents_str = "|".join([f"{i.get('intent')}:{i.get('confidence')}" for i in intents])
+            if intents:
+                top_intent = intents[0].get("intent")
+                confidence = intents[0].get("confidence")
+                explanation = intents[0].get("justification")
+            else:
+                top_intent = "Unknown"
+                confidence = 0.0
+                explanation = classification.get("classification_reason", "")
+
+            # Processing Time
+            proc_time_ms = item.get("processing_time_ms")
+            proc_time_str = f"{proc_time_ms / 1000:.2f}s" if proc_time_ms else "N/A"
+
+            # Model Used (default to phi4 if not recorded)
+            model = item.get("reclassified_with_model") or "phi4"
+
             writer.writerow(
                 [
-                    item.get("id"),
-                    item.get("file_url"),
-                    item.get("status"),
-                    intents_str,
-                    classification.get("needs_review", False),
-                    classification.get("global_complexity"),
-                    (item.get("usage") or {}).get("phi4_cost_usd"),
-                    (item.get("usage") or {}).get("mistral", {}).get("cost_usd")
-                    if isinstance((item.get("usage") or {}).get("mistral"), dict)
-                    else None,
-                    item.get("subject"),
-                    item.get("sender"),
-                    item.get("processing_time_ms")
+                    clean_id,
+                    item.get("markdown", ""),
+                    top_intent,
+                    proc_time_str,
+                    confidence,
+                    model,
+                    explanation
                 ]
             )
             yield buffer.getvalue()

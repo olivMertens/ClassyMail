@@ -16,6 +16,8 @@ DEFAULT_SETTINGS = {
     "cost_overrides": {},
     "categories": DEFAULT_CATEGORIES,
     "processing_strategy": "standard",  # standard | reasoning | vision
+    "ai_model": "phi4",
+    "adversarial_model": "gpt4.1-nano", # Default comparison model
     "finetune_min_examples": 50,
     "ocr_max_attempts": 3,
 }
@@ -51,6 +53,10 @@ def load_settings() -> dict:
             data["cost_overrides"] = {}
         if "processing_strategy" not in data:
             data["processing_strategy"] = "standard"
+        if "ai_model" not in data:
+            data["ai_model"] = "phi4"
+        if "adversarial_model" not in data:
+            data["adversarial_model"] = None
         if "finetune_min_examples" not in data:
             data["finetune_min_examples"] = 50
         if "ocr_max_attempts" not in data:
@@ -90,6 +96,15 @@ def save_settings(settings: dict):
     if "processing_strategy" in settings:
         if settings["processing_strategy"] not in ("standard", "reasoning", "vision"):
             settings["processing_strategy"] = "standard"
+
+    # Sanitize models
+    if "ai_model" in settings:
+        settings["ai_model"] = str(settings["ai_model"])
+    if "adversarial_model" in settings:
+        if settings["adversarial_model"] in (None, "", "none"):
+            settings["adversarial_model"] = None
+        else:
+            settings["adversarial_model"] = str(settings["adversarial_model"])
 
     # Sanitize finetune_min_examples
     if "finetune_min_examples" in settings:
