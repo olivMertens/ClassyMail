@@ -29,11 +29,11 @@ flowchart TD
     EG --> SB[(Service Bus)]
     SB --> W[Worker]
     W --> OCR[Mistral OCR]
-    OCR --> Check{Token Budget<br/>Decision}
-    Check -->|< 8K| Phi[🔶 Phi-4<br/>Primary]
-    Check -->|≥ 8K| GPT[🟢 gpt-4o-mini<br/>Fallback]
-    OCR --> Comp{Comparison<br/>Enabled?}
-    Comp -->|YES| Dual[🔶 Phi-4 ∥ 🟢 gpt4o-mini<br/>Parallel]
+    OCR --> Check{"Token Budget<br/>Decision"}
+    Check -->|< 8K| Phi["🔶 Phi-4<br/>Primary"]
+    Check -->|≥ 8K| GPT["🟢 gpt-4o-mini<br/>Fallback"]
+    OCR --> Comp{"Comparison<br/>Enabled?"}
+    Comp -->|YES| Dual["🔶 Phi-4 ∥ 🟢 gpt4o-mini<br/>Parallel"]
     Comp -->|NO| Single[Single Model]
     Phi -->|JSON| API
     GPT -->|JSON| API

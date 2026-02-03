@@ -61,9 +61,9 @@
   3. ✅ ARCHITECTURE.md: Sequence diagram (comparison message path)
   4. ✅ ARCHITECTURE.md: API/Worker separation (comparison handler note)
   5. ✅ ARCHITECTURE.md: Identity flow (unchanged, reference only)
-  6. ✅ PIPELINE.md: High-level pipeline (token + comparison fork)
-  7. ✅ PIPELINE.md: Message-driven sequence (opt-in comparison)
-  8. ✅ INFRA_CONFIGURATION.md: Event Grid config (comparison note)
+  6. ✅ PIPELINE.md: High-level pipeline included in ARCHITECTURE.md (token + comparison fork)
+  7. ✅ PIPELINE.md: Message-driven sequence included in ARCHITECTURE.md (opt-in comparison)
+  8. ✅ INFRASTRUCTURE.md: Event Grid config (comparison note)
   9. ✅ SCENARIO_E2E.md: Complete E2E flow (comparison path)
 
 ---
@@ -422,4 +422,4 @@ curl http://localhost:8000/api/emails/test-456 | jq '.comparison_results'
 - [README.md](../README.md) - Main documentation
 - [docs/COMPARISON_ADVERSARIAL.md](../docs/COMPARISON_ADVERSARIAL.md) - Feature guide
 - [docs/RBAC_AUDIT.md](../docs/RBAC_AUDIT.md) - Identity troubleshooting
-- [docs/LOCAL_RUN.md](../docs/LOCAL_RUN.md) - Local setup
+- [docs/LOCAL_DEVELOPMENT.md](../docs/LOCAL_DEVELOPMENT.md) - Local setup

@@ -490,5 +490,5 @@ PHI_FALLBACK_ENDPOINT=https://ai-eu-central.openai.azure.com/
 **See Also**:
 - [README.md](../README.md#-adversarial-model-comparison) - Quick start
 - [MODELS.md](./MODELS.md) - Model specifications
-- [LOCAL_RUN.md](./LOCAL_RUN.md) - Local testing
+- [LOCAL_DEVELOPMENT.md](./LOCAL_DEVELOPMENT.md) - Local testing
 - [RBAC_AUDIT.md](./RBAC_AUDIT.md) - Identity & permission troubleshooting

@@ -107,7 +107,7 @@ const uploadFiles = async () => {
 </script>
 
 <template>
-  <div class="max-w-3xl mx-auto space-y-6">
+  <div class="w-full mx-auto space-y-6">
     <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
       <div class="px-4 py-5 sm:p-6">
         <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">

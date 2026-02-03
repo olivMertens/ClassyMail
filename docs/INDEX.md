@@ -3,8 +3,6 @@
 > 📊 **Diagrammes Interactifs** : Ouvrez [index.html](./index.html) pour une documentation interactive avec zoom et téléchargement des diagrammes !
 > Voir aussi : [README_DIAGRAMS.md](./README_DIAGRAMS.md) | [Outil d'export](./mermaid-export.html)
 
-> 🔧 **Documentation consolidée** : Réduite de 21 à 16 fichiers pour une navigation plus claire. Les guides ont été regroupés par thématique.
-
 ## Navigation
 
 ### 🏗️ Core Architecture

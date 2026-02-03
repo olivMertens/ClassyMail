@@ -134,5 +134,5 @@ uv run python scripts/generate_realistic_emails.py \
 ## See Also
 
 - [SCENARIO_E2E.md](./SCENARIO_E2E.md) - Full E2E testing scenarios
-- [LOCAL_RUN.md](./LOCAL_RUN.md) - Running the app locally
-- [PIPELINE.md](./PIPELINE.md) - Understanding the classification pipeline
+- [LOCAL_DEVELOPMENT.md](./LOCAL_DEVELOPMENT.md) - Running the app locally
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - Understanding the classification pipeline

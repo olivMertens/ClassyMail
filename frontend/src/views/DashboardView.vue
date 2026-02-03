@@ -487,6 +487,9 @@ const emit = defineEmits(['open-email'])
           <option value="">
             Any Confidence
           </option>
+          <option disabled>
+            -- Low Confidence --
+          </option>
           <option value="lt_10">
             &lt; 10% (Very Low)
           </option>
@@ -496,11 +499,20 @@ const emit = defineEmits(['open-email'])
           <option value="lt_50">
             &lt; 50%
           </option>
-          <option value="lt_90">
-            &lt; 90%
+          <option value="lt_85">
+            &lt; 85% (Review Required)
+          </option>
+          <option disabled>
+            -- High Confidence --
+          </option>
+          <option value="gt_85">
+            &gt; 85% (High)
+          </option>
+          <option value="gt_90">
+            &gt; 90% (Very High)
           </option>
           <option value="eq_100">
-            100% (High)
+            100% (Perfect)
           </option>
         </select>
       </div>

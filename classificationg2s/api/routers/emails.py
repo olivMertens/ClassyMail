@@ -42,7 +42,7 @@ async def list_emails(
     status: str = Query("all", pattern="^(all|REVIEW_REQUIRED|PROCESSED|ERROR)$"),
     search: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
-    confidence_filter: Optional[str] = Query(None, pattern="^(lt_10|lt_30|lt_50|lt_90|eq_100)$"),
+    confidence_filter: Optional[str] = Query(None, pattern="^(lt_10|lt_30|lt_50|lt_85|gt_85|lt_90|gt_90|eq_100)$"),
     sort_by: str = Query("timestamp", pattern="^(timestamp|status|processing_time|confidence)$"),
     order: str = Query("desc", pattern="^(asc|desc)$"),
     continuation_token: Optional[str] = Query(None),
@@ -79,8 +79,16 @@ async def list_emails(
                     limit = 0.3
                 elif confidence_filter == "lt_50":
                     limit = 0.5
+                elif confidence_filter == "lt_85":
+                    limit = 0.85
+                elif confidence_filter == "gt_85":
+                    limit = 0.85
+                    op = ">="
                 elif confidence_filter == "lt_90":
                     limit = 0.9
+                elif confidence_filter == "gt_90":
+                    limit = 0.9
+                    op = ">="
                 elif confidence_filter == "eq_100":
                     limit = 0.99
                     op = ">="
@@ -119,11 +127,27 @@ async def list_emails(
                 filters.append("IS_DEFINED(c.classification.detected_intents) AND ARRAY_LENGTH(c.classification.detected_intents) > 0")
                 filters.append("NOT EXISTS(SELECT VALUE i FROM i IN c.classification.detected_intents WHERE i.confidence >= @conf_limit)")
 
+            elif confidence_filter == "lt_85":
+                limit = 0.85
+                params["@conf_limit"] = limit
+                filters.append("IS_DEFINED(c.classification.detected_intents) AND ARRAY_LENGTH(c.classification.detected_intents) > 0")
+                filters.append("NOT EXISTS(SELECT VALUE i FROM i IN c.classification.detected_intents WHERE i.confidence >= @conf_limit)")
+
+            elif confidence_filter == "gt_85":
+                limit = 0.85
+                params["@conf_limit"] = limit
+                filters.append("EXISTS(SELECT VALUE i FROM i IN c.classification.detected_intents WHERE i.confidence >= @conf_limit)")
+
             elif confidence_filter == "lt_90":
                 limit = 0.9
                 params["@conf_limit"] = limit
                 filters.append("IS_DEFINED(c.classification.detected_intents) AND ARRAY_LENGTH(c.classification.detected_intents) > 0")
                 filters.append("NOT EXISTS(SELECT VALUE i FROM i IN c.classification.detected_intents WHERE i.confidence >= @conf_limit)")
+
+            elif confidence_filter == "gt_90":
+                limit = 0.9
+                params["@conf_limit"] = limit
+                filters.append("EXISTS(SELECT VALUE i FROM i IN c.classification.detected_intents WHERE i.confidence >= @conf_limit)")
 
             elif confidence_filter == "eq_100":
                 limit = 0.99
