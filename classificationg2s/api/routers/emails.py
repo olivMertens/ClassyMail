@@ -267,10 +267,20 @@ async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
             # Model Used (default to phi4 if not recorded)
             model = item.get("reclassified_with_model") or "phi4"
 
+            # Sanitize fields to avoid CSV layout breakages in Excel
+            # Replace newlines with space to keep records on single lines
+            markdown_content = item.get("markdown", "") or ""
+            markdown_content = markdown_content.replace("\n", " ").replace("\r", " ")
+
+            if explanation:
+                explanation = str(explanation).replace("\n", " ").replace("\r", " ")
+            else:
+                explanation = ""
+
             writer.writerow(
                 [
                     clean_id,
-                    item.get("markdown", ""),
+                    markdown_content,
                     top_intent,
                     proc_time_str,
                     confidence,
