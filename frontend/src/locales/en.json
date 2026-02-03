@@ -111,6 +111,7 @@
     "info": {
         "date": "February 2026",
         "subtitle": "ClassiMail Agent",
+        "tagline": "GenAI that knows exactly where every email belongs.",
         "contact": "Contact",
         "target_title": "Target & Scope",
         "target_desc": "This Proof of Concept (POC) demonstrates an automated email classification pipeline using Azure AI services. It aims to validate the accuracy of LLMs (Phi-4) for intent detection and the feasibility of a serverless, event-driven architecture.",

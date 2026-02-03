@@ -1,5 +1,4 @@
 <script setup>
-import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 
@@ -11,23 +10,7 @@ defineProps({
 })
 const emit = defineEmits(['close', 'navigate'])
 const { t } = useI18n()
-const organizationName = ref('ClassiMail')
-
-const fetchOrganizationName = async () => {
-  try {
-    const response = await fetch('/api/settings/organization')
-    if (response.ok) {
-      const data = await response.json()
-      organizationName.value = data.name || 'ClassiMail'
-    }
-  } catch (error) {
-    console.error('Failed to fetch organization name:', error)
-  }
-}
-
-onMounted(() => {
-  fetchOrganizationName()
-})
+const organizationName = 'ClassyMail'
 </script>
 
 <template>
@@ -59,6 +42,9 @@ onMounted(() => {
             <div class="mt-4 text-sm text-gray-600 dark:text-gray-300">
               <p class="font-medium text-lg">
                 {{ t('info.subtitle') }}
+              </p>
+              <p class="mt-2 text-primary-600 dark:text-primary-400 italic">
+                {{ t('info.tagline') }}
               </p>
               <p class="mt-2">
                 <strong>{{ t('info.contact') }}:</strong> Olivier Mertens<br>
