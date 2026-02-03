@@ -437,10 +437,22 @@ async def reclassify_email(
 
 
 
-@router.get("/export")
+@router.get("/emails/export")
 async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
     import csv
     import io
+
+    # Count total emails first for filename
+    count_query = "SELECT VALUE COUNT(1) FROM c"
+    count_result = cosmos_container.query_items(count_query)
+    total_emails = 0
+    async for count in count_result:
+        total_emails = count
+        break
+
+    # Generate dynamic filename with timestamp and count
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"classimail_export_{timestamp}_{total_emails}emails.csv"
 
     async def row_iter():
         buffer = io.StringIO()
@@ -504,7 +516,7 @@ async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
     return StreamingResponse(
         row_iter(),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=emails.csv"},
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
