@@ -41,7 +41,10 @@
             "title": "Configuration Fine-tuning",
             "desc": "Paramètres pour la génération de datasets d'entraînement.",
             "min_samples": "Échantillons Minimum Requis",
-            "min_samples_help": "Nombre minimum de validations manuelles pour activer l'export JSONL."
+            "min_samples_help": "Nombre minimum de validations manuelles pour activer l'export JSONL.",
+            "info_title": "Pourquoi JSONL ?",
+            "info_desc": "Le format JSONL (JSON Lines) est le standard requis pour le fine-tuning des modèles OpenAI sur Azure. Chaque ligne représente un exemple d'entraînement distinct contenant un message système, une entrée utilisateur et la réponse attendue de l'assistant.",
+            "learn_more": "En savoir plus sur le Fine-tuning dans Azure AI Foundry"
         },
         "danger": {
             "title": "Zone Danger",
@@ -123,7 +126,9 @@
         "item_ops": "Prix Opérations",
         "val_seconds_mail": "Secondes / Email",
         "val_replicas": "Réplicas Min",
-        "val_idle": "Heures d'Inactivité"
+        "val_idle": "Heures d'Inactivité",
+        "ref_title": "Règles empiriques (Référence)",
+        "ref_subtitle": "Coûts typiques pour cette architecture"
     },
     "info": {
         "date": "Février 2026",
@@ -147,7 +152,7 @@
         "disclaimer": "*Tarifs indicatifs, dépendants de la région et de l'usage réel.",
         "close": "OK",
         "target_title": "Objectif",
-        "target_desc": "Démonstrateur technique pour la classification d'emails complexes (Multi-intention, Pièces jointes visuelles) utilisant l'IA générative (Phi-4 / GPT-4).",
+        "target_desc": "Ce Proof of Concept (POC) démontre un pipeline de classification d'emails automatisé utilisant les services Azure AI. Il valide la haute précision et la faible latence des Petits Modèles de Langage (SLM) comme Phi-4 pour la détection d'intention, déployés au sein d'une architecture événementielle scalable.",
         "resources_title": "Architecture Azure/Foundry",
         "guide_prompt": "Pour plus de détails, consultez le",
         "guide_link": "Guide Utilisateur / Documentation",
@@ -186,6 +191,17 @@
             "li1": "Multi-Intention : Emails demandant plusieurs actions distinctes (ex: 'Changer adresse ET envoyer relevé').",
             "li2": "Ambiguïté : Formulation vague nécessitant une inférence ou contexte des pièces jointes.",
             "li3": "Stratégie : Utiliser la stratégie 'Raisonnement' (Paramètres) force l'IA à produire une justification avant de classifier, améliorant la précision sur les cas complexes."
+        },
+        "exports": {
+            "title": "Exports de Données & Fine-Tuning",
+            "desc": "Exportez vos données traitées pour le reporting ou pour entraîner de meilleurs modèles IA.",
+            "csv_title": "Export CSV (Reporting)",
+            "csv_desc": "Téléchargez une liste complète de tous les emails traités avec leur statut, coûts et métadonnées.",
+            "csv_streaming": "Support Streaming : Cet export génère les données à la volée, permettant le téléchargement de très grands jeux de données (10k+ lignes) sans timeout serveur.",
+            "csv_columns": "Inclus : ID, Statut, Intentions Détectées, Scores de Confiance, Coûts Usage IA (USD), et Temps de Traitement.",
+            "jsonl_title": "Export JSONL (Fine-Tuning)",
+            "jsonl_desc": "Exportez un jeu de données 'Reinforcement Learning' conçu pour le fine-tuning Azure OpenAI / Phi-4.",
+            "jsonl_format": "Format : JSON Lines (JSONL), compatible avec Azure AI Foundry."
         },
         "privacy": {
             "title": "Confidentialité & Sécurité des Données (PII)",

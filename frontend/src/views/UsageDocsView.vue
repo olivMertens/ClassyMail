@@ -9,47 +9,47 @@ const isDark = ref(false)
 let observer = null
 
 const initMermaid = async () => {
-    const darkMode = document.documentElement.classList.contains('dark')
-    mermaid.initialize({
-        startOnLoad: false,
-        theme: darkMode ? 'dark' : 'default',
-        securityLevel: 'loose',
-        flowchart: { curve: 'basis' }
-    })
-    await nextTick()
-    // Reset any previous SVG
-    const element = document.querySelector('.mermaid-graph')
-    if (element) {
-        element.removeAttribute('data-processed')
-        element.innerHTML = diagram
-    }
-    await mermaid.run({
-        nodes: document.querySelectorAll('.mermaid-graph')
-    })
+  const darkMode = document.documentElement.classList.contains('dark')
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: darkMode ? 'dark' : 'default',
+    securityLevel: 'loose',
+    flowchart: { curve: 'basis' }
+  })
+  await nextTick()
+  // Reset any previous SVG
+  const element = document.querySelector('.mermaid-graph')
+  if (element) {
+    element.removeAttribute('data-processed')
+    element.innerHTML = diagram
+  }
+  await mermaid.run({
+    nodes: document.querySelectorAll('.mermaid-graph')
+  })
 }
 
 onMounted(() => {
-    isDark.value = document.documentElement.classList.contains('dark')
+  isDark.value = document.documentElement.classList.contains('dark')
 
-    // Watch themes
-    observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.attributeName === 'class') {
-                const newDark = document.documentElement.classList.contains('dark')
-                if (newDark !== isDark.value) {
-                    isDark.value = newDark
-                    initMermaid()
-                }
-            }
-        })
+  // Watch themes
+  observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.attributeName === 'class') {
+        const newDark = document.documentElement.classList.contains('dark')
+        if (newDark !== isDark.value) {
+          isDark.value = newDark
+          initMermaid()
+        }
+      }
     })
-    observer.observe(document.documentElement, { attributes: true })
+  })
+  observer.observe(document.documentElement, { attributes: true })
 
-    initMermaid()
+  initMermaid()
 })
 
 onUnmounted(() => {
-    if (observer) observer.disconnect()
+  if (observer) observer.disconnect()
 })
 
 const diagram = `
@@ -71,8 +71,8 @@ graph LR
     Classify -->|Confidence > 85%| Auto[Auto Process]
     Classify -->|Confidence < 85%| Review[Human Review]
 
-    style Img fill:#ff9,stroke:#333
-    style Desc fill:#f9f,stroke:#333
+    style Img fill:#ff9,stroke:#333,color:#000
+    style Desc fill:#f9f,stroke:#333,color:#000
 `
 
 </script>
@@ -81,7 +81,9 @@ graph LR
   <div class="w-full mx-auto space-y-8">
     <div class="md:flex md:items-center md:justify-between">
       <div class="min-w-0 flex-1">
-        <h2 class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">
+        <h2
+          class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight"
+        >
           {{ t('guide.title') }}
         </h2>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -95,7 +97,9 @@ graph LR
       <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white mb-4">
         {{ t('guide.flow_title') }}
       </h3>
-      <div class="flex justify-center bg-gray-50 dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto">
+      <div
+        class="flex justify-center bg-gray-50 dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto"
+      >
         <div class="mermaid-graph w-full flex justify-center">
           {{ diagram }}
         </div>
@@ -215,7 +219,8 @@ graph LR
               {{ t('guide.exports.jsonl_desc') }}
             </p>
             <div class="bg-gray-900 text-gray-200 p-2 rounded text-xs font-mono overflow-x-auto whitespace-pre">
-              {{ `{"messages": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "{\\"intents\\": [...]}"}]}` }}
+              {{ `{"messages": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "{\\"intents\\":
+              [...]}"}]}` }}
             </div>
           </div>
         </div>
@@ -275,6 +280,6 @@ graph LR
 
 <style scoped>
 .mermaid-graph {
-    min-width: 300px;
+  min-width: 300px;
 }
 </style>

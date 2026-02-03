@@ -16,7 +16,9 @@ import {
   EyeIcon,
   TableCellsIcon,
   Squares2X2Icon,
-  TrashIcon
+  TrashIcon,
+  BarsArrowDownIcon,
+  BarsArrowUpIcon
 } from '@heroicons/vue/24/outline'
 import DlqDetailModal from '@/components/DlqDetailModal.vue'
 
@@ -29,12 +31,12 @@ defineProps({
 
 const emails = ref([])
 const stats = ref({
-    total: 0,
-    review_required: 0,
-    processed: 0,
-    finetune_ready: false,
-    average_confidence: 0,
-    finetune_min_required: 50
+  total: 0,
+  review_required: 0,
+  processed: 0,
+  finetune_ready: false,
+  average_confidence: 0,
+  finetune_min_required: 50
 })
 const filter = ref('all')
 const search = ref('')
@@ -61,6 +63,8 @@ const md = new MarkdownIt({ linkify: true, breaks: true })
 const chatResponseHtml = computed(() => chatResponse.value ? md.render(String(chatResponse.value) || '') : '')
 const viewMode = ref('cards') // 'cards' or 'table'
 const purging = ref(false)
+const sortBy = ref('timestamp')
+const sortOrder = ref('desc')
 
 const pageSizeOptions = [20, 50, 100]
 
@@ -74,210 +78,222 @@ const filters = [
 ]
 
 const reprocessEmail = async (email) => {
-    if (confirm('Are you sure you want to reprocess this email? It will be re-queued.')) {
-        try {
-            reprocessingId.value = email.id
-            const res = await fetch(`/api/emails/${email.id}/reprocess`, { method: 'POST' })
-            if (!res.ok) throw new Error('Failed to reprocess')
-            // Optimistic update
-            email.status = 'PENDING'
-            alert('Email re-queued successfully')
-        } catch (e) {
-            alert(e.message)
-        } finally {
-            reprocessingId.value = null
-        }
+  if (confirm('Are you sure you want to reprocess this email? It will be re-queued.')) {
+    try {
+      reprocessingId.value = email.id
+      const res = await fetch(`/api/emails/${email.id}/reprocess`, { method: 'POST' })
+      if (!res.ok) throw new Error('Failed to reprocess')
+      // Optimistic update
+      email.status = 'PENDING'
+      alert('Email re-queued successfully')
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      reprocessingId.value = null
     }
+  }
 }
 
 const fetchEmails = async () => {
-    loading.value = true
-    error.value = null
-    try {
-        const params = new URLSearchParams()
-        params.set('status', filter.value === 'all' ? 'all' : filter.value)
-        params.set('page', page.value)
-        params.set('page_size', pageSize.value)
-        if (search.value) params.set('search', search.value)
-        if (confidenceFilter.value) params.set('confidence_filter', confidenceFilter.value)
+  loading.value = true
+  error.value = null
+  try {
+    const params = new URLSearchParams()
+    params.set('status', filter.value === 'all' ? 'all' : filter.value)
+    params.set('page', page.value)
+    params.set('page_size', pageSize.value)
+    if (search.value) params.set('search', search.value)
+    if (confidenceFilter.value) params.set('confidence_filter', confidenceFilter.value)
+    params.set('sort_by', sortBy.value)
+    params.set('order', sortOrder.value)
 
-        const res = await fetch(`/api/emails?${params.toString()}`)
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err.detail || `Server Error: ${res.status}`)
-        }
-        const data = await res.json()
-
-        emails.value = data.items || []
-        // Update stats from API response - these are global counts, not filtered
-        stats.value = {
-            total: data.total || 0,
-            review_required: data.review_required || 0,
-            processed: data.processed || 0,
-            finetune_ready: data.finetune_ready || false,
-            average_confidence: data.average_confidence || 0,
-            finetune_min_required: data.finetune_min_required || 50
-        }
-
-        // Log for debugging stats mismatch
-        console.log('[Dashboard] Stats:', stats.value, '| Items:', emails.value.length)
-    } catch (e) {
-        console.error(e)
-        error.value = e.message
-    } finally {
-        loading.value = false
+    const res = await fetch(`/api/emails?${params.toString()}`)
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.detail || `Server Error: ${res.status}`)
     }
+    const data = await res.json()
+
+    emails.value = data.items || []
+    // Update stats from API response - these are global counts, not filtered
+    stats.value = {
+      total: data.total || 0,
+      review_required: data.review_required || 0,
+      processed: data.processed || 0,
+      finetune_ready: data.finetune_ready || false,
+      average_confidence: data.average_confidence || 0,
+      finetune_min_required: data.finetune_min_required || 50
+    }
+
+    // Log for debugging stats mismatch
+    console.log('[Dashboard] Stats:', stats.value, '| Items:', emails.value.length)
+  } catch (e) {
+    console.error(e)
+    error.value = e.message
+  } finally {
+    loading.value = false
+  }
 }
 
 const fetchDeadletters = async () => {
-    try {
-        const res = await fetch('/api/admin/deadletter')
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err.detail || `Server Error: ${res.status}`)
-        }
-        dlq.value = await res.json()
-        dlqError.value = null
-    } catch (e) {
-        console.error(e)
-        dlqError.value = e.message
+  try {
+    const res = await fetch('/api/admin/deadletter')
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.detail || `Server Error: ${res.status}`)
     }
+    dlq.value = await res.json()
+    dlqError.value = null
+  } catch (e) {
+    console.error(e)
+    dlqError.value = e.message
+  }
 }
 
 const fetchDiagnostics = async () => {
-    try {
-        const res = await fetch('/api/admin/diagnostics')
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err.detail || `Server Error: ${res.status}`)
-        }
-        diagnostics.value = await res.json()
-        diagnosticsError.value = null
-    } catch (e) {
-        console.error(e)
-        diagnosticsError.value = e.message
+  try {
+    const res = await fetch('/api/admin/diagnostics')
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.detail || `Server Error: ${res.status}`)
     }
+    diagnostics.value = await res.json()
+    diagnosticsError.value = null
+  } catch (e) {
+    console.error(e)
+    diagnosticsError.value = e.message
+  }
 }
 
 const openDlqDetails = (msg) => {
-    selectedDlq.value = msg
-    dlqModalOpen.value = true
+  selectedDlq.value = msg
+  dlqModalOpen.value = true
 }
 
 const runChatSearch = async () => {
-    chatLoading.value = true
-    chatError.value = null
-    chatResponse.value = null
-    try {
-        const q = chatQuery.value.trim()
-        if (!q) return
-        const res = await fetch('/api/chat', {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({ messages: [{ role: 'user', content: q }] })
-        })
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err.detail || `Server Error: ${res.status}`)
-        }
-        const data = await res.json()
-        chatResponse.value = data.content
-    } catch (e) {
-        chatError.value = e.message
-    } finally {
-        chatLoading.value = false
+  chatLoading.value = true
+  chatError.value = null
+  chatResponse.value = null
+  try {
+    const q = chatQuery.value.trim()
+    if (!q) return
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ role: 'user', content: q }] })
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.detail || `Server Error: ${res.status}`)
     }
+    const data = await res.json()
+    chatResponse.value = data.content
+  } catch (e) {
+    chatError.value = e.message
+  } finally {
+    chatLoading.value = false
+  }
 }
 
 const useExample = (text) => {
-    chatQuery.value = text
-    runChatSearch()
+  chatQuery.value = text
+  runChatSearch()
+}
+
+const toggleSort = (column) => {
+  if (sortBy.value === column) {
+    sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+  } else {
+    sortBy.value = column
+    sortOrder.value = 'desc'
+  }
+  fetchEmails()
 }
 
 const purgeDlq = async () => {
-    if (!confirm("Are you sure you want to delete all messages in the Dead Letter Queue? This action cannot be undone.")) return
+  if (!confirm("Are you sure you want to delete all messages in the Dead Letter Queue? This action cannot be undone.")) return
 
-    purging.value = true
-    try {
-        const res = await fetch('/api/admin/purge-dlq', { method: 'POST' })
-        if (!res.ok) throw new Error('Failed to purge DLQ')
-        const data = await res.json()
-        alert(`Purged ${data.deleted_dlq} messages.`)
-        await fetchDeadletters() // Refresh list
-        if (dlq.value.count === 0) {
-            currentTab.value = 'dashboard'
-            dlqDismissed.value = false // Reset close state so it reappears if new errors come
-        }
-    } catch (e) {
-        alert(e.message)
-    } finally {
-        purging.value = false
+  purging.value = true
+  try {
+    const res = await fetch('/api/admin/purge-dlq', { method: 'POST' })
+    if (!res.ok) throw new Error('Failed to purge DLQ')
+    const data = await res.json()
+    alert(`Purged ${data.deleted_dlq} messages.`)
+    await fetchDeadletters() // Refresh list
+    if (dlq.value.count === 0) {
+      currentTab.value = 'dashboard'
+      dlqDismissed.value = false // Reset close state so it reappears if new errors come
     }
+  } catch (e) {
+    alert(e.message)
+  } finally {
+    purging.value = false
+  }
 }
 
 // Watchers
 watch([filter, pageSize, confidenceFilter], () => {
-    page.value = 1
-    fetchEmails()
+  page.value = 1
+  fetchEmails()
 })
 
 // Debounce search
 let timeout
 watch([search], () => {
-    clearTimeout(timeout)
-    timeout = setTimeout(() => {
-        page.value = 1
-        fetchEmails()
-    }, 500)
+  clearTimeout(timeout)
+  timeout = setTimeout(() => {
+    page.value = 1
+    fetchEmails()
+  }, 500)
 })
 
 onMounted(() => {
-    fetchEmails()
-    fetchDeadletters()
-    fetchDiagnostics()
-    // Poll every 30s
-    const pollEmails = setInterval(fetchEmails, 30000)
-    const pollDlq = setInterval(fetchDeadletters, 30000)
-    const pollDiag = setInterval(fetchDiagnostics, 60000)
-    return () => {
-        clearInterval(pollEmails)
-        clearInterval(pollDlq)
-        clearInterval(pollDiag)
-    }
+  fetchEmails()
+  fetchDeadletters()
+  fetchDiagnostics()
+  // Poll every 30s
+  const pollEmails = setInterval(fetchEmails, 30000)
+  const pollDlq = setInterval(fetchDeadletters, 30000)
+  const pollDiag = setInterval(fetchDiagnostics, 60000)
+  return () => {
+    clearInterval(pollEmails)
+    clearInterval(pollDlq)
+    clearInterval(pollDiag)
+  }
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(stats.value.total / pageSize.value)))
 
 const progressPercentage = computed(() => {
-    if (!stats.value.total) return 0
-    return Math.round(((stats.value.processed + stats.value.review_required) / stats.value.total) * 100)
+  if (!stats.value.total) return 0
+  return Math.round(((stats.value.processed + stats.value.review_required) / stats.value.total) * 100)
 })
 
 const getScoreColor = (email) => {
-    const intents = email.classification?.detected_intents || []
-    if (!intents.length) return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-    const score = Math.max(...intents.map(i => i.confidence || 0))
+  const intents = email.classification?.detected_intents || []
+  if (!intents.length) return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+  const score = Math.max(...intents.map(i => i.confidence || 0))
 
-    if (score >= 0.85) return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
-    if (score >= 0.7) return 'bg-lime-100 text-lime-800 dark:bg-lime-900/50 dark:text-lime-300'
-    if (score >= 0.5) return 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300'
-    return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+  if (score >= 0.85) return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+  if (score >= 0.7) return 'bg-lime-100 text-lime-800 dark:bg-lime-900/50 dark:text-lime-300'
+  if (score >= 0.5) return 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300'
+  return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
 }
 
 const getScore = (email) => {
-    const intents = email.classification?.detected_intents || []
-    if (!intents.length) return 'N/A'
-    return (Math.max(...intents.map(i => i.confidence || 0)) * 100).toFixed(0) + '%'
+  const intents = email.classification?.detected_intents || []
+  if (!intents.length) return 'N/A'
+  return (Math.max(...intents.map(i => i.confidence || 0)) * 100).toFixed(0) + '%'
 }
 
 const formatDuration = (email) => {
-    const ms = email?.processing_time_ms
-    if (!ms) return null
-    if (ms < 1000) return `${ms.toFixed(0)} ms`
-    const s = ms / 1000
-    if (s < 60) return `${s.toFixed(1)} s`
-    const m = s / 60
-    return `${m.toFixed(1)} min`
+  const ms = email?.processing_time_ms
+  if (!ms) return null
+  if (ms < 1000) return `${ms.toFixed(0)} ms`
+  const s = ms / 1000
+  if (s < 60) return `${s.toFixed(1)} s`
+  const m = s / 60
+  return `${m.toFixed(1)} min`
 }
 
 const emit = defineEmits(['open-email'])
@@ -290,22 +306,22 @@ const emit = defineEmits(['open-email'])
       class="flex items-center space-x-4 border-b border-gray-200 dark:border-gray-700 pb-2"
     >
       <button
-        :class="['px-3 py-1 rounded-md text-sm font-medium', currentTab==='dashboard' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300']"
-        @click="currentTab='dashboard'"
+        :class="['px-3 py-1 rounded-md text-sm font-medium', currentTab === 'dashboard' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300']"
+        @click="currentTab = 'dashboard'"
       >
         Dashboard
       </button>
       <button
         v-if="dlq.count > 0"
-        :class="['px-3 py-1 rounded-md text-sm font-medium flex items-center gap-1', currentTab==='failures' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300']"
-        @click="currentTab='failures'"
+        :class="['px-3 py-1 rounded-md text-sm font-medium flex items-center gap-1', currentTab === 'failures' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300']"
+        @click="currentTab = 'failures'"
       >
         <ExclamationCircleIcon class="h-4 w-4" />
         Failures ({{ dlq.count }})
       </button>
       <button
-        :class="['px-3 py-1 rounded-md text-sm font-medium', currentTab==='developer' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300']"
-        @click="currentTab='developer'"
+        :class="['px-3 py-1 rounded-md text-sm font-medium', currentTab === 'developer' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300']"
+        @click="currentTab = 'developer'"
       >
         Developer
       </button>
@@ -331,7 +347,7 @@ const emit = defineEmits(['open-email'])
             Processing failed for some items.
             <button
               class="font-semibold underline ml-1 hover:text-red-900 dark:hover:text-red-100"
-              @click="currentTab='failures'"
+              @click="currentTab = 'failures'"
             >
               View Details
             </button>
@@ -357,7 +373,7 @@ const emit = defineEmits(['open-email'])
     </div>
     <!-- Stats Cards -->
     <dl
-      v-if="currentTab==='dashboard'"
+      v-if="currentTab === 'dashboard'"
       class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4"
     >
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
@@ -550,7 +566,9 @@ const emit = defineEmits(['open-email'])
     <p class="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-4">
       The dashboard cannot retrieve emails. This usually means the database is initializing or empty.
     </p>
-    <p class="text-xs text-gray-400 font-mono bg-white dark:bg-gray-900 px-3 py-2 rounded border border-gray-200 dark:border-gray-700">
+    <p
+      class="text-xs text-gray-400 font-mono bg-white dark:bg-gray-900 px-3 py-2 rounded border border-gray-200 dark:border-gray-700"
+    >
       {{ error }}
     </p>
     <button
@@ -594,29 +612,37 @@ const emit = defineEmits(['open-email'])
         <!-- Header: Status + Actions -->
         <div
           class="flex justify-between items-start"
-          :title="email.classification?.detected_intents?.length > 1 ? 'Autres: ' + email.classification.detected_intents.slice(1).map(i => `${i.intent} (${Math.round((i.confidence||0)*100)}%)`).join(', ') : ''"
+          :title="email.classification?.detected_intents?.length > 1 ? 'Autres: ' + email.classification.detected_intents.slice(1).map(i => `${i.intent} (${Math.round((i.confidence || 0) * 100)}%)`).join(', ') : ''"
         >
           <div class="flex items-center gap-2">
             <span
               v-if="email.status === 'ERROR'"
               class="text-red-500"
               title="Error"
-            ><ExclamationCircleIcon class="h-4 w-4" /></span>
+            >
+              <ExclamationCircleIcon class="h-4 w-4" />
+            </span>
             <span
-              v-else-if="email.status === 'PENDING' || email.status === 'uploaded'"
+              v-else-if="email.status === 'PENDING' || email.status === 'uploaded' || email.status === 'PROCESSING'"
               class="text-blue-500 animate-pulse"
               title="Processing..."
-            ><ArrowPathIcon class="h-4 w-4 animate-spin" /></span>
+            >
+              <ArrowPathIcon class="h-4 w-4 animate-spin" />
+            </span>
             <span
               v-else-if="email.status === 'PROCESSED'"
               class="text-green-500"
               title="Processed"
-            ><CheckCircleIcon class="h-4 w-4" /></span>
+            >
+              <CheckCircleIcon class="h-4 w-4" />
+            </span>
             <span
               v-else-if="email.status === 'REVIEW_REQUIRED'"
               class="text-amber-500"
               title="Review Required"
-            ><ClockIcon class="h-4 w-4" /></span>
+            >
+              <ClockIcon class="h-4 w-4" />
+            </span>
 
             <span
               v-if="email.classification?.detected_intents?.length"
@@ -644,7 +670,7 @@ const emit = defineEmits(['open-email'])
             >
               <ArrowPathIcon
                 class="h-5 w-5"
-                :class="{'animate-spin': reprocessingId === email.id}"
+                :class="{ 'animate-spin': reprocessingId === email.id }"
               />
             </button>
           </div>
@@ -656,7 +682,8 @@ const emit = defineEmits(['open-email'])
             class="font-medium text-gray-900 dark:text-white truncate text-sm leading-tight"
             :title="email.subject || (email.file_url ? decodeURIComponent(email.file_url.split('/').pop().split('?')[0]) : 'No Subject')"
           >
-            {{ email.subject || (email.file_url ? decodeURIComponent(email.file_url.split('/').pop().split('?')[0]) : 'No Subject') }}
+            {{ email.subject || (email.file_url ? decodeURIComponent(email.file_url.split('/').pop().split('?')[0]) :
+              'No Subject') }}
           </h3>
           <p class="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
             {{ email.sender || 'Unknown Sender' }}
@@ -664,9 +691,11 @@ const emit = defineEmits(['open-email'])
         </div>
 
         <!-- Footer: ID & Category & Duration -->
-        <div class="mt-auto pt-2 flex items-center justify-between gap-2 border-t border-gray-100 dark:border-gray-700/50">
+        <div
+          class="mt-auto pt-2 flex items-center justify-between gap-2 border-t border-gray-100 dark:border-gray-700/50"
+        >
           <div class="text-[10px] text-gray-400 font-mono truncate max-w-[40%]">
-            #{{ email.id.slice(0,6) }}
+            #{{ email.id.slice(0, 6) }}
           </div>
           <div
             v-if="email.classification?.detected_intents?.length"
@@ -676,10 +705,11 @@ const emit = defineEmits(['open-email'])
               class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800 max-w-[120px] truncate"
               :title="[
                 email.classification.detected_intents[0].justification ? `Justification: ${email.classification.detected_intents[0].justification}` : '',
-                email.classification.detected_intents.length > 1 ? 'Autres: ' + email.classification.detected_intents.slice(1).map(i => `${i.intent} (${Math.round((i.confidence||0)*100)}%)${i.justification ? ' → ' + i.justification : ''}`).join(', ') : ''
+                email.classification.detected_intents.length > 1 ? 'Autres: ' + email.classification.detected_intents.slice(1).map(i => `${i.intent} (${Math.round((i.confidence || 0) * 100)}%)${i.justification ? ' → ' + i.justification : ''}`).join(', ') : ''
               ].filter(Boolean).join('\n')"
             >
-              {{ email.classification.detected_intents[0].intent }} ({{ Math.round((email.classification.detected_intents[0].confidence || 0)*100) }}%)
+              {{ email.classification.detected_intents[0].intent }} ({{
+                Math.round((email.classification.detected_intents[0].confidence || 0)*100) }}%)
             </span>
           </div>
           <div
@@ -702,7 +732,7 @@ const emit = defineEmits(['open-email'])
   </div>
 
   <div
-    v-if="currentTab==='failures'"
+    v-if="currentTab === 'failures'"
     class="space-y-4 mt-4"
   >
     <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
@@ -719,7 +749,7 @@ const emit = defineEmits(['open-email'])
         <div class="flex gap-2">
           <button
             class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium transition-colors"
-            @click="currentTab='dashboard'"
+            @click="currentTab = 'dashboard'"
           >
             <XMarkIcon class="h-4 w-4" />
             Close View
@@ -739,19 +769,29 @@ const emit = defineEmits(['open-email'])
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead class="bg-gray-50 dark:bg-gray-700">
             <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+              <th
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+              >
                 Item ID / ID
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+              <th
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+              >
                 Reason
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+              <th
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+              >
                 Description
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+              <th
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+              >
                 Time
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+              <th
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+              >
                 Actions
               </th>
             </tr>
@@ -789,7 +829,7 @@ const emit = defineEmits(['open-email'])
   </div>
 
   <div
-    v-if="currentTab==='developer'"
+    v-if="currentTab === 'developer'"
     class="space-y-4 mt-4"
   >
     <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
@@ -832,7 +872,8 @@ const emit = defineEmits(['open-email'])
               readiness
             </td>
             <td class="py-1">
-              <span :class="diagnostics.ok ? 'text-green-600 dark:text-green-300' : 'text-red-600 dark:text-red-300'">{{ diagnostics.ok ? 'OK' : 'NOT READY' }}</span>
+              <span :class="diagnostics.ok ? 'text-green-600 dark:text-green-300' : 'text-red-600 dark:text-red-300'">{{
+                diagnostics.ok ? 'OK' : 'NOT READY' }}</span>
               <pre
                 v-if="diagnostics.readiness && Object.keys(diagnostics.readiness).length"
                 class="mt-1 bg-gray-100 dark:bg-gray-900 p-2 rounded text-xs text-gray-700 dark:text-gray-200"
@@ -852,25 +893,78 @@ const emit = defineEmits(['open-email'])
     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
       <thead class="bg-gray-50 dark:bg-gray-900">
         <tr>
-          <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          <th
+            class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+          >
             Sujet / Expéditeur
           </th>
-          <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          <th
+            class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+          >
             Catégorie
           </th>
-          <th class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Statut
+          <th
+            class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-700 dark:hover:text-gray-200"
+            @click="toggleSort('status')"
+          >
+            <div class="flex items-center gap-1">
+              Statut
+              <span v-if="sortBy === 'status'">
+                <BarsArrowDownIcon
+                  v-if="sortOrder === 'desc'"
+                  class="h-3 w-3"
+                />
+                <BarsArrowUpIcon
+                  v-else
+                  class="h-3 w-3"
+                />
+              </span>
+            </div>
           </th>
-          <th class="hidden lg:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Arrivée
+          <th
+            class="hidden lg:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-700 dark:hover:text-gray-200"
+            @click="toggleSort('timestamp')"
+          >
+            <div class="flex items-center gap-1">
+              Arrivée
+              <span v-if="sortBy === 'timestamp'">
+                <BarsArrowDownIcon
+                  v-if="sortOrder === 'desc'"
+                  class="h-3 w-3"
+                />
+                <BarsArrowUpIcon
+                  v-else
+                  class="h-3 w-3"
+                />
+              </span>
+            </div>
           </th>
-          <th class="hidden lg:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Traité
+          <th
+            class="hidden lg:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+          >
+            Traitée
           </th>
-          <th class="hidden md:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Durée
+          <th
+            class="hidden md:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-700 dark:hover:text-gray-200"
+            @click="toggleSort('processing_time')"
+          >
+            <div class="flex items-center gap-1">
+              Durée
+              <span v-if="sortBy === 'processing_time'">
+                <BarsArrowDownIcon
+                  v-if="sortOrder === 'desc'"
+                  class="h-3 w-3"
+                />
+                <BarsArrowUpIcon
+                  v-else
+                  class="h-3 w-3"
+                />
+              </span>
+            </div>
           </th>
-          <th class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          <th
+            class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+          >
             Actions
           </th>
         </tr>
@@ -922,9 +1016,10 @@ const emit = defineEmits(['open-email'])
               </span>
               <span
                 v-if="email.classification.detected_intents.length > 2"
-                class="text-xs text-gray-500 dark:text-gray-400"
+                class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 cursor-help"
+                :title="'Extra Categories:\n' + email.classification.detected_intents.slice(2).map(i => `${i.intent} (${Math.round((i.confidence || 0) * 100)}%)`).join('\n')"
               >
-                +{{ email.classification.detected_intents.length - 2 }} more
+                +{{ email.classification.detected_intents.length - 2 }}
               </span>
             </div>
             <span
@@ -942,12 +1037,14 @@ const emit = defineEmits(['open-email'])
                   ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                   : email.status === 'REVIEW_REQUIRED'
                     ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300'
-                    : (email.status === 'PENDING' || email.status === 'uploaded')
+                    : (email.status === 'PENDING' || email.status === 'uploaded' || email.status === 'PROCESSING')
                       ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 animate-pulse'
                       : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
               ]"
             >
-              {{ email.status === 'REVIEW_REQUIRED' ? 'To Review' : email.status === 'PROCESSED' ? 'Processed' : (email.status === 'PENDING' || email.status === 'uploaded') ? 'Processing' : 'Error' }}
+              {{ email.status === 'REVIEW_REQUIRED' ? 'To Review' : email.status === 'PROCESSED' ? 'Processed' :
+                (email.status === 'PENDING' || email.status === 'uploaded' || email.status === 'PROCESSING') ?
+                  'Processing' : 'Error' }}
             </span>
           </td>
           <td class="hidden lg:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -974,7 +1071,7 @@ const emit = defineEmits(['open-email'])
             >
               <ArrowPathIcon
                 class="h-4 w-4"
-                :class="{'animate-spin': reprocessingId === email.id}"
+                :class="{ 'animate-spin': reprocessingId === email.id }"
               />
               Reprocess
             </button>
@@ -1042,7 +1139,9 @@ const emit = defineEmits(['open-email'])
               fill="currentColor"
               class="w-5 h-5"
             >
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+              <path
+                d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"
+              />
             </svg>
           </button>
         </div>
@@ -1053,9 +1152,12 @@ const emit = defineEmits(['open-email'])
             v-if="!chatResponse && !chatLoading"
             class="space-y-4"
           >
-            <div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200">
+            <div
+              class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200"
+            >
               <span class="font-bold block mb-1">How it works:</span>
-              I can search the email database using tools (search, latest errors, stats, top intents). Ask me about processed emails.
+              I can search the email database using tools (search, latest errors, stats, top intents). Ask me about
+              processed emails.
             </div>
             <div>
               <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">
@@ -1078,7 +1180,9 @@ const emit = defineEmits(['open-email'])
             v-if="chatLoading"
             class="flex justify-start mt-2"
           >
-            <div class="bg-white dark:bg-gray-800 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-2">
+            <div
+              class="bg-white dark:bg-gray-800 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-2"
+            >
               <div class="animate-spin h-3 w-3 border-2 border-primary-600 border-t-transparent rounded-full" />
               <span class="text-xs text-gray-500">Searching database...</span>
             </div>
@@ -1088,7 +1192,9 @@ const emit = defineEmits(['open-email'])
             v-if="chatResponse"
             class="flex justify-start mt-2"
           >
-            <div class="bg-white dark:bg-gray-800 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm max-w-[90%]">
+            <div
+              class="bg-white dark:bg-gray-800 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm max-w-[90%]"
+            >
               <!-- eslint-disable-next-line vue/no-v-html -->
               <div
                 class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed prose prose-sm dark:prose-invert max-w-none"
@@ -1142,7 +1248,9 @@ const emit = defineEmits(['open-email'])
                 fill="currentColor"
                 class="w-5 h-5"
               >
-                <path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z" />
+                <path
+                  d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"
+                />
               </svg>
             </button>
           </div>
@@ -1151,7 +1259,7 @@ const emit = defineEmits(['open-email'])
 
       <button
         class="pointer-events-auto shadow-lg rounded-full w-14 h-14 bg-primary-600 hover:bg-primary-500 text-white flex items-center justify-center transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600"
-        :class="{'rotate-90': chatOpen}"
+        :class="{ 'rotate-90': chatOpen }"
         @click="chatOpen = !chatOpen"
       >
         <ChatBubbleLeftRightIcon
@@ -1165,7 +1273,9 @@ const emit = defineEmits(['open-email'])
           fill="currentColor"
           class="w-6 h-6"
         >
-          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+          <path
+            d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"
+          />
         </svg>
       </button>
     </div>

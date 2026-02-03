@@ -24,21 +24,51 @@ async def worker_loop_forever(*, queue_name: str, get_settings, clients: Clients
     if not clients.sb_client:
         raise RuntimeError("Service Bus client not initialized")
 
+    # Use the semaphore to limit concurrent TASKS, not sequential execution blocks.
     concurrency = clients.concurrency_limit
-    auto_lock_renewer = AutoLockRenewer(max_lock_renewal_duration=600)
+    # Increase renewal duration to cover potential long processing times in parallel
+    auto_lock_renewer = AutoLockRenewer(max_lock_renewal_duration=1200)
+
+    logger.info("Worker started with concurrency limit: %s", concurrency._value if hasattr(concurrency, "_value") else "Unknown")
+
     while True:
         try:
             async with clients.sb_client.get_queue_receiver(
-                queue_name=queue_name, max_wait_time=5, auto_lock_renewer=auto_lock_renewer
+                queue_name=queue_name,
+                max_wait_time=5,
+                auto_lock_renewer=auto_lock_renewer,
+                prefetch_count=10  # Prefetch to allow pipelining
             ) as receiver:
                 async for msg in receiver:
-                    async with concurrency:
-                        await handle_queue_message(receiver, msg, get_settings=get_settings, clients=clients)
+                    # Wait for a semaphore slot
+                    await concurrency.acquire()
+
+                    # Spawn task.
+                    # CRITICAL: We do NOT await the handler here. We let the loop continue.
+                    # The handler must release the semaphore when done.
+                    asyncio.create_task(
+                        process_message_wrapper(
+                            receiver, msg, get_settings=get_settings, clients=clients, semaphore=concurrency
+                        )
+                    )
         except asyncio.CancelledError:
             break
         except Exception as ex:
             logger.exception("Worker loop error: %s", ex)
             await asyncio.sleep(2)
+
+
+async def process_message_wrapper(receiver, msg, *, get_settings, clients: Clients, semaphore: asyncio.Semaphore):
+    """
+    Wrapper to ensure semaphore is released even if handling crashes.
+    """
+    try:
+        await handle_queue_message(receiver, msg, get_settings=get_settings, clients=clients)
+    except Exception as ex:
+        logger.exception("Wrapper caught unhandled processing error: %s", ex)
+    finally:
+        semaphore.release()
+
 
 
 class ProcessingTimer:
@@ -103,6 +133,20 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
                 # Standard Ingestion Branch
                 if not blob_url:
                      raise ValueError("Ingestion mode requires blob_url")
+
+                # Update status to PROCESSING so it shows up in dashboard immediately
+                try:
+                    logger.info("[msg:%s] Setting status to PROCESSING for %s", message_id, blob_url)
+                    processing_record = EmailRecord(
+                        id=blob_id_from_url(blob_url),
+                        file_url=blob_url,
+                        status="PROCESSING",
+                        updated_at=datetime.now(timezone.utc),
+                        created_at=getattr(msg, "enqueued_time_utc", datetime.now(timezone.utc))
+                    )
+                    await save_to_cosmos(processing_record, clients=clients)
+                except Exception as e:
+                     logger.warning("[msg:%s] Could not set PROCESSING status: %s", message_id, e)
 
                 settings = get_settings()
                 if inspect.iscoroutine(settings):

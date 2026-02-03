@@ -14,98 +14,98 @@ const isResetting = ref(false)
 const resetResult = ref(null)
 
 const confirmResetStep1 = () => {
-    showResetModal1.value = true
+  showResetModal1.value = true
 }
 
 const proceedToStep2 = () => {
-    showResetModal1.value = false
-    showResetModal2.value = true
+  showResetModal1.value = false
+  showResetModal2.value = true
 }
 
 const executeReset = async () => {
-    isResetting.value = true
-    resetResult.value = null
-    try {
-        const res = await fetch('/api/admin/reset', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ confirm_1: true, confirm_2: true })
-        })
-        const data = await res.json()
-        if (res.ok) {
-            resetResult.value = {
-                type: 'success',
-                message: `Environment Reset Complete. Deleted ${data.deleted_blobs} files and ${data.deleted_records} database records.`
-            }
-        } else {
-            resetResult.value = {
-                type: 'error',
-                message: data.detail || 'Reset failed.'
-            }
-        }
-    } catch (e) {
-        resetResult.value = { type: 'error', message: e.message }
-    } finally {
-        isResetting.value = false
-        showResetModal2.value = false
+  isResetting.value = true
+  resetResult.value = null
+  try {
+    const res = await fetch('/api/admin/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm_1: true, confirm_2: true })
+    })
+    const data = await res.json()
+    if (res.ok) {
+      resetResult.value = {
+        type: 'success',
+        message: `Environment Reset Complete. Deleted ${data.deleted_blobs} files and ${data.deleted_records} database records.`
+      }
+    } else {
+      resetResult.value = {
+        type: 'error',
+        message: data.detail || 'Reset failed.'
+      }
     }
+  } catch (e) {
+    resetResult.value = { type: 'error', message: e.message }
+  } finally {
+    isResetting.value = false
+    showResetModal2.value = false
+  }
 }
 
 const initMermaid = async () => {
-    const darkMode = document.documentElement.classList.contains('dark')
-    mermaid.initialize({
-        startOnLoad: false,
-        theme: darkMode ? 'dark' : 'default',
-        securityLevel: 'loose'
-    })
-    await nextTick()
-    await mermaid.run({
-        nodes: document.querySelectorAll('.mermaid')
-    })
+  const darkMode = document.documentElement.classList.contains('dark')
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: darkMode ? 'dark' : 'default',
+    securityLevel: 'loose'
+  })
+  await nextTick()
+  await mermaid.run({
+    nodes: document.querySelectorAll('.mermaid')
+  })
 }
 
 onMounted(() => {
-    // Initial theme check
-    isDark.value = document.documentElement.classList.contains('dark')
+  // Initial theme check
+  isDark.value = document.documentElement.classList.contains('dark')
 
-    // Watch for theme changes
-    observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.attributeName === 'class') {
-                isDark.value = document.documentElement.classList.contains('dark')
-            }
-        })
+  // Watch for theme changes
+  observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.attributeName === 'class') {
+        isDark.value = document.documentElement.classList.contains('dark')
+      }
     })
-    observer.observe(document.documentElement, { attributes: true })
+  })
+  observer.observe(document.documentElement, { attributes: true })
 
-    if (currentTab.value === 'architecture') {
-        initMermaid()
-    }
+  if (currentTab.value === 'architecture') {
+    initMermaid()
+  }
 })
 
 onUnmounted(() => {
-    if (observer) observer.disconnect()
+  if (observer) observer.disconnect()
 })
 
 const redocUrl = computed(() => {
-    return `/docs/redoc-custom?theme=${isDark.value ? 'dark' : 'light'}`
+  return `/docs/redoc-custom?theme=${isDark.value ? 'dark' : 'light'}`
 })
 
 const switchTab = (tab) => {
-    currentTab.value = tab
-    if (tab === 'architecture') {
-        // slight delay to let DOM render
-        setTimeout(initMermaid, 100)
-    }
+  currentTab.value = tab
+  if (tab === 'architecture') {
+    // slight delay to let DOM render
+    setTimeout(initMermaid, 100)
+  }
 }
 
 // Architecture Diagram Definition
 const diagram = `
 graph TD
     classDef azure fill:#0072C6,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef app fill:#50e6ff,stroke:#333,stroke-width:2px;
+    classDef app fill:#50e6ff,stroke:#333,stroke-width:2px,color:#000;
     classDef db fill:#59b4d9,stroke:#333,stroke-width:2px;
-    classDef ai fill:#ff9900,stroke:#333,stroke-width:2px;
+    classDef ai fill:#ff9900,stroke:#333,stroke-width:2px,color:#000;
 
     Client([Client Browser]) -->|HTTPS| FE[Vue Frontend]
     FE -->|API Calls| API[FastAPI Backend]
@@ -122,7 +122,7 @@ graph TD
     SB -->|Trigger| Worker
     Worker -->|Read File| Blob
     Worker -->|OCR| Mistral[Mistral AI OCR]
-    Worker -->|Classify| OPENAI[Azure OpenAI Phi-4]
+    Worker -->|Classify| OPENAI[Azure OpenAI<br/>(Phi-4 / Any LLM)]
 
     Mistral -->|Markdown| Worker
     OPENAI -->|JSON Intent| Worker
@@ -138,7 +138,9 @@ graph TD
   <div class="max-w-6xl mx-auto space-y-6">
     <div class="md:flex md:items-center md:justify-between">
       <div class="min-w-0 flex-1">
-        <h2 class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">
+        <h2
+          class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight"
+        >
           Developer Documentation
         </h2>
       </div>
@@ -222,7 +224,8 @@ graph TD
           </h3>
           <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
             <p>
-              This action will delete <strong>ALL</strong> PDF files from Azure Blob Storage and <strong>ALL</strong> email records from Cosmos DB.
+              This action will delete <strong>ALL</strong> PDF files from Azure Blob Storage and <strong>ALL</strong>
+              email records from Cosmos DB.
               The system will return to a clean slate.
             </p>
           </div>
@@ -318,10 +321,13 @@ graph TD
             System Architecture
           </h3>
           <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
-            The ClassiMail system leverages Azure Container Apps, Azure AI Services, and Cosmos DB to provide a scalable email classification pipeline.
+            The ClassiMail system leverages Azure Container Apps, Azure AI Services, and Cosmos DB to provide a scalable
+            email classification pipeline.
           </p>
 
-          <div class="flex justify-center bg-white dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto">
+          <div
+            class="flex justify-center bg-white dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto"
+          >
             <div class="mermaid">
               {{ diagram }}
             </div>
@@ -417,8 +423,8 @@ graph TD
 
 <style>
 .mermaid {
-    width: 100%;
-    display: flex;
-    justify-content: center;
+  width: 100%;
+  display: flex;
+  justify-content: center;
 }
 </style>

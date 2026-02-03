@@ -20,5 +20,12 @@ if ! uv run pytest -q tests/test_smoke.py; then
     exit 1
 fi
 
+# 3. I18N Check
+echo "Verifying I18N Locales..."
+if ! python scripts/check_i18n.py; then
+    echo "I18N verification failed. Locales are not synchronized."
+    exit 1
+fi
+
 echo "All checks passed!"
 exit 0

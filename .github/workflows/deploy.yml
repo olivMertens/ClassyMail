@@ -280,6 +280,23 @@ jobs:
               --env-vars PORT=8000
           fi
 
+      - name: Wait for API App stability
+        run: |
+          APP="${{ env.IMAGE_NAME }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          echo "Checking stability of $APP in $RG..."
+          for i in {1..30}; do
+            STATUS=$(az containerapp show -n "$APP" -g "$RG" --query properties.provisioningState -o tsv 2>/dev/null || echo "NotFound")
+            echo "Current ProvisioningState: $STATUS"
+            # Succeeded and Failed are terminal states. InProgress/Creating/Updating are not.
+            if [ "$STATUS" == "Succeeded" ] || [ "$STATUS" == "Failed" ] || [ "$STATUS" == "NotFound" ]; then
+               echo "Resource is in a terminal state. Proceeding."
+               break
+            fi
+            echo "Resource is busy. Waiting 10s..."
+            sleep 10
+          done
+
       - name: Assign managed identity to API Container App
         run: |
           IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
@@ -390,6 +407,22 @@ jobs:
                 --image "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
             fi
           fi
+
+      - name: Wait for Worker App stability
+        run: |
+          APP="${{ env.WORKER_APP_NAME }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          echo "Checking stability of $APP in $RG..."
+          for i in {1..30}; do
+            STATUS=$(az containerapp show -n "$APP" -g "$RG" --query properties.provisioningState -o tsv 2>/dev/null || echo "NotFound")
+            echo "Current ProvisioningState: $STATUS"
+            if [ "$STATUS" == "Succeeded" ] || [ "$STATUS" == "Failed" ] || [ "$STATUS" == "NotFound" ]; then
+               echo "Resource is in a terminal state. Proceeding."
+               break
+            fi
+            echo "Resource is busy. Waiting 10s..."
+            sleep 10
+          done
 
       - name: Assign managed identity to Worker Container App
         run: |

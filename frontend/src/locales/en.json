@@ -16,6 +16,7 @@
         "language": "Language",
         "costs_title": "Cost Overrides",
         "costs_desc": "Override the default pricing used for cost calculations. Leave blank to use defaults.",
+        "telemetry_title": "Application Insights Telemetry",
         "tabs": {
             "processing": "Processing",
             "finetuning": "Fine-tuning",
@@ -35,6 +36,27 @@
             },
             "ocr_retries": "Max OCR Attempts",
             "ocr_retries_help": "Number of OCR retry attempts (exponential backoff on network errors)."
+        },
+        "finetuning": {
+            "title": "Fine-tuning Configuration",
+            "desc": "Configure parameters for Fine-tuning dataset generation.",
+            "min_samples": "Minimum Samples Required",
+            "min_samples_help": "Minimum number of reviewed examples required to enable JSONL export.",
+            "info_title": "Why JSONL?",
+            "info_desc": "The JSONL (JSON Lines) format is the standard requirement for fine-tuning OpenAI models on Azure. Each line represents a separate training example containing a system message, user input, and the expected assistant response.",
+            "learn_more": "Learn more about Fine-tuning in Azure AI Foundry"
+        },
+        "danger": {
+            "title": "Danger Zone",
+            "desc": "Destructive operations that cannot be undone. Proceed with caution.",
+            "dlq_title": "Dead Letter Queue (DLQ) Management",
+            "dlq_help": "Service Bus automatically moves processing failures to the DLQ after max retries.",
+            "dlq_desc": "Messages land in DLQ when processing fails repeatedly. Investigate the cause, then purge to retry or clean up.",
+            "view_dlq": "View DLQ Messages",
+            "purge_dlq": "Purge DLQ",
+            "reset_title": "Atomic Reset - Delete All Data",
+            "reset_desc": "Proceed with extreme caution. This action will permanently delete all data in the current environment.",
+            "reset_warning_title": "This action will:"
         },
         "strategy_standard_help": "Fast & Efficient. Best for standard typed text documents and clear emails.",
         "strategy_reasoning_help": "Deep Analysis. Uses Chain-of-Thought to justify decisions before classifying. Useful for ambiguous cases.",
@@ -114,7 +136,7 @@
         "tagline": "GenAI that knows exactly where every email belongs.",
         "contact": "Contact",
         "target_title": "Target & Scope",
-        "target_desc": "This Proof of Concept (POC) demonstrates an automated email classification pipeline using Azure AI services. It aims to validate the accuracy of LLMs (Phi-4) for intent detection and the feasibility of a serverless, event-driven architecture.",
+        "target_desc": "This Proof of Concept (POC) demonstrates an automated email classification pipeline using Azure AI services. It validates the high accuracy and low latency of Small Language Models (SLM) like Phi-4 for intent detection, deployed within a scalable, event-driven architecture.",
         "resources_title": "Deployed Resources",
         "guide_prompt": "For detailed instructions and architecture, see the",
         "guide_link": "Application Guide",
@@ -134,15 +156,10 @@
         },
         "disclaimer": "*Indicative rates, dependent on region and actual usage.",
         "features": {
-            "title": "Features",
-            "model_phi4": "Phi-4 (SLM)",
-            "model_desc": "Cost-effective, high-speed classification.",
-            "serverless": "Serverless",
-            "serverless_desc": "Azure Container Apps & Cosmos DB (Scale to Zero).",
-            "privacy": "Privacy First",
-            "privacy_desc": "PII Anonymization for fine-tuning exports.",
-            "adversarial": "Adversarial",
-            "adversarial_desc": "Multi-model comparison."
+            "title": "New Features",
+            "adversarial": "Adversarial Mode: Phi-4 vs Alternative Models",
+            "dark_mode": "Dark Mode Support & Themes",
+            "retail_prices": "Cost Estimation via Azure Retail Prices"
         },
         "close": "Close"
     },
