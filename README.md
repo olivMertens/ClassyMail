@@ -358,8 +358,9 @@ python scripts/generate_dummy_pdfs.py --count 75 --target-words 300 --use-aoai
 ### Export CSV
 
 - CLI (recommandé): `python -m classificationg2s.cli --export-csv data/output.csv`
+- UI (Dashboard) : `Télécharger CSV Report`
+- Colonnes : `id`, `text_ocr`, `category_detected`, `processing_time`, `precision`, `model_name`, `explanation`
 - Export fine-tuning JSONL: `python -m classificationg2s.cli --export-finetune-jsonl data/fine_tune.jsonl`
-- Colonnes : `intents`, `needs_review`, `global_complexity`
 
 ---
 
