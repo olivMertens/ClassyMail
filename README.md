@@ -1,5 +1,7 @@
 
-# POC Classification Emails : Azure AI Foundry & Mistral + FastAPI Dashboard
+# ClassyMail — GenAI Email Classification
+
+**GenAI that knows exactly where every email belongs.**
 
 **Author:** Olivier Mertens — olmertens@microsoft.com
 **Update:** Février 2026 (POC Refonte UI & Infra)
@@ -7,9 +9,9 @@
 [![Dashboard UI](https://raw.githubusercontent.com/olivMertens/classimail-agent/main/docs/assets/dashboard_preview.png)](https://raw.githubusercontent.com/olivMertens/classimail-agent/main/docs/assets/dashboard_preview.png)
 *Click image to view full size*
 
-## Pourquoi ce POC ?
+## Pourquoi ClassyMail ?
 
-Ce repo est un **POC “agent + pipeline”** pour traiter des emails/PDFs **à fort volume**, avec un objectif de **latence stable** et de **coûts observables**.
+**ClassyMail** est un **POC "agent + pipeline"** pour traiter des emails/PDFs **à fort volume**, avec un objectif de **latence stable** et de **coûts observables**.
 Il sert à valider rapidement :
 
 - Une architecture **événementielle découplée** (ingestion vs traitement) pour absorber des pics (ex: 10k fichiers).

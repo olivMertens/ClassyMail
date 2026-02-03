@@ -54,6 +54,9 @@ async def list_emails(
             filters.append("c.status = @status")
             params["@status"] = status
 
+        # Always filter out non-email documents (like settings)
+        filters.append("IS_DEFINED(c.file_url)")
+
         # Search filter
         if search:
             filters.append("IS_DEFINED(c.search_text) AND CONTAINS(c.search_text, @search)")
