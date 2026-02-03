@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+import re
 import httpx
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
@@ -231,9 +232,22 @@ class ChatAgent:
             }
         ]
 
-        # Ensure system prompt
+        # Ensure developer prompt (Reasoning models prefer 'developer' over 'system')
         conversation = list(messages)
-        if not conversation or conversation[0].get("role") != "system":
+
+        # specific handling for reasoning models (gpt-5.x, o1, etc)
+        # 1. Convert any existing 'system' messages to 'developer'
+        # 2. Or insert developer prompt if missing
+
+        has_context = False
+        for msg in conversation:
+            if msg.get("role") == "system":
+                msg["role"] = "developer"
+                has_context = True
+            elif msg.get("role") == "developer":
+                has_context = True
+
+        if not has_context:
             system_prompt = (
                 "You are a dedicated AI assistant for the 'ClassificationG2S' email processing system. "
                 "Your ONLY purpose is to help users manage and search for insurance emails processed by this system. "
@@ -250,45 +264,59 @@ class ChatAgent:
                 "8. If asked about throughput or durations, use get_processing_stats_by_day and report per-day count and avg/sum durations in seconds.\n"
                 "9. NEVER output raw JSON or internal reasoning in the final response. If you use a tool, do not repeat its arguments or explain your decision process. Just provide the final answer.\n"
                 "10. CRITICAL: Do not expose your internal thinking process. Only output the final user-facing response.\n"
-                "11. NEVER output a raw JSON object as your final answer. If you want to perform a search, you MUST use the provided tools (function calling) instead of writing the JSON parameters in the text."
+                "11. NEVER output a raw JSON object as your final answer. If you want to perform a search, you MUST use the provided tools (function calling) instead of writing the JSON parameters in the text.\n"
+                "12. optimization: Call tools only when necessary. If the user greets you, just reply greeting."
             )
-            conversation.insert(0, {"role": "system", "content": system_prompt})
+            conversation.insert(0, {"role": "developer", "content": system_prompt})
 
         try:
-            # First turn
-            response_json = await self._call_llm(conversation, tools)
-            if "choices" not in response_json or not response_json["choices"]:
-                 logger.error(f"Unexpected LLM response: {response_json}")
-                 return {"role": "assistant", "content": "Error: unexpected response from LLM."}
+            # Main Loop for multi-turn tool execution (Reasoning models do sequential calls)
+            MAX_TURNS = 5
+            turn_count = 0
 
-            message = response_json["choices"][0]["message"]
+            while turn_count < MAX_TURNS:
+                turn_count += 1
 
-            # Handle tool calls
-            tool_calls = message.get("tool_calls")
-            content = message.get("content")
+                # Call LLM
+                response_json = await self._call_llm(conversation, tools)
 
-            # HEURISTIC FIX: If model outputs raw JSON tool args as content instead of using tool_calls
-            if not tool_calls and content and content.strip().startswith("{") and "query" in content:
-                try:
-                    _ = json.loads(content.strip())
-                    # It parses as JSON. Assume it's a hallucinated tool call for search_email_by_text (primary search)
-                    # We construct a fake tool_call and inject it into the flow.
-                    logger.warning("Chatbot recovered from hallucinated JSON tool call in content.")
-                    tool_calls = [{
-                        "id": f"call_{uuid.uuid4()}",
-                        "type": "function",
-                        "function": {
-                            "name": "search_email_by_text",
-                            "arguments": content.strip()
-                        }
-                    }]
-                except Exception:
-                    # Not valid JSON or parsing failed, verify if it was reasoning text starting with {
-                    pass
+                if "choices" not in response_json or not response_json["choices"]:
+                     logger.error(f"Unexpected LLM response: {response_json}")
+                     return {"role": "assistant", "content": "Error: unexpected response from LLM."}
 
-            if tool_calls:
+                message = response_json["choices"][0]["message"]
+                tool_calls = message.get("tool_calls")
+                content = message.get("content")
+
+                # HEURISTIC FIX: Recover from hallucinated JSON in content
+                if not tool_calls and content:
+                    json_match = re.search(r'\{.*"query":.*\}', content.strip(), re.DOTALL)
+                    if json_match:
+                        try:
+                            json_str = json_match.group(0)
+                            _ = json.loads(json_str)
+                            logger.warning("Chatbot recovered from hallucinated JSON tool call.")
+                            tool_calls = [{
+                                "id": f"call_{uuid.uuid4()}",
+                                "type": "function",
+                                "function": {
+                                    "name": "search_email_by_text",
+                                    "arguments": json_str
+                                }
+                            }]
+                            content = None # Clear content as we converted it
+                        except Exception:
+                            pass
+
+                # If no tools, we have our final answer (or just text)
+                if not tool_calls:
+                    content = self._extract_final_answer(content)
+                    return {"role": "assistant", "content": content}
+
+                # Handle Tool Calls
                 conversation.append(message)  # Add assistant's request to history
 
+                # Execute all requested tools (usually 1 if parallel=False, but loop handles list generic)
                 for tool_call in tool_calls:
                     fn = tool_call["function"]
                     fname = fn["name"]
@@ -314,7 +342,6 @@ class ChatAgent:
                             content_str = json.dumps(result, default=str)
                         elif fname == "search_email_by_text":
                             limit = args.get("limit", 5)
-                            # Ensure limit is int
                             if isinstance(limit, str) and limit.isdigit():
                                 limit = int(limit)
                             results = await search_email_by_text(args.get("query"), limit=limit, clients=clients)
@@ -368,27 +395,9 @@ class ChatAgent:
                         "content": content_str
                     })
 
-                # Second turn
-                final_response = await self._call_llm(conversation)
-                if "choices" in final_response and final_response["choices"]:
-                    content = final_response["choices"][0]["message"]["content"]
-                    # Strip reasoning traces from o1/reasoning models
-                    content = self._extract_final_answer(content)
-                    return {
-                        "role": "assistant",
-                        "content": content
-                    }
-                else:
-                    return {"role": "assistant", "content": "I processed the data but received an empty response."}
+                # Loop continues to next turn to let Model see tool results and decide next step...
 
-            # Simple message response
-            content = message["content"]
-            # Strip reasoning traces from o1/reasoning models
-            content = self._extract_final_answer(content)
-            return {
-                "role": "assistant",
-                "content": content
-            }
+            return {"role": "assistant", "content": "Error: Chatbot exceeded maximum turns."}
 
         except Exception as e:
             logger.error(f"Chatbot error: {e}", exc_info=True)
@@ -399,13 +408,17 @@ class ChatAgent:
 
     async def _call_llm(self, messages: list[dict], tools: list[dict] | None = None) -> dict:
         headers = self._auth_header_func()
+        # Reasoning models (e.g. gpt-5.x, o1, o3) do not support 'temperature' or 'top_p'.
+        # We rely on their internal reasoning for consistency.
         payload = {
             "messages": messages,
-            "max_completion_tokens": 800,
+            "max_completion_tokens": 4000, # Increased limit to accommodate reasoning/CoT tokens
         }
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
+            # Explicitly DISABLE parallel tool calls (NOT supported by reasoning models like o1)
+            payload["parallel_tool_calls"] = False
 
         logger.info(f"Calling Chat LLM: {self.endpoint_url}")
         async with httpx.AsyncClient(timeout=60) as client:
@@ -440,6 +453,17 @@ class ChatAgent:
                 if len(parts) > 1:
                     return parts[1].strip()
 
+        # Clean specific technical junk observed in logs
+        if "<njson" in content:
+            content = re.sub(r'<njson.*?>', '', content, flags=re.DOTALL)
+        if "to=functions" in content:
+            content = re.sub(r'to=functions\.[a-zA-Z0-9_]+', '', content)
+
+        # Remove standalone JSON blocks if mixed with text
+        # This regex matches { "key": ... } blocks
+        if "{" in content and "}" in content:
+             content = re.sub(r'\{.*"query":.*\}', '', content, flags=re.DOTALL)
+
         # If content starts with obvious reasoning traces, try to extract the substantive part
         lines = content.split("\n")
         # Filter out lines that look like internal reasoning
@@ -453,6 +477,10 @@ class ChatAgent:
             "Oops I need function",
             "This is going nowhere",
             "Given issue",
+            "Oops formatting",
+            "Need proper function call",
+            "Actually tool calling",
+            "Actually same mistake"
         ]
 
         filtered_lines = []
