@@ -59,8 +59,29 @@ const latestComparison = computed(() => {
   return (hasMeta && hasModels) ? comparison : null
 })
 
+const allComparisons = computed(() => {
+  const results = email.value?.comparison_results
+  if (!results || !Array.isArray(results)) return []
+
+  // Filter and validate all comparisons
+  return results.filter(comparison => {
+    if (!comparison) return false
+    const hasMeta = comparison.meta && (
+      comparison.meta.executed_at ||
+      comparison.meta.agreement !== undefined ||
+      comparison.meta.confidence_delta !== undefined
+    )
+    const hasModels = comparison.model_results && Object.keys(comparison.model_results).length > 0
+    return hasMeta && hasModels
+  }).reverse() // Most recent first
+})
+
 const hasValidComparison = computed(() => {
   return latestComparison.value !== null
+})
+
+const comparisonCount = computed(() => {
+  return allComparisons.value.length
 })
 
 const getModelStyles = (modelName) => {
@@ -613,9 +634,17 @@ const renderMarkdown = (text) => md.render(text || '')
                   class="space-y-6"
                 >
                   <div class="flex justify-between items-center">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-                      Adversarial Model Comparison
-                    </h3>
+                    <div>
+                      <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                        Adversarial Model Comparison
+                      </h3>
+                      <p
+                        v-if="comparisonCount > 0"
+                        class="text-sm text-gray-500 dark:text-gray-400"
+                      >
+                        {{ comparisonCount }} comparison{{ comparisonCount > 1 ? 's' : '' }} executed
+                      </p>
+                    </div>
                     <button
                       :disabled="isComparing"
                       class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 flex items-center gap-2"
@@ -631,81 +660,110 @@ const renderMarkdown = (text) => md.render(text || '')
 
                   <div
                     v-if="hasValidComparison"
-                    class="space-y-6"
+                    class="space-y-4"
                   >
-                    <!-- Agreement Banner -->
+                    <!-- Loop through all comparisons -->
                     <div
-                      class="rounded-md p-4 border flex items-center gap-3"
-                      :class="latestComparison.meta?.agreement ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300' : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300'"
+                      v-for="(comparison, index) in allComparisons"
+                      :key="index"
+                      class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
                     >
-                      <div class="text-2xl">
-                        {{ latestComparison.meta?.agreement ? '✅' : '⚠️' }}
-                      </div>
-                      <div>
-                        <h4 class="font-bold">
-                          {{ latestComparison.meta?.agreement ? 'Models Agree' : 'Divergence Detected' }}
-                        </h4>
-                        <p class="text-sm opacity-90">
-                          Confidence Delta: {{ latestComparison.meta?.confidence_delta?.toFixed(2) || 'N/A' }} | Execution: {{
-                            latestComparison.meta?.elapsed_ms || 'N/A' }}ms
-                        </p>
-                      </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <!-- Comparison Header -->
                       <div
-                        v-for="(result, modelName) in parsedComparisonResults"
-                        :key="modelName"
-                        class="rounded-lg border p-4"
-                        :class="getModelStyles(modelName).card"
+                        class="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
                       >
-                        <div
-                          class="flex justify-between mb-3 border-b pb-2"
-                          :class="getModelStyles(modelName).border"
-                        >
-                          <h4
-                            class="font-bold"
-                            :class="getModelStyles(modelName).text"
-                          >
-                            {{ getModelStyles(modelName).displayName }}
-                          </h4>
+                        <div class="flex justify-between items-center">
+                          <div class="flex items-center gap-3">
+                            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                              #{{ comparisonCount - index }}
+                            </span>
+                            <div
+                              class="flex items-center gap-2 text-sm"
+                              :class="comparison.meta?.agreement ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'"
+                            >
+                              <span class="text-lg">{{ comparison.meta?.agreement ? '✅' : '⚠️' }}</span>
+                              <span class="font-medium">
+                                {{ comparison.meta?.agreement ? 'Agreement' : 'Divergence' }}
+                              </span>
+                            </div>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                              Δ {{ comparison.meta?.confidence_delta?.toFixed(2) || 'N/A' }}
+                            </span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                              {{ comparison.meta?.elapsed_ms || 'N/A' }}ms
+                            </span>
+                          </div>
+                          <div class="text-xs text-gray-500 dark:text-gray-400">
+                            {{ comparison.meta?.executed_at ? new Date(comparison.meta.executed_at).toLocaleString() : 'Unknown' }}
+                          </div>
+                        </div>
+                        <!-- Models badges -->
+                        <div class="flex gap-2 mt-2">
                           <span
-                            class="text-xs px-2 py-0.5 rounded-full"
+                            v-for="modelName in Object.keys(comparison.model_results || {})"
+                            :key="modelName"
+                            class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                             :class="getModelStyles(modelName).badge"
                           >
-                            {{ result.global_complexity || 'N/A' }}
+                            {{ modelName }}
                           </span>
                         </div>
-                        <div class="space-y-3">
+                      </div>
+
+                      <!-- Comparison Results -->
+                      <div class="p-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div
-                            v-for="intent in result.detected_intents"
-                            :key="intent.intent"
-                            class="bg-white dark:bg-gray-800 p-3 rounded shadow-sm"
+                            v-for="(result, modelName) in comparison.model_results"
+                            :key="modelName"
+                            class="rounded-lg border p-4"
+                            :class="getModelStyles(modelName).card"
                           >
-                            <div class="flex justify-between items-start">
-                              <span class="font-semibold text-gray-900 dark:text-white">{{ intent.intent }}</span>
-                              <span class="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">{{
-                                Math.round(intent.confidence * 100) }}%</span>
+                            <div
+                              class="flex justify-between mb-3 border-b pb-2"
+                              :class="getModelStyles(modelName).border"
+                            >
+                              <h4
+                                class="font-bold"
+                                :class="getModelStyles(modelName).text"
+                              >
+                                {{ getModelStyles(modelName).displayName }}
+                              </h4>
+                              <span
+                                class="text-xs px-2 py-0.5 rounded-full"
+                                :class="getModelStyles(modelName).badge"
+                              >
+                                {{ result.global_complexity || 'N/A' }}
+                              </span>
                             </div>
-                            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 italic">
-                              {{ intent.justification }}
-                            </p>
-                          </div>
-                          <div
-                            v-if="!result.detected_intents?.length"
-                            class="text-xs text-gray-500 italic"
-                          >
-                            No intents detected.
-                            <div v-if="result.classification_reason">
-                              Reason: {{ result.classification_reason }}
+                            <div class="space-y-3">
+                              <div
+                                v-for="intent in result.detected_intents"
+                                :key="intent.intent"
+                                class="bg-white dark:bg-gray-800 p-3 rounded shadow-sm"
+                              >
+                                <div class="flex justify-between items-start">
+                                  <span class="font-semibold text-gray-900 dark:text-white">{{ intent.intent }}</span>
+                                  <span class="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">{{
+                                    Math.round(intent.confidence * 100) }}%</span>
+                                </div>
+                                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 italic">
+                                  {{ intent.justification }}
+                                </p>
+                              </div>
+                              <div
+                                v-if="!result.detected_intents?.length"
+                                class="text-xs text-gray-500 italic"
+                              >
+                                No intents detected.
+                                <div v-if="result.classification_reason">
+                                  Reason: {{ result.classification_reason }}
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-
-                    <div class="text-xs text-gray-400 text-center">
-                      Comparison run at: {{ latestComparison.meta?.executed_at ? new Date(latestComparison.meta.executed_at).toLocaleString() : 'Unknown' }}
                     </div>
                   </div>
 
