@@ -569,14 +569,14 @@ onMounted(() => {
               <option value="phi4">
                 Phi-4 (Standard)
               </option>
-              <option value="gpt5-nano">
-                GPT-5 Nano
+              <option value="gpt-5-nano">
+                gpt-5-nano
               </option>
-              <option value="gpt5-mini">
-                GPT-5 Mini
+              <option value="gpt-5-mini">
+                gpt-5-mini
               </option>
-              <option value="gpt4.1-nano">
-                GPT-4.1 Nano
+              <option value="gpt-4.1-nano">
+                gpt-4.1-nano
               </option>
             </select>
           </div>
@@ -602,16 +602,16 @@ onMounted(() => {
                   None (Single Model)
                 </option>
                 <option value="gpt-4o">
-                  GPT-4o (Standard)
+                  gpt-4o
                 </option>
                 <option value="gpt-4o-mini">
-                  GPT-4o-Mini
+                  gpt-4o-mini
                 </option>
-                <option value="gpt5-nano">
-                  GPT-5 Nano
+                <option value="gpt-5-nano">
+                  gpt-5-nano
                 </option>
                 <option value="gpt-4.1-nano">
-                  GPT-4.1 Nano
+                  gpt-4.1-nano
                 </option>
               </select>
             </div>
@@ -638,7 +638,7 @@ onMounted(() => {
                   <div class="flex items-center justify-between">
                     <span><strong>gpt-4o:</strong> Quality 0.92 ⭐⭐, Cost ~$120/10K emails</span>
                     <span
-                      v-if="settings.ai_model === 'gpt4o'"
+                      v-if="settings.ai_model === 'gpt-4o'"
                       class="text-green-600 dark:text-green-400"
                     >✓
                       Selected</span>
@@ -646,7 +646,15 @@ onMounted(() => {
                   <div class="flex items-center justify-between">
                     <span><strong>gpt-5-mini:</strong> Quality 0.89 ⭐, Cost ~$70/10K emails</span>
                     <span
-                      v-if="settings.ai_model === 'gpt5-mini'"
+                      v-if="settings.ai_model === 'gpt-5-mini'"
+                      class="text-green-600 dark:text-green-400"
+                    >✓
+                      Selected</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span><strong>gpt-5-nano:</strong> Quality 0.79 ⭐, Cost ~$35/10K emails</span>
+                    <span
+                      v-if="settings.ai_model === 'gpt-5-nano'"
                       class="text-green-600 dark:text-green-400"
                     >✓
                       Selected</span>
@@ -670,7 +678,7 @@ onMounted(() => {
                   <div class="flex items-center justify-between">
                     <span><strong>gpt-4o-mini:</strong> Quality 0.84, Cost ~$22/10K emails</span>
                     <span
-                      v-if="settings.ai_model === 'gpt4o-mini'"
+                      v-if="settings.ai_model === 'gpt-4o-mini'"
                       class="text-green-600 dark:text-green-400"
                     >✓
                       Selected</span>
@@ -678,20 +686,18 @@ onMounted(() => {
                   <div class="flex items-center justify-between">
                     <span><strong>gpt-4.1-nano:</strong> Quality 0.69, Cost ~$17/10K emails</span>
                     <span
-                      v-if="settings.ai_model === 'gpt4.1-nano'"
+                      v-if="settings.ai_model === 'gpt-4.1-nano'"
                       class="text-green-600 dark:text-green-400"
                     >✓
                       Selected</span>
                   </div>
                   <p class="mt-2 text-xs italic border-t border-blue-200 dark:border-blue-700 pt-2">
-                    💡 <strong>Strategy:</strong> Use <strong>gpt-4o</strong> for highest quality,
-                    <strong>gpt-4o-mini</strong> for balanced quality/cost, or <strong>Phi-4</strong> (base or
-                    fine-tuned) for cost-efficiency at high volume (>5K/month).
-                    See <a
-                      href="https://github.com/olivMertens/classimail-agent/blob/main/docs/MODELS.md#cost-benefit-analysis-fine-tuned-vs-pre-trained-models"
+                    💡 <strong>Strategy:</strong> Prices may vary by region and volume. Please verify with the
+                    <a
+                      href="https://azure.microsoft.com/en-us/pricing/calculator/"
                       target="_blank"
-                      class="underline"
-                    >detailed analysis</a>.
+                      class="underline font-bold"
+                    >Azure Pricing Calculator</a>.
                   </p>
                 </div>
               </div>
