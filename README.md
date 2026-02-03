@@ -4,6 +4,8 @@
 **Author:** Olivier Mertens — olmertens@microsoft.com
 **Update:** Février 2026 (POC Refonte UI & Infra)
 
+![Dashboard UI](https://raw.githubusercontent.com/olivMertens/classimail-agent/main/docs/assets/dashboard_preview.png)
+
 ## Pourquoi ce POC ?
 
 Ce repo est un **POC “agent + pipeline”** pour traiter des emails/PDFs **à fort volume**, avec un objectif de **latence stable** et de **coûts observables**.
@@ -83,9 +85,6 @@ Selon ton objectif :
 - Running Phi-4 locally (Foundry Local guide): https://techcommunity.microsoft.com/blog/educatordeveloperblog/running-phi-4-locally-with-microsoft-foundry-local-a-step-by-step-guide/4466304
 
 Ce projet implémente un pipeline de classification d'emails à haut volume et faible latence, capable de gérer des pics de charge (10k fichiers simultanés) grâce à une architecture événementielle découplée, avec un backend FastAPI et un frontend SPA (Vue 3 + Tailwind).
-
-![Dashboard UI](https://raw.githubusercontent.com/olivMertens/classimail-agent/main/docs/assets/dashboard_preview.png)
-<!-- (Note: add a screenshot to docs/assets if available, otherwise just text description below) -->
 
 The new frontend provides a dark-mode enabled dashboard to:
 - Monitor email processing metrics.
