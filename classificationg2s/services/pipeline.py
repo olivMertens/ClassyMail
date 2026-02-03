@@ -52,11 +52,13 @@ async def run_reclassification_pipeline(
     # Store result
     meta = comparison_result.get("comparison_meta", {})
     comparison_record = {
-        "executed_at": meta.get("executed_at", datetime.now(timezone.utc).isoformat()),
-        "model_results": comparison_result.get("model_results"),
-        "agreement": meta.get("agreement"),
-        "confidence_delta": meta.get("confidence_delta"),
-        "processing_time_ms": meta.get("elapsed_ms"),
+        "meta": {
+            "executed_at": meta.get("executed_at", datetime.now(timezone.utc).isoformat()),
+            "agreement": meta.get("agreement", False),
+            "confidence_delta": meta.get("confidence_delta", 0.0),
+            "elapsed_ms": meta.get("elapsed_ms", 0),
+        },
+        "model_results": comparison_result.get("model_results", {}),
         "mode": "async", # This ran via worker
         # Legacy fields
         "phi4": comparison_result.get("phi4"),

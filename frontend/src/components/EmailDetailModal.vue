@@ -37,10 +37,30 @@ const latestComparison = computed(() => {
   const results = email.value?.comparison_results
   if (!results) return null
   // Handle if it's an array (legacy) or single object (current Pydantic model)
+  let comparison = null
   if (Array.isArray(results)) {
-    return results.length > 0 ? results[results.length - 1] : null
+    comparison = results.length > 0 ? results[results.length - 1] : null
+  } else {
+    comparison = results
   }
-  return results
+
+  // Validate that comparison has meaningful data
+  if (!comparison) return null
+
+  // Check if comparison has valid metadata and model results
+  const hasMeta = comparison.meta && (
+    comparison.meta.executed_at ||
+    comparison.meta.agreement !== undefined ||
+    comparison.meta.confidence_delta !== undefined
+  )
+  const hasModels = comparison.model_results && Object.keys(comparison.model_results).length > 0
+
+  // Only return comparison if it has both metadata and model results
+  return (hasMeta && hasModels) ? comparison : null
+})
+
+const hasValidComparison = computed(() => {
+  return latestComparison.value !== null
 })
 
 const getModelStyles = (modelName) => {
@@ -610,7 +630,7 @@ const renderMarkdown = (text) => md.render(text || '')
                   </div>
 
                   <div
-                    v-if="latestComparison"
+                    v-if="hasValidComparison"
                     class="space-y-6"
                   >
                     <!-- Agreement Banner -->
@@ -626,8 +646,8 @@ const renderMarkdown = (text) => md.render(text || '')
                           {{ latestComparison.meta?.agreement ? 'Models Agree' : 'Divergence Detected' }}
                         </h4>
                         <p class="text-sm opacity-90">
-                          Confidence Delta: {{ latestComparison.meta?.confidence_delta }} | Execution: {{
-                            latestComparison.meta?.elapsed_ms }}ms
+                          Confidence Delta: {{ latestComparison.meta?.confidence_delta?.toFixed(2) || 'N/A' }} | Execution: {{
+                            latestComparison.meta?.elapsed_ms || 'N/A' }}ms
                         </p>
                       </div>
                     </div>
@@ -685,7 +705,7 @@ const renderMarkdown = (text) => md.render(text || '')
                     </div>
 
                     <div class="text-xs text-gray-400 text-center">
-                      Comparison run at: {{ new Date(latestComparison.meta?.executed_at).toLocaleString() }}
+                      Comparison run at: {{ latestComparison.meta?.executed_at ? new Date(latestComparison.meta.executed_at).toLocaleString() : 'Unknown' }}
                     </div>
                   </div>
 
