@@ -22,11 +22,16 @@ const loading = ref(false)
 const reprocessing = ref(false)
 const intentsJson = ref('[]')
 const availableCategories = ref([])
+const adversarialModel = ref(null)
 const correctionReason = ref('')
 const activeTab = ref('review') // review | comparison | history
 const isFullWidth = ref(false)
 
-const pdfUrl = computed(() => email.value?.file_url_proxy || email.value?.file_url_sas || email.value?.file_url || null)
+const pdfUrl = computed(() => {
+  const url = email.value?.file_url_proxy || email.value?.file_url_sas || email.value?.file_url || null
+  // Append #toolbar=0 to hide the internal PDF viewer toolbar (save/print/etx)
+  return url ? `${url}#toolbar=0` : null
+})
 
 // New Multi-select state
 const selectedCategoryNames = ref([])
@@ -120,6 +125,7 @@ const loadSettings = async () => {
     if (res.ok) {
       const data = await res.json()
       availableCategories.value = data.categories || []
+      adversarialModel.value = data.adversarial_model
     }
   } catch (e) { console.error(e) }
 }
@@ -582,6 +588,20 @@ const renderMarkdown = (text) => md.render(text || '')
                     </ul>
                   </div>
 
+                  <!-- No Category Reason -->
+                  <div
+                    v-if="(!email.classification?.detected_intents?.length) && email.classification?.classification_reason"
+                  >
+                    <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                      Raisonnement (Aucune catégorie)
+                    </h4>
+                    <div
+                      class="text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700 italic"
+                    >
+                      {{ email.classification.classification_reason }}
+                    </div>
+                  </div>
+
                   <!-- Reason -->
                   <div>
                     <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Raison /
@@ -630,17 +650,26 @@ const renderMarkdown = (text) => md.render(text || '')
                         {{ comparisonCount }} comparison{{ comparisonCount > 1 ? 's' : '' }} executed
                       </p>
                     </div>
-                    <button
-                      :disabled="isComparing"
-                      class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 flex items-center gap-2"
-                      @click="runComparison"
-                    >
-                      <ArrowPathIcon
-                        v-if="isComparing"
-                        class="h-4 w-4 animate-spin"
-                      />
-                      {{ isComparing ? 'Running Models...' : 'Run New Comparison' }}
-                    </button>
+                    <div class="flex flex-col items-end gap-1">
+                      <button
+                        :disabled="isComparing || !adversarialModel"
+                        class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 flex items-center gap-2"
+                        :title="!adversarialModel ? 'Configure Adversarial Model in Settings first' : ''"
+                        @click="runComparison"
+                      >
+                        <ArrowPathIcon
+                          v-if="isComparing"
+                          class="h-4 w-4 animate-spin"
+                        />
+                        {{ isComparing ? 'Running Models...' : 'Run New Comparison' }}
+                      </button>
+                      <span
+                        v-if="!adversarialModel"
+                        class="text-[10px] text-red-500"
+                      >
+                        Requires "Adversarial Model" in Settings
+                      </span>
+                    </div>
                   </div>
 
                   <div
@@ -762,10 +791,11 @@ const renderMarkdown = (text) => md.render(text || '')
                     <p class="mt-1 text-sm text-gray-500">
                       Run an adversarial check to compare Phi-4 with GPT-4o-mini.
                     </p>
-                    <div class="mt-6">
+                    <div class="mt-6 flex flex-col items-center gap-2">
                       <button
                         type="button"
-                        class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                        class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
+                        :disabled="!adversarialModel"
                         @click="runComparison"
                       >
                         <ArrowPathIcon
@@ -774,6 +804,12 @@ const renderMarkdown = (text) => md.render(text || '')
                         />
                         Run Comparison
                       </button>
+                      <p
+                        v-if="!adversarialModel"
+                        class="text-xs text-red-500"
+                      >
+                        Please configure an Adversarial Model in Settings first.
+                      </p>
                     </div>
                   </div>
                 </div>

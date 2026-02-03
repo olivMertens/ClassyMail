@@ -17,7 +17,7 @@ DEFAULT_SETTINGS = {
     "categories": DEFAULT_CATEGORIES,
     "processing_strategy": "standard",  # standard | reasoning | vision
     "ai_model": "phi4",
-    "adversarial_model": "gpt4.1-nano", # Default comparison model
+    "adversarial_model": None, # Default comparison model
     "finetune_min_examples": 50,
     "ocr_max_attempts": 3,
 }
