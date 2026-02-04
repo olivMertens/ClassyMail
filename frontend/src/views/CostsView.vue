@@ -149,6 +149,9 @@ onMounted(() => {
           </dd>
         </div>
       </div>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+        {{ t('costs.counts_hint') }}
+      </p>
 
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <!-- Actual Spend -->

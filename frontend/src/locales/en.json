@@ -98,8 +98,9 @@
             "fixed": "Fixed Estimate (POC)",
             "retail": "Azure Retail Prices API"
         },
-        "processed_emails": "Processed Emails",
-        "emails_usage": "Emails with Usage Data",
+        "processed_emails": "Emails processed (OCR + Classification)",
+        "emails_usage": "Emails priced (usage telemetry)",
+        "counts_hint": "All emails are processed by Mistral OCR and Phi-4 classification. Pricing uses usage telemetry; counts may differ if data is missing or deduplicated.",
         "avg_cost": "Avg AI Cost / Email",
         "actual_spend": "Actual AI Spend (Repo History)",
         "total_ai": "Total AI",
@@ -132,6 +133,7 @@
     },
     "info": {
         "date": "February 2026",
+        "poc_header": "POC - {org} ({date})",
         "subtitle": "ClassiMail Agent",
         "tagline": "GenAI that knows exactly where every email belongs.",
         "contact": "Contact",

@@ -32,7 +32,7 @@ const { t } = useI18n()
                 id="modal-title"
                 class="text-xl font-semibold leading-6 text-gray-900 dark:text-white"
               >
-                POC - {{ props.organizationName }} ({{ t('info.date') }})
+                {{ t('info.poc_header', { org: props.organizationName, date: t('info.date') }) }}
               </h3>
               <button
                 class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-200"
