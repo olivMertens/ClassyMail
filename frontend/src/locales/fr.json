@@ -100,6 +100,7 @@
         },
         "processed_emails": "Emails traités (OCR + Classification)",
         "emails_usage": "Emails tarifés (télémétrie d’usage)",
+        "proc_vs_usage": "Traités : {processed} · Tarifés : {priced}",
         "counts_hint": "Tous les emails sont traités par Mistral OCR et classification Phi-4. La tarification repose sur la télémétrie d’usage ; les compteurs peuvent différer en cas de données manquantes ou dédupliquées.",
         "avg_cost": "Coût IA Moyen / Email",
         "actual_spend": "Dépense IA Réelle (Historique)",
@@ -134,7 +135,7 @@
     "info": {
         "date": "Février 2026",
         "poc_header": "Ce Proof of Concept (POC) - {org} ({date})",
-        "subtitle": "ClassiMail Agent",
+        "subtitle": "ClassyMail Agent",
         "tagline": "L'IA générative qui sait exactement où va chaque email.",
         "contact": "Contact",
         "est_monthly": "Estimation coûts (approx./mois)",
@@ -167,7 +168,7 @@
     },
     "guide": {
         "title": "Documentation de l'Application",
-        "subtitle": "Guide d'utilisation de ClassiMail, compréhension des capacités IA et gestion de la confidentialité.",
+        "subtitle": "Guide d'utilisation de ClassyMail, compréhension des capacités IA et gestion de la confidentialité.",
         "usage": {
             "title": "Comment utiliser",
             "step1_title": "1. Tableau de bord & Monitoring",

@@ -11,31 +11,31 @@ const emailsPerMonth = ref(10000)
 const pricingSource = ref('fixed')
 
 const loadCosts = async () => {
-    loading.value = true
-    error.value = null
-    try {
-        const params = new URLSearchParams()
-        params.set('emails_per_month', emailsPerMonth.value)
-        params.set('pricing_source', pricingSource.value)
-        params.set('region', 'swedencentral')
+  loading.value = true
+  error.value = null
+  try {
+    const params = new URLSearchParams()
+    params.set('emails_per_month', emailsPerMonth.value)
+    params.set('pricing_source', pricingSource.value)
+    params.set('region', 'swedencentral')
 
-        const res = await fetch(`/api/costs/summary?${params.toString()}`)
-        if (res.ok) {
-            costs.value = await res.json()
-        } else {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err.detail || `Server Error: ${res.status}`)
-        }
-    } catch (e) {
-        console.error(e)
-        error.value = e.message
-    } finally {
-        loading.value = false
+    const res = await fetch(`/api/costs/summary?${params.toString()}`)
+    if (res.ok) {
+      costs.value = await res.json()
+    } else {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.detail || `Server Error: ${res.status}`)
     }
+  } catch (e) {
+    console.error(e)
+    error.value = e.message
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(() => {
-    loadCosts()
+  loadCosts()
 })
 </script>
 
@@ -43,7 +43,9 @@ onMounted(() => {
   <div class="space-y-6">
     <div class="md:flex md:items-center md:justify-between">
       <div class="min-w-0 flex-1">
-        <h2 class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">
+        <h2
+          class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight"
+        >
           {{ t('costs.title') }}
         </h2>
       </div>
@@ -62,7 +64,8 @@ onMounted(() => {
     <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
         <div>
-          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('costs.emails_projection') }}</label>
+          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{
+            t('costs.emails_projection') }}</label>
           <div class="mt-2">
             <input
               v-model.number="emailsPerMonth"
@@ -72,7 +75,8 @@ onMounted(() => {
           </div>
         </div>
         <div>
-          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('costs.pricing_source') }}</label>
+          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('costs.pricing_source')
+          }}</label>
           <div class="mt-2">
             <select
               v-model="pricingSource"
@@ -111,7 +115,8 @@ onMounted(() => {
         Start Processing to see Costs
       </h3>
       <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
-        No cost data is available yet because the database is empty or unreachable. Upload your first document to initialize specific cost tracking.
+        No cost data is available yet because the database is empty or unreachable. Upload your first document to
+        initialize specific cost tracking.
       </p>
       <p class="mt-4 text-xs text-gray-400 font-mono bg-gray-100 dark:bg-gray-900 p-2 rounded inline-block">
         Debug: {{ error }}
@@ -123,22 +128,17 @@ onMounted(() => {
       class="space-y-6"
     >
       <!-- Stats -->
-      <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
-        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
-          <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-            {{ t('costs.processed_emails') }}
-          </dt>
-          <dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
-            {{ costs.counts?.processed ?? 0 }}
-          </dd>
-        </div>
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
           <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
             {{ t('costs.emails_usage') }}
           </dt>
           <dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
-            {{ costs.counts?.emails_with_usage ?? 0 }}
+            {{ costs.counts?.emails_with_usage ?? costs.counts?.processed ?? 0 }}
           </dd>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            {{ t('costs.proc_vs_usage', { processed: costs.counts?.processed ?? 0, priced: costs.counts?.emails_with_usage ?? 0 }) }}
+          </p>
         </div>
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
           <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
@@ -176,7 +176,9 @@ onMounted(() => {
                 ${{ (costs.actual_usd?.mistral_ocr ?? 0).toFixed(4) }}
               </dd>
             </div>
-            <div class="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4 font-bold bg-gray-50 dark:bg-gray-700/50 rounded-md px-2">
+            <div
+              class="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4 font-bold bg-gray-50 dark:bg-gray-700/50 rounded-md px-2"
+            >
               <dt class="text-sm text-gray-900 dark:text-white">
                 {{ t('costs.total_ai') }}
               </dt>
@@ -196,7 +198,8 @@ onMounted(() => {
 
           <div class="mb-3 space-y-1 text-xs text-gray-500 dark:text-gray-400">
             <div>
-              {{ t('costs.projection_emails', { n: costs.projection_monthly_usd?.emails_per_month ?? emailsPerMonth }) }}
+              {{ t('costs.projection_emails', { n: costs.projection_monthly_usd?.emails_per_month ?? emailsPerMonth })
+              }}
             </div>
             <div>
               {{ t('costs.projection_ai_formula', {
@@ -229,7 +232,9 @@ onMounted(() => {
                 ${{ (costs.projection_monthly_usd?.fixed ?? 0).toFixed(2) }}
               </dd>
             </div>
-            <div class="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4 font-bold bg-gray-50 dark:bg-gray-700/50 rounded-md px-2">
+            <div
+              class="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4 font-bold bg-gray-50 dark:bg-gray-700/50 rounded-md px-2"
+            >
               <dt class="text-sm text-gray-900 dark:text-white">
                 {{ t('costs.total_estimated') }}
               </dt>
@@ -254,7 +259,7 @@ onMounted(() => {
           <!-- Unit Prices -->
           <div>
             <h4 class="font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {{ t('costs.logic_unit_prices', {region: costs.pricing.region}) }}
+              {{ t('costs.logic_unit_prices', { region: costs.pricing.region }) }}
             </h4>
             <ul class="list-disc pl-5 space-y-1 text-gray-600 dark:text-gray-400">
               <li v-if="costs.pricing.retail.aca?.vcpu_seconds?.unit_price">
@@ -264,7 +269,8 @@ onMounted(() => {
                 {{ t('costs.item_gib') }}: ${{ costs.pricing.retail.aca.gib_seconds.unit_price.toPrecision(4) }} / s
               </li>
               <li v-if="costs.pricing.retail.service_bus?.operations?.unit_price">
-                {{ t('costs.item_ops') }}: ${{ (costs.pricing.retail.service_bus.operations.unit_price * 1000).toPrecision(4) }} / 1k ops
+                {{ t('costs.item_ops') }}: ${{ (costs.pricing.retail.service_bus.operations.unit_price *
+                  1000).toPrecision(4) }} / 1k ops
               </li>
             </ul>
           </div>
@@ -281,7 +287,8 @@ onMounted(() => {
               <li>
                 {{ t('costs.logic_aca_worker') }}:
                 {{ costs.pricing.retail.assumptions.aca_worker_seconds_per_email }}s/email
-                ({{ costs.pricing.retail.assumptions.aca_worker_vcpu }} vCPU, {{ costs.pricing.retail.assumptions.aca_worker_gib }} GiB)
+                ({{ costs.pricing.retail.assumptions.aca_worker_vcpu }} vCPU, {{
+                  costs.pricing.retail.assumptions.aca_worker_gib }} GiB)
               </li>
               <li>
                 {{ t('costs.logic_aca_api') }}:
@@ -297,9 +304,15 @@ onMounted(() => {
           v-if="costs.pricing.retail.assumptions"
           class="bg-gray-50 dark:bg-gray-700/50 p-3 rounded text-xs font-mono text-gray-600 dark:text-gray-300 overflow-x-auto"
         >
-          <div><strong>Worker:</strong> (Emails/Mo * {{ costs.pricing.retail.assumptions.aca_worker_seconds_per_email }}s) * ({{ costs.pricing.retail.assumptions.aca_worker_vcpu }} * vCPU_Price + {{ costs.pricing.retail.assumptions.aca_worker_gib }} * GiB_Price)</div>
+          <div>
+            <strong>Worker:</strong> (Emails/Mo * {{ costs.pricing.retail.assumptions.aca_worker_seconds_per_email
+            }}s) * ({{ costs.pricing.retail.assumptions.aca_worker_vcpu }} * vCPU_Price + {{
+              costs.pricing.retail.assumptions.aca_worker_gib }} * GiB_Price)
+          </div>
           <div class="mt-1">
-            <strong>API:</strong> ({{ costs.pricing.retail.assumptions.aca_api_min_replicas }} Rep. * {{ costs.pricing.retail.assumptions.aca_api_idle_hours_per_month }}h * 3600s) * (0.5 * vCPU_Price + 1.0 * GiB_Price)
+            <strong>API:</strong> ({{ costs.pricing.retail.assumptions.aca_api_min_replicas }} Rep. * {{
+              costs.pricing.retail.assumptions.aca_api_idle_hours_per_month }}h * 3600s) * (0.5 * vCPU_Price + 1.0 *
+            GiB_Price)
           </div>
         </div>
       </div>
@@ -307,7 +320,8 @@ onMounted(() => {
       <!-- Static Reference Rates (Moved from Info) -->
       <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
         <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white mb-4">
-          {{ t('costs.ref_title') }} <span class="text-xs font-normal text-gray-500">({{ t('costs.ref_subtitle') }})</span>
+          {{ t('costs.ref_title') }} <span class="text-xs font-normal text-gray-500">({{ t('costs.ref_subtitle')
+          }})</span>
         </h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
           <div>

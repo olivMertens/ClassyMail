@@ -100,6 +100,7 @@
         },
         "processed_emails": "Emails processed (OCR + Classification)",
         "emails_usage": "Emails priced (usage telemetry)",
+        "proc_vs_usage": "Processed: {processed} · Priced: {priced}",
         "counts_hint": "All emails are processed by Mistral OCR and Phi-4 classification. Pricing uses usage telemetry; counts may differ if data is missing or deduplicated.",
         "avg_cost": "Avg AI Cost / Email",
         "actual_spend": "Actual AI Spend (Repo History)",
@@ -134,7 +135,7 @@
     "info": {
         "date": "February 2026",
         "poc_header": "POC - {org} ({date})",
-        "subtitle": "ClassiMail Agent",
+        "subtitle": "ClassyMail Agent",
         "tagline": "GenAI that knows exactly where every email belongs.",
         "contact": "Contact",
         "target_title": "Target & Scope",
@@ -167,7 +168,7 @@
     },
     "guide": {
         "title": "Application Documentation",
-        "subtitle": "Guide to using ClassiMail, understanding its AI capabilities, and managing data privacy.",
+        "subtitle": "Guide to using ClassyMail, understanding its AI capabilities, and managing data privacy.",
         "exports": {
             "title": "Data Exports & Fine-Tuning",
             "desc": "Export your processed data for reporting or for training better AI models.",
