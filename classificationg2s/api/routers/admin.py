@@ -572,7 +572,7 @@ async def test_phi4_connection(clients: Clients = Depends(get_clients)):
         from classificationg2s.services.azure_clients import auth_headers
 
         headers = await auth_headers(clients, model_type="openai")
-        endpoint = f"{config.PHI_ENDPOINT}/openai/deployments/{config.PHI_DEPLOYMENT}/chat/completions?api-version={config.AZURE_OPENAI_API_VERSION}"
+        endpoint = f"{config.PHI_ENDPOINT.rstrip('/')}/openai/deployments/{config.PHI_DEPLOYMENT}/chat/completions?api-version={config.AI_API_VERSION}"
 
         payload = {
             "messages": [{"role": "user", "content": "Say 'Connection OK'"}],
@@ -627,9 +627,15 @@ async def test_mistral_ocr_connection(clients: Clients = Depends(get_clients)):
         from classificationg2s.services.azure_clients import auth_headers
 
         headers = await auth_headers(clients, model_type="mistral")
-        endpoint = f"{config.MISTRAL_ENDPOINT}/providers/mistral/azure/ocr"
 
-# Minimal test payload: 1x1 PNG data URI
+        # Handle full URL vs base URL
+        base_mistral = config.MISTRAL_ENDPOINT.rstrip("/")
+        if base_mistral.endswith("/providers/mistral/azure/ocr"):
+            endpoint = base_mistral
+        else:
+            endpoint = f"{base_mistral}/providers/mistral/azure/ocr"
+
+        # Minimal test payload: 1x1 PNG data URI
         one_px_png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAuMBg4eM8sYAAAAASUVORK5CYII="
         payload = {
             "model": config.MISTRAL_DEPLOYMENT,
@@ -670,17 +676,17 @@ async def test_gpt_connection(model: str | None = None, clients: Clients = Depen
         # Use PHI_ENDPOINT as fallback if GPT endpoint not configured
         gpt_endpoint = getattr(config, "GPT_ENDPOINT", config.PHI_ENDPOINT)
 
-        # Determine deployment name
+        # Determine deployment name - prefer configured fallback if None
         if model:
              # trust the caller (admin) to test specific models like gpt5-nano
             gpt_deployment = model
         else:
-            gpt_deployment = getattr(config, "GPT_DEPLOYMENT", "gpt-4")
+            gpt_deployment = getattr(config, "GPT_DEPLOYMENT", config.PHI_FALLBACK_DEPLOYMENT)
 
-        api_version = getattr(config, "AZURE_OPENAI_API_VERSION", getattr(config, "AI_API_VERSION", "2024-02-15-preview"))
+        api_version = config.AI_API_VERSION
 
         headers = await auth_headers(clients, model_type="openai")
-        endpoint = f"{gpt_endpoint}/openai/deployments/{gpt_deployment}/chat/completions?api-version={api_version}"
+        endpoint = f"{gpt_endpoint.rstrip('/')}/openai/deployments/{gpt_deployment}/chat/completions?api-version={api_version}"
         payload = {
             "messages": [{"role": "user", "content": "Say 'GPT Connection OK'"}],
             "max_tokens": 10,
@@ -703,5 +709,5 @@ async def test_gpt_connection(model: str | None = None, clients: Clients = Depen
         return {
             "status": "error",
             "error": str(e),
-            "model": model or getattr(config, "GPT_DEPLOYMENT", "gpt-4")
+            "model": model or getattr(config, "GPT_DEPLOYMENT", config.PHI_FALLBACK_DEPLOYMENT)
         }

@@ -39,6 +39,10 @@ class Clients:
         self.blob_service_client: BlobServiceClient | None = None
         self._cosmos_init_lock = asyncio.Lock()
 
+        # RAG Containers
+        self.cosmos_chat_container = None
+        self.cosmos_cache_container = None
+
     async def init(self) -> None:
         # Keep startup resilient: avoid network calls here.
         sb_conn_str = os.getenv("AZURE_SERVICE_BUS_CONNECTION_STRING")
@@ -108,6 +112,72 @@ class Clients:
                 vector_embedding_policy=vector_embedding_policy,
                 indexing_policy=indexing_policy
             )
+
+    async def ensure_rag_containers(self):
+        """
+        Initializes the specialized containers for RAG:
+        1. Chat History: Stores conversation turns.
+        2. Vector Cache: Stores semantic cache of questions/answers to save tokens.
+        """
+        if self.cosmos_chat_container is not None and self.cosmos_cache_container is not None:
+            return
+
+        if not config.COSMOS_ENDPOINT:
+            raise RuntimeError("AZURE_COSMOS_ENDPOINT is not set")
+
+        async with self._cosmos_init_lock:
+            # Re-check inside lock
+            if self.cosmos_chat_container is not None and self.cosmos_cache_container is not None:
+                return
+
+            if self.cosmos_client is None:
+                self.cosmos_client = CosmosClient(
+                    config.COSMOS_ENDPOINT,
+                    credential=config.COSMOS_KEY if config.COSMOS_KEY else self.credential,
+                )
+
+            db = await self.cosmos_client.create_database_if_not_exists(id=config.COSMOS_DB)
+
+            # 1. Chat History Container (Partition by /id or /sessionId)
+            # We use /id similar to the tutorial for simplicity, or /sessionId if we have explicit sessions.
+            # Tutorial uses /id.
+            self.cosmos_chat_container = await db.create_container_if_not_exists(
+                id=config.COSMOS_CHAT_CONTAINER,
+                partition_key=PartitionKey(path="/id")
+            )
+
+            # 2. Vector Cache Container
+            # Needs Vector Policy matching the embedding model (text-embedding-3-small = 1536 dims)
+            vector_embedding_policy = {
+                "vectorEmbeddings": [
+                    {
+                        "path": "/vector",
+                        "dataType": "float32",
+                        "distanceFunction": "cosine",
+                        "dimensions": 1536
+                    }
+                ]
+            }
+
+            # Indexing policy: Exclude vectors from standard index, include them in vector index
+            indexing_policy = {
+                "indexingMode": "consistent",
+                "automatic": True,
+                "includedPaths": [{"path": "/*"}],
+                "excludedPaths": [{"path": "/_etag/?"}, {"path": "/vector/*"}],
+                "vectorIndexes": [{"path": "/vector", "type": "quantizedFlat"}]
+            }
+
+            self.cosmos_cache_container = await db.create_container_if_not_exists(
+                id=config.COSMOS_CACHE_CONTAINER,
+                partition_key=PartitionKey(path="/id"),
+                vector_embedding_policy=vector_embedding_policy,
+                indexing_policy=indexing_policy,
+                # Cache can benefit from TTL (Time To Live) to auto-expire old entries if desired.
+                # Here we default to -1 (no expiry) but enable the capability.
+                default_ttl=-1
+            )
+
 _DEFAULT_CLIENTS: Clients | None = None
 
 

@@ -13,6 +13,28 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def chunk_markdown(markdown: str, chunk_size: int = 2000, overlap: int = 200) -> list[dict]:
+    """
+    Splits markdown into overlapping chunks for RAG.
+    Returns list of {index, content} dicts.
+    """
+    if not markdown:
+        return []
+    chunks: list[dict] = []
+    start = 0
+    n = len(markdown)
+    while start < n:
+        end = min(n, start + chunk_size)
+        content = markdown[start:end]
+        chunks.append({"index": len(chunks), "content": content})
+        if end == n:  # Reached the end
+            break
+        start = end - overlap
+        if start < 0:
+            start = 0
+    return chunks
+
+
 def estimate_pdf_pages(pdf_bytes: bytes) -> int:
     try:
         return max(pdf_bytes.count(b"/Type /Page"), 1)
@@ -171,11 +193,25 @@ async def run_classification_pipeline(
 
     # Generate Embeddings
     vector = []
+    chunk_docs: list[dict] = []
     try:
         log("embedding", "start")
         if markdown:
             vector = await generate_embedding(markdown, clients=clients)
-        log("embedding", "ok", f"dim={len(vector)}")
+            # Chunking & chunk embeddings for RAG
+            chunks = chunk_markdown(markdown)
+            for ch in chunks:
+                ch_vec = []
+                try:
+                    ch_vec = await generate_embedding(ch["content"], clients=clients)
+                except Exception as ex_inner:
+                    log("embedding", "warn", f"Chunk {ch['index']} embed failed: {ex_inner}")
+                chunk_docs.append({
+                    "index": ch["index"],
+                    "content": ch["content"],
+                    "vector": ch_vec,
+                })
+        log("embedding", "ok", f"dim={len(vector)} chunks={len(chunk_docs)}")
     except Exception as ex:
         log("embedding", "error", f"Failed to generate embedding: {ex}")
         # We generally don't want to fail the whole pipeline if embedding fails,
@@ -216,7 +252,7 @@ async def run_classification_pipeline(
 
     from classificationg2s.models import BusinessEntities
 
-    return EmailRecord(
+    record = EmailRecord(
         id=blob_id_from_url(blob_url),
         file_url=blob_url,
         markdown=markdown_trunc,
@@ -240,3 +276,6 @@ async def run_classification_pipeline(
         updated_at=datetime.now(timezone.utc),
         processing_log=processing_log,
     )
+    if chunk_docs:
+        setattr(record, "chunks", chunk_docs)
+    return record

@@ -14,12 +14,18 @@ from classificationg2s.services.repository import (
     get_email_by_id,
     search_email_by_text,
     search_similar_emails,
+    search_chunks_by_vector,
     get_latest_errors,
     get_stats_summary,
     get_top_intents,
     get_low_confidence_items,
     get_processing_stats_by_day,
+    get_chat_history,
+    append_chat_history_entry,
+    get_cache_entry,
+    set_cache_entry,
 )
+from classificationg2s.services.llm_pipeline import generate_embedding
 
 logger = logging.getLogger("classimail.chatbot")
 
@@ -92,6 +98,7 @@ class ChatAgent:
         self,
         messages: list[dict],
         clients: Clients,
+        session_id: str | None = None,
     ) -> dict:
         """
         Runs the chat loop:
@@ -269,6 +276,65 @@ class ChatAgent:
             )
             conversation.insert(0, {"role": "developer", "content": system_prompt})
 
+        # RAG context: chat history, semantic cache, chunk retrieval
+        history_msgs = []
+        try:
+            if session_id:
+                hist_items = await get_chat_history(session_id, clients=clients)
+                history_msgs = [{"role": h.get("role"), "content": h.get("content", "")} for h in hist_items]
+        except Exception as ex:
+            logger.warning(f"Chat history fetch failed: {ex}")
+
+        # Append history before current conversation
+        conversation = history_msgs + conversation
+
+        sources = []
+        cached_response = None
+        last_user = next((m for m in reversed(messages) if m.get("role") == "user"), None)
+        query_vector = []
+        if last_user:
+            query_text = last_user.get("content", "")
+            try:
+                query_vector = await generate_embedding(query_text, clients=clients)
+            except Exception as ex:
+                logger.warning(f"Embedding for query failed: {ex}")
+
+            # Semantic cache lookup
+            if query_vector:
+                try:
+                    cache_hits = await get_cache_entry(query_vector, clients=clients)
+                    if cache_hits:
+                        cached = cache_hits[0]
+                        cached_response = cached.get("response")
+                        sources = cached.get("sources", [])
+                        if cached_response:
+                            # Return cached early
+                            if session_id:
+                                await append_chat_history_entry(session_id, "user", query_text, clients=clients)
+                                await append_chat_history_entry(session_id, "assistant", cached_response, sources=sources, clients=clients)
+                            return {"role": "assistant", "content": cached_response, "sources": sources}
+                except Exception as ex:
+                    logger.warning(f"Cache lookup failed: {ex}")
+
+            # Retrieve chunks
+            try:
+                chunk_results = await search_chunks_by_vector(query_text, limit=5, clients=clients)
+                for r in chunk_results:
+                    sources.append({
+                        "parent_id": r.get("parent_id"),
+                        "subject": r.get("subject"),
+                        "chunk_index": r.get("chunk_index"),
+                        "content": r.get("content"),
+                        "distance": r.get("distance"),
+                    })
+            except Exception as ex:
+                logger.warning(f"Chunk retrieval failed: {ex}")
+
+        if sources:
+            # Add grounding context as a system message
+            context_blob = json.dumps({"sources": sources}, ensure_ascii=False)
+            conversation.insert(0, {"role": "system", "content": f"Grounding context (use to answer): {context_blob}"})
+
         try:
             # Main Loop for multi-turn tool execution (Reasoning models do sequential calls)
             MAX_TURNS = 5
@@ -311,7 +377,19 @@ class ChatAgent:
                 # If no tools, we have our final answer (or just text)
                 if not tool_calls:
                     content = self._extract_final_answer(content)
-                    return {"role": "assistant", "content": content}
+                    # Persist history & cache
+                    if session_id and last_user:
+                        try:
+                            await append_chat_history_entry(session_id, "user", last_user.get("content", ""), clients=clients)
+                            await append_chat_history_entry(session_id, "assistant", content, sources=sources, clients=clients)
+                        except Exception as ex:
+                            logger.warning(f"Chat history append failed: {ex}")
+                    if query_vector and last_user and content:
+                        try:
+                            await set_cache_entry(last_user.get("content", ""), query_vector, content, sources=sources, clients=clients)
+                        except Exception as ex:
+                            logger.warning(f"Cache set failed: {ex}")
+                    return {"role": "assistant", "content": content, "sources": sources}
 
                 # Handle Tool Calls
                 conversation.append(message)  # Add assistant's request to history

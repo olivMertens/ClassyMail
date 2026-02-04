@@ -13,6 +13,8 @@
 ### 🚀 Déploiement & Infrastructure
 - [INFRASTRUCTURE](INFRASTRUCTURE.md) - Déploiement Terraform, configuration Azure, Event Grid, RBAC
 - [CLI_SETUP](CLI_SETUP.md) - Configuration CLI et identité managée (commandes rapides)
+- [CLI_RAG](CLI_RAG.md) - Scripts de vérification RAG, backfill embeddings/chunks
+- [CLI_RAG](CLI_RAG.md) - Scripts de vérification RAG, backfill embeddings/chunks
 
 ### 💻 Développement Local
 - [LOCAL_DEVELOPMENT](LOCAL_DEVELOPMENT.md) - Setup, exécution locale, build Docker, testing, troubleshooting

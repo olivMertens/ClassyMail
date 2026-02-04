@@ -15,6 +15,11 @@ COSMOS_KEY = os.getenv("AZURE_COSMOS_KEY")  # optional if using MSI
 COSMOS_DB = os.getenv("AZURE_COSMOS_DB", "emailsdb")
 COSMOS_CONTAINER = os.getenv("AZURE_COSMOS_CONTAINER", "emails")
 
+# RAG / Chatbot Configuration
+# Containers for Chat History and Semantic Caching (as per Azure RAG designs)
+COSMOS_CHAT_CONTAINER = os.getenv("AZURE_COSMOS_CHAT_CONTAINER", "chat_history")
+COSMOS_CACHE_CONTAINER = os.getenv("AZURE_COSMOS_CACHE_CONTAINER", "vector_cache")
+
 # AI endpoints
 MISTRAL_ENDPOINT = os.getenv("MISTRAL_ENDPOINT")  # https://...azure.net
 MISTRAL_DEPLOYMENT = os.getenv("MISTRAL_DEPLOYMENT", "mistral-document-ai-2505")
@@ -30,7 +35,7 @@ PHI_FALLBACK_DEPLOYMENT = os.getenv("PHI_FALLBACK_DEPLOYMENT", "gpt-4o-mini")
 
 # Anonymization model (used to create fine-tuning datasets without PII).
 ANONYMIZER_ENDPOINT = os.getenv("ANONYMIZER_ENDPOINT") or PHI_ENDPOINT
-ANONYMIZER_DEPLOYMENT = os.getenv("ANONYMIZER_DEPLOYMENT", "gpt-4o")
+ANONYMIZER_DEPLOYMENT = os.getenv("ANONYMIZER_DEPLOYMENT", "gpt-4o-mini")
 ANONYMIZER_API_VERSION = os.getenv("ANONYMIZER_API_VERSION", AI_API_VERSION)
 ANONYMIZER_PROMPT_VERSION = os.getenv("ANONYMIZER_PROMPT_VERSION", "v1")
 ANONYMIZER_MAX_TOKENS = int(os.getenv("ANONYMIZER_MAX_TOKENS", "6000"))
@@ -43,7 +48,7 @@ EMBEDDING_API_VERSION = os.getenv("EMBEDDING_API_VERSION", AI_API_VERSION)
 
 # Vision model for image description (parallel flow with OCR)
 VISION_ENDPOINT = os.getenv("VISION_ENDPOINT") or PHI_ENDPOINT
-VISION_DEPLOYMENT = os.getenv("VISION_DEPLOYMENT", "gpt-4o")
+VISION_DEPLOYMENT = os.getenv("VISION_DEPLOYMENT", "gpt-4o-mini")
 VISION_API_VERSION = os.getenv("VISION_API_VERSION", AI_API_VERSION)
 
 # Chatbot model
@@ -54,10 +59,10 @@ CHAT_API_VERSION = os.getenv("CHAT_API_VERSION", AI_API_VERSION)
 # Data Zone / Data Residency (EU Central, Global, etc)
 # Used to validate endpoints are in preferred region for compliance
 AZURE_PREFERRED_DATA_ZONE = os.getenv("AZURE_PREFERRED_DATA_ZONE", "eu-central")  # eu-central, eastus, etc
-AZURE_REGION = os.getenv("AZURE_REGION", "eastus")  # Container App region for observability
+AZURE_REGION = os.getenv("AZURE_REGION", "swedencentral")  # Container App region for observability
 
 # Cosmos query guardrail
-COSMOS_QUERY_MAX_LIMIT = int(os.getenv("COSMOS_QUERY_MAX_LIMIT", "20"))
+COSMOS_QUERY_MAX_LIMIT = int(os.getenv("COSMOS_QUERY_MAX_LIMIT", "100"))
 
 # Context sizing (best-effort). Adjust to match your deployments.
 PHI_PRIMARY_MAX_INPUT_TOKENS = int(os.getenv("PHI_PRIMARY_MAX_INPUT_TOKENS", "8000"))
@@ -85,4 +90,4 @@ UI_SHOW_INFO_MODAL = os.getenv("UI_SHOW_INFO_MODAL", "true").lower() == "true"
 UI_SHOW_DEVELOPER_TAB = os.getenv("UI_SHOW_DEVELOPER_TAB", "true").lower() == "true"
 
 # Organization / Branding
-ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME", "ClassiMail")
+ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME", "ClassyMail")

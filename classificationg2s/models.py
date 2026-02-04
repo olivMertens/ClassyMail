@@ -64,6 +64,7 @@ class EmailRecord(BaseModel):
     markdown: Optional[str] = None
     search_text: Optional[str] = None
     vector: Optional[List[float]] = None
+    chunks: Optional[List[dict]] = None
     classification: Optional[ClassificationResult] = None
     entities: Optional[BusinessEntities] = None  # Auto-extracted entities
     comparison_results: List[ComparisonResult] = Field(default_factory=list)  # Adversarial model comparison (dual-model results)

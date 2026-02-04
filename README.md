@@ -103,6 +103,8 @@ Besoin de données ? Le script intégré génère des PDFs d'emails réalistes m
 ## 📚 Documentation
 
 L'index complet est disponible ici : **[docs/INDEX.md](docs/INDEX.md)**.
+- [CLI_SETUP](docs/CLI_SETUP.md)
+- [CLI_RAG](docs/CLI_RAG.md)
 
 ### Parcours Recommandé
 

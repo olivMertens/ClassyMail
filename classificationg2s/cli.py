@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from datetime import datetime, timezone
 from typing import Optional
 
 from azure.cosmos import PartitionKey
@@ -197,7 +198,7 @@ async def export_cosmos_to_finetune_jsonl(
 def _parse_args():
     import argparse
 
-    parser = argparse.ArgumentParser(description="ClassificationG2S export helpers")
+    parser = argparse.ArgumentParser(description="ClassificationG2S helpers")
     parser.add_argument("--export-csv", nargs="?", const="./data/output.csv", help="Export Cosmos items to CSV")
     parser.add_argument(
         "--export-finetune-jsonl",
@@ -213,7 +214,44 @@ def _parse_args():
     parser.add_argument("--include-unreviewed", action="store_true", help="Include items without reviewed=true")
     parser.add_argument("--max-examples", type=int, default=None, help="Limit number of exported examples")
     parser.add_argument("--taxonomy-version", type=str, default="v1", help="Taxonomy version tag")
+    parser.add_argument("--backfill-rag", action="store_true", help="Backfill embeddings and chunks for RAG")
+    parser.add_argument("--max-items", type=int, default=None, help="Limit number of items to backfill")
     return parser.parse_args()
+
+
+async def backfill_rag(max_items: int | None = None):
+    """Backfill embeddings and chunks for emails."""
+    from classificationg2s.services.pipeline import chunk_markdown
+    from classificationg2s.services.llm_pipeline import generate_embedding
+    from classificationg2s.services.repository import save_chunks
+
+    await ensure_cosmos_container()
+    query = "SELECT * FROM c WHERE c.type = 'email'"
+    it = cosmos_container.query_items(query)
+    count = 0
+    async for item in it:
+        if max_items is not None and count >= max_items:
+            break
+        markdown = item.get("markdown")
+        if not markdown:
+            continue
+        if item.get("vector"):
+            vector = item["vector"]
+        else:
+            vector = await generate_embedding(markdown)
+            item["vector"] = vector
+        chunks = chunk_markdown(markdown)
+        enriched_chunks = []
+        for ch in chunks:
+            ch_vec = await generate_embedding(ch["content"])
+            enriched_chunks.append({"index": ch["index"], "content": ch["content"], "vector": ch_vec})
+        # Save chunks
+        await save_chunks(item.get("id"), enriched_chunks, subject=item.get("subject"), file_url=item.get("file_url"))
+        # Update email doc (vector and touched timestamp)
+        item["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await cosmos_container.upsert_item(item)
+        count += 1
+    return count
 
 
 async def _main_async() -> int:
@@ -234,7 +272,11 @@ async def _main_async() -> int:
             )
             return 0
 
-        raise SystemExit("No action specified. Use --export-csv or --export-finetune-jsonl")
+        if getattr(args, "backfill_rag", False):
+            await backfill_rag(args.max_items)
+            return 0
+
+        raise SystemExit("No action specified. Use --export-csv, --export-finetune-jsonl, or --backfill-rag")
     finally:
         await close_cosmos()
 

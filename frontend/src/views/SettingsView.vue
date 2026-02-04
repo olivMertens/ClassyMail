@@ -1182,51 +1182,8 @@ onMounted(() => {
           </p>
         </div>
 
-        <!-- Dead Letter Queue Management -->
+        <!-- Connectivity Tests (Moved to Top) -->
         <div class="mt-8">
-          <h4 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-            <ExclamationTriangleIcon class="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-            Dead Letter Queue (DLQ) Management
-          </h4>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Service Bus automatically moves processing failures to the DLQ after max retries. Use these tools to
-            investigate and clear them.
-          </p>
-          <div class="mt-3 flex gap-2">
-            <a
-              href="/api/admin/deadletter"
-              target="_blank"
-              class="inline-flex items-center rounded-md bg-yellow-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-yellow-500"
-            >
-              View DLQ Messages
-            </a>
-            <button
-              type="button"
-              class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-yellow-600 shadow-sm ring-1 ring-inset ring-yellow-300 hover:bg-yellow-50 dark:bg-gray-800 dark:text-yellow-400 dark:ring-yellow-900 dark:hover:bg-yellow-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="purgingDlq"
-              @click="performDlqPurge"
-            >
-              <TrashIcon
-                v-if="!purgingDlq"
-                class="-ml-0.5 mr-1.5 h-5 w-5"
-                aria-hidden="true"
-              />
-              <ArrowPathIcon
-                v-else
-                class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
-                aria-hidden="true"
-              />
-              {{ purgingDlq ? 'Purging DLQ...' : 'Purge DLQ' }}
-            </button>
-          </div>
-          <p class="mt-2 text-xs text-gray-600 dark:text-gray-400">
-            Messages land in DLQ when processing fails repeatedly. Investigate the cause, then purge to retry or clean
-            up.
-          </p>
-        </div>
-
-        <!-- Connectivity Tests -->
-        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
           <h4 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
             <CommandLineIcon class="h-4 w-4 text-blue-600 dark:text-blue-400" />
             Diagnostics & Connectivity
@@ -1235,6 +1192,19 @@ onMounted(() => {
             Run on-demand tests to verify connections to Azure Services and LLMs.
           </p>
           <div class="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50"
+              :disabled="llmTestLoading"
+              @click="runLLMTests"
+            >
+              <ArrowPathIcon
+                v-if="llmTestLoading"
+                class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
+                aria-hidden="true"
+              />
+              Test LLM Models
+            </button>
             <button
               type="button"
               class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600"
@@ -1247,19 +1217,6 @@ onMounted(() => {
                 aria-hidden="true"
               />
               Test Service Connectivity
-            </button>
-            <button
-              type="button"
-              class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600"
-              :disabled="llmTestLoading"
-              @click="runLLMTests"
-            >
-              <ArrowPathIcon
-                v-if="llmTestLoading"
-                class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
-                aria-hidden="true"
-              />
-              Test LLM Models
             </button>
           </div>
 
@@ -1310,6 +1267,49 @@ onMounted(() => {
           >
             <pre>{{ JSON.stringify(llmTestResults, null, 2) }}</pre>
           </div>
+        </div>
+
+        <!-- Dead Letter Queue Management -->
+        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+          <h4 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+            <ExclamationTriangleIcon class="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+            Dead Letter Queue (DLQ) Management
+          </h4>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Service Bus automatically moves processing failures to the DLQ after max retries. Use these tools to
+            investigate and clear them.
+          </p>
+          <div class="mt-3 flex gap-2">
+            <a
+              href="/api/admin/deadletter"
+              target="_blank"
+              class="inline-flex items-center rounded-md bg-yellow-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-yellow-500"
+            >
+              View DLQ Messages
+            </a>
+            <button
+              type="button"
+              class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-yellow-600 shadow-sm ring-1 ring-inset ring-yellow-300 hover:bg-yellow-50 dark:bg-gray-800 dark:text-yellow-400 dark:ring-yellow-900 dark:hover:bg-yellow-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="purgingDlq"
+              @click="performDlqPurge"
+            >
+              <TrashIcon
+                v-if="!purgingDlq"
+                class="-ml-0.5 mr-1.5 h-5 w-5"
+                aria-hidden="true"
+              />
+              <ArrowPathIcon
+                v-else
+                class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
+                aria-hidden="true"
+              />
+              {{ purgingDlq ? 'Purging DLQ...' : 'Purge DLQ' }}
+            </button>
+          </div>
+          <p class="mt-2 text-xs text-gray-600 dark:text-gray-400">
+            Messages land in DLQ when processing fails repeatedly. Investigate the cause, then purge to retry or clean
+            up.
+          </p>
         </div>
 
         <!-- Reset Section -->

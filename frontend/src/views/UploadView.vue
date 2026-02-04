@@ -10,99 +10,99 @@ const files = ref([])
 
 
 const handleDragOver = (e) => {
-    e.preventDefault()
-    dragActive.value = true
+  e.preventDefault()
+  dragActive.value = true
 }
 
 const handleDragLeave = (e) => {
-    e.preventDefault()
-    dragActive.value = false
+  e.preventDefault()
+  dragActive.value = false
 }
 
 const handleDrop = (e) => {
-    e.preventDefault()
-    dragActive.value = false
-    const droppedFiles = Array.from(e.dataTransfer.files)
-    addFiles(droppedFiles)
+  e.preventDefault()
+  dragActive.value = false
+  const droppedFiles = Array.from(e.dataTransfer.files)
+  addFiles(droppedFiles)
 }
 
 const handleFileSelect = (e) => {
-    const selectedFiles = Array.from(e.target.files)
-    addFiles(selectedFiles)
+  const selectedFiles = Array.from(e.target.files)
+  addFiles(selectedFiles)
 }
 
 const addFiles = (newFiles) => {
-    // Filter by type (PDF) and size (max 10MB)
-    const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+  // Filter by type (PDF) and size (max 10MB)
+  const MAX_SIZE = 10 * 1024 * 1024 // 10MB
 
-    const validFiles = newFiles
-        .filter(f => f.type === 'application/pdf')
-        .slice(0, 10 - files.value.length)
+  const validFiles = newFiles
+    .filter(f => f.type === 'application/pdf')
+    .slice(0, 10 - files.value.length)
 
-    validFiles.forEach(f => {
-        if (files.value.length < 10) {
-            const isTooLarge = f.size > MAX_SIZE
-            files.value.push({
-                file: f,
-                id: Math.random().toString(36).substring(7),
-                status: isTooLarge ? 'error' : 'pending',
-                message: isTooLarge ? 'File exceeds 10MB limit' : ''
-            })
-        }
-    })
+  validFiles.forEach(f => {
+    if (files.value.length < 10) {
+      const isTooLarge = f.size > MAX_SIZE
+      files.value.push({
+        file: f,
+        id: Math.random().toString(36).substring(7),
+        status: isTooLarge ? 'error' : 'pending',
+        message: isTooLarge ? 'File exceeds 10MB limit' : ''
+      })
+    }
+  })
 }
 
 const removeFile = (id) => {
-    files.value = files.value.filter(f => f.id !== id)
+  files.value = files.value.filter(f => f.id !== id)
 }
 
 const uploadFiles = async () => {
-    if (!files.value.length) return
+  if (!files.value.length) return
 
-    uploading.value = true
-    const pendingFiles = files.value.filter(f => f.status === 'pending' || f.status === 'error')
+  uploading.value = true
+  const pendingFiles = files.value.filter(f => f.status === 'pending' || f.status === 'error')
 
-    const formData = new FormData()
-    pendingFiles.forEach(f => {
-        formData.append('files', f.file)
-        f.status = 'uploading'
+  const formData = new FormData()
+  pendingFiles.forEach(f => {
+    formData.append('files', f.file)
+    f.status = 'uploading'
+  })
+
+  try {
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData
     })
 
-    try {
-        const res = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData
-        })
+    if (!res.ok) throw new Error('Upload failed')
 
-        if (!res.ok) throw new Error('Upload failed')
+    const data = await res.json()
+    const results = data.results || []
 
-        const data = await res.json()
-        const results = data.results || []
+    pendingFiles.forEach(f => {
+      const result = results.find(r => r.name === f.file.name)
+      if (result) {
+        if (result.status === 'uploaded') {
+          f.status = 'success'
+          f.message = 'Uploaded'
+        } else {
+          f.status = 'error'
+          f.message = result.error
+        }
+      } else {
+        f.status = 'error'
+        f.message = 'Unknown error'
+      }
+    })
 
-        pendingFiles.forEach(f => {
-            const result = results.find(r => r.name === f.file.name)
-            if (result) {
-                if (result.status === 'uploaded') {
-                    f.status = 'success'
-                    f.message = 'Uploaded'
-                } else {
-                    f.status = 'error'
-                    f.message = result.error
-                }
-            } else {
-                f.status = 'error'
-                f.message = 'Unknown error'
-            }
-        })
-
-    } catch (e) {
-        pendingFiles.forEach(f => {
-            f.status = 'error'
-            f.message = e.message
-        })
-    } finally {
-        uploading.value = false
-    }
+  } catch (e) {
+    pendingFiles.forEach(f => {
+      f.status = 'error'
+      f.message = e.message
+    })
+  } finally {
+    uploading.value = false
+  }
 }
 </script>
 
@@ -176,8 +176,10 @@ const uploadFiles = async () => {
             <span
               class="ml-2 truncate text-sm font-medium text-gray-900 dark:text-gray-200"
               :title="file.file.name"
-            >{{ file.file.name }}</span>
-            <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">{{ (file.file.size / 1024 / 1024).toFixed(2) }} MB</span>
+            >{{
+              file.file.name }}</span>
+            <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">{{ (file.file.size / 1024 / 1024).toFixed(2) }}
+              MB</span>
           </div>
           <div class="flex items-center ml-4">
             <div
@@ -196,7 +198,7 @@ const uploadFiles = async () => {
             <span
               v-if="file.message"
               class="text-xs mr-3"
-              :class="{'text-red-500': file.status === 'error', 'text-green-500': file.status === 'success'}"
+              :class="{ 'text-red-500': file.status === 'error', 'text-green-500': file.status === 'success' }"
             >
               {{ file.message }}
             </span>

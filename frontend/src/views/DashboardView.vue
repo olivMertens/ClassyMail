@@ -61,6 +61,9 @@ const chatQuery = ref('')
 const chatLoading = ref(false)
 const chatError = ref(null)
 const chatResponse = ref(null)
+const chatSources = ref([])
+const chatSessionId = ref(localStorage.getItem('chatSessionId') || crypto.randomUUID())
+watch(chatSessionId, (val) => localStorage.setItem('chatSessionId', val))
 const md = new MarkdownIt({ linkify: true, breaks: true })
 const chatResponseHtml = computed(() => chatResponse.value ? md.render(String(chatResponse.value) || '') : '')
 const viewMode = ref('cards') // 'cards' or 'table'
@@ -184,7 +187,7 @@ const runChatSearch = async () => {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: [{ role: 'user', content: q }] })
+      body: JSON.stringify({ messages: [{ role: 'user', content: q }], session_id: chatSessionId.value })
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
@@ -192,6 +195,7 @@ const runChatSearch = async () => {
     }
     const data = await res.json()
     chatResponse.value = data.content
+    chatSources.value = data.sources || []
   } catch (e) {
     chatError.value = e.message
   } finally {
@@ -753,12 +757,12 @@ const emit = defineEmits(['open-email'])
               :title="email.classification.detected_intents[0].justification || ''"
             >
               {{ email.classification.detected_intents[0].intent }} ({{
-                Math.round((email.classification.detected_intents[0].confidence || 0)*100) }}%)
+                Math.round((email.classification.detected_intents[0].confidence || 0) * 100) }}%)
             </span>
             <span
               v-if="email.classification.detected_intents.length > 1"
               class="inline-flex items-center px-1 py-0.5 rounded-full text-[9px] bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 cursor-help"
-              :title="'Other intents:\n' + email.classification.detected_intents.slice(1).map(i => `- ${i.intent} (${Math.round((i.confidence || 0)*100)}%)`).join('\n')"
+              :title="'Other intents:\n' + email.classification.detected_intents.slice(1).map(i => `- ${i.intent} (${Math.round((i.confidence || 0) * 100)}%)`).join('\n')"
             >
               +{{ email.classification.detected_intents.length - 1 }}
             </span>
@@ -1251,6 +1255,22 @@ const emit = defineEmits(['open-email'])
                 class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed prose prose-sm dark:prose-invert max-w-none"
                 v-html="chatResponseHtml"
               />
+              <div
+                v-if="chatSources.length"
+                class="mt-2 text-[10px] text-gray-500 dark:text-gray-400"
+              >
+                <div class="uppercase tracking-wider font-semibold">
+                  Sources
+                </div>
+                <ul class="list-disc ml-4">
+                  <li
+                    v-for="s in chatSources"
+                    :key="(s.parent_id || '') + ':' + (s.chunk_index || 0)"
+                  >
+                    {{ s.subject || s.parent_id }} <span v-if="s.chunk_index !== undefined">(chunk {{ s.chunk_index }})</span>
+                  </li>
+                </ul>
+              </div>
               <div class="mt-2 text-[10px] text-gray-400 border-t dark:border-gray-700 pt-1 flex items-center gap-1">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

@@ -42,7 +42,15 @@ async def save_to_cosmos(record: EmailRecord, clients: Clients | None = None) ->
         record.search_text = compute_search_text(record.markdown)
     clients = clients or get_default_clients()
     await clients.ensure_cosmos_container()
-    await clients.cosmos_container.upsert_item(record.model_dump(mode="json"))
+    # Ensure type for filtering
+    payload = record.model_dump(mode="json")
+    payload.setdefault("type", "email")
+    await clients.cosmos_container.upsert_item(payload)
+
+    # Optional: save chunks attached to record (set by pipeline)
+    chunks = getattr(record, "chunks", None)
+    if chunks:
+        await save_chunks(record.id, chunks, subject=record.subject, file_url=record.file_url, clients=clients)
 
 
 async def count_by_status(status: str, clients: Clients | None = None) -> int:
@@ -283,6 +291,56 @@ async def search_email_by_text(q: str, limit: int = 5, clients: Clients | None =
     return items
 
 
+async def save_chunks(parent_id: str, chunks: list[dict], *, subject: str | None = None, file_url: str | None = None, clients: Clients | None = None) -> None:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    # Each chunk: {content, vector, index}
+    docs = []
+    for ch in chunks:
+        idx = ch.get("index")
+        content = ch.get("content")
+        vector = ch.get("vector")
+        doc = {
+            "id": f"{parent_id}::chunk-{idx}",
+            "type": "chunk",
+            "parent_id": parent_id,
+            "chunk_index": idx,
+            "content": content,
+            "vector": vector,
+            "subject": subject,
+            "file_url": file_url,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        docs.append(doc)
+    # Upsert sequentially (batch SDK not used here)
+    for d in docs:
+        await clients.cosmos_container.upsert_item(d)
+
+
+async def search_chunks_by_vector(q: str, limit: int = 5, clients: Clients | None = None) -> list[dict]:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    limit = _bound_limit(limit)
+    vector = await generate_embedding(q, clients=clients)
+    if not vector:
+         return []
+    query = (
+        "SELECT TOP @limit c.id, c.parent_id, c.subject, c.file_url, c.chunk_index, c.content, "
+        "VectorDistance(c.vector, @vector) as distance "
+        "FROM c WHERE c.type = 'chunk' AND IS_DEFINED(c.vector) "
+        "ORDER BY VectorDistance(c.vector, @vector) ASC"
+    )
+    params = [
+        {"name": "@vector", "value": vector},
+        {"name": "@limit", "value": limit},
+    ]
+    try:
+        items = [x async for x in _query(clients.cosmos_container, query, parameters=params, max_items=limit)]
+        return items
+    except Exception:
+        return []
+
 async def search_similar_emails(q: str, limit: int = 5, clients: Clients | None = None) -> list[dict]:
     clients = clients or get_default_clients()
     await clients.ensure_cosmos_container()
@@ -427,3 +485,65 @@ async def get_processing_stats_by_day(days: int = 7, clients: Clients | None = N
         logger.error(f"Failed to get processing stats: {e}", exc_info=True)
         # Return empty list on error to avoid crashing the UI
         return []
+
+
+# --- Chat History & Semantic Cache ---
+
+async def append_chat_history_entry(session_id: str, role: str, content: str, sources: list[dict] | None = None, clients: Clients | None = None) -> None:
+    clients = clients or get_default_clients()
+    await clients.ensure_rag_containers()
+    doc = {
+        "id": f"{session_id}:{datetime.now(timezone.utc).isoformat()}",
+        "session_id": session_id,
+        "role": role,
+        "content": content,
+        "sources": sources or [],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "type": "chat_history"
+    }
+    await clients.cosmos_chat_container.upsert_item(doc)
+
+
+async def get_chat_history(session_id: str, limit: int = 20, clients: Clients | None = None) -> list[dict]:
+    clients = clients or get_default_clients()
+    await clients.ensure_rag_containers()
+    query = """
+    SELECT * FROM c WHERE c.session_id = @session_id
+    ORDER BY c.created_at DESC
+    """
+    params = [{"name": "@session_id", "value": session_id}]
+    items = [x async for x in clients.cosmos_chat_container.query_items(query, parameters=params, max_item_count=limit)]
+    return list(reversed(items))
+
+
+async def get_cache_entry(vector: list[float], similarity_score: float = 0.99, num_results: int = 1, clients: Clients | None = None) -> list[dict]:
+    clients = clients or get_default_clients()
+    await clients.ensure_rag_containers()
+    query = """
+    SELECT TOP @num_results *
+    FROM c
+    WHERE VectorDistance(c.vector,@embedding) > @similarity_score
+    ORDER BY VectorDistance(c.vector,@embedding)
+    """
+    params = [
+        {"name": "@embedding", "value": vector},
+        {"name": "@num_results", "value": num_results},
+        {"name": "@similarity_score", "value": similarity_score},
+    ]
+    results = clients.cosmos_cache_container.query_items(query, parameters=params, enable_cross_partition_query=True, populate_query_metrics=True)
+    return [x async for x in results]
+
+
+async def set_cache_entry(prompt: str, vector: list[float], response: str, sources: list[dict] | None = None, clients: Clients | None = None) -> None:
+    clients = clients or get_default_clients()
+    await clients.ensure_rag_containers()
+    doc = {
+        "id": f"cache:{hashlib.sha256(prompt.encode('utf-8')).hexdigest()}",
+        "prompt": prompt,
+        "response": response,
+        "sources": sources or [],
+        "vector": vector,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "type": "cache_entry"
+    }
+    await clients.cosmos_cache_container.upsert_item(doc)

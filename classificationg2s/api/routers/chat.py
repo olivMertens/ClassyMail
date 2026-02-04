@@ -10,11 +10,13 @@ logger = logging.getLogger("classimail.chat")
 
 class ChatRequest(BaseModel):
     messages: list[dict]  # [{"role": "user", "content": "..."}]
+    session_id: str | None = None
 
 
 class ChatResponse(BaseModel):
     role: str
     content: str
+    sources: list[dict] | None = None
 
 
 @router.post("/api/chat", response_model=ChatResponse)
@@ -29,5 +31,5 @@ async def chat_completion(
     if not req.messages:
         raise HTTPException(status_code=400, detail="Messages list cannot be empty")
 
-    response = await chat_agent.run(req.messages, clients=clients)
-    return ChatResponse(role=response["role"], content=response["content"])
+    response = await chat_agent.run(req.messages, clients=clients, session_id=req.session_id)
+    return ChatResponse(role=response["role"], content=response["content"], sources=response.get("sources"))

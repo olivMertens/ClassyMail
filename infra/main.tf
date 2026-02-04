@@ -46,7 +46,7 @@ variable "cosmos_use_rbac" {
 variable "organization_name" {
   type        = string
   description = "Organization/destination name displayed in the UI (e.g., G2S, Groupama, ClassiMail)"
-  default     = "ClassiMail"
+  default     = "ClassyMail"
 }
 
 variable "location" { default = "swedencentral" } # Région recommandée pour disponibilité Mistral/Phi
@@ -321,6 +321,69 @@ resource "azurerm_cosmosdb_sql_container" "container" {
       path = "/classification/raw_response/?"
     }
   }
+}
+
+# --- RAG Containers (Chatbot & Cache) ---
+
+resource "azurerm_cosmosdb_sql_container" "chat_history" {
+  name                = "chat_history"
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.db.name
+  database_name       = azurerm_cosmosdb_sql_database.sql.name
+  partition_key_paths = ["/id"]
+  default_ttl         = -1 # Enable TTL but no expiration by default
+
+  indexing_policy {
+    indexing_mode = "consistent"
+
+    included_path {
+      path = "/*"
+    }
+  }
+}
+
+# Use AzApi for Vector Search (Preview feature support)
+resource "azapi_resource" "vector_cache" {
+  type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15"
+  name      = "vector_cache"
+  parent_id = azurerm_cosmosdb_sql_database.sql.id
+
+  body = jsonencode({
+    properties = {
+      resource = {
+        id = "vector_cache"
+        partitionKey = {
+          paths = ["/id"]
+          kind  = "Hash"
+        }
+        vectorEmbeddingPolicy = {
+          vectorEmbeddings = [
+            {
+              path             = "/vector"
+              dataType         = "float32"
+              distanceFunction = "cosine"
+              dimensions       = 1536
+            }
+          ]
+        }
+        indexingPolicy = {
+          indexingMode = "consistent"
+          automatic    = true
+          includedPaths = [
+            { path = "/*" }
+          ]
+          excludedPaths = [
+            { path = "/vector/*" },
+            { path = "/_etag/?" }
+          ]
+          vectorIndexes = [
+            { path = "/vector", type = "quantizedFlat" }
+          ]
+        }
+        defaultTtl = -1
+      }
+    }
+  })
 }
 
 # --- 5. Compute (Container App) ---
