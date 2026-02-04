@@ -16,6 +16,7 @@ from classificationg2s.models import OCRFailed, BusinessEntities
 from classificationg2s.services.azure_clients import auth_headers, Clients
 from classificationg2s.services.settings_store import get_categories_prompt_text, load_settings
 from classificationg2s.services.annotations import ImageDescription
+from classificationg2s.services.circuit_breaker import with_ocr_circuit_breaker, with_classification_circuit_breaker
 
 logger = logging.getLogger(__name__)
 
@@ -254,6 +255,7 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
     return content, annotated_images
 
 
+@with_ocr_circuit_breaker
 async def ocr_with_mistral(
     base64_pdf: str,
     clients: Clients | None = None,
@@ -584,6 +586,7 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
             return payload_dict
 
 
+@with_classification_circuit_breaker
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10), retry=retry_if_exception(retryable_httpx))
 async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False, strategy: str = "standard", clients: Clients | None = None) -> dict:
     """

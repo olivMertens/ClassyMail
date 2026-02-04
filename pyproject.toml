@@ -29,6 +29,7 @@ dependencies = [
 	"pdf2image>=1.17.0",
 	"pillow>=12.1.0",
 	"pymupdf>=1.26.7",
+	"pybreaker==1.2.0",
 ]
 
 [project.optional-dependencies]

@@ -349,6 +349,7 @@ dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "pdf2image" },
     { name = "pillow" },
+    { name = "pybreaker" },
     { name = "pydantic" },
     { name = "pymupdf" },
     { name = "python-dotenv" },
@@ -386,6 +387,7 @@ requires-dist = [
     { name = "pdf2image", specifier = ">=1.17.0" },
     { name = "pillow", specifier = ">=12.1.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = "==3.7.0" },
+    { name = "pybreaker", specifier = "==1.2.0" },
     { name = "pydantic", specifier = "==2.6.0" },
     { name = "pymupdf", specifier = ">=1.26.7" },
     { name = "pytest", marker = "extra == 'dev'", specifier = "==8.2.0" },
@@ -1124,6 +1126,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1c/15/dd6fd869753ce82ff64dcbc18356093471a5a5adf4f77ed1f805d473d859/psutil-7.2.1-cp36-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:99a4cd17a5fdd1f3d014396502daa70b5ec21bf4ffe38393e152f8e449757d67", size = 147402, upload-time = "2025-12-29T08:26:39.21Z" },
     { url = "https://files.pythonhosted.org/packages/34/68/d9317542e3f2b180c4306e3f45d3c922d7e86d8ce39f941bb9e2e9d8599e/psutil-7.2.1-cp37-abi3-win_amd64.whl", hash = "sha256:b1b0671619343aa71c20ff9767eced0483e4fc9e1f489d50923738caf6a03c17", size = 136938, upload-time = "2025-12-29T08:26:41.036Z" },
     { url = "https://files.pythonhosted.org/packages/3e/73/2ce007f4198c80fcf2cb24c169884f833fe93fbc03d55d302627b094ee91/psutil-7.2.1-cp37-abi3-win_arm64.whl", hash = "sha256:0d67c1822c355aa6f7314d92018fb4268a76668a536f133599b91edd48759442", size = 133836, upload-time = "2025-12-29T08:26:43.086Z" },
+]
+
+[[package]]
+name = "pybreaker"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/9b/675a7cad98bb19a131b9aaa5a1a876607071c64a5e64c9656f0156cec53a/pybreaker-1.2.0.tar.gz", hash = "sha256:18707776316f93a30c1be0e4fec1f8aa5ed19d7e395a218eb2f050c8524fb2dc", size = 14720, upload-time = "2024-02-14T22:16:04.744Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6d/bd/8d9a1a0de00f10430a55b92910991ae8ea3dd407371054be12d619903474/pybreaker-1.2.0-py3-none-any.whl", hash = "sha256:c3e7683e29ecb3d4421265aaea55504f1186a2fdc1f17b6b091d80d1e1eb5ede", size = 12327, upload-time = "2024-02-14T22:16:00.672Z" },
 ]
 
 [[package]]

@@ -68,6 +68,17 @@ class Clients:
             await self.blob_service_client.close()
 
     async def ensure_cosmos_container(self):
+        # Health check: If container exists, verify connection is still valid
+        if self.cosmos_container is not None:
+            try:
+                # Lightweight ping query to verify connection health
+                await self.cosmos_container.read()
+            except Exception as health_error:
+                logger.warning("Cosmos connection health check failed, recreating client: %s", health_error)
+                # Force reconnection by clearing cached client
+                self.cosmos_container = None
+                self.cosmos_client = None
+        
         if self.cosmos_container is not None:
             return
         if not config.COSMOS_ENDPOINT:

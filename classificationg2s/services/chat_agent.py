@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import uuid
 import re
 import httpx
@@ -9,6 +10,7 @@ from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
 from classificationg2s.core import config
 from classificationg2s.services.azure_clients import Clients
+from classificationg2s.services.circuit_breaker import with_chat_circuit_breaker
 from classificationg2s.services.repository import (
     search_email_records,
     get_email_by_id,
@@ -84,11 +86,21 @@ class ChatAgent:
         if self._auth_header_func:
             return
 
+        # SECURITY: Block API keys in production environments
+        azure_env = os.getenv("AZURE_ENV", "").lower()
         api_key = getattr(config, "AI_API_KEY", None)
-        if api_key:
+        
+        if azure_env == "production" and api_key:
+            raise RuntimeError(
+                "API keys are not allowed in production. Use managed identity (Entra ID) only. "
+                "Set AZURE_ENV!=production to bypass this check in dev/staging."
+            )
+        
+        if api_key and azure_env != "production":
+            # Only allow API key auth in non-production
             self._auth_header_func = lambda: {"api-key": api_key}
         else:
-            # Use Entra ID
+            # Use Entra ID (managed identity)
             cred = DefaultAzureCredential()
             scope = "https://cognitiveservices.azure.com/.default"
             self._token_provider = get_bearer_token_provider(cred, scope)
@@ -484,6 +496,7 @@ class ChatAgent:
                 "content": f"I encountered an error processing your request: {str(e)}",
             }
 
+    @with_chat_circuit_breaker
     async def _call_llm(self, messages: list[dict], tools: list[dict] | None = None) -> dict:
         headers = self._auth_header_func()
         # Reasoning models (e.g. gpt-5.x, o1, o3) do not support 'temperature' or 'top_p'.

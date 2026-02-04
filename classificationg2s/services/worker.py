@@ -43,14 +43,20 @@ async def worker_loop_forever(*, queue_name: str, get_settings, clients: Clients
                     # Wait for a semaphore slot
                     await concurrency.acquire()
 
-                    # Spawn task.
-                    # CRITICAL: We do NOT await the handler here. We let the loop continue.
-                    # The handler must release the semaphore when done.
-                    asyncio.create_task(
-                        process_message_wrapper(
-                            receiver, msg, get_settings=get_settings, clients=clients, semaphore=concurrency
+                    # Spawn task with error handling to prevent semaphore leak
+                    # CRITICAL: If create_task fails, we must release the semaphore
+                    try:
+                        asyncio.create_task(
+                            process_message_wrapper(
+                                receiver, msg, get_settings=get_settings, clients=clients, semaphore=concurrency
+                            )
                         )
-                    )
+                    except Exception as task_error:
+                        # Release semaphore if task creation fails
+                        concurrency.release()
+                        logger.error("Failed to create processing task: %s", task_error)
+                        # Re-raise to trigger outer exception handler
+                        raise
         except asyncio.CancelledError:
             break
         except Exception as ex:
