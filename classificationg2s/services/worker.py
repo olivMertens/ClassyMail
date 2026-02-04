@@ -34,6 +34,8 @@ async def worker_loop_forever(*, queue_name: str, get_settings, clients: Clients
 
     logger.info("Worker started with concurrency limit: %s", concurrency._value if hasattr(concurrency, "_value") else "Unknown")
 
+    active_tasks: set[asyncio.Task] = set()
+
     while True:
         try:
             async with clients.sb_client.get_queue_receiver(
@@ -42,24 +44,33 @@ async def worker_loop_forever(*, queue_name: str, get_settings, clients: Clients
                 auto_lock_renewer=auto_lock_renewer,
                 prefetch_count=10  # Prefetch to allow pipelining
             ) as receiver:
-                async for msg in receiver:
-                    # Wait for a semaphore slot
-                    await concurrency.acquire()
+                try:
+                    async for msg in receiver:
+                        # Wait for a semaphore slot
+                        await concurrency.acquire()
 
-                    # Spawn task with error handling to prevent semaphore leak
-                    # CRITICAL: If create_task fails, we must release the semaphore
-                    try:
-                        asyncio.create_task(
-                            process_message_wrapper(
-                                receiver, msg, get_settings=get_settings, clients=clients, semaphore=concurrency
+                        # Spawn task with error handling to prevent semaphore leak
+                        # CRITICAL: If create_task fails, we must release the semaphore
+                        try:
+                            task = asyncio.create_task(
+                                process_message_wrapper(
+                                    receiver, msg, get_settings=get_settings, clients=clients, semaphore=concurrency
+                                )
                             )
-                        )
-                    except Exception as task_error:
-                        # Release semaphore if task creation fails
-                        concurrency.release()
-                        logger.error("Failed to create processing task: %s", task_error)
-                        # Re-raise to trigger outer exception handler
-                        raise
+                            active_tasks.add(task)
+                            task.add_done_callback(active_tasks.discard)
+                        except Exception as task_error:
+                            # Release semaphore if task creation fails
+                            concurrency.release()
+                            logger.error("Failed to create processing task: %s", task_error)
+                            # Re-raise to trigger outer exception handler
+                            raise
+                except asyncio.CancelledError:
+                    if active_tasks:
+                        logger.info("Worker shutting down, waiting for %d active tasks...", len(active_tasks))
+                        # Wait for tasks to complete, ensuring receiver stays open
+                        await asyncio.gather(*active_tasks, return_exceptions=True)
+                    raise
         except asyncio.CancelledError:
             break
         except Exception as ex:

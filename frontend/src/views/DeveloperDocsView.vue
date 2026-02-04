@@ -156,8 +156,10 @@ graph TD
             System Architecture
           </h3>
           <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
-            The ClassyMail system leverages Azure Container Apps, Azure AI Services, and Cosmos DB to provide a scalable
-            email classification pipeline.
+            The ClassyMail system leverages <strong>Azure Container Apps</strong> to host two distinct microservices:
+            the <strong>FastAPI Backend</strong> (handling API requests) and the <strong>Background Worker</strong>
+            (processing long-running tasks asynchronously). This decoupling allows independent scaling:
+            the API scales on HTTP traffic, while the Worker scales based on Service Bus queue depth.
           </p>
 
           <div
@@ -173,28 +175,14 @@ graph TD
           <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white mb-4">
             Reference Architecture
           </h3>
-          <div class="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-12 text-center">
-            <svg
-              class="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
+          <div
+            class="flex justify-center bg-white dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 overflow-hidden"
+          >
+            <img
+              src="/images/architecture_app.png"
+              alt="Reference Architecture Diagram"
+              class="max-w-full h-auto rounded"
             >
-              <path
-                vector-effect="non-scaling-stroke"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
-            <h3 class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
-              Future Architecture Diagram
-            </h3>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Placeholder for PNG image export.
-            </p>
           </div>
         </div>
       </div>

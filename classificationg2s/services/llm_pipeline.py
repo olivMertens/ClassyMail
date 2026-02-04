@@ -562,7 +562,7 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
         span.set_attribute("app.estimated.user_tokens", int(user_tokens_est))
         span.set_attribute("app.user_budget_tokens", int(max_user))
 
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=120) as client:
             try:
                 # Best-effort TPM gating
                 while not await limiter.consume_if_allowed(user_tokens_est + config.PHI_RESERVED_OUTPUT_TOKENS):

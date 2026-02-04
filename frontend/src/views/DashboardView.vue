@@ -21,6 +21,9 @@ import {
   BarsArrowUpIcon
 } from '@heroicons/vue/24/outline'
 import DlqDetailModal from '@/components/DlqDetailModal.vue'
+import { useDialog } from '@/composables/useDialog'
+
+const { confirm, alert: showAlert } = useDialog()
 
 defineProps({
   active: {
@@ -83,16 +86,16 @@ const filters = [
 ]
 
 const reprocessEmail = async (email) => {
-  if (confirm('Are you sure you want to reprocess this email? It will be re-queued.')) {
+  if (await confirm('Are you sure you want to reprocess this email? It will be re-queued.')) {
     try {
       reprocessingId.value = email.id
       const res = await fetch(`/api/emails/${email.id}/reprocess`, { method: 'POST' })
       if (!res.ok) throw new Error('Failed to reprocess')
       // Optimistic update
       email.status = 'PENDING'
-      alert('Email re-queued successfully')
+      await showAlert('Email re-queued successfully')
     } catch (e) {
-      alert(e.message)
+      await showAlert(e.message)
     } finally {
       reprocessingId.value = null
     }
@@ -219,21 +222,21 @@ const toggleSort = (column) => {
 }
 
 const purgeDlq = async () => {
-  if (!confirm("Are you sure you want to delete all messages in the Dead Letter Queue? This action cannot be undone.")) return
+  if (!await confirm("Are you sure you want to delete all messages in the Dead Letter Queue? This action cannot be undone.")) return
 
   purging.value = true
   try {
     const res = await fetch('/api/admin/purge-dlq', { method: 'POST' })
     if (!res.ok) throw new Error('Failed to purge DLQ')
     const data = await res.json()
-    alert(`Purged ${data.deleted_dlq} messages.`)
+    await showAlert(`Purged ${data.deleted_dlq} messages.`)
     await fetchDeadletters() // Refresh list
     if (dlq.value.count === 0) {
       currentTab.value = 'dashboard'
       dlqDismissed.value = false // Reset close state so it reappears if new errors come
     }
   } catch (e) {
-    alert(e.message)
+    await showAlert(e.message)
   } finally {
     purging.value = false
   }

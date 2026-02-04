@@ -646,6 +646,9 @@ async def test_phi4_connection(clients: Clients = Depends(get_clients)):
         import httpx
         from classificationg2s.services.azure_clients import auth_headers
 
+        if not config.PHI_ENDPOINT:
+             return { "status": "error", "error": "PHI_ENDPOINT not configured", "model": config.PHI_DEPLOYMENT }
+
         headers = await auth_headers(clients, model_type="openai")
         endpoint = f"{config.PHI_ENDPOINT.rstrip('/')}/openai/deployments/{config.PHI_DEPLOYMENT}/chat/completions?api-version={config.AI_API_VERSION}"
 
@@ -657,7 +660,11 @@ async def test_phi4_connection(clients: Clients = Depends(get_clients)):
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(endpoint, json=payload, headers=headers)
-            response.raise_for_status()
+            if response.is_error:
+                error_detail = response.text
+                logger.error(f"Phi-4 error response: {error_detail}")
+                return { "status": "error", "error": f"HTTP {response.status_code}: {error_detail}", "model": config.PHI_DEPLOYMENT }
+
             data = response.json()
 
         return {
@@ -701,6 +708,9 @@ async def test_mistral_ocr_connection(clients: Clients = Depends(get_clients)):
         import httpx
         from classificationg2s.services.azure_clients import auth_headers
 
+        if not config.MISTRAL_ENDPOINT:
+            return { "status": "error", "error": "MISTRAL_ENDPOINT not configured in environment", "model": config.MISTRAL_DEPLOYMENT }
+
         headers = await auth_headers(clients, model_type="mistral")
 
         # Handle full URL vs base URL
@@ -725,7 +735,10 @@ async def test_mistral_ocr_connection(clients: Clients = Depends(get_clients)):
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(endpoint, json=payload, headers=headers)
-            response.raise_for_status()
+            if response.is_error:
+                error_detail = response.text
+                logger.error(f"Mistral OCR error response: {error_detail}")
+                return { "status": "error", "error": f"HTTP {response.status_code}: {error_detail}", "model": config.MISTRAL_DEPLOYMENT }
             data = response.json()
 
         return {
@@ -753,6 +766,9 @@ async def test_gpt_connection(model: str | None = None, clients: Clients = Depen
         # Use PHI_ENDPOINT as fallback if GPT endpoint not configured
         gpt_endpoint = getattr(config, "GPT_ENDPOINT", config.PHI_ENDPOINT)
 
+        if not gpt_endpoint:
+             return { "status": "error", "error": "GPT_ENDPOINT/PHI_ENDPOINT not configured", "model": "unknown" }
+
         # Determine deployment name - prefer configured fallback if None
         if model:
              # trust the caller (admin) to test specific models like gpt5-nano
@@ -772,7 +788,10 @@ async def test_gpt_connection(model: str | None = None, clients: Clients = Depen
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(endpoint, json=payload, headers=headers)
-            response.raise_for_status()
+            if response.is_error:
+                error_detail = response.text
+                logger.error(f"GPT error response for {gpt_deployment}: {error_detail}")
+                return { "status": "error", "error": f"HTTP {response.status_code}: {error_detail}", "model": gpt_deployment }
             data = response.json()
 
         return {
