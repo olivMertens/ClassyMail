@@ -22,6 +22,7 @@ COSMOS_CACHE_CONTAINER = os.getenv("AZURE_COSMOS_CACHE_CONTAINER", "vector_cache
 
 # AI endpoints
 MISTRAL_ENDPOINT = os.getenv("MISTRAL_ENDPOINT")  # https://...azure.net
+MISTRAL_API_VERSION = os.getenv("MISTRAL_API_VERSION", "2024-05-01-preview")
 MISTRAL_DEPLOYMENT = os.getenv("MISTRAL_DEPLOYMENT", "mistral-document-ai-2505")
 PHI_ENDPOINT = os.getenv("PHI_ENDPOINT") or os.getenv("AZURE_AI_ENDPOINT")
 PHI_DEPLOYMENT = os.getenv("PHI_DEPLOYMENT", "phi-4")
@@ -95,6 +96,14 @@ ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME", "ClassyMail")
 # Worker Configuration
 WORKER_CONCURRENCY = int(os.getenv("WORKER_CONCURRENCY", "30"))  # Concurrent message processing tasks
 WORKER_LOCK_RENEWAL_DURATION = int(os.getenv("WORKER_LOCK_RENEWAL_DURATION", "3600"))  # 1 hour for long documents
+
+# Rate limits (RPM/TPM) per model
+MISTRAL_RPM = int(os.getenv("MISTRAL_RPM", "30"))
+MISTRAL_TPM = int(os.getenv("MISTRAL_TPM", "60000"))
+PHI_RPM = int(os.getenv("PHI_RPM", "60"))
+PHI_TPM = int(os.getenv("PHI_TPM", "80000"))
+CHAT_RPM = int(os.getenv("CHAT_RPM", "60"))
+CHAT_TPM = int(os.getenv("CHAT_TPM", "80000"))
 
 # Environment Configuration
 AZURE_ENV = os.getenv("AZURE_ENV", "development")  # production, staging, development

@@ -152,15 +152,15 @@
         "disclaimer": "*Tarifs indicatifs, dépendants de la région et de l'usage réel.",
         "close": "OK",
         "target_title": "Objectif",
-        "target_desc": "Ce Proof of Concept (POC) démontre un pipeline de classification d'emails automatisé utilisant les services Azure AI. Il valide la haute précision et la faible latence des Petits Modèles de Langage (SLM) comme Phi-4 pour la détection d'intention, déployés au sein d'une architecture événementielle scalable.",
+        "target_desc": "Cette POC démontre un pipeline intelligent prêt pour la production : évaluation adversariale bi-modèle, recherche vectorielle avec cache, scoring de santé des files et identité managée sans secret — optimisé pour la faible latence à grande échelle.",
         "resources_title": "Architecture Azure/Foundry",
         "guide_prompt": "Pour plus de détails, consultez le",
         "guide_link": "Guide Utilisateur / Documentation",
         "features": {
-            "title": "Nouveautés (Adversarial Update)",
-            "adversarial": "Mode Comparaison : Phi-4 vs Modèles Alternatifs",
-            "dark_mode": "Support du Mode Sombre & Thèmes",
-            "retail_prices": "Estimation des Coûts via Azure Retail Prices"
+            "title": "Points forts",
+            "adversarial": "Évaluation adversariale bi-modèle (Phi-4 vs personnalisé)",
+            "dark_mode": "Cache sémantique + recherche vectorielle Cosmos",
+            "retail_prices": "Pipeline scoré : métriques de file, probes de santé, identité managée"
         }
     },
     "guide": {

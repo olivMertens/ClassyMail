@@ -2,15 +2,18 @@
 import { useI18n } from 'vue-i18n'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 
-defineProps({
+const props = defineProps({
   show: {
     type: Boolean,
     default: false
+  },
+  organizationName: {
+    type: String,
+    default: 'ClassiMail'
   }
 })
 const emit = defineEmits(['close', 'navigate'])
 const { t } = useI18n()
-const organizationName = 'ClassyMail'
 </script>
 
 <template>
@@ -29,7 +32,7 @@ const organizationName = 'ClassyMail'
                 id="modal-title"
                 class="text-xl font-semibold leading-6 text-gray-900 dark:text-white"
               >
-                POC - {{ organizationName }} ({{ t('info.date') }})
+                POC - {{ props.organizationName }} ({{ t('info.date') }})
               </h3>
               <button
                 class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-200"

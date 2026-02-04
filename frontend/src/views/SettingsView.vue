@@ -267,23 +267,33 @@ const runLLMTests = async () => {
   llmTestLoading.value = true
   llmTestResults.value = null
   try {
-    const [phi4Res, mistralRes, gptRes] = await Promise.all([
+    const adversarialModel = settings.value?.adversarial_model
+    const chatModel = settings.value?.chat_model || 'gpt-5.2-chat'
+
+    const requests = [
       fetch('/api/admin/test-phi4'),
       fetch('/api/admin/test-mistral-ocr'),
       fetch('/api/admin/test-gpt')
-    ])
+    ]
+    if (adversarialModel) {
+      requests.push(fetch(`/api/admin/test-gpt?model=${encodeURIComponent(adversarialModel)}`))
+    }
+    requests.push(fetch(`/api/admin/test-gpt?model=${encodeURIComponent(chatModel)}`))
 
-    const [phi4Data, mistralData, gptData] = await Promise.all([
-      phi4Res.json(),
-      mistralRes.json(),
-      gptRes.json()
-    ])
+    const responses = await Promise.all(requests)
+    const data = await Promise.all(responses.map(r => r.json()))
+
+    const [phi4Data, mistralData, gptData, maybeAdversarial, chatData] = data
 
     llmTestResults.value = {
       phi4: phi4Data,
       mistral: mistralData,
-      gpt: gptData
+      gpt: gptData,
     }
+    if (adversarialModel) {
+      llmTestResults.value.adversarial = maybeAdversarial
+    }
+    llmTestResults.value.chat = adversarialModel ? chatData : maybeAdversarial
   } catch (e) {
     alert(`LLM Test Error: ${e.message}`)
   } finally {

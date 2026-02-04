@@ -27,10 +27,11 @@ const emit = defineEmits(['change-view'])
 const { t } = useI18n()
 
 const sidebarOpen = ref(false)
+const sidebarCollapsed = ref(false)
 const showInfoModal = ref(false)
 const isDark = ref(document.documentElement.classList.contains('dark'))
-const uiConfig = ref({ show_info_modal: true, show_developer_tab: true })
-const organizationName = 'ClassyMail'
+const uiConfig = ref({ show_info_modal: true, show_developer_tab: true, organization_name: 'ClassiMail', environment: 'development' })
+const organizationName = computed(() => uiConfig.value.organization_name || 'ClassiMail')
 
 const fetchUiConfig = async () => {
   try {
@@ -120,16 +121,25 @@ const navigation = computed(() => {
     </div>
 
     <!-- Desktop sidebar -->
-    <div class="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col shadow-lg z-30">
+    <div
+      class="hidden md:fixed md:inset-y-0 md:flex md:flex-col shadow-lg z-30"
+      :class="sidebarCollapsed ? 'md:w-20' : 'md:w-64'"
+    >
       <div class="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
         <div
           class="flex items-center h-16 flex-shrink-0 px-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
         >
           <span class="text-2xl mr-2">📧</span>
-          <span class="text-xl font-bold text-gray-900 dark:text-white">{{ organizationName }}</span>
+          <span
+            v-if="!sidebarCollapsed"
+            class="text-xl font-bold text-gray-900 dark:text-white"
+          >{{ organizationName }}</span>
         </div>
         <div class="flex-1 flex flex-col overflow-y-auto">
-          <nav class="flex-1 px-2 py-4 space-y-1">
+          <nav
+            class="flex-1 px-2 py-4 space-y-1"
+            :class="sidebarCollapsed ? 'items-center' : ''"
+          >
             <a
               v-for="item in navigation"
               :key="item.name"
@@ -140,11 +150,11 @@ const navigation = computed(() => {
             >
               <component
                 :is="item.icon"
-                class="mr-3 h-5 w-5 flex-shrink-0"
-                :class="[currentView === item.id ? 'text-primary-600 dark:text-white' : 'text-gray-400 group-hover:text-gray-500 dark:text-gray-400 dark:group-hover:text-gray-300']"
+                class="h-5 w-5 flex-shrink-0"
+                :class="[currentView === item.id ? 'text-primary-600 dark:text-white' : 'text-gray-400 group-hover:text-gray-500 dark:text-gray-400 dark:group-hover:text-gray-300', sidebarCollapsed ? '' : 'mr-3']"
                 aria-hidden="true"
               />
-              {{ item.name }}
+              <span v-if="!sidebarCollapsed">{{ item.name }}</span>
             </a>
           </nav>
         </div>
@@ -152,10 +162,16 @@ const navigation = computed(() => {
         <div class="flex-shrink-0 flex border-t border-gray-200 dark:border-gray-700 p-4">
           <div class="flex items-center w-full">
             <div class="ml-3">
-              <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
+              <p
+                v-if="!sidebarCollapsed"
+                class="text-xs font-medium text-gray-500 dark:text-gray-400"
+              >
                 {{ organizationName }}
               </p>
-              <p class="text-xs font-medium text-gray-400 dark:text-gray-500">
+              <p
+                v-if="!sidebarCollapsed"
+                class="text-xs font-medium text-gray-400 dark:text-gray-500"
+              >
                 Février 2026
               </p>
             </div>
@@ -165,7 +181,10 @@ const navigation = computed(() => {
     </div>
 
     <!-- Content Area -->
-    <div class="flex flex-col md:pl-64 flex-1 h-screen overflow-hidden">
+    <div
+      class="flex flex-col flex-1 h-screen overflow-hidden"
+      :class="sidebarCollapsed ? 'md:pl-20' : 'md:pl-64'"
+    >
       <!-- Top bar -->
       <div
         class="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white dark:bg-gray-800 shadow dark:shadow-gray-900/20 md:hidden"
@@ -205,29 +224,38 @@ const navigation = computed(() => {
 
       <!-- Desktop Top Bar extensions -->
       <header
-        class="hidden md:flex items-center justify-end h-16 px-8 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 gap-2"
+        class="hidden md:flex items-center justify-between h-16 px-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 gap-2"
       >
         <button
-          v-if="uiConfig.show_info_modal"
           class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
-          title="Info"
-          @click="showInfoModal = true"
+          title="Toggle sidebar"
+          @click="sidebarCollapsed = !sidebarCollapsed"
         >
-          <InformationCircleIcon class="h-6 w-6" />
+          <Bars3Icon class="h-6 w-6" />
         </button>
-        <button
-          class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
-          @click="toggleDarkMode"
-        >
-          <SunIcon
-            v-if="isDark"
-            class="h-6 w-6"
-          />
-          <MoonIcon
-            v-else
-            class="h-6 w-6"
-          />
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            v-if="uiConfig.show_info_modal"
+            class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
+            title="Info"
+            @click="showInfoModal = true"
+          >
+            <InformationCircleIcon class="h-6 w-6" />
+          </button>
+          <button
+            class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
+            @click="toggleDarkMode"
+          >
+            <SunIcon
+              v-if="isDark"
+              class="h-6 w-6"
+            />
+            <MoonIcon
+              v-else
+              class="h-6 w-6"
+            />
+          </button>
+        </div>
       </header>
 
       <!-- Main Content Scroller -->
@@ -239,6 +267,7 @@ const navigation = computed(() => {
     </div>
     <InfoModal
       :show="showInfoModal"
+      :organization-name="organizationName"
       @close="showInfoModal = false"
       @navigate="(view) => { showInfoModal = false; emit('change-view', view) }"
     />

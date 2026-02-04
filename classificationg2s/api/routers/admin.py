@@ -20,6 +20,7 @@ from classificationg2s.services.repository import (
     get_processing_stats_by_day,
 )
 from classificationg2s.services.generator import generate_email_pdf
+from classificationg2s.services.settings_store import load_settings
 from azure.monitor.query.aio import LogsQueryClient
 from azure.monitor.query import LogsQueryStatus
 
@@ -99,6 +100,8 @@ class LowConfidenceResponse(BaseModel):
 class UIConfigResponse(BaseModel):
     show_info_modal: bool
     show_developer_tab: bool
+    organization_name: str | None = None
+    environment: str | None = None
 
 
 class QueueMetricsResponse(BaseModel):
@@ -125,7 +128,9 @@ async def get_ui_config():
     """Returns UI feature flags based on environment variables."""
     return UIConfigResponse(
         show_info_modal=config.UI_SHOW_INFO_MODAL,
-        show_developer_tab=config.UI_SHOW_DEVELOPER_TAB
+        show_developer_tab=config.UI_SHOW_DEVELOPER_TAB,
+        organization_name=getattr(config, "ORGANIZATION_NAME", None),
+        environment=getattr(config, "AZURE_ENV", None),
     )
 
 
@@ -454,6 +459,7 @@ async def version():
 @router.get("/diagnostics", response_model=DiagnosticsResponse)
 async def diagnostics(clients: Clients = Depends(get_clients)):
     ok, readiness = await readiness_checks(clients=clients, deep=True)
+    settings = load_settings()
     env = {
         "subscription_id": os.getenv("AZURE_SUBSCRIPTION_ID"),
         "tenant_id": os.getenv("AZURE_TENANT_ID"),
@@ -470,6 +476,8 @@ async def diagnostics(clients: Clients = Depends(get_clients)):
         "ai_endpoint": config.MISTRAL_ENDPOINT or config.PHI_ENDPOINT,
         "mistral_deployment": config.MISTRAL_DEPLOYMENT,
         "phi_deployment": config.PHI_DEPLOYMENT,
+        "chat_deployment": config.CHAT_DEPLOYMENT,
+        "adversarial_model": settings.get("adversarial_model"),
     }
     return DiagnosticsResponse(env=env, readiness=readiness, ok=ok)
 
@@ -654,6 +662,8 @@ async def test_mistral_ocr_connection(clients: Clients = Depends(get_clients)):
             endpoint = base_mistral
         else:
             endpoint = f"{base_mistral}/providers/mistral/azure/ocr"
+        if "?" not in endpoint:
+            endpoint = f"{endpoint}?api-version={config.MISTRAL_API_VERSION}"
 
         # Minimal test payload: 1x1 PNG data URI
         one_px_png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAuMBg4eM8sYAAAAASUVORK5CYII="

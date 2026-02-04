@@ -16,6 +16,7 @@ from classificationg2s.models import OCRFailed, BusinessEntities
 from classificationg2s.services.azure_clients import auth_headers, Clients
 from classificationg2s.services.settings_store import get_categories_prompt_text, load_settings
 from classificationg2s.services.annotations import ImageDescription
+from classificationg2s.core.llm_limits import get_limiter
 # from classificationg2s.services.circuit_breaker import with_ocr_circuit_breaker, with_classification_circuit_breaker
 
 logger = logging.getLogger(__name__)
@@ -277,6 +278,8 @@ async def ocr_with_mistral(
         url = base_end
     else:
         url = f"{base_end}/providers/mistral/azure/ocr"
+    if "?" not in url:
+        url = f"{url}?api-version={config.MISTRAL_API_VERSION}"
 
     # Prepare payloads (per page if image conversion works, else single PDF)
     # NOTE: Vision strategy uses OCR-rendered page images only (no attachments/external images).
@@ -387,7 +390,8 @@ async def ocr_with_mistral(
                             logger.info(f"[metrics] OCR Request attempt {attempt_no}/{attempts}: {url}")
 
                             async with httpx.AsyncClient(timeout=90) as client:
-                                resp = await client.post(url, json=current_payload, headers=headers)
+                                async with get_limiter("mistral"):
+                                    resp = await client.post(url, json=current_payload, headers=headers)
                                 try:
                                     resp.raise_for_status()
                                 except httpx.HTTPStatusError as ex:
@@ -548,6 +552,8 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
     logger.info(f"[metrics] Classify Request: {deployment} strategy={strategy}")
     logger.info(f"[metrics] Token Estimate: system={system_tokens} user={user_tokens_est} truncated={truncated}")
 
+    limiter = get_limiter("phi")
+
     with tracer.start_as_current_span(f"classify_{deployment}") as span:
         span.set_attribute("gen_ai.system", "azure_openai")
         span.set_attribute("gen_ai.operation", "chat.completions")
@@ -558,7 +564,12 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
 
         async with httpx.AsyncClient(timeout=60) as client:
             try:
-                resp = await client.post(url, json=payload, headers=headers)
+                # Best-effort TPM gating
+                while not await limiter.consume_if_allowed(user_tokens_est + config.PHI_RESERVED_OUTPUT_TOKENS):
+                    await asyncio.sleep(1)
+
+                async with limiter:
+                    resp = await client.post(url, json=payload, headers=headers)
                 resp.raise_for_status()
             except httpx.HTTPStatusError as ex:
                 status = ex.response.status_code if ex.response is not None else None

@@ -5,10 +5,12 @@ import logging
 import os
 import uuid
 import re
+import asyncio
 import httpx
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
 from classificationg2s.core import config
+from classificationg2s.core.llm_limits import get_limiter
 from classificationg2s.services.azure_clients import Clients
 # from classificationg2s.services.circuit_breaker import with_chat_circuit_breaker
 from classificationg2s.services.repository import (
@@ -511,8 +513,14 @@ class ChatAgent:
             payload["parallel_tool_calls"] = False
 
         logger.info(f"Calling Chat LLM: {self.endpoint_url}")
+        limiter = get_limiter("chat")
         async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(self.endpoint_url, json=payload, headers=headers)
+            tokens_est = 4000
+            while not await limiter.consume_if_allowed(tokens_est):
+                await asyncio.sleep(1)
+
+            async with limiter:
+                resp = await client.post(self.endpoint_url, json=payload, headers=headers)
             try:
                 resp.raise_for_status()
             except httpx.HTTPStatusError as ex:

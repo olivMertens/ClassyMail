@@ -136,7 +136,7 @@
         "tagline": "GenAI that knows exactly where every email belongs.",
         "contact": "Contact",
         "target_title": "Target & Scope",
-        "target_desc": "This Proof of Concept (POC) demonstrates an automated email classification pipeline using Azure AI services. It validates the high accuracy and low latency of Small Language Models (SLM) like Phi-4 for intent detection, deployed within a scalable, event-driven architecture.",
+        "target_desc": "This Proof of Concept showcases a production-ready email intelligence pipeline: dual-model adversarial evaluation, semantic vector search with cache, queue health scoring, and zero-secret managed identity—optimized for low latency at scale.",
         "resources_title": "Deployed Resources",
         "guide_prompt": "For detailed instructions and architecture, see the",
         "guide_link": "Application Guide",
@@ -156,10 +156,10 @@
         },
         "disclaimer": "*Indicative rates, dependent on region and actual usage.",
         "features": {
-            "title": "New Features",
-            "adversarial": "Adversarial Mode: Phi-4 vs Alternative Models",
-            "dark_mode": "Dark Mode Support & Themes",
-            "retail_prices": "Cost Estimation via Azure Retail Prices"
+            "title": "Highlights",
+            "adversarial": "Dual-model adversarial evaluation (Phi-4 vs custom)",
+            "dark_mode": "Semantic cache + vector search with Cosmos",
+            "retail_prices": "Health-scored pipeline: queue metrics, readiness probes, managed identity"
         },
         "close": "Close"
     },
