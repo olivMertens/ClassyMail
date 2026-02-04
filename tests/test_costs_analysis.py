@@ -7,8 +7,8 @@ fonctionne correctement avec les deux modes: fixed et retail.
 
 import pytest
 from unittest.mock import AsyncMock, patch
-from classificationg2s.api.routers.costs import costs_summary
-from classificationg2s.services.azure_clients import Clients
+from classymail.api.routers.costs import costs_summary
+from classymail.services.azure_clients import Clients
 
 
 @pytest.fixture
@@ -24,10 +24,10 @@ async def test_costs_summary_fixed_mode(mock_clients):
     """Test du mode 'fixed' (Fixed Estimate POC)."""
 
     # Mock des fonctions de repository
-    with patch("classificationg2s.api.routers.costs.count_by_status") as mock_count, \
-         patch("classificationg2s.api.routers.costs.sum_phi4_cost_usd") as mock_phi4, \
-         patch("classificationg2s.api.routers.costs.sum_mistral_cost_usd") as mock_mistral, \
-         patch("classificationg2s.api.routers.costs.count_items_with_any_usage_cost") as mock_usage:
+    with patch("classymail.api.routers.costs.count_by_status") as mock_count, \
+         patch("classymail.api.routers.costs.sum_phi4_cost_usd") as mock_phi4, \
+         patch("classymail.api.routers.costs.sum_mistral_cost_usd") as mock_mistral, \
+         patch("classymail.api.routers.costs.count_items_with_any_usage_cost") as mock_usage:
 
         # Simuler 100 emails traités
         mock_count.side_effect = lambda status, **_: {
@@ -82,11 +82,11 @@ async def test_costs_summary_fixed_mode(mock_clients):
 async def test_costs_summary_retail_mode(mock_clients):
     """Test du mode 'retail' (Azure Retail Prices API)."""
 
-    with patch("classificationg2s.api.routers.costs.count_by_status") as mock_count, \
-         patch("classificationg2s.api.routers.costs.sum_phi4_cost_usd") as mock_phi4, \
-         patch("classificationg2s.api.routers.costs.sum_mistral_cost_usd") as mock_mistral, \
-         patch("classificationg2s.api.routers.costs.count_items_with_any_usage_cost") as mock_usage, \
-         patch("classificationg2s.api.routers.costs.get_retail_unit_prices") as mock_retail:
+    with patch("classymail.api.routers.costs.count_by_status") as mock_count, \
+         patch("classymail.api.routers.costs.sum_phi4_cost_usd") as mock_phi4, \
+         patch("classymail.api.routers.costs.sum_mistral_cost_usd") as mock_mistral, \
+         patch("classymail.api.routers.costs.count_items_with_any_usage_cost") as mock_usage, \
+         patch("classymail.api.routers.costs.get_retail_unit_prices") as mock_retail:
 
         # Mock repository data
         mock_count.side_effect = lambda status, **_: {
@@ -150,10 +150,10 @@ async def test_costs_summary_retail_mode(mock_clients):
 async def test_costs_summary_zero_emails(mock_clients):
     """Test avec zéro email (cas limite)."""
 
-    with patch("classificationg2s.api.routers.costs.count_by_status") as mock_count, \
-         patch("classificationg2s.api.routers.costs.sum_phi4_cost_usd") as mock_phi4, \
-         patch("classificationg2s.api.routers.costs.sum_mistral_cost_usd") as mock_mistral, \
-         patch("classificationg2s.api.routers.costs.count_items_with_any_usage_cost") as mock_usage:
+    with patch("classymail.api.routers.costs.count_by_status") as mock_count, \
+         patch("classymail.api.routers.costs.sum_phi4_cost_usd") as mock_phi4, \
+         patch("classymail.api.routers.costs.sum_mistral_cost_usd") as mock_mistral, \
+         patch("classymail.api.routers.costs.count_items_with_any_usage_cost") as mock_usage:
 
         mock_count.return_value = 0
         mock_phi4.return_value = 0.0
@@ -181,10 +181,10 @@ async def test_costs_summary_zero_emails(mock_clients):
 async def test_costs_breakdown_consistency(mock_clients):
     """Vérifie la cohérence entre le total et le breakdown."""
 
-    with patch("classificationg2s.api.routers.costs.count_by_status") as mock_count, \
-         patch("classificationg2s.api.routers.costs.sum_phi4_cost_usd") as mock_phi4, \
-         patch("classificationg2s.api.routers.costs.sum_mistral_cost_usd") as mock_mistral, \
-         patch("classificationg2s.api.routers.costs.count_items_with_any_usage_cost") as mock_usage:
+    with patch("classymail.api.routers.costs.count_by_status") as mock_count, \
+         patch("classymail.api.routers.costs.sum_phi4_cost_usd") as mock_phi4, \
+         patch("classymail.api.routers.costs.sum_mistral_cost_usd") as mock_mistral, \
+         patch("classymail.api.routers.costs.count_items_with_any_usage_cost") as mock_usage:
 
         mock_count.return_value = 100
         mock_phi4.return_value = 1.0

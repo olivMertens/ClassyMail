@@ -9,9 +9,9 @@ env_path = os.path.join(base_dir, "secrets.env")
 print(f"Loading env from: {env_path}")
 load_dotenv(env_path)
 
-from classificationg2s.services.llm_pipeline import generate_embedding  # noqa: E402
-from classificationg2s.services.azure_clients import Clients, set_default_clients  # noqa: E402
-from classificationg2s.core import config  # noqa: E402
+from classymail.services.llm_pipeline import generate_embedding  # noqa: E402
+from classymail.services.azure_clients import Clients, set_default_clients  # noqa: E402
+from classymail.core import config  # noqa: E402
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -73,7 +73,7 @@ async def verify_chat_endpoint():
     # Assumes the API is running or we simulate the client call.
     # Since we can't depend on uvicorn running in this script, we will simulate the ChatAgent run directly.
 
-    from classificationg2s.services.chat_agent import agent
+    from classymail.services.chat_agent import agent
 
     clients = Clients()
     try:

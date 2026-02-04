@@ -7,12 +7,12 @@ load_dotenv("secrets.env")
 
 # Re-use project modules
 try:
-    from classificationg2s.services.azure_clients import Clients
+    from classymail.services.azure_clients import Clients
 except ImportError:
     # Allow running from root context where package might not be installed but is in path
     import sys
     sys.path.append(".")
-    from classificationg2s.services.azure_clients import Clients
+    from classymail.services.azure_clients import Clients
 
 
 async def main():

@@ -1,5 +1,5 @@
 
-from classificationg2s.services.pipeline import chunk_markdown
+from classymail.services.pipeline import chunk_markdown
 
 
 def test_chunk_markdown_basic():

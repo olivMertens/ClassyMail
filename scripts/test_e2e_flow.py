@@ -23,7 +23,7 @@ import httpx
 # Add parent dir to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from classificationg2s.services.generator import generate_email_pdf
+from classymail.services.generator import generate_email_pdf
 
 
 

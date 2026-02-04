@@ -90,7 +90,7 @@ async def launch_e2e():
 
             # 4. Monitor Cosmos DB for processing
             print("⏳ Step 4: Waiting for processing completion (polling API)...")
-            from classificationg2s.services.azure_clients import blob_id_from_url
+            from classymail.services.azure_clients import blob_id_from_url
             doc_id = blob_id_from_url(blob_url)
 
             processed = False

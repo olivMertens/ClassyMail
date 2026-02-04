@@ -3,10 +3,10 @@ import logging
 import argparse
 import base64
 import json
-from classificationg2s.services.azure_clients import Clients, set_default_clients
-from classificationg2s.services.llm_pipeline import ocr_with_mistral, classify_with_phi4
-from classificationg2s.core import config
-from classificationg2s.cli import ensure_cosmos_container, cosmos_container, close_cosmos
+from classymail.services.azure_clients import Clients, set_default_clients
+from classymail.services.llm_pipeline import ocr_with_mistral, classify_with_phi4
+from classymail.core import config
+from classymail.cli import ensure_cosmos_container, cosmos_container, close_cosmos
 from dotenv import load_dotenv
 
 # Configure logging to see all steps

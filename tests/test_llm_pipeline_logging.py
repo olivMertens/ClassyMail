@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-from classificationg2s.services.llm_pipeline import _combine_ocr_pages, OCRFailed
+from classymail.services.llm_pipeline import _combine_ocr_pages, OCRFailed
 
 
 def test_combine_logs_metrics(caplog):

@@ -1,4 +1,4 @@
-from classificationg2s.services.llm_pipeline import _combine_ocr_pages
+from classymail.services.llm_pipeline import _combine_ocr_pages
 
 def test_combine_ocr_pages_normalizes_bboxes():
     ocr_pages = [

@@ -3,7 +3,7 @@ import types
 import asyncio
 import sys
 
-from classificationg2s.services import llm_pipeline
+from classymail.services import llm_pipeline
 
 
 class FakePage:
