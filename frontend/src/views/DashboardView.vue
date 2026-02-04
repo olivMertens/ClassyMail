@@ -301,6 +301,16 @@ const formatDuration = (email) => {
   return `${m.toFixed(1)} min`
 }
 
+const formatMetric = (num) => {
+  if (num === undefined || num === null) return '0'
+  // Use compact notation for numbers >= 10,000 to handle large volumes (e.g., 10k, 9M)
+  // Below 10,000, show full number with separators
+  return new Intl.NumberFormat('en-US', {
+    notation: num >= 10000 ? 'compact' : 'standard',
+    maximumFractionDigits: 1
+  }).format(num)
+}
+
 const emit = defineEmits(['open-email'])
 </script>
 
@@ -385,30 +395,39 @@ const emit = defineEmits(['open-email'])
         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
           Total Emails
         </dt>
-        <dd class="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
-          {{ stats.total }}
+        <dd
+          class="mt-1 text-3xl font-semibold text-gray-900 dark:text-white"
+          :title="stats.total.toLocaleString()"
+        >
+          {{ formatMetric(stats.total) }}
         </dd>
       </div>
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
           To Review
         </dt>
-        <dd class="mt-1 text-3xl font-semibold text-amber-600 dark:text-amber-400">
-          {{ stats.review_required }}
+        <dd
+          class="mt-1 text-3xl font-semibold text-amber-600 dark:text-amber-400"
+          :title="stats.review_required.toLocaleString()"
+        >
+          {{ formatMetric(stats.review_required) }}
         </dd>
       </div>
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
           Processed
         </dt>
-        <dd class="mt-1 text-3xl font-semibold text-green-600 dark:text-green-400">
-          {{ stats.processed }}
+        <dd
+          class="mt-1 text-3xl font-semibold text-green-600 dark:text-green-400"
+          :title="stats.processed.toLocaleString()"
+        >
+          {{ formatMetric(stats.processed) }}
         </dd>
       </div>
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
         <dt
           class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate"
-          title="Average confidence of processed emails"
+          title="The average AI confidence score for all processed emails. A higher score (+85%) indicates better classification accuracy and reliability."
         >
           Avg. Quality
         </dt>
