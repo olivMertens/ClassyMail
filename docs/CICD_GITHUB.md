@@ -30,13 +30,13 @@ Objectif : build/push l'image et déployer/mettre à jour la Container App.
 Recommandation “simple qui marche” (scope = Resource Group) :
 
 - **Contributor** sur le RG (ex: `email-poc-rg`)
-- **AcrPush** sur l'ACR (si l'ACR est dans le même RG, vous pouvez aussi le mettre au niveau RG mais c'est plus large)
+- **AcrPush** + **Reader** sur l'ACR (Reader nécessaire pour `az acr show` / login, et AcrPush pour le push)
 
 Option “least privilege” (plus strict, plus verbeux) :
 
 - **Container Apps Contributor** sur le RG
 - **Managed Identity Operator** sur la User Assigned Managed Identity (pour permettre l'assignation à la Container App)
-- **AcrPush** sur l'ACR
+- **AcrPush** + **Reader** sur l'ACR
 
 ### 2) RBAC de l'identité managée de l'app (runtime)
 
@@ -124,7 +124,7 @@ Terraform outputs → variables à renseigner :
 
 ACR :
 
-- Option A (recommandé) : définir `ACR_NAME` (nom du registry ACR) et donner au SP OIDC le rôle **AcrPush**.
+- Option A (recommandé) : définir `ACR_NAME` (nom du registry ACR) et donner au SP OIDC les rôles **AcrPush** et **Reader**.
 - Option B : définir `ACR_LOGIN_SERVER`, `ACR_USERNAME`, `ACR_PASSWORD` en secrets (ancienne méthode).
 
 ## Terraform dans GitHub Actions
