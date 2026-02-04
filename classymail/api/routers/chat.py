@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from classificationg2s.services.azure_clients import Clients, get_clients
-from classificationg2s.services.chat_agent import agent as chat_agent
-# from classificationg2s.core.rate_limit import limiter  # TODO: Re-enable for rate limiting
+from classymail.services.azure_clients import Clients, get_clients
+from classymail.services.chat_agent import agent as chat_agent
+# from classymail.core.rate_limit import limiter  # TODO: Re-enable for rate limiting
 import logging
 
 router = APIRouter(tags=["chat"])

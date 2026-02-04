@@ -5,9 +5,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 
-from classificationg2s.services.azure_clients import Clients, get_clients
-from classificationg2s.services.azure_retail_prices import get_retail_unit_prices
-from classificationg2s.services.repository import (
+from classymail.services.azure_clients import Clients, get_clients
+from classymail.services.azure_retail_prices import get_retail_unit_prices
+from classymail.services.repository import (
     count_by_status,
     sum_mistral_cost_usd,
     sum_phi4_cost_usd,

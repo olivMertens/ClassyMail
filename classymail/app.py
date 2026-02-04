@@ -8,26 +8,26 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from classificationg2s.core.paths import project_root
-from classificationg2s.core.telemetry import init_telemetry
-from classificationg2s.core import config
-from classificationg2s.core.rate_limit import limiter
-from classificationg2s.core.middleware import RequestContextMiddleware
-from classificationg2s.core.errors import AppError, error_handler
-from classificationg2s.services.azure_clients import Clients, set_default_clients
-from classificationg2s.services.worker import worker_loop_forever
-from classificationg2s.services.settings_store import load_settings
+from classymail.core.paths import project_root
+from classymail.core.telemetry import init_telemetry
+from classymail.core import config
+from classymail.core.rate_limit import limiter
+from classymail.core.middleware import RequestContextMiddleware
+from classymail.core.errors import AppError, error_handler
+from classymail.services.azure_clients import Clients, set_default_clients
+from classymail.services.worker import worker_loop_forever
+from classymail.services.settings_store import load_settings
 
-from classificationg2s.api.routers.health import router as health_router
-from classificationg2s.api.routers.ui import router as ui_router
-from classificationg2s.api.routers.settings import router as settings_router
-from classificationg2s.api.routers.upload import router as upload_router
-from classificationg2s.api.routers.emails import router as emails_router
-from classificationg2s.api.routers.webhook import router as webhook_router
-from classificationg2s.api.routers.costs import router as costs_router
-from classificationg2s.api.routers.docs import router as docs_router
-from classificationg2s.api.routers.admin import router as admin_router
-from classificationg2s.api.routers.chat import router as chat_router
+from classymail.api.routers.health import router as health_router
+from classymail.api.routers.ui import router as ui_router
+from classymail.api.routers.settings import router as settings_router
+from classymail.api.routers.upload import router as upload_router
+from classymail.api.routers.emails import router as emails_router
+from classymail.api.routers.webhook import router as webhook_router
+from classymail.api.routers.costs import router as costs_router
+from classymail.api.routers.docs import router as docs_router
+from classymail.api.routers.admin import router as admin_router
+from classymail.api.routers.chat import router as chat_router
 
 
 def create_app() -> FastAPI:

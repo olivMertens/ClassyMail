@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from classificationg2s.core.paths import project_root
+from classymail.core.paths import project_root
 
 DATA_FILE = Path(project_root()) / "data" / "settings.json"
 

@@ -13,7 +13,7 @@ from azure.storage.blob.aio import BlobClient, BlobServiceClient
 from azure.cosmos.aio import CosmosClient
 from azure.cosmos import PartitionKey
 
-from classificationg2s.core import config
+from classymail.core import config
 
 logger = logging.getLogger(__name__)
 try:

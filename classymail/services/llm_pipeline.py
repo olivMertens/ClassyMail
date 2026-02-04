@@ -11,13 +11,13 @@ from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel
 from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential, retry_if_exception, retry
 
-from classificationg2s.core import config
-from classificationg2s.models import OCRFailed, BusinessEntities
-from classificationg2s.services.azure_clients import auth_headers, Clients
-from classificationg2s.services.settings_store import get_categories_prompt_text, load_settings
-from classificationg2s.services.annotations import ImageDescription
-from classificationg2s.core.llm_limits import get_limiter
-# from classificationg2s.services.circuit_breaker import with_ocr_circuit_breaker, with_classification_circuit_breaker
+from classymail.core import config
+from classymail.models import OCRFailed, BusinessEntities
+from classymail.services.azure_clients import auth_headers, Clients
+from classymail.services.settings_store import get_categories_prompt_text, load_settings
+from classymail.services.annotations import ImageDescription
+from classymail.core.llm_limits import get_limiter
+# from classymail.services.circuit_breaker import with_ocr_circuit_breaker, with_classification_circuit_breaker
 
 logger = logging.getLogger(__name__)
 

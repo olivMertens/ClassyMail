@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 
-from classificationg2s.core import config
-from classificationg2s.services.azure_clients import Clients, set_default_clients
-from classificationg2s.services.worker import worker_loop_forever
+from classymail.core import config
+from classymail.services.azure_clients import Clients, set_default_clients
+from classymail.services.worker import worker_loop_forever
 
 
 async def main():

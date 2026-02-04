@@ -13,7 +13,7 @@ from azure.servicebus.aio import ServiceBusClient
 from azure.servicebus.management import ServiceBusAdministrationClient
 from azure.core.credentials import TokenCredential
 
-from classificationg2s.core import config
+from classymail.core import config
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Depends
 
-from classificationg2s.services.azure_clients import readiness_checks, get_clients, Clients
+from classymail.services.azure_clients import readiness_checks, get_clients, Clients
 
 
 router = APIRouter(tags=["health"])

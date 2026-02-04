@@ -10,13 +10,13 @@ import inspect
 
 from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ResourceNotFoundError
 from azure.servicebus.aio import AutoLockRenewer
-from classificationg2s.core import config
-from classificationg2s.services.azure_clients import Clients
-from classificationg2s.services.pipeline import run_classification_pipeline
-from classificationg2s.services.repository import save_to_cosmos
-from classificationg2s.models import EmailRecord, OCRFailed
-from classificationg2s.services.azure_clients import blob_id_from_url
-from classificationg2s.services.messages import extract_blob_url
+from classymail.core import config
+from classymail.services.azure_clients import Clients
+from classymail.services.pipeline import run_classification_pipeline
+from classymail.services.repository import save_to_cosmos
+from classymail.models import EmailRecord, OCRFailed
+from classymail.services.azure_clients import blob_id_from_url
+from classymail.services.messages import extract_blob_url
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +146,7 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
                     elif m:
                         models = [m]
 
-                from classificationg2s.services.pipeline import run_reclassification_pipeline
+                from classymail.services.pipeline import run_reclassification_pipeline
                 result = await run_reclassification_pipeline(item_id or blob_id_from_url(blob_url), models=models, clients=clients)
 
             else:

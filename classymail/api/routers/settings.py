@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from classificationg2s.services.settings_store import load_settings, save_settings, save_settings_async
-from classificationg2s.core import config
-from classificationg2s.services.azure_clients import Clients, get_clients
+from classymail.services.settings_store import load_settings, save_settings, save_settings_async
+from classymail.core import config
+from classymail.services.azure_clients import Clients, get_clients
 
 router = APIRouter(prefix="/api", tags=["settings"])
 

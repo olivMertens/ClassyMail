@@ -8,9 +8,9 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, File, HTTPException, UploadFile, Depends
 from azure.core.exceptions import AzureError
 
-from classificationg2s.core import config
-# from classificationg2s.core.rate_limit import limiter  # TODO: Re-enable for rate limiting
-from classificationg2s.services.azure_clients import get_blob_service_client
+from classymail.core import config
+# from classymail.core.rate_limit import limiter  # TODO: Re-enable for rate limiting
+from classymail.services.azure_clients import get_blob_service_client
 
 logger = logging.getLogger(__name__)
 

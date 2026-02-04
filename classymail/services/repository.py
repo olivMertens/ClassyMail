@@ -6,11 +6,11 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from classificationg2s.models import EmailRecord
-from classificationg2s.services.azure_clients import Clients, get_default_clients
-from classificationg2s.services.anonymizer import anonymize_markdown_for_finetune
-from classificationg2s.services.llm_pipeline import generate_embedding
-from classificationg2s.core import config
+from classymail.models import EmailRecord
+from classymail.services.azure_clients import Clients, get_default_clients
+from classymail.services.anonymizer import anonymize_markdown_for_finetune
+from classymail.services.llm_pipeline import generate_embedding
+from classymail.core import config
 
 
 def compute_search_text(markdown: str | None, *, max_chars: int = 8192) -> str | None:

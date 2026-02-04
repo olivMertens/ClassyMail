@@ -9,7 +9,7 @@ from azure.cosmos import PartitionKey
 from azure.cosmos.aio import CosmosClient
 from azure.identity.aio import DefaultAzureCredential
 
-from classificationg2s.core import config
+from classymail.core import config
 
 
 _credential: DefaultAzureCredential | None = None
@@ -120,7 +120,7 @@ async def export_cosmos_to_finetune_jsonl(
     import hashlib
     import json
 
-    from classificationg2s.services.anonymizer import anonymize_markdown_for_finetune
+    from classymail.services.anonymizer import anonymize_markdown_for_finetune
 
     await ensure_cosmos_container()
 
@@ -198,7 +198,7 @@ async def export_cosmos_to_finetune_jsonl(
 def _parse_args():
     import argparse
 
-    parser = argparse.ArgumentParser(description="ClassificationG2S helpers")
+    parser = argparse.ArgumentParser(description="classymail helpers")
     parser.add_argument("--export-csv", nargs="?", const="./data/output.csv", help="Export Cosmos items to CSV")
     parser.add_argument(
         "--export-finetune-jsonl",
@@ -221,9 +221,9 @@ def _parse_args():
 
 async def backfill_rag(max_items: int | None = None):
     """Backfill embeddings and chunks for emails."""
-    from classificationg2s.services.pipeline import chunk_markdown
-    from classificationg2s.services.llm_pipeline import generate_embedding
-    from classificationg2s.services.repository import save_chunks
+    from classymail.services.pipeline import chunk_markdown
+    from classymail.services.llm_pipeline import generate_embedding
+    from classymail.services.repository import save_chunks
 
     await ensure_cosmos_container()
     query = "SELECT * FROM c WHERE c.type = 'email'"

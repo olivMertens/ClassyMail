@@ -9,11 +9,11 @@ import asyncio
 import httpx
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
-from classificationg2s.core import config
-from classificationg2s.core.llm_limits import get_limiter
-from classificationg2s.services.azure_clients import Clients
-# from classificationg2s.services.circuit_breaker import with_chat_circuit_breaker
-from classificationg2s.services.repository import (
+from classymail.core import config
+from classymail.core.llm_limits import get_limiter
+from classymail.services.azure_clients import Clients
+# from classymail.services.circuit_breaker import with_chat_circuit_breaker
+from classymail.services.repository import (
     search_email_records,
     get_email_by_id,
     search_email_by_text,
@@ -29,7 +29,7 @@ from classificationg2s.services.repository import (
     get_cache_entry,
     set_cache_entry,
 )
-from classificationg2s.services.llm_pipeline import generate_embedding
+from classymail.services.llm_pipeline import generate_embedding
 
 logger = logging.getLogger("ClassyMail.chatbot")
 

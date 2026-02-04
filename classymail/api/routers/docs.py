@@ -87,7 +87,7 @@ async def custom_redoc(theme: str = "light"):
     <!DOCTYPE html>
     <html>
     <head>
-    <title>ClassificationG2S API</title>
+    <title>classymail API</title>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://fonts.googleapis.com/css?family=Inter:300,400,600,700" rel="stylesheet">

@@ -4,5 +4,5 @@ from pathlib import Path
 
 
 def project_root() -> Path:
-    # classificationg2s/core/paths.py -> classificationg2s -> repo root
+    # classymail/core/paths.py -> classymail -> repo root
     return Path(__file__).resolve().parents[2]

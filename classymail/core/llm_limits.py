@@ -11,7 +11,7 @@ import asyncio
 from typing import Dict
 from aiolimiter import AsyncLimiter
 
-from classificationg2s.core import config
+from classymail.core import config
 
 # Default limits per model (RPM)
 DEFAULT_RPM = 60

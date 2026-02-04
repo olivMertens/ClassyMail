@@ -6,8 +6,8 @@ import re
 import httpx
 from opentelemetry import trace
 
-from classificationg2s.core import config
-from classificationg2s.services.azure_clients import auth_headers, Clients
+from classymail.core import config
+from classymail.services.azure_clients import auth_headers, Clients
 
 
 tracer = trace.get_tracer(__name__)

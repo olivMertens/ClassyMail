@@ -6,8 +6,8 @@ from fastapi import APIRouter, Body, Depends
 
 from azure.servicebus import ServiceBusMessage
 
-from classificationg2s.core import config
-from classificationg2s.services.azure_clients import get_sb_client
+from classymail.core import config
+from classymail.services.azure_clients import get_sb_client
 
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])

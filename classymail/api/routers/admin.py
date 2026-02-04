@@ -1,17 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from classificationg2s.core import config
-from classificationg2s.core.monitoring import get_queue_metrics, get_system_health_score
-from classificationg2s.services.azure_clients import Clients, get_clients, blob_id_from_url
+from classymail.core import config
+from classymail.core.monitoring import get_queue_metrics, get_system_health_score
+from classymail.services.azure_clients import Clients, get_clients, blob_id_from_url
 import logging
 import uuid
 import json
 import os
 from datetime import datetime, timezone, timedelta
 from azure.servicebus import ServiceBusMessage, ServiceBusSubQueue
-from classificationg2s.services.messages import extract_blob_url
-from classificationg2s.services.azure_clients import readiness_checks, get_cosmos_container as azure_get_cosmos_container
-from classificationg2s.services.repository import (
+from classymail.services.messages import extract_blob_url
+from classymail.services.azure_clients import readiness_checks, get_cosmos_container as azure_get_cosmos_container
+from classymail.services.repository import (
     search_email_records,
     get_latest_errors,
     get_stats_summary,
@@ -21,8 +21,8 @@ from classificationg2s.services.repository import (
     get_seed_examples_for_synthesis,
     save_synthetic_record
 )
-from classificationg2s.services.generator import generate_email_pdf, generate_synthetic_from_seeds
-from classificationg2s.services.settings_store import load_settings
+from classymail.services.generator import generate_email_pdf, generate_synthetic_from_seeds
+from classymail.services.settings_store import load_settings
 from azure.monitor.query.aio import LogsQueryClient
 from azure.monitor.query import LogsQueryStatus
 
@@ -644,7 +644,7 @@ async def test_phi4_connection(clients: Clients = Depends(get_clients)):
     """Test Phi-4 model connection"""
     try:
         import httpx
-        from classificationg2s.services.azure_clients import auth_headers
+        from classymail.services.azure_clients import auth_headers
 
         if not config.PHI_ENDPOINT:
              return { "status": "error", "error": "PHI_ENDPOINT not configured", "model": config.PHI_DEPLOYMENT }
@@ -706,7 +706,7 @@ async def test_mistral_ocr_connection(clients: Clients = Depends(get_clients)):
     """Test Mistral OCR connection"""
     try:
         import httpx
-        from classificationg2s.services.azure_clients import auth_headers
+        from classymail.services.azure_clients import auth_headers
 
         if not config.MISTRAL_ENDPOINT:
             return { "status": "error", "error": "MISTRAL_ENDPOINT not configured in environment", "model": config.MISTRAL_DEPLOYMENT }
@@ -761,7 +761,7 @@ async def test_gpt_connection(model: str | None = None, clients: Clients = Depen
     """Test GPT connection (defaults to configured fallback, or specific model)"""
     try:
         import httpx
-        from classificationg2s.services.azure_clients import auth_headers
+        from classymail.services.azure_clients import auth_headers
 
         # Use PHI_ENDPOINT as fallback if GPT endpoint not configured
         gpt_endpoint = getattr(config, "GPT_ENDPOINT", config.PHI_ENDPOINT)

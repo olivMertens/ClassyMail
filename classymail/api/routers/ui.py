@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, Response
 
-from classificationg2s.core.paths import project_root
+from classymail.core.paths import project_root
 
 
 router = APIRouter(tags=["ui"])

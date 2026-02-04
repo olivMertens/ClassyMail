@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from classificationg2s.core import config
+from classymail.core import config
 
 
 def compute_cost_llm(usage: Optional[dict], *, fallback_used: bool, overrides: Optional[dict] = None) -> Optional[float]:

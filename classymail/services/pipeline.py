@@ -3,11 +3,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from classificationg2s.models import EmailRecord, ClassificationResult
-from classificationg2s.services.azure_clients import download_blob_as_base64, blob_id_from_url, Clients
-from classificationg2s.services.llm_pipeline import ocr_with_mistral, classify_with_phi4, process_agent_response, generate_embedding, extract_business_entities, classify_comparison
-from classificationg2s.services.costing import compute_cost_llm, compute_cost_mistral
-from classificationg2s.core import config
+from classymail.models import EmailRecord, ClassificationResult
+from classymail.services.azure_clients import download_blob_as_base64, blob_id_from_url, Clients
+from classymail.services.llm_pipeline import ocr_with_mistral, classify_with_phi4, process_agent_response, generate_embedding, extract_business_entities, classify_comparison
+from classymail.services.costing import compute_cost_llm, compute_cost_mistral
+from classymail.core import config
 import logging
 
 logger = logging.getLogger(__name__)
@@ -132,7 +132,7 @@ async def run_classification_pipeline(
         pdf_b64, pdf_bytes = await download_blob_as_base64(blob_url, return_bytes=True, clients=clients)
         log("download", "ok", f"{len(pdf_bytes)} bytes")
     except Exception as ex:
-        from classificationg2s.models import OCRFailed
+        from classymail.models import OCRFailed
 
         log("download", "error", f"{type(ex).__name__}: {ex}")
         err = OCRFailed(f"stage=download: {type(ex).__name__}: {ex}")
@@ -153,7 +153,7 @@ async def run_classification_pipeline(
         )
         log("ocr", "ok")
     except Exception as ex:
-        from classificationg2s.models import OCRFailed
+        from classymail.models import OCRFailed
 
         log("ocr", "error", f"{type(ex).__name__}: {ex}")
         err = OCRFailed(f"stage=ocr: {type(ex).__name__}: {ex}")
@@ -183,7 +183,7 @@ async def run_classification_pipeline(
         classification_raw = await classify_with_phi4(markdown, strategy=strategy, clients=clients)
         log("classify", "ok")
     except Exception as ex:
-        from classificationg2s.models import OCRFailed
+        from classymail.models import OCRFailed
 
         log("classify", "error", f"{type(ex).__name__}: {ex}")
         err = OCRFailed(f"stage=classify: {type(ex).__name__}: {ex}")
@@ -250,7 +250,7 @@ async def run_classification_pipeline(
     # Extract metadata from JSON response if present
     response_data = processed.get("raw_response", {})
 
-    from classificationg2s.models import BusinessEntities
+    from classymail.models import BusinessEntities
 
     record = EmailRecord(
         id=blob_id_from_url(blob_url),

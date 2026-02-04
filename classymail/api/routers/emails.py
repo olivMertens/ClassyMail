@@ -13,24 +13,24 @@ from fastapi.responses import StreamingResponse
 from azure.servicebus import ServiceBusMessage
 from azure.storage.blob.aio import BlobClient
 
-from classificationg2s.core import config
-from classificationg2s.models import EmailListResponse, EmailRecord
-from classificationg2s.services.azure_clients import (
+from classymail.core import config
+from classymail.models import EmailListResponse, EmailRecord
+from classymail.services.azure_clients import (
     get_cosmos_container,
     get_sb_client,
     get_queue_active_count,
     get_clients,
     Clients,
 )
-from classificationg2s.services.repository import (
+from classymail.services.repository import (
     count_by_status,
     count_reviewed_ready_items,
     export_finetune_jsonl_iter,
     compute_search_text,
     get_average_confidence,
 )
-from classificationg2s.services.llm_pipeline import analyze_correction
-from classificationg2s.services.settings_store import load_settings
+from classymail.services.llm_pipeline import analyze_correction
+from classymail.services.settings_store import load_settings
 
 logger = logging.getLogger(__name__)
 
@@ -548,7 +548,7 @@ async def reclassify_email(
     - If mode="sync": Returns classification result(s) directly
     - If mode="async": Returns status with job ID for polling
     """
-    from classificationg2s.services.llm_pipeline import classify_with_phi4, classify_comparison
+    from classymail.services.llm_pipeline import classify_with_phi4, classify_comparison
 
     try:
         item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
