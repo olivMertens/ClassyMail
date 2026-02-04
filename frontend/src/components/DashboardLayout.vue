@@ -30,8 +30,8 @@ const sidebarOpen = ref(false)
 const sidebarCollapsed = ref(false)
 const showInfoModal = ref(false)
 const isDark = ref(document.documentElement.classList.contains('dark'))
-const uiConfig = ref({ show_info_modal: true, show_developer_tab: true, organization_name: 'ClassiMail', environment: 'development' })
-const organizationName = computed(() => uiConfig.value.organization_name || 'ClassiMail')
+const uiConfig = ref({ show_info_modal: true, show_developer_tab: true, organization_name: 'ClassyMail', environment: 'development' })
+const organizationName = computed(() => uiConfig.value.organization_name || 'ClassyMail')
 
 const fetchUiConfig = async () => {
   try {
@@ -52,10 +52,10 @@ const toggleDarkMode = () => {
   isDark.value = !isDark.value
   if (isDark.value) {
     document.documentElement.classList.add('dark')
-    localStorage.setItem('classimail-dark', 'true')
+    localStorage.setItem('ClassyMail-dark', 'true')
   } else {
     document.documentElement.classList.remove('dark')
-    localStorage.setItem('classimail-dark', 'false')
+    localStorage.setItem('ClassyMail-dark', 'false')
   }
 }
 
@@ -133,7 +133,8 @@ const navigation = computed(() => {
           <span
             v-if="!sidebarCollapsed"
             class="text-xl font-bold text-gray-900 dark:text-white"
-          >{{ organizationName }}</span>
+          >{{ organizationName
+          }}</span>
         </div>
         <div class="flex-1 flex flex-col overflow-y-auto">
           <nav

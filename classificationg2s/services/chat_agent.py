@@ -31,7 +31,7 @@ from classificationg2s.services.repository import (
 )
 from classificationg2s.services.llm_pipeline import generate_embedding
 
-logger = logging.getLogger("classimail.chatbot")
+logger = logging.getLogger("ClassyMail.chatbot")
 
 
 def _enrich_with_links(item: dict | None) -> dict | None:

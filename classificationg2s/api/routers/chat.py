@@ -6,7 +6,7 @@ from classificationg2s.services.chat_agent import agent as chat_agent
 import logging
 
 router = APIRouter(tags=["chat"])
-logger = logging.getLogger("classimail.chat")
+logger = logging.getLogger("ClassyMail.chat")
 
 
 class ChatRequest(BaseModel):

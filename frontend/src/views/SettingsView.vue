@@ -182,7 +182,7 @@ const saveSettings = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
-    localStorage.setItem('classimail-settings', JSON.stringify(payload))
+    localStorage.setItem('ClassyMail-settings', JSON.stringify(payload))
     saved.value = true
     setTimeout(() => saved.value = false, 3000)
   } catch (e) {
@@ -343,32 +343,32 @@ const themes = [
 const toggleDarkMode = () => {
   isDark.value = !isDark.value
   document.documentElement.classList.toggle('dark', isDark.value)
-  localStorage.setItem('classimail-dark', isDark.value)
+  localStorage.setItem('ClassyMail-dark', isDark.value)
 }
 
 const setTheme = (id) => {
   currentTheme.value = id
   document.documentElement.setAttribute('data-theme', id)
-  localStorage.setItem('classimail-theme', id)
+  localStorage.setItem('ClassyMail-theme', id)
 }
 
 const setLocale = (l) => {
   currentLocale.value = l
   locale.value = l
-  localStorage.setItem('classimail-locale', l)
+  localStorage.setItem('ClassyMail-locale', l)
 }
 
 onMounted(() => {
   loadSettings()
 
-  const savedDark = localStorage.getItem('classimail-dark')
+  const savedDark = localStorage.getItem('ClassyMail-dark')
   isDark.value = savedDark === 'true'
   if (isDark.value) document.documentElement.classList.add('dark')
 
-  const savedTheme = localStorage.getItem('classimail-theme')
+  const savedTheme = localStorage.getItem('ClassyMail-theme')
   if (savedTheme) setTheme(savedTheme)
 
-  const savedLocale = localStorage.getItem('classimail-locale')
+  const savedLocale = localStorage.getItem('ClassyMail-locale')
   if (savedLocale) {
     currentLocale.value = savedLocale
     locale.value = savedLocale

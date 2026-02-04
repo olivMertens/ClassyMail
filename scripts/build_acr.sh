@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ACR_NAME="${ACR_NAME:-}"
-IMAGE_NAME="${IMAGE_NAME:-classimail-agent}"
+IMAGE_NAME="${IMAGE_NAME:-ClassyMail-agent}"
 TAG="${TAG:-local}"
 REGISTRY="${REGISTRY:-}" # e.g. myacr.azurecr.io
 PUSH_METHOD="${PUSH_METHOD:-acr}" # acr|docker

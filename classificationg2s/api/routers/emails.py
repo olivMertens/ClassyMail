@@ -301,7 +301,7 @@ async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
 
     # Generate dynamic filename with timestamp and count
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
-    filename = f"classimail_export_{timestamp}_{total_emails}emails.csv"
+    filename = f"ClassyMail_export_{timestamp}_{total_emails}emails.csv"
 
     async def row_iter():
         buffer = io.StringIO()

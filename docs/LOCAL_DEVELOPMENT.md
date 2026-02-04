@@ -85,7 +85,7 @@ OTEL_SERVICE_NAME=classificationg2s-api
 # UI Configuration (Optional)
 UI_SHOW_INFO_MODAL=true
 UI_SHOW_DEVELOPER_TAB=true
-ORGANIZATION_NAME=G2S  # or Groupama, ClassiMail (default)
+ORGANIZATION_NAME=G2S  # or Groupama, ClassyMail (default)
 MAX_UPLOAD_SIZE=10  # MB
 
 # Optional: Anonymization
@@ -169,7 +169,7 @@ bash ./scripts/fetch_vue_runtime.sh
 ```bash
 # Set variables
 $env:ACR_NAME = "<acrname>"
-$env:IMAGE_NAME = "classimail-agent"
+$env:IMAGE_NAME = "ClassyMail-agent"
 $env:TAG = "local"
 
 # Get ACR login server

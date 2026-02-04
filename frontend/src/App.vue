@@ -18,30 +18,30 @@ const selectedEmailId = ref(null)
 const isModalOpen = ref(false)
 
 const openEmail = (email) => {
-    selectedEmailId.value = email.id
-    isModalOpen.value = true
+  selectedEmailId.value = email.id
+  isModalOpen.value = true
 }
 
 onMounted(() => {
-    // Restore Theme
-    const savedTheme = localStorage.getItem('classimail-theme')
-    if (savedTheme) {
-        document.documentElement.setAttribute('data-theme', savedTheme)
-    }
+  // Restore Theme
+  const savedTheme = localStorage.getItem('ClassyMail-theme')
+  if (savedTheme) {
+    document.documentElement.setAttribute('data-theme', savedTheme)
+  }
 
-    // Restore Dark Mode
-    const savedDark = localStorage.getItem('classimail-dark')
-    if (savedDark === 'true') {
-        document.documentElement.classList.add('dark')
-    } else if (savedDark === 'false') {
-        document.documentElement.classList.remove('dark')
-    }
+  // Restore Dark Mode
+  const savedDark = localStorage.getItem('ClassyMail-dark')
+  if (savedDark === 'true') {
+    document.documentElement.classList.add('dark')
+  } else if (savedDark === 'false') {
+    document.documentElement.classList.remove('dark')
+  }
 
-    // Restore Locale
-    const savedLocale = localStorage.getItem('classimail-locale')
-    if (savedLocale) {
-        locale.value = savedLocale
-    }
+  // Restore Locale
+  const savedLocale = localStorage.getItem('ClassyMail-locale')
+  if (savedLocale) {
+    locale.value = savedLocale
+  }
 })
 </script>
 
@@ -65,7 +65,7 @@ onMounted(() => {
       :email-id="selectedEmailId"
       :is-open="isModalOpen"
       @close="isModalOpen = false"
-      @updated="() => {} /* Optional: refetch dashboard */"
+      @updated="() => { } /* Optional: refetch dashboard */"
     />
   </DashboardLayout>
 </template>

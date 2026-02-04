@@ -156,7 +156,7 @@ graph TD
             System Architecture
           </h3>
           <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
-            The ClassiMail system leverages Azure Container Apps, Azure AI Services, and Cosmos DB to provide a scalable
+            The ClassyMail system leverages Azure Container Apps, Azure AI Services, and Cosmos DB to provide a scalable
             email classification pipeline.
           </p>
 

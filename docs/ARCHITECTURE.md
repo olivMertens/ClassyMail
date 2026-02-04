@@ -153,9 +153,9 @@ Pour isoler totalement le système d'Internet (VNet Injection), l'architecture c
 
 ## 6. Déploiement & Docker local
 
-- Build : `docker build -t <acr>.azurecr.io/classimail-agent:local .`
-- Push : `az acr login --name <acr>; docker push <acr>.azurecr.io/classimail-agent:local`
-- ACA : `az containerapp update --name classimail-agent --resource-group <rg> --image <acr>.azurecr.io/classimail-agent:local`
+- Build : `docker build -t <acr>.azurecr.io/ClassyMail-agent:local .`
+- Push : `az acr login --name <acr>; docker push <acr>.azurecr.io/ClassyMail-agent:local`
+- ACA : `az containerapp update --name ClassyMail-agent --resource-group <rg> --image <acr>.azurecr.io/ClassyMail-agent:local`
 
 ## 6. Pipeline Processing Details
 

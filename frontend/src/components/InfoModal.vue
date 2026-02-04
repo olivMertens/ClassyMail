@@ -9,7 +9,7 @@ const props = defineProps({
   },
   organizationName: {
     type: String,
-    default: 'ClassiMail'
+    default: 'ClassyMail'
   }
 })
 const emit = defineEmits(['close', 'navigate'])

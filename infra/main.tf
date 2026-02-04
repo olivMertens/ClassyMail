@@ -45,7 +45,7 @@ variable "cosmos_use_rbac" {
 
 variable "organization_name" {
   type        = string
-  description = "Organization/destination name displayed in the UI (e.g., G2S, Groupama, ClassiMail)"
+  description = "Organization/destination name displayed in the UI (e.g., G2S, Groupama, ClassyMail)"
   default     = "ClassyMail"
 }
 

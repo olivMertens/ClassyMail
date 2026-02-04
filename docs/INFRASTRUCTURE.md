@@ -101,7 +101,7 @@ Some AzureRM provider versions don't auto-detect subscription from Azure CLI. Th
 | `LOG_ANALYTICS_WORKSPACE_ID` | Log Analytics Workspace ID | `9f225d73-351d-471e-9371-c15d265e9bd4` |
 | `OTEL_SERVICE_NAME` | OpenTelemetry service name | `classificationg2s-api` |
 | `ENABLE_WORKER` | Enable background processing? | `false` (API only) |
-| `ORGANIZATION_NAME` | UI branding/destination name | `G2S`, `Groupama`, or `ClassiMail` (default) |
+| `ORGANIZATION_NAME` | UI branding/destination name | `G2S`, `Groupama`, or `ClassyMail` (default) |
 | `UI_SHOW_INFO_MODAL` | Show info modal button | `true` (default) |
 | `UI_SHOW_DEVELOPER_TAB` | Show developer tab | `true` (default) |
 | `MAX_UPLOAD_SIZE` | Max upload size (MB) | `10` (default) |
@@ -147,7 +147,7 @@ Some AzureRM provider versions don't auto-detect subscription from Azure CLI. Th
 
 ### Images & Container Registry
 
-- `variable "container_image"` **required**: Public image (e.g., `mcr.microsoft.com/azuredocs/containerapps-helloworld:latest`) or private (e.g., `<monacr>.azurecr.io/classimail-agent:tag`)
+- `variable "container_image"` **required**: Public image (e.g., `mcr.microsoft.com/azuredocs/containerapps-helloworld:latest`) or private (e.g., `<monacr>.azurecr.io/ClassyMail-agent:tag`)
 - ACR **not required** for public images
 - ACR private: set `acr_name` (+ `acr_resource_group` if different) for Terraform to assign **AcrPull** role to managed identity
 

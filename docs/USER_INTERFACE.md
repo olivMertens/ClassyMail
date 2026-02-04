@@ -1,6 +1,6 @@
 # User Interface Guide
 
-This guide explains how to use the *ClassiMail* web interface to manage, review, and analyze processed emails.
+This guide explains how to use the *ClassyMail* web interface to manage, review, and analyze processed emails.
 
 ## Dashboard Overview
 

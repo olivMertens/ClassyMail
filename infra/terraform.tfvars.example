@@ -5,7 +5,7 @@
 
 # Required: container image for both Container Apps
 # Example:
-# container_image = "myregistry.azurecr.io/classimail-agent:local"
+# container_image = "myregistry.azurecr.io/ClassyMail-agent:local"
 
 # Optional: if using a private ACR and want Terraform to grant AcrPull to the managed identity
 # acr_name = "myregistry"

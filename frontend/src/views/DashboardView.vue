@@ -1267,7 +1267,8 @@ const emit = defineEmits(['open-email'])
                     v-for="s in chatSources"
                     :key="(s.parent_id || '') + ':' + (s.chunk_index || 0)"
                   >
-                    {{ s.subject || s.parent_id }} <span v-if="s.chunk_index !== undefined">(chunk {{ s.chunk_index }})</span>
+                    {{ s.subject || s.parent_id }} <span v-if="s.chunk_index !== undefined">(chunk {{ s.chunk_index
+                    }})</span>
                   </li>
                 </ul>
               </div>

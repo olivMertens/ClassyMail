@@ -25,7 +25,7 @@ from azure.monitor.query.aio import LogsQueryClient
 from azure.monitor.query import LogsQueryStatus
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-logger = logging.getLogger("classimail.admin")
+logger = logging.getLogger("ClassyMail.admin")
 
 class ResetRequest(BaseModel):
     confirm_1: bool
