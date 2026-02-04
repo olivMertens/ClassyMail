@@ -1,8 +1,13 @@
 import random
 import os
-from datetime import datetime
+import json
+import uuid
+import logging
+from datetime import datetime, timezone
 from typing import Optional
 import httpx
+
+logger = logging.getLogger(__name__)
 
 # Realistic email templates (French)
 EMAIL_TEMPLATES = {
@@ -197,3 +202,134 @@ def _aoai_enhance_body(body: str, category: str) -> Optional[str]:
         return enhanced if enhanced else None
     except Exception:
         return None
+
+async def generate_synthetic_from_seeds(seed_examples: list[dict], count: int = 5) -> list[dict]:
+    """
+    Generates synthetic email records based on seed examples using Azure OpenAI.
+    Resulting records mimic the seed's classification but vary in content.
+    """
+    if not seed_examples or count <= 0:
+        return []
+
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    deployment = os.getenv("CHAT_DEPLOYMENT", "gpt-5.2-chat") # User requested gpt5-2 chat specifically
+    # Fallback if CHAT_DEPLOYMENT not set or incorrect, try GPT_DEPLOYMENT or just hardcode what we saw in context
+    if not deployment:
+         deployment = os.getenv("GPT_DEPLOYMENT", "gpt-4o")
+
+    if not endpoint:
+        logger.error("Cannot generate synthetic data: AZURE_OPENAI_ENDPOINT not set.")
+        return []
+
+    # Get Auth Headers (Async)
+    # We duplicate auth logic slightly to avoid heavy deps, or assume client provided.
+    # Ideally should use AzureClients but we want to avoid circular deps with repository/clients here if possible.
+    # Let's try raw HTTPX async with token resolution if possible, or key.
+    api_key = os.getenv("AZURE_OPENAI_API_KEY")
+    api_version = os.getenv("AI_API_VERSION", "2024-10-01-preview")
+
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["api-key"] = api_key
+    else:
+        try:
+             from azure.identity.aio import DefaultAzureCredential
+             scope = os.getenv("AZURE_OPENAI_SCOPE", "https://cognitiveservices.azure.com/.default")
+             async with DefaultAzureCredential() as credential:
+                token = await credential.get_token(scope)
+                headers["Authorization"] = f"Bearer {token.token}"
+        except ImportError:
+             logger.error("azure-identity not installed or async credential failed.")
+             return []
+        except Exception as e:
+             logger.error(f"Failed to get token: {e}")
+             return []
+
+    url = endpoint.rstrip("/") + f"/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
+
+    results = []
+
+    # We will generate in batches or one by one. One by one is safer for large context.
+    # Let's parallelize slightly or just loop. Loop is safer for rate limits.
+
+    generated_count = 0
+    while generated_count < count:
+        # Pick a seed
+        seed = random.choice(seed_examples)
+        seed_md = seed.get("markdown", "")
+        seed_cls = seed.get("classification", {})
+        seed_subj = seed.get("subject", "")
+
+        # Construct Prompt
+        # We want the model to generate a NEW email that matches the intent distribution of the seed
+        system_prompt = (
+            "You are a synthetic data generator for an insurance email processing system. "
+            "Generate a REALISTIC, FRENCH email that matches the classification provided in the example. "
+            "Identify the intents and categorization from the seed, and create a NEW, DISTINCT email "
+            "with different entities (names, addresses), different phrasing, maybe a different scenario "
+            "but the SAME underlying classification intent. "
+            "Output strictly valid JSON with keys: 'subject', 'markdown' (the body), and keep the 'classification' roughly the same structure."
+        )
+
+        user_prompt = (
+            f"SEED EXAMPLE:\n"
+            f"Subject: {seed_subj}\n"
+            f"Body:\n{seed_md}\n\n"
+            f"Classification:\n{json.dumps(seed_cls)}\n\n"
+            f"TASK:\n"
+            f"Generate 1 new distinct example in JSON format matching this classification/intent."
+        )
+
+        payload = {
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "response_format": { "type": "json_object" }, # GPT-4o/5 supports this
+            "temperature": 0.8, # Higher temp for variety
+            "max_tokens": 1000
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(url, headers=headers, json=payload)
+                if resp.status_code != 200:
+                    logger.error(f"Generation failed: {resp.text}")
+                    continue
+
+                content = resp.json()["choices"][0]["message"]["content"]
+                new_data = json.loads(content)
+
+                # Check structure
+                if "markdown" not in new_data:
+                    # sometimes puts body in 'body'
+                    new_data["markdown"] = new_data.get("body", "")
+
+                # Validate it has classification or copy from seed
+                if "classification" not in new_data:
+                    new_data["classification"] = seed_cls # Fallback
+
+                # Add metadata
+                record = {
+                    "id": str(uuid.uuid4()),
+                    "status": "PROCESSED",
+                    "subject": new_data.get("subject", "Synthetic Email"),
+                    "markdown": new_data.get("markdown", ""),
+                    "classification": new_data.get("classification"),
+                    "file_url": "synthetic://generated",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "reviewed": True, # Mark as reviewed so it counts for export
+                    "correction_reason": "Synthetic Generation",
+                    "is_synthetic": True
+                }
+
+                results.append(record)
+                generated_count += 1
+
+        except Exception as e:
+            logger.error(f"Error generating synthetic item: {e}")
+            # Do not infinite loop if persistent error
+            break
+
+    return results

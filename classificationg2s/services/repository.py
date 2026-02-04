@@ -375,6 +375,31 @@ async def search_similar_emails(q: str, limit: int = 5, clients: Clients | None 
 
 
 
+async def get_seed_examples_for_synthesis(limit: int = 10, clients: Clients | None = None) -> list[dict]:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    limit = _bound_limit(limit)
+    # Fetch processed items that have valid classification
+    query = (
+        "SELECT c.markdown, c.classification, c.subject FROM c "
+        "WHERE c.status='PROCESSED' "
+        "AND IS_DEFINED(c.classification) "
+        "AND IS_DEFINED(c.markdown) "
+        "ORDER BY c._ts DESC OFFSET 0 LIMIT @limit"
+    )
+    params = [{"name": "@limit", "value": limit}]
+    items = [x async for x in _query(clients.cosmos_container, query, parameters=params, max_items=limit)]
+    return items
+
+
+async def save_synthetic_record(record: dict, clients: Clients | None = None) -> None:
+    clients = clients or get_default_clients()
+    await clients.ensure_cosmos_container()
+    # Ensure it looks like a regular record
+    # record should have id, markdown, classification, status='PROCESSED', etc.
+    await clients.cosmos_container.upsert_item(record)
+
+
 async def get_latest_errors(limit: int = 5, clients: Clients | None = None) -> list[dict]:
     clients = clients or get_default_clients()
     await clients.ensure_cosmos_container()

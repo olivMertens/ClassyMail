@@ -18,8 +18,10 @@ from classificationg2s.services.repository import (
     get_top_intents,
     get_low_confidence_items,
     get_processing_stats_by_day,
+    get_seed_examples_for_synthesis,
+    save_synthetic_record
 )
-from classificationg2s.services.generator import generate_email_pdf
+from classificationg2s.services.generator import generate_email_pdf, generate_synthetic_from_seeds
 from classificationg2s.services.settings_store import load_settings
 from azure.monitor.query.aio import LogsQueryClient
 from azure.monitor.query import LogsQueryStatus
@@ -122,6 +124,51 @@ class HealthScoreResponse(BaseModel):
     status: str
     factors: dict
 
+
+class GenerateSyntheticRequest(BaseModel):
+    target_count: int = 50
+
+@router.post("/generate-synthetic", status_code=status.HTTP_200_OK)
+async def generate_synthetic_data(
+    req: GenerateSyntheticRequest,
+    clients: Clients = Depends(get_clients)
+):
+    """
+    Generate synthetic data to reach the target count for fine-tuning.
+    Uses existing processed examples from Cosmos DB as seeds.
+    """
+    try:
+        # 1. Get current count (from stats or just proceed)
+        # We assume caller checked stats, but we can prevent over-generation if needed.
+
+        # 2. Fetch seed examples
+        seeds = await get_seed_examples_for_synthesis(limit=20, clients=clients)
+        if not seeds:
+            raise HTTPException(status_code=400, detail="Not enough existing processed data to use as seed (need at least 1).")
+
+        # 3. Generate synthetic data
+        # We limit generation to avoid timeouts.
+        # Generating 50 items might take too long for one request.
+        # Ideally this should be a background job, but for demo we do a small batch synchronously.
+        count_to_generate = min(req.target_count, 10) # Safety cap for sync request
+
+        generated_items = await generate_synthetic_from_seeds(seed_examples=seeds, count=count_to_generate)
+
+        # 4. Save items
+        saved_count = 0
+        for item in generated_items:
+            await save_synthetic_record(item, clients=clients)
+            saved_count += 1
+
+        return {
+            "status": "success",
+            "generated_count": saved_count,
+            "message": f"Generated {saved_count} synthetic items based on {len(seeds)} seeds."
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to generate synthetic data: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/ui-config", response_model=UIConfigResponse)
 async def get_ui_config():

@@ -8,90 +8,120 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const stats = ref({
-    total: 0,
-    finetune_ready: false,
-    finetune_min_required: 50
+  total: 0,
+  finetune_ready: false,
+  finetune_min_required: 50
 })
 const loading = ref(false)
+const generating = ref(false) // Added generating state
 const error = ref(null)
 
 const downloadFile = async (url, filename) => {
-    try {
-        const res = await fetch(url)
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err.detail?.message || err.detail || `Server Error: ${res.status}`)
-        }
-        const blob = await res.blob()
-        const downloadUrl = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = downloadUrl
-
-        // Try to get filename from content-disposition if not provided
-        if (!filename) {
-            const disposition = res.headers.get('Content-Disposition')
-            if (disposition && disposition.indexOf('attachment') !== -1) {
-                const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition)
-                if (matches != null && matches[1]) {
-                    filename = matches[1].replace(/['"]/g, '')
-                }
-            }
-        }
-
-        a.download = filename || 'download'
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        window.URL.revokeObjectURL(downloadUrl)
-    } catch (e) {
-        console.error(e)
-        alert(e.message)
+  try {
+    const res = await fetch(url)
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.detail?.message || err.detail || `Server Error: ${res.status}`)
     }
+    const blob = await res.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+
+    // Try to get filename from content-disposition if not provided
+    if (!filename) {
+      const disposition = res.headers.get('Content-Disposition')
+      if (disposition && disposition.indexOf('attachment') !== -1) {
+        const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition)
+        if (matches != null && matches[1]) {
+          filename = matches[1].replace(/['"]/g, '')
+        }
+      }
+    }
+
+    a.download = filename || 'download'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(downloadUrl)
+  } catch (e) {
+    console.error(e)
+    alert(e.message)
+  }
 }
 
 const exportCsv = () => {
-    downloadFile('/api/emails/export', 'emails.csv')
+  downloadFile('/api/emails/export', 'emails.csv')
 }
 
 const exportJsonl = (split = 'all') => {
-    downloadFile(`/api/emails/export-finetune-jsonl?anonymize=true&split=${split}`)
+  downloadFile(`/api/emails/export-finetune-jsonl?anonymize=true&split=${split}`)
+}
+
+const generateSyntheticData = async () => {
+  if (!confirm("This will use GPT-5.2 to generate synthetic emails based on your existing data to help you reach the minimum requirement. Continue?")) return;
+
+  generating.value = true
+  try {
+    // Calculate how many we successfully need, cap at 10 per batch for performance
+    const needed = Math.max(stats.value.finetune_min_required - stats.value.total, 5)
+
+    const res = await fetch('/api/admin/generate-synthetic', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_count: needed })
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      alert(data.message)
+      fetchStats() // refresh
+    } else {
+      const err = await res.json()
+      alert(`Generation failed: ${err.detail || 'Unknown error'}`)
+    }
+  } catch (e) {
+    alert(`Error: ${e.message}`)
+  } finally {
+    generating.value = false
+  }
 }
 
 const fetchStats = async () => {
-    loading.value = true
-    try {
-        // Use admin summary endpoint for lightweight stats
-        let data = {}
-        const res2 = await fetch('/api/admin/stats/summary')
-        if (res2.ok) {
-             data = await res2.json()
-             // Map backend stats to frontend expectations
-             stats.value = {
-                total: data.total || 0,
-                finetune_ready: (data.processed || 0) >= 50, // rough check, ideally backend provides this flag
-                finetune_min_required: 50
-             }
-        } else {
-             // Fallback to searching emails if admin endpoint fails or is different
-             const resFull = await fetch('/api/emails?page_size=1')
-             if (resFull.ok) {
-                const d = await resFull.json()
-                stats.value = {
-                    total: d.total || 0,
-                    finetune_ready: d.finetune_ready || false,
-                    finetune_min_required: d.finetune_min_required || 50
-                }
-             }
+  loading.value = true
+  try {
+    // Use admin summary endpoint for lightweight stats
+    let data = {}
+    const res2 = await fetch('/api/admin/stats/summary')
+    if (res2.ok) {
+      data = await res2.json()
+      // Map backend stats to frontend expectations
+      stats.value = {
+        total: data.total || 0,
+        finetune_ready: (data.processed || 0) >= 50, // rough check, ideally backend provides this flag
+        finetune_min_required: 50
+      }
+    } else {
+      // Fallback to searching emails if admin endpoint fails or is different
+      const resFull = await fetch('/api/emails?page_size=1')
+      if (resFull.ok) {
+        const d = await resFull.json()
+        stats.value = {
+          total: d.total || 0,
+          finetune_ready: d.finetune_ready || false,
+          finetune_min_required: d.finetune_min_required || 50
         }
-    } catch (e) {
-        error.value = e.message
-    } finally {
-        loading.value = false
+      }
     }
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(() => {
-    fetchStats()
+  fetchStats()
 })
 </script>
 
@@ -108,7 +138,9 @@ onMounted(() => {
 
     <div class="grid gap-6 grid-cols-1">
       <!-- Human Reporting -->
-      <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+      <div
+        class="bg-white dark:bg-gray-800 shadow sm:rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700"
+      >
         <div class="px-4 py-5 sm:px-6 bg-gray-50 dark:bg-gray-700/50">
           <div class="flex items-center gap-3">
             <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
@@ -121,7 +153,8 @@ onMounted(() => {
         </div>
         <div class="px-4 py-5 sm:p-6 space-y-4">
           <p class="text-sm text-gray-500 dark:text-gray-300">
-            Download all processed emails, including classification results, metadata, and validation status in CSV format.
+            Download all processed emails, including classification results, metadata, and validation status in CSV
+            format.
             Ideal for Excel, PowerBI, or manual audit.
           </p>
           <div class="pt-2">
@@ -147,7 +180,9 @@ onMounted(() => {
       </div>
 
       <!-- Machine Learning Info -->
-      <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+      <div
+        class="bg-white dark:bg-gray-800 shadow sm:rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700"
+      >
         <div class="px-4 py-5 sm:px-6 bg-gray-50 dark:bg-gray-700/50">
           <div class="flex items-center gap-3">
             <div class="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
@@ -220,6 +255,18 @@ onMounted(() => {
                 </h3>
                 <div class="mt-2 text-sm text-amber-700 dark:text-amber-200">
                   <p>You need {{ stats.finetune_min_required }} processed emails to enable dataset generation.</p>
+                </div>
+                <!-- Generator Button -->
+                <div class="mt-3">
+                  <button
+                    type="button"
+                    class="rounded-md bg-amber-100 dark:bg-amber-800 px-2 py-1.5 text-sm font-medium text-amber-800 dark:text-amber-100 hover:bg-amber-200 dark:hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50"
+                    :disabled="generating"
+                    @click="generateSyntheticData"
+                  >
+                    <span v-if="!generating">Generate data with GPT-5.2</span>
+                    <span v-else>Generating...</span>
+                  </button>
                 </div>
               </div>
             </div>
