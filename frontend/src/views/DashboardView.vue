@@ -34,6 +34,8 @@ const stats = ref({
   total: 0,
   review_required: 0,
   processed: 0,
+  pending: 0,
+  queue_depth: 0,
   finetune_ready: false,
   average_confidence: 0,
   finetune_min_required: 50
@@ -120,6 +122,8 @@ const fetchEmails = async () => {
       total: data.total || 0,
       review_required: data.review_required || 0,
       processed: data.processed || 0,
+      pending: data.pending || 0,
+      queue_depth: data.queue_depth || 0,
       finetune_ready: data.finetune_ready || false,
       average_confidence: data.average_confidence || 0,
       finetune_min_required: data.finetune_min_required || 50
@@ -251,9 +255,9 @@ onMounted(() => {
   fetchEmails()
   fetchDeadletters()
   fetchDiagnostics()
-  // Poll every 30s
-  const pollEmails = setInterval(fetchEmails, 30000)
-  const pollDlq = setInterval(fetchDeadletters, 30000)
+  // Poll every 20s as requested
+  const pollEmails = setInterval(fetchEmails, 20000)
+  const pollDlq = setInterval(fetchDeadletters, 20000)
   const pollDiag = setInterval(fetchDiagnostics, 60000)
   return () => {
     clearInterval(pollEmails)
@@ -266,7 +270,8 @@ const totalPages = computed(() => Math.max(1, Math.ceil(stats.value.total / page
 
 const progressPercentage = computed(() => {
   if (!stats.value.total) return 0
-  return Math.round(((stats.value.processed + stats.value.review_required) / stats.value.total) * 100)
+  const processed = stats.value.processed + stats.value.review_required
+  return Math.round((processed / stats.value.total) * 100)
 })
 
 const getScoreColor = (email) => {
@@ -422,6 +427,14 @@ const emit = defineEmits(['open-email'])
       class="mb-4"
     >
       <div class="flex justify-between mb-1">
+        Pipeline Progress
+        <span
+          v-if="stats.queue_depth > 0 || stats.pending > 0"
+          class="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400"
+        >
+          ({{ stats.pending }} processing, {{ stats.queue_depth }} queued in Service Bus)
+        </span>
+
         <span class="text-sm font-medium text-primary-700 dark:text-primary-400">Pipeline Progress</span>
         <span class="text-sm font-medium text-primary-700 dark:text-primary-400">{{ progressPercentage }}%</span>
       </div>

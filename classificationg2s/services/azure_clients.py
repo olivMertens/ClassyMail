@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from azure.core.exceptions import AzureError
 from azure.identity.aio import DefaultAzureCredential
 from azure.servicebus.aio import ServiceBusClient
+from azure.servicebus.management import ServiceBusAdministrationClient
 from azure.storage.blob.aio import BlobClient, BlobServiceClient
 from azure.cosmos.aio import CosmosClient
 from azure.cosmos import PartitionKey
@@ -32,6 +33,7 @@ class Clients:
         self.credential = DefaultAzureCredential(exclude_interactive_browser_credential=True)
         self.concurrency_limit = asyncio.Semaphore(concurrency_limit)
         self.sb_client: ServiceBusClient | None = None
+        self.sb_admin_client: ServiceBusAdministrationClient | None = None
         self.cosmos_client: CosmosClient | None = None
         self.cosmos_container = None
         self.blob_service_client: BlobServiceClient | None = None
@@ -54,6 +56,8 @@ class Clients:
     async def close(self) -> None:
         if self.sb_client:
             await self.sb_client.close()
+        if self.sb_admin_client:
+            self.sb_admin_client.close()
         if self.cosmos_client:
             await self.cosmos_client.close()
         if self.blob_service_client:
@@ -126,6 +130,39 @@ def get_clients(request: Request) -> Clients:
             raise HTTPException(status_code=503, detail="Clients not initialized")
         raise RuntimeError("Clients not initialized")
     return clients
+
+
+def get_sb_admin_client(clients: Clients = Depends(get_clients)) -> ServiceBusAdministrationClient:
+    """Synchronous admin client for stats/management."""
+    if not clients.sb_admin_client:
+        if config.SERVICE_BUS_FQDN:
+            clients.sb_admin_client = ServiceBusAdministrationClient(
+                fully_qualified_namespace=config.SERVICE_BUS_FQDN,
+                credential=clients.credential
+            )
+        elif os.getenv("AZURE_SERVICE_BUS_CONNECTION_STRING"):
+             clients.sb_admin_client = ServiceBusAdministrationClient.from_connection_string(
+                 os.getenv("AZURE_SERVICE_BUS_CONNECTION_STRING")
+             )
+        else:
+             raise RuntimeError("Cannot initialize SB Admin Client")
+
+    return clients.sb_admin_client
+
+
+async def get_queue_active_count(queue_name: str, clients: Clients | None = None) -> int:
+    clients = clients or get_default_clients()
+    try:
+        admin_client = get_sb_admin_client(clients)
+        # ServiceBusAdministrationClient is synchronous. Run in thread to avoid blocking loop.
+        def _get_count():
+            props = admin_client.get_queue_runtime_properties(queue_name)
+            return props.active_message_count
+
+        return await asyncio.to_thread(_get_count)
+    except Exception as e:
+        logger.warning(f"Failed to get queue active count: {e}")
+        return 0
 
 
 async def get_sb_client(clients: Clients = Depends(get_clients)) -> ServiceBusClient:

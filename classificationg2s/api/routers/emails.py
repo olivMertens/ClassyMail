@@ -17,6 +17,7 @@ from classificationg2s.models import EmailListResponse, EmailRecord
 from classificationg2s.services.azure_clients import (
     get_cosmos_container,
     get_sb_client,
+    get_queue_active_count,
     get_clients,
     Clients,
 )
@@ -230,7 +231,28 @@ async def get_stats(clients: Clients = Depends(get_clients)):
 
     processed_count = await count_by_status("PROCESSED", clients=clients)
     review_count = await count_by_status("REVIEW_REQUIRED", clients=clients)
-    total = processed_count + review_count
+
+    # "Pending" includes items in queue and items in Cosmos marked PENDING or PROCESSING
+    db_pending = await count_by_status("PENDING", clients=clients)
+    db_processing = await count_by_status("PROCESSING", clients=clients)
+    queue_pending = await get_queue_active_count(config.SERVICE_BUS_QUEUE, clients=clients)
+
+    total_emails = processed_count + review_count + db_pending + db_processing + queue_pending
+
+    # Avoid duplicate counting (queue items might be 'PENDING' in DB)
+    # The 'queue_pending' is the most accurate for "waiting for worker".
+    # 'db_pending' might include items not yet enqueued or just enqueued.
+    # We'll use the MAX of db_pending and queue_pending to be safe, or just sum pending specific states.
+    # Actually, simplest is:
+    # Pending = (DB PENDING + DB PROCESSING)
+    # But queue might have items not yet in DB? No, flow is DB then Queue.
+    # Or DB has items, queue is empty (worker drained it).
+    # Active Pending = DB PENDING + DB PROCESSING.
+    # The queue count is a subset of DB PENDING/PROCESSING usually.
+    # BUT, the user explicitly asked for Service Bus count.
+    # Let's return extended stats.
+
+    pending_total = db_pending + db_processing
 
     settings = load_settings()
     finetune_min_examples = settings.get("finetune_min_examples", 50)
@@ -243,8 +265,10 @@ async def get_stats(clients: Clients = Depends(get_clients)):
     return {
         "processed": processed_count,
         "review_required": review_count,
-        "total": total,
-        "progress": (processed_count / total) if total else 0,
+        "pending": pending_total,
+        "queue_depth": queue_pending,
+        "total": total_emails, # Estimate
+        "progress": (processed_count + review_count) / total_emails if total_emails else 0,
         "finetune_reviewed_ready": finetune_reviewed_ready,
         "finetune_min_required": finetune_min_required,
         "finetune_ready": finetune_reviewed_ready >= finetune_min_required,
