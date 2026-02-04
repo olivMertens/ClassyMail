@@ -58,17 +58,18 @@ const switchTab = (tab) => {
 }
 
 // Architecture Diagram Definition
+// Removing strict classDefs and semi-colons which can sometimes cause parsing issues in strict mode
 const diagram = `
 graph TD
-    classDef azure fill:#0072C6,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef app fill:#50e6ff,stroke:#333,stroke-width:2px,color:#000;
-    classDef db fill:#59b4d9,stroke:#333,stroke-width:2px;
-    classDef ai fill:#ff9900,stroke:#333,stroke-width:2px,color:#000;
+    classDef azure fill:#0072C6,stroke:#fff,stroke-width:2px,color:#fff
+    classDef app fill:#50e6ff,stroke:#333,stroke-width:2px,color:#000
+    classDef db fill:#59b4d9,stroke:#333,stroke-width:2px
+    classDef ai fill:#ff9900,stroke:#333,stroke-width:2px,color:#000
 
     Client([Client Browser]) -->|HTTPS| FE[Vue Frontend]
     FE -->|API Calls| API[FastAPI Backend]
 
-    subgraph Azure Container Apps
+    subgraph AzureContainerApps [Azure Container Apps]
         API
         Worker[Background Worker]
     end
@@ -80,15 +81,15 @@ graph TD
     SB -->|Trigger| Worker
     Worker -->|Read File| Blob
     Worker -->|OCR| Mistral[Mistral AI OCR]
-    Worker -->|Classify| OPENAI[Azure OpenAI<br/>(Phi-4 / Any LLM)]
+    Worker -->|Classify| OPENAI[Azure OpenAI]
 
     Mistral -->|Markdown| Worker
     OPENAI -->|JSON Intent| Worker
     Worker -->|Update| Cosmos
 
-    class Blob,Cosmos,SB azure;
-    class FE,API,Worker app;
-    class Mistral,OPENAI ai;
+    class Blob,Cosmos,SB azure
+    class FE,API,Worker app
+    class Mistral,OPENAI ai
 `
 </script>
 

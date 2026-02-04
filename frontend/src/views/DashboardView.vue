@@ -514,6 +514,9 @@ const emit = defineEmits(['open-email'])
           <option value="eq_100">
             100% (Perfect)
           </option>
+          <option value="none">
+            No Category Detected
+          </option>
         </select>
       </div>
 
@@ -711,17 +714,21 @@ const emit = defineEmits(['open-email'])
           </div>
           <div
             v-if="email.classification?.detected_intents?.length"
-            class="flex-shrink-0"
+            class="flex-shrink-0 flex items-center gap-1"
           >
             <span
-              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800 max-w-[120px] truncate"
-              :title="[
-                email.classification.detected_intents[0].justification ? `Justification: ${email.classification.detected_intents[0].justification}` : '',
-                email.classification.detected_intents.length > 1 ? 'Autres: ' + email.classification.detected_intents.slice(1).map(i => `${i.intent} (${Math.round((i.confidence || 0) * 100)}%)${i.justification ? ' → ' + i.justification : ''}`).join(', ') : ''
-              ].filter(Boolean).join('\n')"
+              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800 max-w-[100px] truncate"
+              :title="email.classification.detected_intents[0].justification || ''"
             >
               {{ email.classification.detected_intents[0].intent }} ({{
                 Math.round((email.classification.detected_intents[0].confidence || 0)*100) }}%)
+            </span>
+            <span
+              v-if="email.classification.detected_intents.length > 1"
+              class="inline-flex items-center px-1 py-0.5 rounded-full text-[9px] bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 cursor-help"
+              :title="'Other intents:\n' + email.classification.detected_intents.slice(1).map(i => `- ${i.intent} (${Math.round((i.confidence || 0)*100)}%)`).join('\n')"
+            >
+              +{{ email.classification.detected_intents.length - 1 }}
             </span>
           </div>
           <div

@@ -42,7 +42,7 @@ async def list_emails(
     status: str = Query("all", pattern="^(all|REVIEW_REQUIRED|PROCESSED|ERROR)$"),
     search: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
-    confidence_filter: Optional[str] = Query(None, pattern="^(lt_10|lt_30|lt_50|lt_85|gt_85|lt_90|gt_90|eq_100)$"),
+    confidence_filter: Optional[str] = Query(None, pattern="^(lt_10|lt_30|lt_50|lt_85|gt_85|lt_90|gt_90|eq_100|none)$"),
     sort_by: str = Query("timestamp", pattern="^(timestamp|status|processing_time|confidence)$"),
     order: str = Query("desc", pattern="^(asc|desc)$"),
     continuation_token: Optional[str] = Query(None),
@@ -153,6 +153,10 @@ async def list_emails(
                 limit = 0.99
                 params["@conf_limit"] = limit
                 filters.append("EXISTS(SELECT VALUE i FROM i IN c.classification.detected_intents WHERE i.confidence >= @conf_limit)")
+
+            elif confidence_filter == "none":
+                # Filter for emails with NO detected intents
+                filters.append("((NOT IS_DEFINED(c.classification.detected_intents)) OR (ARRAY_LENGTH(c.classification.detected_intents) = 0))")
 
         where = " AND ".join(filters)
         query = "SELECT * FROM c"
