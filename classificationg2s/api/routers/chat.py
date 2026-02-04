@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from classificationg2s.services.azure_clients import Clients, get_clients
 from classificationg2s.services.chat_agent import agent as chat_agent
+# from classificationg2s.core.rate_limit import limiter  # TODO: Re-enable for rate limiting
 import logging
 
 router = APIRouter(tags=["chat"])
@@ -20,6 +21,7 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/api/chat", response_model=ChatResponse)
+# @limiter.limit("60/hour")  # TODO: Re-enable once slowapi integration is completed
 async def chat_completion(
     req: ChatRequest,
     clients: Clients = Depends(get_clients),

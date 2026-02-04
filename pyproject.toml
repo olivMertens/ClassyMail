@@ -30,6 +30,7 @@ dependencies = [
 	"pillow>=12.1.0",
 	"pymupdf>=1.26.7",
 	"pybreaker==1.2.0",
+	"slowapi==0.1.9",
 ]
 
 [project.optional-dependencies]

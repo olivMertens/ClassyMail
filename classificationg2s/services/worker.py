@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 import logging
 from datetime import datetime, timezone
@@ -26,8 +27,10 @@ async def worker_loop_forever(*, queue_name: str, get_settings, clients: Clients
 
     # Use the semaphore to limit concurrent TASKS, not sequential execution blocks.
     concurrency = clients.concurrency_limit
-    # Increase renewal duration to cover potential long processing times in parallel
-    auto_lock_renewer = AutoLockRenewer(max_lock_renewal_duration=1200)
+    # Lock renewal: Default 3600s (1 hour) to handle large PDFs (30+ pages)
+    # Configurable via WORKER_LOCK_RENEWAL_DURATION
+    lock_renewal_duration = int(os.getenv("WORKER_LOCK_RENEWAL_DURATION", "3600"))
+    auto_lock_renewer = AutoLockRenewer(max_lock_renewal_duration=lock_renewal_duration)
 
     logger.info("Worker started with concurrency limit: %s", concurrency._value if hasattr(concurrency, "_value") else "Unknown")
 

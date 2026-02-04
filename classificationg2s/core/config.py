@@ -91,3 +91,10 @@ UI_SHOW_DEVELOPER_TAB = os.getenv("UI_SHOW_DEVELOPER_TAB", "true").lower() == "t
 
 # Organization / Branding
 ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME", "ClassyMail")
+
+# Worker Configuration
+WORKER_CONCURRENCY = int(os.getenv("WORKER_CONCURRENCY", "30"))  # Concurrent message processing tasks
+WORKER_LOCK_RENEWAL_DURATION = int(os.getenv("WORKER_LOCK_RENEWAL_DURATION", "3600"))  # 1 hour for long documents
+
+# Environment Configuration
+AZURE_ENV = os.getenv("AZURE_ENV", "development")  # production, staging, development

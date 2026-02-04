@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -50,6 +51,15 @@ async def list_emails(
     cosmos_container=Depends(get_cosmos_container),
     clients: Clients = Depends(get_clients),
 ):
+    # Validate continuation token
+    if continuation_token:
+        if len(continuation_token) > 4096:
+            raise HTTPException(status_code=400, detail="Invalid continuation token: too long")
+        try:
+            base64.b64decode(continuation_token + "==", validate=True)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid continuation token format")
+
     try:
         filters = []
         params = {}

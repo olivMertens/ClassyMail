@@ -5,10 +5,13 @@ import os
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from classificationg2s.core.paths import project_root
 from classificationg2s.core.telemetry import init_telemetry
 from classificationg2s.core import config
+from classificationg2s.core.rate_limit import limiter
 from classificationg2s.services.azure_clients import Clients, set_default_clients
 from classificationg2s.services.worker import worker_loop_forever
 from classificationg2s.services.settings_store import load_settings
@@ -27,6 +30,8 @@ from classificationg2s.api.routers.chat import router as chat_router
 
 def create_app() -> FastAPI:
     app = FastAPI()
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     static_dir = project_root() / "static"
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")

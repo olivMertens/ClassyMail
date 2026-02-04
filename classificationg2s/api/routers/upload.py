@@ -9,6 +9,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile, Depends
 from azure.core.exceptions import AzureError
 
 from classificationg2s.core import config
+# from classificationg2s.core.rate_limit import limiter  # TODO: Re-enable for rate limiting
 from classificationg2s.services.azure_clients import get_blob_service_client
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/api", tags=["upload"])
 
 
 @router.post("/upload")
+# @limiter.limit("20/hour")  # TODO: Re-enable once slowapi integration is completed
 async def upload_pdfs(files: list[UploadFile] = File(...), blob_service_client=Depends(get_blob_service_client)):
     if len(files) > 10:
         raise HTTPException(status_code=400, detail="Max 10 fichiers")
@@ -46,6 +48,12 @@ async def upload_pdfs(files: list[UploadFile] = File(...), blob_service_client=D
             f.file.seek(0)
             if size > config.MAX_UPLOAD_SIZE:
                 status, error = "error", "too_large"
+            else:
+                # Validate PDF magic bytes
+                magic = f.file.read(4)
+                f.file.seek(0)
+                if not magic.startswith(b"%PDF"):
+                    status, error = "error", "invalid_pdf_format"
 
         if status == "error":
             results.append({"name": f.filename, "status": status, "error": error})

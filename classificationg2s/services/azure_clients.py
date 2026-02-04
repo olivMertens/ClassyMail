@@ -25,7 +25,9 @@ except Exception:
     HTTPException = None
 
 
-CONCURRENCY_DEFAULT = 5
+# Worker concurrency: Configurable via WORKER_CONCURRENCY env var
+# Increased from 5 to 30 for better throughput on modern Container Apps (1 vCPU / 2GB RAM)
+CONCURRENCY_DEFAULT = int(os.getenv("WORKER_CONCURRENCY", "30"))
 
 
 class Clients:
@@ -78,7 +80,7 @@ class Clients:
                 # Force reconnection by clearing cached client
                 self.cosmos_container = None
                 self.cosmos_client = None
-        
+
         if self.cosmos_container is not None:
             return
         if not config.COSMOS_ENDPOINT:
