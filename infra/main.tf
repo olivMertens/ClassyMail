@@ -588,7 +588,7 @@ resource "azurerm_container_app" "api" {
       # Telemetry
       env {
         name  = "OTEL_SERVICE_NAME"
-        value = "classificationg2s-api"
+        value = "classymail-api"
       }
       env {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
@@ -687,7 +687,7 @@ resource "azurerm_container_app" "worker" {
       cpu     = 0.5
       memory  = "1Gi"
       command = ["python"]
-      args    = ["-m", "classificationg2s.worker_main"]
+      args    = ["-m", "classymail.worker_main"]
 
       env {
         name  = "ENABLE_WORKER"
@@ -757,7 +757,7 @@ resource "azurerm_container_app" "worker" {
 
       env {
         name  = "OTEL_SERVICE_NAME"
-        value = "classificationg2s-worker"
+        value = "classymail-worker"
       }
       env {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"

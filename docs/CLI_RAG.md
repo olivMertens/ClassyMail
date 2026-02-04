@@ -29,7 +29,7 @@ $env:PREFIX="email-poc"
 ## Backfill Embeddings & Chunks
 
 ```bash
-uv run python -m classificationg2s.cli --backfill-rag --max-items 50
+uv run python -m classymail.cli --backfill-rag --max-items 50
 ```
 - Regenerates email embeddings and stores chunk embeddings for RAG
 

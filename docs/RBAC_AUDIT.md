@@ -1,10 +1,10 @@
 # RBAC Audit & Managed Identity Configuration
 
-> 🔐 **Purpose**: Document and verify managed identity role assignments for ClassificationG2S deployment on Azure Container Apps.
+> 🔐 **Purpose**: Document and verify managed identity role assignments for ClassyMail deployment on Azure Container Apps.
 
 ## Overview
 
-ClassificationG2S uses **Azure Managed Identity** (specifically, User-Assigned Managed Identity) to authenticate securely with Azure services. This guide covers:
+ClassyMail uses **Azure Managed Identity** (specifically, User-Assigned Managed Identity) to authenticate securely with Azure services. This guide covers:
 
 1. **What roles are assigned** - Access control matrix
 2. **How to audit current assignments** - Azure CLI commands
@@ -17,7 +17,7 @@ ClassificationG2S uses **Azure Managed Identity** (specifically, User-Assigned M
 
 ## 1. Role Assignment Matrix
 
-The Terraform configuration (`infra/main.tf`) assigns the following roles to the ClassificationG2S managed identity:
+The Terraform configuration (`infra/main.tf`) assigns the following roles to the ClassyMail managed identity:
 
 | # | Role Name | Scope | Purpose | Resource |
 |---|-----------|-------|---------|----------|
@@ -362,4 +362,4 @@ az role assignment create \
 ---
 
 **Last Updated**: 2024-12-01
-**Maintained by**: ClassificationG2S Team
+**Maintained by**: ClassyMail Team

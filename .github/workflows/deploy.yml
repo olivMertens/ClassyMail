@@ -55,8 +55,8 @@ jobs:
           fi
           echo "Changed files:\n$files"
 
-          api_paths='classificationg2s/api|templates/|static/|classificationg2s/app.py|classificationg2s/services/azure_clients.py|classificationg2s/services/repository.py'
-          worker_paths='classificationg2s/services/worker.py|classificationg2s/worker_main.py|classificationg2s/services/pipeline.py|classificationg2s/services/llm_pipeline.py|classificationg2s/services/anonymizer.py|classificationg2s/services/repository.py'
+          api_paths='classymail/api|templates/|static/|classymail/app.py|classymail/services/azure_clients.py|classymail/services/repository.py'
+          worker_paths='classymail/services/worker.py|classymail/worker_main.py|classymail/services/pipeline.py|classymail/services/llm_pipeline.py|classymail/services/anonymizer.py|classymail/services/repository.py'
           build_paths='Dockerfile|pyproject.toml|uv.lock|requirements.txt'
 
           # Build is required for ANY change outside docs/ and README.md

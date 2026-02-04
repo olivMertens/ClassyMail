@@ -241,7 +241,7 @@ flowchart LR
 
 - API expose `/healthz` + `/readyz` (alias `/health`, `/ready`).
 - Worker scale avec KEDA (scaler azure-servicebus, identité managée).
-- Même image pour les deux; worker: `python -m classificationg2s.worker_main`.
+- Même image pour les deux; worker: `python -m classymail.worker_main`.
 
 **Ancien (mono-process):** API + worker dans le même process, scaling couplé et clients globaux vieillissants.
 

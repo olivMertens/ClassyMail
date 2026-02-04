@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 # Load secrets.env environment variables if present (local dev)
 load_dotenv("secrets.env")
 
-from classificationg2s.app import app
-from classificationg2s.cli import main as cli_main
+from classymail.app import app
+from classymail.cli import main as cli_main
 import sys
 
 if __name__ == "__main__":

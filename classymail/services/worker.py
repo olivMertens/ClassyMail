@@ -40,7 +40,7 @@ async def worker_loop_forever(*, queue_name: str, get_settings, clients: Clients
         try:
             async with clients.sb_client.get_queue_receiver(
                 queue_name=queue_name,
-                max_wait_time=5,
+                # max_wait_time=5, # Removed to prevent receiver closure while tasks are running
                 auto_lock_renewer=auto_lock_renewer,
                 prefetch_count=10  # Prefetch to allow pipelining
             ) as receiver:

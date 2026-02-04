@@ -1,5 +1,5 @@
 [project]
-name = "classificationg2s"
+name = "classymail"
 version = "0.1.0"
 description = "Email classification POC with FastAPI, Azure Service Bus, Cosmos DB, Storage, Mistral OCR, Phi-4"
 readme = "README.md"

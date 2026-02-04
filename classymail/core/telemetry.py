@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def init_telemetry(app) -> None:
     # Keep behavior aligned with the previous single-file implementation.
     if not trace.get_tracer_provider() or isinstance(trace.get_tracer_provider(), trace.NoOpTracerProvider):
-        service_name = os.getenv("OTEL_SERVICE_NAME", "classificationg2s-api")
+        service_name = os.getenv("OTEL_SERVICE_NAME", "classymail-api")
         provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
 
         # Preferred for App Insights: set APPLICATIONINSIGHTS_CONNECTION_STRING.

@@ -99,7 +99,7 @@ Some AzureRM provider versions don't auto-detect subscription from Azure CLI. Th
 | `AZURE_AI_ENDPOINT` | Azure AI Foundry Endpoint | `https://email-poc-aifoundry.cognitiveservices.azure.com/` |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | App Insights telemetry | `InstrumentationKey=...;IngestionEndpoint=...` |
 | `LOG_ANALYTICS_WORKSPACE_ID` | Log Analytics Workspace ID | `9f225d73-351d-471e-9371-c15d265e9bd4` |
-| `OTEL_SERVICE_NAME` | OpenTelemetry service name | `classificationg2s-api` |
+| `OTEL_SERVICE_NAME` | OpenTelemetry service name | `classymail-api` |
 | `ENABLE_WORKER` | Enable background processing? | `false` (API only) |
 | `ORGANIZATION_NAME` | UI branding/destination name | `G2S`, `Groupama`, or `ClassyMail` (default) |
 | `UI_SHOW_INFO_MODAL` | Show info modal button | `true` (default) |
@@ -128,7 +128,7 @@ Some AzureRM provider versions don't auto-detect subscription from Azure CLI. Th
 | `EMBEDDING_DEPLOYMENT` | Embeddings Model Deployment | `text-embedding-3-small` |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | App Insights telemetry | `InstrumentationKey=...;IngestionEndpoint=...` |
 | `LOG_ANALYTICS_WORKSPACE_ID` | Log Analytics Workspace ID | `9f225d73-351d-471e-9371-c15d265e9bd4` |
-| `OTEL_SERVICE_NAME` | OpenTelemetry service name | `classificationg2s-worker` |
+| `OTEL_SERVICE_NAME` | OpenTelemetry service name | `classymail-worker` |
 
 **⚠️ Security Note:** Do NOT set `AZURE_AI_KEY` in production. Use Managed Identity authentication (`DefaultAzureCredential`) with the `Cognitive Services User` role.
 

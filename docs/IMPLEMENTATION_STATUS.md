@@ -7,7 +7,7 @@
 ## What's Been Implemented ✅
 
 ### 1. **Backend API Endpoint** (Ready for Use)
-- **Location**: [classificationg2s/api/routers/emails.py](../classificationg2s/api/routers/emails.py#L298)
+- **Location**: [classymail/api/routers/emails.py](../classymail/api/routers/emails.py#L298)
 - **Endpoint**: `POST /api/emails/{id}/reclassify`
 - **Parameters**:
   ```json
@@ -22,7 +22,7 @@
   - Returns response with `comparison_results` field containing dual-model results
 
 ### 2. **LLM Pipeline Core Function** (Ready for Use)
-- **Location**: [classificationg2s/services/llm_pipeline.py](../classificationg2s/services/llm_pipeline.py#L330)
+- **Location**: [classymail/services/llm_pipeline.py](../classymail/services/llm_pipeline.py#L330)
 - **New Function**: `_call_model_with_endpoint()`
   - Generic model caller for any Azure OpenAI-compatible endpoint
   - Handles retry logic, token budgeting, and fallback
@@ -34,7 +34,7 @@
   - Returns `ComparisonResult` in response dict
 
 ### 3. **Data Model Schema** (Ready for Database)
-- **Location**: [classificationg2s/models.py](../classificationg2s/models.py#L21)
+- **Location**: [classymail/models.py](../classymail/models.py#L21)
 - **New Class**: `ComparisonResult`
   ```python
   class ComparisonResult(BaseModel):
@@ -53,7 +53,7 @@
   - ✅ [README.md](../README.md#-adversarial-model-comparison) - Quick start guide
   - ✅ [docs/COMPARISON_ADVERSARIAL.md](../docs/COMPARISON_ADVERSARIAL.md) - Full guide (when/how/why)
   - ✅ [docs/RBAC_AUDIT.md](../docs/RBAC_AUDIT.md) - Identity & permissions
-  - ✅ [classificationg2s/core/config.py](../classificationg2s/core/config.py) - Data Zone config
+  - ✅ [classymail/core/config.py](../classymail/core/config.py) - Data Zone config
 
 - **Updated Diagrams** (9 total):
   1. ✅ README.md: Main pipeline flowchart (token decision + comparison fork)
@@ -257,7 +257,7 @@ const close = () => emit('close')
 
 ### Phase 3: Worker Async Comparison Handler (2-3 hours)
 
-**Location**: `classificationg2s/services/worker.py` and `classificationg2s/services/pipeline.py`
+**Location**: `classymail/services/worker.py` and `classymail/services/pipeline.py`
 
 #### Changes Required:
 
@@ -349,7 +349,7 @@ curl http://localhost:8000/api/emails/{id} | jq '.comparison_results'
 4. Add CSS styles (use existing Tailwind classes)
 
 ### To Complete Worker Handler (Next Dev)
-1. Read `classificationg2s/services/worker.py` (line 22+)
+1. Read `classymail/services/worker.py` (line 22+)
 2. Modify `handle_queue_message()` to extract `comparison` flag
 3. Pass to `run_classification_pipeline(run_comparison=...)`
 4. Test with: `mode=async` API calls
@@ -360,7 +360,7 @@ curl http://localhost:8000/api/emails/{id} | jq '.comparison_results'
 uv run uvicorn main:app --reload
 
 # 2. In another terminal, start worker
-python -m classificationg2s.worker_main
+python -m classymail.worker_main
 
 # 3. Test sync comparison
 curl -X POST http://localhost:8000/api/emails/test-123/reclassify \
@@ -380,12 +380,12 @@ curl http://localhost:8000/api/emails/test-456 | jq '.comparison_results'
 
 | File | Changes | Status |
 |------|---------|--------|
-| `classificationg2s/models.py` | Added `ComparisonResult` class, updated `EmailRecord` | ✅ |
-| `classificationg2s/core/config.py` | Added `AZURE_PREFERRED_DATA_ZONE`, `AZURE_REGION` | ✅ |
-| `classificationg2s/services/llm_pipeline.py` | Added `_call_model_with_endpoint()`, modified `classify_with_phi4()` | ✅ |
-| `classificationg2s/api/routers/emails.py` | Added `POST /api/emails/{id}/reclassify` endpoint | ✅ |
-| `classificationg2s/services/worker.py` | Ready for comparison flag extraction (not yet modified) | 🔄 |
-| `classificationg2s/services/pipeline.py` | Ready for `run_comparison` parameter (not yet modified) | 🔄 |
+| `classymail/models.py` | Added `ComparisonResult` class, updated `EmailRecord` | ✅ |
+| `classymail/core/config.py` | Added `AZURE_PREFERRED_DATA_ZONE`, `AZURE_REGION` | ✅ |
+| `classymail/services/llm_pipeline.py` | Added `_call_model_with_endpoint()`, modified `classify_with_phi4()` | ✅ |
+| `classymail/api/routers/emails.py` | Added `POST /api/emails/{id}/reclassify` endpoint | ✅ |
+| `classymail/services/worker.py` | Ready for comparison flag extraction (not yet modified) | 🔄 |
+| `classymail/services/pipeline.py` | Ready for `run_comparison` parameter (not yet modified) | 🔄 |
 | `frontend/src/views/SettingsView.vue` | Code template provided above | 🔄 |
 | `frontend/src/components/EmailDetailModal.vue` | Code template provided above | 🔄 |
 | `frontend/src/components/ModelComparisonModal.vue` | New component template provided above | 🔄 |
@@ -423,3 +423,4 @@ curl http://localhost:8000/api/emails/test-456 | jq '.comparison_results'
 - [docs/COMPARISON_ADVERSARIAL.md](../docs/COMPARISON_ADVERSARIAL.md) - Feature guide
 - [docs/RBAC_AUDIT.md](../docs/RBAC_AUDIT.md) - Identity troubleshooting
 - [docs/LOCAL_DEVELOPMENT.md](../docs/LOCAL_DEVELOPMENT.md) - Local setup
+

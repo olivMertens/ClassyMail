@@ -35,6 +35,6 @@ RUN chown -R app:app /app
 USER app
 
 EXPOSE 8000
-CMD ["uvicorn", "classificationg2s.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "classymail.app:app", "--host", "0.0.0.0", "--port", "8000"]
 # Worker entrypoint example:
-# CMD ["python", "-m", "classificationg2s.worker_main"]
+# CMD ["python", "-m", "classymail.worker_main"]

@@ -1,5 +1,5 @@
 {
-	"name": "ClassificationG2S Dev Container",
+	"name": "ClassyMail Dev Container",
 	"build": {
 		"dockerfile": "Dockerfile"
 	},

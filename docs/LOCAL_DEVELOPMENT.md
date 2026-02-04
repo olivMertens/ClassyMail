@@ -80,7 +80,7 @@ CHAT_DEPLOYMENT=gpt-5.2-chat
 # Observability (Azure)
 APPLICATIONINSIGHTS_CONNECTION_STRING=InstrumentationKey=...;IngestionEndpoint=https://...
 LOG_ANALYTICS_WORKSPACE_ID=9f225d73-351d-471e-9371-c15d265e9bd4
-OTEL_SERVICE_NAME=classificationg2s-api
+OTEL_SERVICE_NAME=classymail-api
 
 # UI Configuration (Optional)
 UI_SHOW_INFO_MODAL=true
