@@ -380,6 +380,7 @@ dev = [
 [package.dev-dependencies]
 dev = [
     { name = "execnet" },
+    { name = "pre-commit" },
     { name = "pytest-asyncio" },
     { name = "pytest-xdist" },
 ]
@@ -423,6 +424,7 @@ provides-extras = ["dev"]
 [package.metadata.requires-dev]
 dev = [
     { name = "execnet", specifier = ">=2.1.2" },
+    { name = "pre-commit", specifier = ">=3.7.0" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
 ]

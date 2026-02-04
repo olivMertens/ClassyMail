@@ -423,4 +423,3 @@ curl http://localhost:8000/api/emails/test-456 | jq '.comparison_results'
 - [docs/COMPARISON_ADVERSARIAL.md](../docs/COMPARISON_ADVERSARIAL.md) - Feature guide
 - [docs/RBAC_AUDIT.md](../docs/RBAC_AUDIT.md) - Identity troubleshooting
 - [docs/LOCAL_DEVELOPMENT.md](../docs/LOCAL_DEVELOPMENT.md) - Local setup
-

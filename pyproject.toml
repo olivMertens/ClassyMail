@@ -86,6 +86,7 @@ build-backend = "poetry.core.masonry.api"
 [dependency-groups]
 dev = [
     "execnet>=2.1.2",
+    "pre-commit>=3.7.0",
     "pytest-asyncio>=0.24.0",
     "pytest-xdist>=3.8.0",
 ]
