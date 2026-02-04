@@ -30,8 +30,58 @@ from classymail.api.routers.admin import router as admin_router
 from classymail.api.routers.chat import router as chat_router
 
 
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
+    missing_env: list[str] = []
+    if not config.SERVICE_BUS_FQDN:
+        missing_env.append("AZURE_SERVICE_BUS_FQDN")
+    if not config.BLOB_ACCOUNT_URL:
+        missing_env.append("AZURE_STORAGE_ACCOUNT_URL")
+    if not config.COSMOS_ENDPOINT:
+        missing_env.append("AZURE_COSMOS_ENDPOINT")
+    if not config.MISTRAL_ENDPOINT:
+        missing_env.append("MISTRAL_ENDPOINT")
+    if not config.PHI_ENDPOINT:
+        missing_env.append("PHI_ENDPOINT (or AZURE_AI_ENDPOINT)")
+    if missing_env:
+        raise RuntimeError(
+            "Missing required environment variables: "
+            + ", ".join(missing_env)
+            + ". Load secrets.env first (see docs/LOCAL_RUN.md)."
+        )
+
+    init_telemetry(app)
+
+    clients = Clients()
+    await clients.init()
+    app.state.clients = clients
+    set_default_clients(clients)
+
+    # Run worker inside API only when explicitly enabled (local dev convenience)
+    if os.getenv("ENABLE_WORKER", "false").lower() in {"1", "true", "yes"}:
+        app.state.worker_task = asyncio.create_task(
+            worker_loop_forever(
+                clients=clients,
+                queue_name=config.SERVICE_BUS_QUEUE,
+                get_settings=load_settings,
+            )
+        )
+
+    yield  # Application running
+
+    # Shutdown logic
+    if task := getattr(app.state, "worker_task", None):
+        task.cancel()
+    if clients := getattr(app.state, "clients", None):
+        await clients.close()
+
+
 def create_app() -> FastAPI:
-    app = FastAPI()
+    app = FastAPI(lifespan=lifespan)
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -58,50 +108,6 @@ def create_app() -> FastAPI:
     app.include_router(chat_router)
     # UI router must be last to handle catch-all for SPA
     app.include_router(ui_router)
-
-    @app.on_event("startup")
-    async def on_startup():
-        missing_env: list[str] = []
-        if not config.SERVICE_BUS_FQDN:
-            missing_env.append("AZURE_SERVICE_BUS_FQDN")
-        if not config.BLOB_ACCOUNT_URL:
-            missing_env.append("AZURE_STORAGE_ACCOUNT_URL")
-        if not config.COSMOS_ENDPOINT:
-            missing_env.append("AZURE_COSMOS_ENDPOINT")
-        if not config.MISTRAL_ENDPOINT:
-            missing_env.append("MISTRAL_ENDPOINT")
-        if not config.PHI_ENDPOINT:
-            missing_env.append("PHI_ENDPOINT (or AZURE_AI_ENDPOINT)")
-        if missing_env:
-            raise RuntimeError(
-                "Missing required environment variables: "
-                + ", ".join(missing_env)
-                + ". Load secrets.env first (see docs/LOCAL_RUN.md)."
-            )
-
-        init_telemetry(app)
-
-        clients = Clients()
-        await clients.init()
-        app.state.clients = clients
-        set_default_clients(clients)
-
-        # Run worker inside API only when explicitly enabled (local dev convenience)
-        if os.getenv("ENABLE_WORKER", "false").lower() in {"1", "true", "yes"}:
-            app.state.worker_task = asyncio.create_task(
-                worker_loop_forever(
-                    clients=clients,
-                    queue_name=config.SERVICE_BUS_QUEUE,
-                    get_settings=load_settings,
-                )
-            )
-
-    @app.on_event("shutdown")
-    async def on_shutdown():
-        if task := getattr(app.state, "worker_task", None):
-            task.cancel()
-        if clients := getattr(app.state, "clients", None):
-            await clients.close()
 
     return app
 

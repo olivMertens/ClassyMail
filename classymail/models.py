@@ -23,6 +23,7 @@ class ClassificationResult(BaseModel):
 
 class ComparisonResult(BaseModel):
     """Stores multi-model adversarial comparison results"""
+    model_config = {'protected_namespaces': ()}
     model_results: Dict[str, ClassificationResult] = Field(default_factory=dict)
     confidence_delta: Optional[float] = None  # Absolute difference in top intent confidence
     agreement: bool = False  # True if all/both models detected same top intent
