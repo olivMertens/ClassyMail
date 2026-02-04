@@ -26,6 +26,7 @@ const reprocessing = ref(false)
 const intentsJson = ref('[]')
 const availableCategories = ref([])
 const adversarialModel = ref(null)
+const primaryModel = ref('Phi-4')
 const correctionReason = ref('')
 const activeTab = ref('review') // review | comparison | history
 const isFullWidth = ref(false)
@@ -113,6 +114,12 @@ const getModelStyles = (modelName) => {
   }
 }
 
+const formatConfidence = (result) => {
+  if (!result?.detected_intents?.length) return '0%'
+  const maxConf = Math.max(...result.detected_intents.map(i => i.confidence || 0))
+  return Math.round(maxConf * 100) + '%'
+}
+
 const loadSettings = async () => {
   try {
     const res = await fetch('/api/settings')
@@ -120,6 +127,7 @@ const loadSettings = async () => {
       const data = await res.json()
       availableCategories.value = data.categories || []
       adversarialModel.value = data.adversarial_model
+      primaryModel.value = data.ai_model || 'Phi-4'
     }
   } catch (e) { console.error(e) }
 }
@@ -743,12 +751,21 @@ const renderMarkdown = (text) => md.render(text || '')
                               >
                                 {{ getModelStyles(modelName).displayName }}
                               </h4>
-                              <span
-                                class="text-xs px-2 py-0.5 rounded-full"
-                                :class="getModelStyles(modelName).badge"
-                              >
-                                {{ result.global_complexity || 'N/A' }}
-                              </span>
+                              <div class="flex gap-2">
+                                <span
+                                  class="text-xs px-2 py-0.5 rounded-full border"
+                                  :class="getModelStyles(modelName).badge"
+                                  title="Max Confidence"
+                                >
+                                  {{ formatConfidence(result) }}
+                                </span>
+                                <span
+                                  class="text-xs px-2 py-0.5 rounded-full"
+                                  :class="getModelStyles(modelName).badge"
+                                >
+                                  {{ result.global_complexity || 'N/A' }}
+                                </span>
+                              </div>
                             </div>
                             <div class="space-y-3">
                               <div
@@ -790,7 +807,7 @@ const renderMarkdown = (text) => md.render(text || '')
                       No comparison data
                     </h3>
                     <p class="mt-1 text-sm text-gray-500">
-                      Run an adversarial check to compare Phi-4 with GPT-4o-mini.
+                      Run an adversarial check to compare {{ primaryModel }} with {{ adversarialModel || 'configured model' }}.
                     </p>
                     <div class="mt-6 flex flex-col items-center gap-2">
                       <button

@@ -569,11 +569,17 @@ async def reclassify_email(
             target_models = models
         elif model == "both":
             is_comparison = True
-            target_models = ["phi-4", "gpt-4o-mini"]
+            settings = load_settings()
+            primary = settings.get("ai_model") or "phi-4"
+            adv_model = settings.get("adversarial_model") or "gpt-4o-mini"
+            target_models = [primary, adv_model]
         elif not model:
             # Default to comparison if nothing specified
             is_comparison = True
-            target_models = ["phi-4", "gpt-4o-mini"]
+            settings = load_settings()
+            primary = settings.get("ai_model") or "phi-4"
+            adv_model = settings.get("adversarial_model") or "gpt-4o-mini"
+            target_models = [primary, adv_model]
 
         if mode not in ("sync", "async"):
             raise HTTPException(status_code=400, detail="mode must be 'sync' or 'async'")
