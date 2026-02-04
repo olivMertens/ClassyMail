@@ -12,6 +12,8 @@ from classificationg2s.core.paths import project_root
 from classificationg2s.core.telemetry import init_telemetry
 from classificationg2s.core import config
 from classificationg2s.core.rate_limit import limiter
+from classificationg2s.core.middleware import RequestContextMiddleware
+from classificationg2s.core.errors import AppError, error_handler
 from classificationg2s.services.azure_clients import Clients, set_default_clients
 from classificationg2s.services.worker import worker_loop_forever
 from classificationg2s.services.settings_store import load_settings
@@ -32,6 +34,13 @@ def create_app() -> FastAPI:
     app = FastAPI()
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # Add request context middleware for distributed tracing
+    app.add_middleware(RequestContextMiddleware)
+
+    # Add global error handler
+    app.add_exception_handler(AppError, error_handler)
+    app.add_exception_handler(Exception, error_handler)
 
     static_dir = project_root() / "static"
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")

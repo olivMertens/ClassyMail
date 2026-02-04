@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from classificationg2s.core import config
+from classificationg2s.core.monitoring import get_queue_metrics, get_system_health_score
 from classificationg2s.services.azure_clients import Clients, get_clients, blob_id_from_url
 import logging
 import uuid
@@ -98,6 +99,25 @@ class LowConfidenceResponse(BaseModel):
 class UIConfigResponse(BaseModel):
     show_info_modal: bool
     show_developer_tab: bool
+
+
+class QueueMetricsResponse(BaseModel):
+    """Queue metrics response."""
+    active_message_count: int
+    dead_letter_count: int
+    scheduled_message_count: int
+    transfer_message_count: int
+    total_message_count: int
+    size_in_bytes: int | None = None
+    updated_at: str | None = None
+    error: str | None = None
+
+
+class HealthScoreResponse(BaseModel):
+    """System health score response."""
+    score: float
+    status: str
+    factors: dict
 
 
 @router.get("/ui-config", response_model=UIConfigResponse)
@@ -711,3 +731,62 @@ async def test_gpt_connection(model: str | None = None, clients: Clients = Depen
             "error": str(e),
             "model": model or getattr(config, "GPT_DEPLOYMENT", config.PHI_FALLBACK_DEPLOYMENT)
         }
+
+
+@router.get("/metrics/queue", response_model=QueueMetricsResponse)
+async def queue_metrics(clients: Clients = Depends(get_clients)):
+    """
+    Get Service Bus queue metrics including message counts.
+
+    Provides visibility into:
+    - Active message count (pending processing)
+    - Dead letter queue count (failed messages)
+    - Scheduled message count
+    - Total message count
+    """
+    metrics = await get_queue_metrics(
+        sb_client=clients.sb_client,
+        credential=clients.credential,
+    )
+    return QueueMetricsResponse(**metrics)
+
+
+@router.get("/metrics/health", response_model=HealthScoreResponse)
+async def health_score(clients: Clients = Depends(get_clients)):
+    """
+    Get overall system health score (0-100).
+
+    Factors:
+    - Queue backlog
+    - Dead letter queue size
+    - Recent error count
+    - Processing success rate
+    """
+    # Get queue metrics
+    queue_metrics_data = await get_queue_metrics(
+        sb_client=clients.sb_client,
+        credential=clients.credential,
+    )
+
+    # Get error statistics (using latest errors as proxy)
+    try:
+        errors = await get_latest_errors(limit=100, clients=clients)
+        error_count = len(errors)
+    except Exception:
+        error_count = 0
+
+    # Get total count from stats
+    try:
+        stats = await get_stats_summary(clients=clients)
+        total_count = stats.get("total", 0)
+    except Exception:
+        total_count = 0
+
+    # Calculate health score
+    health = get_system_health_score(
+        queue_metrics=queue_metrics_data,
+        error_count=error_count,
+        total_count=max(total_count, 1),  # Avoid division by zero
+    )
+
+    return HealthScoreResponse(**health)
