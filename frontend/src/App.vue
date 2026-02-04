@@ -8,8 +8,9 @@ import CostsView from './views/CostsView.vue'
 import SettingsView from './views/SettingsView.vue'
 import DeveloperDocsView from './views/DeveloperDocsView.vue'
 import UsageDocsView from './views/UsageDocsView.vue'
-import ExportsView from './views/ExportsView.vue' // Added import
+import ExportsView from './views/ExportsView.vue'
 import EmailDetailModal from './components/EmailDetailModal.vue'
+import GlobalConfirmDialog from './components/GlobalConfirmDialog.vue'
 
 const { locale } = useI18n()
 
@@ -67,5 +68,7 @@ onMounted(() => {
       @close="isModalOpen = false"
       @updated="() => { } /* Optional: refetch dashboard */"
     />
+
+    <GlobalConfirmDialog />
   </DashboardLayout>
 </template>

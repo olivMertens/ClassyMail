@@ -1,5 +1,6 @@
 <script setup>
 import { XMarkIcon } from '@heroicons/vue/24/outline'
+import { trackException } from '../services/telemetry'
 
 defineProps({
   show: { type: Boolean, default: false },
@@ -12,6 +13,8 @@ const formatTime = (t) => {
   try {
     return new Date(t).toLocaleString()
   } catch (e) {
+    console.error('Date formatting error:', e)
+    trackException(e)
     return t
   }
 }
@@ -23,7 +26,9 @@ const formatTime = (t) => {
     class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75 p-4 backdrop-blur-sm"
     @click.self="emit('close')"
   >
-    <div class="relative w-full max-w-3xl bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden transform transition-all">
+    <div
+      class="relative w-full max-w-3xl bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden transform transition-all"
+    >
       <div class="px-5 py-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
           Dead Letter Details
@@ -74,7 +79,9 @@ const formatTime = (t) => {
           <div class="text-gray-500 text-xs uppercase mb-1">
             Description
           </div>
-          <pre class="whitespace-pre-wrap bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700 text-xs font-mono max-h-60 overflow-auto">{{ message.dead_letter_error_description || '—' }}</pre>
+          <pre
+            class="whitespace-pre-wrap bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700 text-xs font-mono max-h-60 overflow-auto"
+          >{{ message.dead_letter_error_description || '—' }}</pre>
         </div>
 
         <div v-if="message.processing_log?.length">

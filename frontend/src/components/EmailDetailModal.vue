@@ -2,6 +2,8 @@
 import { ref, watch, computed } from 'vue'
 import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
+import { useDialog } from '../composables/useDialog'
+import { trackException } from '../services/telemetry'
 
 const props = defineProps({
   emailId: {
@@ -14,6 +16,7 @@ const props = defineProps({
   }
 })
 const emit = defineEmits(['close', 'updated'])
+const { confirm, alert: showAlert, prompt: showPrompt } = useDialog()
 
 const md = new MarkdownIt({ html: true, linkify: true, breaks: true })
 
@@ -52,16 +55,10 @@ const latestComparison = computed(() => {
   // Validate that comparison has meaningful data
   if (!comparison) return null
 
-  // Check if comparison has valid metadata and model results
-  const hasMeta = comparison.meta && (
-    comparison.meta.executed_at ||
-    comparison.meta.agreement !== undefined ||
-    comparison.meta.confidence_delta !== undefined
-  )
+  // Check if comparison has valid model results (relaxed)
   const hasModels = comparison.model_results && Object.keys(comparison.model_results).length > 0
 
-  // Only return comparison if it has both metadata and model results
-  return (hasMeta && hasModels) ? comparison : null
+  return hasModels ? comparison : null
 })
 
 const allComparisons = computed(() => {
@@ -71,13 +68,9 @@ const allComparisons = computed(() => {
   // Filter and validate all comparisons
   return results.filter(comparison => {
     if (!comparison) return false
-    const hasMeta = comparison.meta && (
-      comparison.meta.executed_at ||
-      comparison.meta.agreement !== undefined ||
-      comparison.meta.confidence_delta !== undefined
-    )
+    // Relaxed check: Just ensure we have model results
     const hasModels = comparison.model_results && Object.keys(comparison.model_results).length > 0
-    return hasMeta && hasModels
+    return hasModels
   }).reverse() // Most recent first
 })
 
@@ -91,31 +84,32 @@ const comparisonCount = computed(() => {
 
 const getModelStyles = (modelName) => {
   const n = (modelName || '').toLowerCase()
+  let styleParams = {
+    card: 'border-indigo-200 bg-indigo-50 dark:bg-indigo-900/10 dark:border-indigo-800',
+    text: 'text-indigo-800 dark:text-indigo-300',
+    border: 'border-indigo-200',
+    badge: 'text-indigo-600 bg-indigo-100 dark:bg-indigo-900 dark:text-indigo-200'
+  }
+
   if (n.includes('phi')) {
-    return {
-      displayName: 'Phi-4 (Primary)',
+    styleParams = {
       card: 'border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-800',
       text: 'text-blue-800 dark:text-blue-300',
       border: 'border-blue-200',
       badge: 'text-blue-600 bg-blue-100 dark:bg-blue-900 dark:text-blue-200'
     }
-  }
-  if (n.includes('gpt')) {
-    return {
-      displayName: 'GPT-4o-mini (Audit)',
+  } else if (n.includes('gpt')) {
+    styleParams = {
       card: 'border-orange-200 bg-orange-50 dark:bg-orange-900/10 dark:border-orange-800',
       text: 'text-orange-800 dark:text-orange-300',
       border: 'border-orange-200',
       badge: 'text-orange-600 bg-orange-100 dark:bg-orange-900 dark:text-orange-200'
     }
   }
-  // Default generic
+
   return {
     displayName: modelName,
-    card: 'border-indigo-200 bg-indigo-50 dark:bg-indigo-900/10 dark:border-indigo-800',
-    text: 'text-indigo-800 dark:text-indigo-300',
-    border: 'border-indigo-200',
-    badge: 'text-indigo-600 bg-indigo-100 dark:bg-indigo-900 dark:text-indigo-200'
+    ...styleParams
   }
 }
 
@@ -179,8 +173,8 @@ const toggleCategory = (name) => {
   }
 }
 
-const addCustomCategory = () => {
-  const name = prompt("Enter new category name:")
+const addCustomCategory = async () => {
+  const name = await showPrompt("Enter new category name:")
   if (name) {
     if (!customCategories.value.includes(name)) {
       customCategories.value.push(name)
@@ -205,11 +199,11 @@ const runComparison = async () => {
       await loadEmail()
       activeTab.value = 'comparison'
     } else {
-      alert('Error running comparison')
+      showAlert('Error running comparison')
     }
   } catch (e) {
-    console.error(e)
-    alert('Error running comparison: ' + e.message)
+    trackException(e)
+    showAlert('Error running comparison: ' + e.message)
   } finally {
     isComparing.value = false
   }
@@ -221,23 +215,24 @@ const reprocess = async () => {
   try {
     const res = await fetch(`/api/emails/${email.value.id}/reprocess`, { method: 'POST' })
     if (res.ok) {
-      alert('Reprocessing started')
+      await showAlert('Reprocessing started')
       emit('close')
     } else {
-      alert('Error reprocessing')
+      showAlert('Error reprocessing')
     }
   } catch (e) {
-    alert('Error reprocessing')
+    trackException(e)
+    showAlert('Error reprocessing: ' + e.message)
   } finally {
     reprocessing.value = false
   }
 }
 
 const markAsInvalid = async () => {
-  if (!confirm("Are you sure you want to mark this email as Invalid/Garbage?")) return;
+  if (!await confirm("Are you sure you want to mark this email as Invalid/Garbage?")) return;
 
   if (!correctionReason.value || !correctionReason.value.trim() || correctionReason.value.trim().length < 5) {
-    alert("Please provide a reason or comment for marking this email as Invalid (at least 5 characters).")
+    showAlert("Please provide a reason or comment for marking this email as Invalid (at least 5 characters).")
     return
   }
 
@@ -252,7 +247,10 @@ const markAsInvalid = async () => {
       emit('updated')
       emit('close')
     }
-  } catch (e) { alert("Error saving") }
+  } catch (e) {
+    trackException(e)
+    showAlert("Error saving: " + e.message)
+  }
 }
 
 const saveIntents = async () => {
@@ -261,7 +259,7 @@ const saveIntents = async () => {
   // Validation: Require correction reason ALWAYS if validating manually
   // The user requirement is "obligation of a comment for the user" when verifying/reassigning
   if (!correctionReason.value || !correctionReason.value.trim() || correctionReason.value.trim().length < 5) {
-    alert("Please provide a valid reason or comment for this classification (at least 5 characters). This is required for reinforcement learning.")
+    showAlert("Please provide a valid reason or comment for this classification (at least 5 characters). This is required for reinforcement learning.")
     return
   }
 
@@ -285,7 +283,8 @@ const saveIntents = async () => {
       emit('close')
     }
   } catch (e) {
-    alert('Error Saving')
+    trackException(e)
+    showAlert('Error Saving: ' + e.message)
   }
 }
 
@@ -306,7 +305,9 @@ const parseArrivalDate = (fileUrl) => {
       const [, y, mo, d] = m
       return new Date(`${y}-${mo}-${d}T00:00:00Z`)
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    console.error(e)
+  }
   return null
 }
 

@@ -20,8 +20,11 @@ import {
   InformationCircleIcon
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
+import { useDialog } from '../composables/useDialog'
+import { trackException } from '../services/telemetry'
 
 const { t, locale } = useI18n()
+const { confirm, alert: showAlert } = useDialog() // Rename alert because it conflicts with window.alert if not careful, though in setup scope it shadows it.
 
 // Tabs
 const activeTab = ref('classification')
@@ -117,8 +120,8 @@ const addNewCategory = () => {
   }
 }
 
-const removeCategory = (index) => {
-  if (confirm('Are you sure you want to remove this category?')) {
+const removeCategory = async (index) => {
+  if (await confirm('Are you sure you want to remove this category?')) {
     settings.value.categories.splice(index, 1)
     expandedCategories.value.delete(index)
     saveSettings()
@@ -137,6 +140,7 @@ const loadDefaults = async () => {
     }
   } catch (e) {
     console.error(e)
+    trackException(e)
   }
 }
 
@@ -155,6 +159,7 @@ const loadSettings = async () => {
     }
   } catch (e) {
     console.error(e)
+    trackException(e)
   } finally {
     loading.value = false
   }
@@ -186,7 +191,9 @@ const saveSettings = async () => {
     saved.value = true
     setTimeout(() => saved.value = false, 3000)
   } catch (e) {
-    alert('Failed to save settings')
+    console.error(e)
+    trackException(e)
+    showAlert('Failed to save settings: ' + e.message)
   } finally {
     loading.value = false
   }
@@ -194,7 +201,7 @@ const saveSettings = async () => {
 
 const performReset = async () => {
   if (!resetConfirm1.value || !resetConfirm2.value) return
-  if (!confirm('FINAL WARNING: This is irreversible. Proceed?')) return
+  if (!await confirm('FINAL WARNING: This is irreversible. Proceed?')) return
 
   resetting.value = true
   try {
@@ -208,20 +215,21 @@ const performReset = async () => {
     })
     if (res.ok) {
       const data = await res.json()
-      alert(`Reset Successful.\nDeleted Blobs: ${data.deleted_blobs}\nDeleted Records: ${data.deleted_records}\nPurged DLQ: ${data.deleted_dlq}`)
+      await showAlert(`Reset Successful.\nDeleted Blobs: ${data.deleted_blobs}\nDeleted Records: ${data.deleted_records}\nPurged DLQ: ${data.deleted_dlq}`)
       window.location.reload()
     } else {
-      alert('Reset Failed')
+      showAlert('Reset Failed')
     }
   } catch (e) {
-    alert(`Reset Error: ${e.message}`)
+    trackException(e)
+    showAlert(`Reset Error: ${e.message}`)
   } finally {
     resetting.value = false
   }
 }
 
 const performDlqPurge = async () => {
-  if (!confirm('Are you sure you want to purge the Service Bus Dead Letter Queue? This cannot be undone.')) return
+  if (!await confirm('Are you sure you want to purge the Service Bus Dead Letter Queue? This cannot be undone.')) return
 
   purgingDlq.value = true
   try {
@@ -230,19 +238,20 @@ const performDlqPurge = async () => {
     })
     if (res.ok) {
       const data = await res.json()
-      alert(`Purge Successful.\nDeleted Messages: ${data.deleted_dlq}`)
+      showAlert(`Purge Successful.\nDeleted Messages: ${data.deleted_dlq}`)
     } else {
       const err = await res.json()
-      alert(`Purge Failed: ${err.detail || 'Unknown error'}`)
+      showAlert(`Purge Failed: ${err.detail || 'Unknown error'}`)
     }
   } catch (e) {
-    alert(`Purge Error: ${e.message}`)
+    trackException(e)
+    showAlert(`Purge Error: ${e.message}`)
   } finally {
     purgingDlq.value = false
   }
 }
 
-// eslint-disable-next-line no-unused-vars
+
 const runConnectivityTest = async () => {
   connTestLoading.value = true
   connTestResults.value = null
@@ -250,19 +259,20 @@ const runConnectivityTest = async () => {
     const res = await fetch('/api/admin/debug/connectivity', { method: 'POST' })
     if (res.ok) {
       connTestResults.value = await res.json()
-      alert('Connectivity Test Complete. See results.')
+      showAlert('Connectivity Test Complete. See results.')
     } else {
       const err = await res.json()
-      alert(`Connectivity Test Failed: ${err.detail || 'Request failed'}`)
+      showAlert(`Connectivity Test Failed: ${err.detail || 'Request failed'}`)
     }
   } catch (e) {
-    alert(`Connectivity Error: ${e.message}`)
+    trackException(e)
+    showAlert(`Connectivity Error: ${e.message}`)
   } finally {
     connTestLoading.value = false
   }
 }
 
-// eslint-disable-next-line no-unused-vars
+
 const runLLMTests = async () => {
   llmTestLoading.value = true
   llmTestResults.value = null
@@ -295,13 +305,14 @@ const runLLMTests = async () => {
     }
     llmTestResults.value.chat = adversarialModel ? chatData : maybeAdversarial
   } catch (e) {
-    alert(`LLM Test Error: ${e.message}`)
+    trackException(e)
+    showAlert(`LLM Test Error: ${e.message}`)
   } finally {
     llmTestLoading.value = false
   }
 }
 
-// eslint-disable-next-line no-unused-vars
+
 const performSimulateFlow = async () => {
   simulatingFlow.value = true
   try {
@@ -315,13 +326,14 @@ const performSimulateFlow = async () => {
     if (res.ok) {
       const data = await res.json()
       const aoaiNote = useAoaiEnhancement.value ? ' (with AOAI enhancement)' : ' (template-based)'
-      alert(`✓ E2E Simulation Complete${aoaiNote}\n\nBlob ID: ${data.item_id}\n\nYou can track this email in the Dashboard.`)
+      showAlert(`✓ E2E Simulation Complete${aoaiNote}\n\nBlob ID: ${data.item_id}\n\nYou can track this email in the Dashboard.`)
     } else {
       const err = await res.json()
-      alert(`Simulation Failed: ${err.detail || 'Unknown error'}`)
+      showAlert(`Simulation Failed: ${err.detail || 'Unknown error'}`)
     }
   } catch (e) {
-    alert(`Simulation Error: ${e.message}`)
+    trackException(e)
+    showAlert(`Simulation Error: ${e.message}`)
   } finally {
     simulatingFlow.value = false
   }
