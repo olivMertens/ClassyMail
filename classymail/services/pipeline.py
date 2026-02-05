@@ -259,6 +259,7 @@ async def run_classification_pipeline(
         subject=response_data.get("subject"),
         sender=response_data.get("sender"),
         vector=vector,
+        processing_strategy=strategy,
         classification=ClassificationResult(
             **{
                 "detected_intents": processed.get("intents", []),

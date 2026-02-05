@@ -301,6 +301,14 @@ const getScoreColor = (email) => {
   return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
 }
 
+const strategyBadge = (strategy) => {
+  const map = {
+    reasoning: { icon: '🧠', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200 dark:border-purple-700', key: 'reasoning_short' },
+    vision: { icon: '👁', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300 border-teal-200 dark:border-teal-700', key: 'vision_short' },
+  }
+  return map[strategy] || null // null = standard (no badge, it's the default)
+}
+
 const getScore = (email) => {
   const intents = email.classification?.detected_intents || []
   if (!intents.length) return 'N/A'
@@ -794,12 +802,22 @@ const emit = defineEmits(['open-email'])
           >
             {{ email.classification?.classification_reason || 'No category' }}
           </div>
-          <div
-            v-if="formatDuration(email)"
-            class="text-[10px] text-gray-500 dark:text-gray-400 inline-flex items-center gap-0.5"
-            title="Processing time"
-          >
-            ⏱ {{ formatDuration(email) }}
+          <div class="flex items-center gap-1.5">
+            <span
+              v-if="strategyBadge(email.processing_strategy)"
+              class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium border"
+              :class="strategyBadge(email.processing_strategy).color"
+              :title="t('dashboard.strategy.' + (email.processing_strategy || 'standard'))"
+            >
+              {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' + strategyBadge(email.processing_strategy).key) }}
+            </span>
+            <div
+              v-if="formatDuration(email)"
+              class="text-[10px] text-gray-500 dark:text-gray-400 inline-flex items-center gap-0.5"
+              title="Processing time"
+            >
+              ⏱ {{ formatDuration(email) }}
+            </div>
           </div>
         </div>
       </div>
@@ -1131,7 +1149,17 @@ const emit = defineEmits(['open-email'])
             {{ email.updated_at ? new Date(email.updated_at).toLocaleString() : '—' }}
           </td>
           <td class="hidden md:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-            {{ formatDuration(email) || '—' }}
+            <div class="flex items-center gap-1.5">
+              <span>{{ formatDuration(email) || '—' }}</span>
+              <span
+                v-if="strategyBadge(email.processing_strategy)"
+                class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium border"
+                :class="strategyBadge(email.processing_strategy).color"
+                :title="t('dashboard.strategy.' + (email.processing_strategy || 'standard'))"
+              >
+                {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' + strategyBadge(email.processing_strategy).key) }}
+              </span>
+            </div>
           </td>
           <td class="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex justify-end gap-3">
             <button
@@ -1398,4 +1426,93 @@ const emit = defineEmits(['open-email'])
     :message="selectedDlq"
     @close="dlqModalOpen = false"
   />
+
+  <!-- Reprocess Modal with Strategy Selector -->
+  <Teleport to="body">
+    <div
+      v-if="reprocessModalOpen"
+      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40"
+      @click.self="reprocessModalOpen = false"
+    >
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <ArrowPathIcon class="h-5 w-5 text-primary-600" />
+            {{ t('dashboard.reprocess.title') }}
+          </h3>
+          <p
+            v-if="reprocessTarget?.processing_strategy"
+            class="text-xs text-gray-500 dark:text-gray-400 mt-1"
+          >
+            {{ t('dashboard.reprocess.current') }} {{ t('dashboard.strategy.' + reprocessTarget.processing_strategy) }}
+          </p>
+        </div>
+
+        <!-- Strategy Options -->
+        <div class="px-6 py-4 space-y-3">
+          <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('dashboard.reprocess.select_strategy') }}
+          </p>
+          <label
+            v-for="s in ['standard', 'reasoning', 'vision']"
+            :key="s"
+            class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all"
+            :class="reprocessStrategy === s
+              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-400'
+              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'"
+          >
+            <input
+              v-model="reprocessStrategy"
+              type="radio"
+              :value="s"
+              class="mt-0.5 text-primary-600 focus:ring-primary-500"
+            >
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-gray-900 dark:text-white">
+                  {{ t('dashboard.strategy.' + s) }}
+                </span>
+                <span
+                  v-if="s === 'vision'"
+                  class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                >
+                  {{ t('dashboard.strategy.experimental') }}
+                </span>
+              </div>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {{ t('dashboard.strategy.' + s + '_desc') }}
+              </p>
+            </div>
+          </label>
+
+          <!-- Vision warning -->
+          <div
+            v-if="reprocessStrategy === 'vision'"
+            class="flex items-start gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200"
+          >
+            <ExclamationCircleIcon class="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <span>{{ t('dashboard.reprocess.warning_vision') }}</span>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+          <button
+            class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+            @click="reprocessModalOpen = false"
+          >
+            {{ t('dashboard.reprocess.cancel') }}
+          </button>
+          <button
+            class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
+            @click="confirmReprocess"
+          >
+            <ArrowPathIcon class="h-4 w-4" />
+            {{ t('dashboard.reprocess.confirm') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>

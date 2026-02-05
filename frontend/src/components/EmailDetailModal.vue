@@ -1,9 +1,12 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/vue/24/outline'
+import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, ExclamationCircleIcon } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
 import { useDialog } from '../composables/useDialog'
+import { useI18n } from 'vue-i18n'
 import { trackException } from '../services/telemetry'
+
+const { t } = useI18n()
 
 const props = defineProps({
   emailId: {
@@ -23,6 +26,8 @@ const md = new MarkdownIt({ html: true, linkify: true, breaks: true })
 const email = ref(null)
 const loading = ref(false)
 const reprocessing = ref(false)
+const reprocessModalOpen = ref(false)
+const reprocessStrategy = ref('standard')
 const intentsJson = ref('[]')
 const availableCategories = ref([])
 const adversarialModel = ref(null)
@@ -219,11 +224,22 @@ const runComparison = async () => {
 
 const reprocess = async () => {
   if (!email.value) return
+  reprocessStrategy.value = email.value.processing_strategy || 'standard'
+  reprocessModalOpen.value = true
+}
+
+const confirmReprocess = async () => {
+  if (!email.value) return
+  reprocessModalOpen.value = false
   reprocessing.value = true
   try {
-    const res = await fetch(`/api/emails/${email.value.id}/reprocess`, { method: 'POST' })
+    const res = await fetch(`/api/emails/${email.value.id}/reprocess`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ processing_strategy: reprocessStrategy.value }),
+    })
     if (res.ok) {
-      await showAlert('Reprocessing started')
+      await showAlert(t('dashboard.reprocess.success'))
       emit('close')
     } else {
       showAlert('Error reprocessing')
@@ -234,6 +250,15 @@ const reprocess = async () => {
   } finally {
     reprocessing.value = false
   }
+}
+
+const strategyBadge = (strategy) => {
+  const map = {
+    standard: { icon: '📄', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600' },
+    reasoning: { icon: '🧠', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200 dark:border-purple-700' },
+    vision: { icon: '👁', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300 border-teal-200 dark:border-teal-700' },
+  }
+  return map[strategy] || map.standard
 }
 
 const markAsInvalid = async () => {
@@ -373,8 +398,16 @@ const renderMarkdown = (text) => md.render(text || '')
                   class="h-4 w-4"
                   :class="{ 'animate-spin': reprocessing }"
                 />
-                Reprocess
+                {{ t('email_detail.reprocess') }}
               </button>
+              <span
+                v-if="email.processing_strategy"
+                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border"
+                :class="strategyBadge(email.processing_strategy).color"
+                :title="t('email_detail.processing_mode') + ': ' + t('dashboard.strategy.' + email.processing_strategy)"
+              >
+                {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' + email.processing_strategy) }}
+              </span>
               <button
                 type="button"
                 class="rounded-md bg-white dark:bg-gray-800 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
@@ -928,4 +961,86 @@ const renderMarkdown = (text) => md.render(text || '')
       </div>
     </div>
   </div>
+
+  <!-- Reprocess Strategy Modal -->
+  <Teleport to="body">
+    <div
+      v-if="reprocessModalOpen"
+      class="fixed inset-0 z-[70] flex items-center justify-center bg-black/40"
+      @click.self="reprocessModalOpen = false"
+    >
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <ArrowPathIcon class="h-5 w-5 text-primary-600" />
+            {{ t('dashboard.reprocess.title') }}
+          </h3>
+          <p
+            v-if="email?.processing_strategy"
+            class="text-xs text-gray-500 dark:text-gray-400 mt-1"
+          >
+            {{ t('dashboard.reprocess.current') }} {{ t('dashboard.strategy.' + email.processing_strategy) }}
+          </p>
+        </div>
+        <div class="px-6 py-4 space-y-3">
+          <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('dashboard.reprocess.select_strategy') }}
+          </p>
+          <label
+            v-for="s in ['standard', 'reasoning', 'vision']"
+            :key="s"
+            class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all"
+            :class="reprocessStrategy === s
+              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-400'
+              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'"
+          >
+            <input
+              v-model="reprocessStrategy"
+              type="radio"
+              :value="s"
+              class="mt-0.5 text-primary-600 focus:ring-primary-500"
+            >
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-gray-900 dark:text-white">
+                  {{ t('dashboard.strategy.' + s) }}
+                </span>
+                <span
+                  v-if="s === 'vision'"
+                  class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                >
+                  {{ t('dashboard.strategy.experimental') }}
+                </span>
+              </div>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {{ t('dashboard.strategy.' + s + '_desc') }}
+              </p>
+            </div>
+          </label>
+          <div
+            v-if="reprocessStrategy === 'vision'"
+            class="flex items-start gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200"
+          >
+            <ExclamationCircleIcon class="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <span>{{ t('dashboard.reprocess.warning_vision') }}</span>
+          </div>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+          <button
+            class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+            @click="reprocessModalOpen = false"
+          >
+            {{ t('dashboard.reprocess.cancel') }}
+          </button>
+          <button
+            class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
+            @click="confirmReprocess"
+          >
+            <ArrowPathIcon class="h-4 w-4" />
+            {{ t('dashboard.reprocess.confirm') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>

@@ -509,19 +509,42 @@ async def patch_email(item_id: str, payload: dict, cosmos_container=Depends(get_
 
 
 @router.post("/emails/{item_id}/reprocess")
-async def reprocess_email(item_id: str, cosmos_container=Depends(get_cosmos_container), sb_client=Depends(get_sb_client)):
+async def reprocess_email(
+    item_id: str,
+    payload: Optional[dict] = None,
+    cosmos_container=Depends(get_cosmos_container),
+    sb_client=Depends(get_sb_client),
+):
+    """
+    Re-enqueue an email for full pipeline reprocessing.
 
+    Optional payload:
+    {
+        "processing_strategy": "standard" | "reasoning" | "vision"
+    }
+    If omitted, uses the global default strategy.
+    """
     try:
         item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
         blob_url = item.get("file_url")
         if not blob_url:
             raise HTTPException(status_code=400, detail="file_url missing")
 
+        message_data: dict = {"blob_url": blob_url}
+
+        # Optional per-email strategy override
+        if payload and payload.get("processing_strategy") in ("standard", "reasoning", "vision"):
+            message_data["processing_strategy"] = payload["processing_strategy"]
+
         sender = sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
         async with sender:
-            await sender.send_messages(ServiceBusMessage(json.dumps({"blob_url": blob_url})))
+            await sender.send_messages(ServiceBusMessage(json.dumps(message_data)))
 
-        return {"status": "enqueued", "blob_url": blob_url}
+        return {
+            "status": "enqueued",
+            "blob_url": blob_url,
+            "processing_strategy": message_data.get("processing_strategy"),
+        }
     except Exception as ex:
         raise HTTPException(status_code=400, detail=str(ex))
 

@@ -171,6 +171,11 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
                 settings = get_settings()
                 if inspect.iscoroutine(settings):
                     settings = await settings
+                # Allow per-message strategy override (e.g. reprocess with different mode)
+                msg_strategy = payload.get("processing_strategy")
+                if msg_strategy in ("standard", "reasoning", "vision"):
+                    settings = {**settings, "processing_strategy": msg_strategy}
+                    logger.info("[msg:%s] Strategy override: %s", message_id, msg_strategy)
                 logger.info("[msg:%s] Starting classification pipeline", message_id)
                 result = await run_classification_pipeline(blob_url, settings=settings, clients=clients)
 

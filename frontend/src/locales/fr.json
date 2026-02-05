@@ -157,6 +157,28 @@
             "view": "Voir Détails",
             "reprocess": "Retraiter"
         },
+        "reprocess": {
+            "title": "Retraiter l'Email",
+            "select_strategy": "Sélectionner le mode de traitement",
+            "current": "Traité actuellement avec :",
+            "confirm": "Retraiter",
+            "cancel": "Annuler",
+            "success": "Email remis en file pour retraitement",
+            "warning_vision": "Le mode Vision utilise l'analyse d'images et peut prendre plus de temps"
+        },
+        "strategy": {
+            "standard": "Standard",
+            "standard_short": "STD",
+            "standard_desc": "Optimisé texte/OCR (défaut)",
+            "reasoning": "Raisonnement",
+            "reasoning_short": "CoT",
+            "reasoning_desc": "Analyse profonde chaîne de pensée",
+            "vision": "Vision",
+            "vision_short": "VIS",
+            "vision_desc": "Analyse visuelle (expérimental)",
+            "experimental": "Expérimental",
+            "unknown": "Défaut"
+        },
         "dlq": {
             "banner_title": "La file d'attente Dead-letter contient {count} message(s)",
             "banner_button": "Voir Détails",
@@ -457,6 +479,7 @@
         "reasoning_none": "Raisonnement (Aucune catégorie)",
         "minimize_width": "Minimiser la largeur",
         "full_width": "Pleine largeur",
-        "reprocess": "Retraiter"
+        "reprocess": "Retraiter",
+        "processing_mode": "Mode de traitement"
     }
 }

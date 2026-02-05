@@ -76,6 +76,7 @@ class EmailRecord(BaseModel):
     classification_history: List[HistoryEntry] = []
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    processing_strategy: Optional[str] = None  # standard | reasoning | vision
     error: Optional[str] = None
     error_stage: Optional[str] = None
     processing_log: Optional[list[dict]] = None

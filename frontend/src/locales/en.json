@@ -157,6 +157,28 @@
             "view": "View Details",
             "reprocess": "Reprocess"
         },
+        "reprocess": {
+            "title": "Reprocess Email",
+            "select_strategy": "Select processing mode",
+            "current": "Currently processed with:",
+            "confirm": "Reprocess",
+            "cancel": "Cancel",
+            "success": "Email re-queued for reprocessing",
+            "warning_vision": "Vision mode uses image analysis and may take longer"
+        },
+        "strategy": {
+            "standard": "Standard",
+            "standard_short": "STD",
+            "standard_desc": "Text/OCR optimized (default)",
+            "reasoning": "Reasoning",
+            "reasoning_short": "CoT",
+            "reasoning_desc": "Chain-of-thought deep analysis",
+            "vision": "Vision",
+            "vision_short": "VIS",
+            "vision_desc": "Visual analysis (experimental)",
+            "experimental": "Experimental",
+            "unknown": "Default"
+        },
         "dlq": {
             "banner_title": "Dead-letter queue has {count} message(s)",
             "banner_button": "View Details",
@@ -457,6 +479,7 @@
         "reasoning_none": "Reasoning (No Category)",
         "minimize_width": "Minimize width",
         "full_width": "Full width",
-        "reprocess": "Reprocess"
+        "reprocess": "Reprocess",
+        "processing_mode": "Processing Mode"
     }
 }
