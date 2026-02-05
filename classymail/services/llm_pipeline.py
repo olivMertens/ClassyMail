@@ -16,6 +16,8 @@ from classymail.models import OCRFailed, BusinessEntities
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.settings_store import get_categories_prompt_text, load_settings
 from classymail.services.annotations import ImageDescription
+from classymail.services.email_preprocessing import preprocess_email_content
+from classymail.services.pii_detection import detect_pii_with_llm
 from classymail.core.llm_limits import get_limiter
 # from classymail.services.circuit_breaker import with_ocr_circuit_breaker, with_classification_circuit_breaker
 
@@ -608,13 +610,42 @@ async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False
         clients: Optional pre-configured clients (for testing/DI)
 
     Returns:
-        Classification result dict with intents, complexity, usage, model info
+        Classification result dict with intents, complexity, usage, model info,
+        optional PII data and preprocessing metadata
     """
     if not config.PHI_ENDPOINT:
         raise RuntimeError("PHI_ENDPOINT is not set")
     if not config.PHI_FALLBACK_ENDPOINT:
         raise RuntimeError("PHI_FALLBACK_ENDPOINT is not set")
 
+    # --- EMAIL PREPROCESSING (Client G2S) ---
+    preprocessing_metadata = {}
+    pii_result = None
+    settings = load_settings()
+    preprocessing_config = settings.get("email_preprocessing", {})
+
+    # Apply preprocessing if enabled
+    if preprocessing_config.get("enabled", True):
+        try:
+            text_markdown, preprocessing_metadata = await preprocess_email_content(
+                text_markdown,
+                clients=clients,
+                override_settings=settings
+            )
+            logger.info(f"Preprocessing applied: {preprocessing_metadata}")
+        except Exception as e:
+            logger.warning(f"Preprocessing failed, using original content: {e}")
+            preprocessing_metadata = {"error": str(e)}
+
+    # PII Detection if enabled
+    if preprocessing_config.get("detect_pii", False):
+        try:
+            pii_result = await detect_pii_with_llm(text_markdown, clients=clients)
+            logger.info(f"PII detection: {pii_result.total_count} items ({', '.join(pii_result.pii_types)})")
+        except Exception as e:
+            logger.warning(f"PII detection failed: {e}")
+
+    # --- CONTINUE WITH CLASSIFICATION ---
     # Determine which model to use based on token budget
     system_prompt_rough = "Tu es un assistant expert en classification d'emails d'assurance."
     system_tokens = estimate_tokens_rough(system_prompt_rough)
@@ -641,6 +672,14 @@ async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False
             clients=clients,
         )
         result["fallback_used"] = bool(use_fallback)
+
+        # Add preprocessing metadata and PII to result
+        if preprocessing_metadata:
+            result["preprocessing_metadata"] = preprocessing_metadata
+        if pii_result:
+            result["detected_pii"] = pii_result.model_dump()
+            result["pii_detected"] = pii_result.has_pii
+
         return result
     except httpx.HTTPStatusError as ex:
         status = ex.response.status_code if ex.response is not None else None

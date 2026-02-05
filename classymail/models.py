@@ -19,6 +19,7 @@ class ClassificationResult(BaseModel):
     needs_review: bool = False
     classification_reason: Optional[str] = None  # Explanation when no category found
     raw_response: Optional[dict] = None
+    detected_pii: Optional[dict] = None  # PII detection results from preprocessing
 
 
 class ComparisonResult(BaseModel):
@@ -68,6 +69,9 @@ class EmailRecord(BaseModel):
     chunks: Optional[List[dict]] = None
     classification: Optional[ClassificationResult] = None
     entities: Optional[BusinessEntities] = None  # Auto-extracted entities
+    pii_detected: Optional[bool] = False  # Whether PII was found
+    pii_data: Optional[dict] = None  # Structured PII extraction (for GDPR audits)
+    preprocessing_metadata: Optional[dict] = None  # Preprocessing info (subject, conversation extraction)
     comparison_results: List[ComparisonResult] = Field(default_factory=list)  # Adversarial model comparison (dual-model results)
     classification_history: List[HistoryEntry] = []
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

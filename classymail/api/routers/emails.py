@@ -288,7 +288,7 @@ async def get_stats(clients: Clients = Depends(get_clients)):
 
 
 @router.get("/emails/export")
-async def export_emails_csv(cosmos_container=Depends(get_cosmos_container)):
+async def export_emails_csv_legacy(cosmos_container=Depends(get_cosmos_container)):
     import csv
     import io
 
@@ -716,4 +716,239 @@ async def download_email_file(item_id: str, clients: Clients = Depends(get_clien
         raise
     except Exception as e:
         logger.exception(f"[PDF Proxy] Unexpected error for item_id={item_id}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def extract_filename(blob_url: str) -> str:
+    """Extract PDF filename from blob URL, removing path and SAS tokens."""
+    if not blob_url:
+        return "unknown.pdf"
+
+    from urllib.parse import urlparse, unquote
+    parsed = urlparse(blob_url)
+    path = parsed.path
+
+    # Remove leading slashes and container name
+    parts = path.strip('/').split('/')
+    filename = parts[-1] if parts else "unknown.pdf"
+
+    # Decode URL encoding
+    filename = unquote(filename)
+
+    return filename
+
+
+def extract_visual_proofs(item: dict) -> str:
+    """Extract visual proofs (image descriptions) from chunks when vision mode used."""
+    chunks = item.get("chunks", [])
+    visual_proofs = []
+
+    for chunk in chunks:
+        alt_text = chunk.get("alt_text")
+        description = chunk.get("description")
+
+        if alt_text:
+            visual_proofs.append(f"[Image: {alt_text}]")
+        elif description:
+            visual_proofs.append(f"[Image: {description}]")
+
+    return " | ".join(visual_proofs) if visual_proofs else ""
+
+
+@router.get("/emails/export/csv")
+async def export_emails_csv(
+    status: str = Query("all", pattern="^(all|REVIEW_REQUIRED|PROCESSED|ERROR)$"),
+    format: str = Query("enriched", pattern="^(minimal|enriched)$"),
+    cosmos_container=Depends(get_cosmos_container),
+):
+    """
+    Export emails to CSV format.
+
+    Two formats supported:
+    - minimal: ID;INTENTIONS;CONFIDENCE_MOYENNE (client G2S compatible)
+    - enriched: 12 columns with full audit trail including detection mode and visual proofs
+
+    Args:
+        status: Filter by status (all, REVIEW_REQUIRED, PROCESSED, ERROR)
+        format: Output format (minimal or enriched)
+
+    Returns:
+        CSV file with UTF-8 BOM encoding and semicolon delimiter
+    """
+    import csv
+    import io
+
+    logger.info(f"CSV Export request: status={status}, format={format}")
+
+    try:
+        # Build query
+        filters = ["IS_DEFINED(c.file_url)", "IS_DEFINED(c.status)"]
+        params = {}
+
+        if status != "all":
+            filters.append("c.status = @status")
+            params["@status"] = status
+
+        where_clause = " AND ".join(filters)
+        query_sql = f"SELECT * FROM c WHERE {where_clause} ORDER BY c.created_at DESC"
+
+        # Fetch items
+        items = []
+        async for item in cosmos_container.query_items(query=query_sql, parameters=params, enable_cross_partition_query=True):
+            items.append(item)
+
+        logger.info(f"Found {len(items)} emails for export")
+
+        # Load settings for slug mapping
+        settings = load_settings()
+        categories = settings.get("categories", [])
+        slug_map = {cat.get("name", ""): cat.get("slug", cat.get("name", "")) for cat in categories}
+
+        # Generate CSV in memory
+        output = io.StringIO()
+
+        if format == "minimal":
+            # Client G2S compatible format: ID;INTENTIONS;CONFIDENCE_MOYENNE
+            writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+            writer.writerow(['ID', 'INTENTIONS', 'CONFIDENCE_MOYENNE'])
+
+            for item in items:
+                # Extract PDF filename from blob URL
+                blob_url = item.get("file_url", "")
+                pdf_filename = extract_filename(blob_url)
+
+                classification = item.get("classification", {})
+                intents = classification.get("detected_intents", [])
+
+                # Convert category names to slugs for CSV stability
+                intent_slugs = []
+                confidences = []
+                for intent_obj in intents:
+                    intent_name = intent_obj.get("intent", "")
+                    confidence = intent_obj.get("confidence", 0)
+                    slug = slug_map.get(intent_name, intent_name.lower().replace(" ", "_"))
+                    intent_slugs.append(slug)
+                    confidences.append(confidence)
+
+                intentions_str = ",".join(intent_slugs) if intent_slugs else "unclassified"
+
+                # Calculate average confidence
+                avg_confidence = round(sum(confidences) / len(confidences), 2) if confidences else 0.0
+                confidence_pct = f"{avg_confidence}%"
+
+                writer.writerow([pdf_filename, intentions_str, confidence_pct])
+
+        else:  # enriched format
+            # Full audit format with 12 columns
+            writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+            writer.writerow([
+                'ID',
+                'INTENTIONS',
+                'CONFIDENCE_MOYENNE',
+                'DETAILS_CONFIDENCES',
+                'MODE_DETECTION',
+                'QUALITE',
+                'MODELE',
+                'JUSTIFICATION',
+                'PREUVES_VISUELLES',
+                'TEMPS_MS',
+                'PII_DETECTE',
+                'PII_TYPES'
+            ])
+
+            for item in items:
+                # Extract PDF filename from blob URL
+                blob_url = item.get("file_url", "")
+                pdf_filename = extract_filename(blob_url)
+
+                classification = item.get("classification", {})
+                intents = classification.get("detected_intents", [])
+                processing_time = item.get("processing_time_ms", "")
+
+                # Extract model info and detection mode
+                usage = item.get("usage", {})
+                model_name = usage.get("model", "unknown")
+                detection_mode = usage.get("strategy", "standard")
+
+                # Intentions and confidences
+                intent_slugs = []
+                confidences = []
+                confidence_details = []
+                justifications = []
+
+                for intent_obj in intents:
+                    intent_name = intent_obj.get("intent", "")
+                    confidence = intent_obj.get("confidence", 0)
+                    slug = slug_map.get(intent_name, intent_name.lower().replace(" ", "_"))
+                    intent_slugs.append(slug)
+                    confidences.append(confidence)
+                    # Format: "CategoryName: 95%"
+                    confidence_details.append(f"{intent_name}: {confidence}%")
+                    justifications.append(intent_obj.get("justification", ""))
+
+                intentions_str = ",".join(intent_slugs) if intent_slugs else "unclassified"
+
+                # Calculate average confidence
+                avg_confidence = round(sum(confidences) / len(confidences), 2) if confidences else 0.0
+                confidence_pct = f"{avg_confidence}%"
+
+                # Details confidences
+                details_str = ", ".join(confidence_details) if confidence_details else ""
+
+                # Quality indicator
+                if avg_confidence >= 90:
+                    quality = "Excellent"
+                elif avg_confidence >= 85:
+                    quality = "Bon"
+                else:
+                    quality = "À revoir"
+
+                justification_str = " | ".join(justifications) if justifications else ""
+
+                # Extract visual proofs from chunks (only when vision mode)
+                visual_proofs = extract_visual_proofs(item) if detection_mode == "vision" else ""
+
+                # PII data
+                pii_detected = "Oui" if item.get("pii_detected", False) else "Non"
+                pii_data = item.get("pii_data", {})
+                pii_types = []
+
+                if pii_data:
+                    for key in ['names', 'emails', 'phones', 'addresses', 'contract_ids', 'dates', 'other']:
+                        items_list = pii_data.get(key, [])
+                        if items_list:
+                            pii_types.append(key)
+
+                pii_types_str = ",".join(pii_types) if pii_types else ""
+
+                writer.writerow([
+                    pdf_filename,
+                    intentions_str,
+                    confidence_pct,
+                    details_str,
+                    detection_mode,
+                    quality,
+                    model_name,
+                    justification_str,
+                    visual_proofs,
+                    processing_time,
+                    pii_detected,
+                    pii_types_str
+                ])
+
+        # Get CSV content with UTF-8 BOM
+        csv_content = output.getvalue()
+        csv_bytes = ('\ufeff' + csv_content).encode('utf-8')  # Add BOM for Excel compatibility
+
+        # Return as downloadable file
+        filename = f"emails_export_{format}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
+
+        return StreamingResponse(
+            iter([csv_bytes]),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except Exception as e:
+        logger.exception(f"CSV export failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))

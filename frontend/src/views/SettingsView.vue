@@ -41,7 +41,13 @@ const settings = ref({
   finetune_min_examples: 50,
   ocr_max_attempts: 3,
   review_confidence_threshold: 0.85,
-  categories: []
+  categories: [],
+  email_preprocessing: {
+    enabled: true,
+    include_subject: true,
+    extract_last_conversation: true,
+    detect_pii: false
+  }
 })
 const defaults = ref({
   phi4_input_per_1k: null,
@@ -76,7 +82,7 @@ const useAoaiEnhancement = ref(false)
 // --- Category Management & Sanitization ---
 
 const expandedCategories = ref(new Set())
-const newCategory = ref({ name: '', description: '' })
+const newCategory = ref({ name: '', slug: '', description: '', exclusions: '' })
 const newCategoryExpanded = ref(false)
 
 const sanitizeInput = (str, type) => {
@@ -109,12 +115,20 @@ const updateCategory = (index, field, value) => {
 
 const addNewCategory = () => {
   const name = sanitizeInput(newCategory.value.name, 'name')
+  let slug = sanitizeInput(newCategory.value.slug, 'name')
   const desc = sanitizeInput(newCategory.value.description, 'description')
+  const excl = sanitizeInput(newCategory.value.exclusions, 'description')
 
-  if (name && desc) {
+  // Auto-generate slug if empty
+  if (!slug && name) {
+    slug = name.toLowerCase().replace(/ /g, '_').replace(/é/g, 'e').replace(/è/g, 'e').replace(/à/g, 'a')
+    slug = slug.replace(/[^a-z0-9_]/g, '')
+  }
+
+  if (name && slug) {
     if (!settings.value.categories) settings.value.categories = []
-    settings.value.categories.push({ name, description: desc })
-    newCategory.value = { name: '', description: '' }
+    settings.value.categories.push({ name, slug, description: desc, exclusions: excl })
+    newCategory.value = { name: '', slug: '', description: '', exclusions: '' }
     newCategoryExpanded.value = false
     saveSettings()
   }
@@ -604,6 +618,9 @@ onMounted(() => {
                 <option :value="null">
                   None (Single Model)
                 </option>
+                <option value="phi4">
+                  Phi-4
+                </option>
                 <option value="gpt-4o">
                   gpt-4o
                 </option>
@@ -612,6 +629,9 @@ onMounted(() => {
                 </option>
                 <option value="gpt-5-nano">
                   gpt-5-nano
+                </option>
+                <option value="gpt-5-mini">
+                  gpt-5-mini
                 </option>
                 <option value="gpt-4.1-nano">
                   gpt-4.1-nano
@@ -638,61 +658,107 @@ onMounted(() => {
                   Model Comparison (Azure Foundry Benchmarks)
                 </p>
                 <div class="text-blue-700 dark:text-blue-200 space-y-1">
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between gap-2">
                     <span><strong>gpt-4o:</strong> Quality 0.92 ⭐⭐, Cost ~$120/10K emails</span>
-                    <span
-                      v-if="settings.ai_model === 'gpt-4o'"
-                      class="text-green-600 dark:text-green-400"
-                    >✓
-                      Selected</span>
+                    <div class="flex gap-2 shrink-0">
+                      <span
+                        v-if="settings.ai_model === 'gpt-4o'"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                      >
+                        ✓ Primary
+                      </span>
+                      <span
+                        v-if="settings.adversarial_model === 'gpt-4o'"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
+                      >
+                        🔄 Adversarial
+                      </span>
+                    </div>
                   </div>
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between gap-2">
                     <span><strong>gpt-5-mini:</strong> Quality 0.89 ⭐, Cost ~$70/10K emails</span>
-                    <span
-                      v-if="settings.ai_model === 'gpt-5-mini'"
-                      class="text-green-600 dark:text-green-400"
-                    >✓
-                      Selected</span>
+                    <div class="flex gap-2 shrink-0">
+                      <span
+                        v-if="settings.ai_model === 'gpt-5-mini'"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                      >
+                        ✓ Primary
+                      </span>
+                      <span
+                        v-if="settings.adversarial_model === 'gpt-5-mini'"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
+                      >
+                        🔄 Adversarial
+                      </span>
+                    </div>
                   </div>
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between gap-2">
                     <span><strong>gpt-5-nano:</strong> Quality 0.79 ⭐, Cost ~$35/10K emails</span>
-                    <span
-                      v-if="settings.ai_model === 'gpt-5-nano'"
-                      class="text-green-600 dark:text-green-400"
-                    >✓
-                      Selected</span>
+                    <div class="flex gap-2 shrink-0">
+                      <span
+                        v-if="settings.ai_model === 'gpt-5-nano'"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                      >
+                        ✓ Primary
+                      </span>
+                      <span
+                        v-if="settings.adversarial_model === 'gpt-5-nano'"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
+                      >
+                        🔄 Adversarial
+                      </span>
+                    </div>
                   </div>
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between gap-2">
                     <span><strong>Phi-4 (base):</strong> Quality 0.82, Cost ~$12/10K emails</span>
-                    <span
-                      v-if="settings.ai_model === 'phi4'"
-                      class="text-green-600 dark:text-green-400"
-                    >✓
-                      Selected</span>
+                    <div class="flex gap-2 shrink-0">
+                      <span
+                        v-if="settings.ai_model === 'phi4'"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                      >
+                        ✓ Primary
+                      </span>
+                      <span
+                        v-if="settings.adversarial_model === 'phi4'"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
+                      >
+                        🔄 Adversarial
+                      </span>
+                    </div>
                   </div>
-                  <div class="flex items-center justify-between">
-                    <span><strong>Phi-4 (fine-tuned):</strong> Quality ~0.85, Cost ~$15/10K emails</span>
-                    <span
-                      v-if="settings.ai_model === 'phi4-finetuned'"
-                      class="text-green-600 dark:text-green-400"
-                    >✓
-                      Selected</span>
-                  </div>
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between gap-2">
                     <span><strong>gpt-4o-mini:</strong> Quality 0.84, Cost ~$22/10K emails</span>
-                    <span
-                      v-if="settings.ai_model === 'gpt-4o-mini'"
-                      class="text-green-600 dark:text-green-400"
-                    >✓
-                      Selected</span>
+                    <div class="flex gap-2 shrink-0">
+                      <span
+                        v-if="settings.ai_model === 'gpt-4o-mini'"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                      >
+                        ✓ Primary
+                      </span>
+                      <span
+                        v-if="settings.adversarial_model === 'gpt-4o-mini'"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
+                      >
+                        🔄 Adversarial
+                      </span>
+                    </div>
                   </div>
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between gap-2">
                     <span><strong>gpt-4.1-nano:</strong> Quality 0.69, Cost ~$17/10K emails</span>
-                    <span
-                      v-if="settings.ai_model === 'gpt-4.1-nano'"
-                      class="text-green-600 dark:text-green-400"
-                    >✓
-                      Selected</span>
+                    <div class="flex gap-2 shrink-0">
+                      <span
+                        v-if="settings.ai_model === 'gpt-4.1-nano'"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                      >
+                        ✓ Primary
+                      </span>
+                      <span
+                        v-if="settings.adversarial_model === 'gpt-4.1-nano'"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
+                      >
+                        🔄 Adversarial
+                      </span>
+                    </div>
                   </div>
                   <p class="mt-2 text-xs italic border-t border-blue-200 dark:border-blue-700 pt-2">
                     💡 <strong>Strategy:</strong> Prices may vary by region and volume. Please verify with the
@@ -773,6 +839,125 @@ onMounted(() => {
           <p class="mt-1 text-xs text-gray-500">
             {{ t('settings.processing.ocr_retries_help') }}
           </p>
+        </div>
+
+        <!-- Email Preprocessing Section -->
+        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+          <h4 class="text-base font-semibold leading-6 text-gray-900 dark:text-white mb-2">
+            Email Preprocessing (Client G2S)
+          </h4>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Configure intelligent email content extraction using LLM-based preprocessing
+          </p>
+
+          <div class="space-y-4">
+            <div class="flex items-start">
+              <div class="flex items-center h-5">
+                <input
+                  id="preprocessing-enabled"
+                  v-model="settings.email_preprocessing.enabled"
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+                >
+              </div>
+              <div class="ml-3 text-sm">
+                <label
+                  for="preprocessing-enabled"
+                  class="font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Enable Email Preprocessing
+                </label>
+                <p class="text-gray-500 dark:text-gray-400">
+                  Apply intelligent extraction before classification (recommended)
+                </p>
+              </div>
+            </div>
+
+            <div
+              v-if="settings.email_preprocessing.enabled"
+              class="ml-7 space-y-3 pl-4 border-l-2 border-gray-200 dark:border-gray-700"
+            >
+              <div class="flex items-start">
+                <div class="flex items-center h-5">
+                  <input
+                    id="preprocessing-subject"
+                    v-model="settings.email_preprocessing.include_subject"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+                  >
+                </div>
+                <div class="ml-3 text-sm">
+                  <label
+                    for="preprocessing-subject"
+                    class="font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Include Email Subject
+                  </label>
+                  <p class="text-gray-500 dark:text-gray-400">
+                    Use subject line as additional context for classification
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-start">
+                <div class="flex items-center h-5">
+                  <input
+                    id="preprocessing-conversation"
+                    v-model="settings.email_preprocessing.extract_last_conversation"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+                  >
+                </div>
+                <div class="ml-3 text-sm">
+                  <label
+                    for="preprocessing-conversation"
+                    class="font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Extract Last Conversation Only
+                  </label>
+                  <p class="text-gray-500 dark:text-gray-400">
+                    Ignore email history, signatures, and boilerplate (LLM-based)
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-start">
+                <div class="flex items-center h-5">
+                  <input
+                    id="preprocessing-pii"
+                    v-model="settings.email_preprocessing.detect_pii"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+                  >
+                </div>
+                <div class="ml-3 text-sm">
+                  <label
+                    for="preprocessing-pii"
+                    class="font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Detect Personal Information (PII)
+                  </label>
+                  <p class="text-gray-500 dark:text-gray-400">
+                    Extract names, emails, phones, addresses for GDPR compliance (~€0.002/email)
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 rounded-md bg-amber-50 dark:bg-amber-900/20 p-3 border border-amber-200 dark:border-amber-800">
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <InformationCircleIcon
+                  class="h-5 w-5 text-amber-400"
+                  aria-hidden="true"
+                />
+              </div>
+              <div class="ml-3 text-sm text-amber-700 dark:text-amber-300">
+                <p><strong>Professional Mode:</strong> Prompts use structured DEFINITION/EXCLUSIONS format without emojis for business compatibility</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6 flex items-center gap-4">
@@ -1073,7 +1258,6 @@ onMounted(() => {
                   </div>
                 </div>
 
-                <!-- Accordion Body (Edit Form) -->
                 <div
                   v-if="expandedCategories.has(idx)"
                   class="mt-3 pl-8 pr-2 pb-2"
@@ -1082,25 +1266,51 @@ onMounted(() => {
                     class="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-md border border-gray-200 dark:border-gray-600"
                   >
                     <div class="grid grid-cols-1 gap-4">
-                      <div>
-                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
-                        <input
-                          v-model="cat.name"
-                          type="text"
-                          class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600"
-                          @change="updateCategory(idx, 'name', cat.name)"
-                        >
+                      <div class="grid grid-cols-2 gap-3">
+                        <div>
+                          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Name (Display)</label>
+                          <input
+                            v-model="cat.name"
+                            type="text"
+                            class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600"
+                            @change="updateCategory(idx, 'name', cat.name)"
+                          >
+                        </div>
+                        <div>
+                          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Slug (Technical ID for CSV)</label>
+                          <input
+                            v-model="cat.slug"
+                            type="text"
+                            pattern="[a-z0-9_]+"
+                            class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono"
+                            @change="updateCategory(idx, 'slug', cat.slug)"
+                          >
+                        </div>
                       </div>
                       <div>
                         <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Description (Context for LLM) - {{ cat.description?.length || 0 }}/2000
+                          Definition (What it IS) - {{ cat.description?.length || 0 }}/2000
                         </label>
                         <textarea
                           v-model="cat.description"
-                          rows="3"
+                          rows="2"
                           maxlength="2000"
+                          placeholder="Describe what this category includes..."
                           class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono text-xs"
                           @change="updateCategory(idx, 'description', cat.description)"
+                        />
+                      </div>
+                      <div>
+                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Exclusions (What it ISN'T) - {{ cat.exclusions?.length || 0 }}/2000
+                        </label>
+                        <textarea
+                          v-model="cat.exclusions"
+                          rows="2"
+                          maxlength="2000"
+                          placeholder="Describe what this category does NOT include..."
+                          class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono text-xs"
+                          @change="updateCategory(idx, 'exclusions', cat.exclusions)"
                         />
                       </div>
                       <div class="flex justify-end pt-2">
@@ -1142,8 +1352,8 @@ onMounted(() => {
               class="mt-4 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-md border border-gray-200 dark:border-gray-700 transition-all"
             >
               <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
-                <div class="sm:col-span-2">
-                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Name</label>
+                <div class="sm:col-span-3">
+                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Name (Display)</label>
                   <div class="mt-1">
                     <input
                       v-model="newCategory.name"
@@ -1153,19 +1363,48 @@ onMounted(() => {
                     >
                   </div>
                 </div>
-                <div class="sm:col-span-4">
+                <div class="sm:col-span-3">
+                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Slug (Technical ID)</label>
+                  <div class="mt-1">
+                    <input
+                      v-model="newCategory.slug"
+                      type="text"
+                      pattern="[a-z0-9_]+"
+                      class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono"
+                      placeholder="e.g. contract_cancellation"
+                    >
+                  </div>
+                  <p class="mt-1 text-xs text-gray-500">
+                    Auto-generated if left empty
+                  </p>
+                </div>
+                <div class="sm:col-span-6">
                   <div class="flex justify-between">
-                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Description
-                      (LLM Context)</label>
+                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Definition (What it IS)</label>
                     <span class="text-xs text-gray-500">{{ newCategory.description?.length || 0 }}/2000</span>
                   </div>
                   <div class="mt-1">
                     <textarea
                       v-model="newCategory.description"
-                      rows="3"
+                      rows="2"
                       maxlength="2000"
                       class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono text-xs"
-                      placeholder="Describe the criteria for this category..."
+                      placeholder="Describe what this category includes..."
+                    />
+                  </div>
+                </div>
+                <div class="sm:col-span-6">
+                  <div class="flex justify-between">
+                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Exclusions (What it ISN'T)</label>
+                    <span class="text-xs text-gray-500">{{ newCategory.exclusions?.length || 0 }}/2000</span>
+                  </div>
+                  <div class="mt-1">
+                    <textarea
+                      v-model="newCategory.exclusions"
+                      rows="2"
+                      maxlength="2000"
+                      class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono text-xs"
+                      placeholder="Describe what this category does NOT include..."
                     />
                   </div>
                 </div>

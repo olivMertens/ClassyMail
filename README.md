@@ -98,6 +98,15 @@ Comparez en temps réel les performances de deux modèles (ex: Phi-4 vs GPT-4o-m
 Besoin de données ? Le script intégré génère des PDFs d'emails réalistes mais bruités (typos, argot, scans flous) pour tester la robustesse du pipeline.
 *   👉 **Détails :** [docs/TESTING_EMAIL_GENERATION.md](docs/TESTING_EMAIL_GENERATION.md)
 
+### 📧 Email Preprocessing (Client G2S)
+Configuration avancée pour le traitement professionnel des emails :
+*   **Extraction Intelligente** : LLM-based subject extraction et conversation isolée (sans historique/signatures)
+*   **Catégories Enrichies** : Définitions + exclusions pour une classification précise
+*   **Slugs Techniques** : Identifiants stables pour export CSV
+*   **Détection PII** : Extraction GDPR-compliant des données personnelles
+*   **Export CSV Dual** : Format minimal (client) et enrichi (audit)
+*   👉 **Guide Complet :** [docs/INTEGRATION_CLIENT_G2S.md](docs/INTEGRATION_CLIENT_G2S.md)
+
 ---
 
 ## 📚 Documentation

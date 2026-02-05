@@ -758,7 +758,10 @@ async def test_mistral_ocr_connection(clients: Clients = Depends(get_clients)):
 
 @router.get("/test-gpt")
 async def test_gpt_connection(model: str | None = None, clients: Clients = Depends(get_clients)):
-    """Test GPT connection (defaults to configured fallback, or specific model)"""
+    """
+    Test GPT connection (defaults to configured fallback, or specific model).
+    Enhanced to test gpt-5-nano, gpt-5-mini, gpt-4.1-nano and other models.
+    """
     try:
         import httpx
         from classymail.services.azure_clients import auth_headers
@@ -771,7 +774,7 @@ async def test_gpt_connection(model: str | None = None, clients: Clients = Depen
 
         # Determine deployment name - prefer configured fallback if None
         if model:
-             # trust the caller (admin) to test specific models like gpt5-nano
+             # Trust the caller (admin) to test specific models like gpt5-nano, gpt-4o, etc
             gpt_deployment = model
         else:
             gpt_deployment = getattr(config, "GPT_DEPLOYMENT", config.PHI_FALLBACK_DEPLOYMENT)
@@ -780,24 +783,47 @@ async def test_gpt_connection(model: str | None = None, clients: Clients = Depen
 
         headers = await auth_headers(clients, model_type="openai")
         endpoint = f"{gpt_endpoint.rstrip('/')}/openai/deployments/{gpt_deployment}/chat/completions?api-version={api_version}"
+
+        # Base payload
         payload = {
             "messages": [{"role": "user", "content": "Say 'GPT Connection OK'"}],
             "max_tokens": 10,
-            "temperature": 0
         }
+
+        # Some models don't support temperature parameter
+        if model not in ["gpt-5-nano", "gpt-4.1-nano"]:
+            payload["temperature"] = 0
+
+        logger.info(f"[TEST-GPT] Testing {gpt_deployment} at {endpoint}")
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(endpoint, json=payload, headers=headers)
             if response.is_error:
                 error_detail = response.text
-                logger.error(f"GPT error response for {gpt_deployment}: {error_detail}")
-                return { "status": "error", "error": f"HTTP {response.status_code}: {error_detail}", "model": gpt_deployment }
+                try:
+                    error_json = response.json()
+                    error_message = error_json.get("error", {}).get("message", error_detail)
+                except Exception:
+                    error_message = error_detail
+
+                logger.error(f"GPT error response for {gpt_deployment}: {error_message}")
+                return {
+                    "status": "error",
+                    "error": f"HTTP {response.status_code}: {error_message}",
+                    "model": gpt_deployment,
+                    "endpoint": gpt_endpoint,
+                    "deployment": gpt_deployment,
+                    "details": "Check if deployment exists in Azure AI Foundry and has proper RBAC permissions"
+                }
             data = response.json()
 
         return {
             "status": "success",
             "model": gpt_deployment,
+            "endpoint": gpt_endpoint,
             "response": data.get("choices", [{}])[0].get("message", {}).get("content", ""),
+            "usage": data.get("usage"),
+            "api_version": api_version,
             "status_code": response.status_code
         }
     except Exception as e:

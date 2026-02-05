@@ -5,11 +5,36 @@ from classymail.core.paths import project_root
 DATA_FILE = Path(project_root()) / "data" / "settings.json"
 
 DEFAULT_CATEGORIES = [
-    {"name": "Attestation habitation", "description": ""},
-    {"name": "Attestation scolaire", "description": ""},
-    {"name": "Relevé de compte", "description": ""},
-    {"name": "Dommages électriques", "description": ""},
-    {"name": "Événements naturels", "description": ""}
+    {
+        "name": "Attestation habitation",
+        "slug": "attestation_habitation",
+        "description": "Documents certifiant la résidence ou l'assurance habitation",
+        "exclusions": "Ne concerne pas les attestations professionnelles ou véhicules"
+    },
+    {
+        "name": "Attestation scolaire",
+        "slug": "attestation_scolaire",
+        "description": "Documents liés à la scolarité et à l'éducation",
+        "exclusions": "Ne concerne pas les attestations de travail ou formation professionnelle"
+    },
+    {
+        "name": "Relevé de compte",
+        "slug": "releve_compte",
+        "description": "Relevés bancaires et transactions financières",
+        "exclusions": "Ne concerne pas les factures ou contrats"
+    },
+    {
+        "name": "Dommages électriques",
+        "slug": "dommages_electriques",
+        "description": "Sinistres liés aux équipements électriques",
+        "exclusions": "Ne concerne pas les dommages structurels ou naturels"
+    },
+    {
+        "name": "Événements naturels",
+        "slug": "evenements_naturels",
+        "description": "Sinistres causés par des phénomènes naturels (inondations, tempêtes, etc.)",
+        "exclusions": "Ne concerne pas les dommages causés par l'homme ou les équipements"
+    }
 ]
 
 DEFAULT_SETTINGS = {
@@ -20,6 +45,12 @@ DEFAULT_SETTINGS = {
     "adversarial_model": None, # Default comparison model
     "finetune_min_examples": 50,
     "ocr_max_attempts": 3,
+    "email_preprocessing": {
+        "enabled": True,
+        "include_subject": True,
+        "extract_last_conversation": True,
+        "detect_pii": False
+    }
 }
 PROCESSING_STRATEGY_ENV = "PROCESSING_STRATEGY"
 
@@ -41,6 +72,27 @@ def _apply_env_overrides(settings: dict) -> dict:
         settings["processing_strategy"] = env_strategy
     return settings
 
+def _migrate_categories(categories: list) -> list:
+    """Migrate old categories to new format with slug and exclusions."""
+    migrated = []
+    for c in categories:
+        if isinstance(c, dict):
+            name = c.get("name", "")
+            # Auto-generate slug if missing
+            if "slug" not in c:
+                slug = name.lower().replace(" ", "_").replace("é", "e").replace("è", "e").replace("à", "a")
+                slug = "".join(ch for ch in slug if ch.isalnum() or ch == "_")
+            else:
+                slug = c["slug"]
+
+            migrated.append({
+                "name": name,
+                "slug": slug,
+                "description": c.get("description", ""),
+                "exclusions": c.get("exclusions", "")
+            })
+    return migrated
+
 def load_settings() -> dict:
     if not DATA_FILE.exists():
         return _apply_env_overrides(DEFAULT_SETTINGS.copy())
@@ -49,6 +101,9 @@ def load_settings() -> dict:
         # Merge with defaults to ensure keys exist
         if "categories" not in data:
             data["categories"] = DEFAULT_CATEGORIES
+        else:
+            # Migrate old categories to new format
+            data["categories"] = _migrate_categories(data["categories"])
         if "cost_overrides" not in data:
             data["cost_overrides"] = {}
         if "processing_strategy" not in data:
@@ -63,6 +118,8 @@ def load_settings() -> dict:
             data["ocr_max_attempts"] = 3
         else:
             data["ocr_max_attempts"] = _sanitize_ocr_attempts(data["ocr_max_attempts"])
+        if "email_preprocessing" not in data:
+            data["email_preprocessing"] = DEFAULT_SETTINGS["email_preprocessing"].copy()
         return _apply_env_overrides(data)
     except Exception:
         return _apply_env_overrides(DEFAULT_SETTINGS.copy())
@@ -85,11 +142,24 @@ def save_settings(settings: dict):
     if "categories" in settings:
         clean_cats = []
         for c in settings["categories"]:
-            # Simple sanitization: keep only name/desc and ensure they are strings
+            # Sanitize: keep name/slug/description/exclusions
             name = str(c.get("name", "")).strip()
+            slug = str(c.get("slug", "")).strip()
             desc = str(c.get("description", "")).strip()
-            if name:
-               clean_cats.append({"name": name, "description": desc})
+            excl = str(c.get("exclusions", "")).strip()
+
+            # Auto-generate slug if missing
+            if not slug and name:
+                slug = name.lower().replace(" ", "_").replace("é", "e").replace("è", "e").replace("à", "a")
+                slug = "".join(ch for ch in slug if ch.isalnum() or ch == "_")
+
+            if name and slug:
+                clean_cats.append({
+                    "name": name,
+                    "slug": slug,
+                    "description": desc,
+                    "exclusions": excl
+                })
         settings["categories"] = clean_cats
 
     # Sanitize strategy
@@ -119,6 +189,20 @@ def save_settings(settings: dict):
     if "ocr_max_attempts" in settings:
         settings["ocr_max_attempts"] = _sanitize_ocr_attempts(settings["ocr_max_attempts"])
 
+    # Sanitize email_preprocessing
+    if "email_preprocessing" not in settings:
+        settings["email_preprocessing"] = DEFAULT_SETTINGS["email_preprocessing"].copy()
+    else:
+        ep = settings["email_preprocessing"]
+        if not isinstance(ep, dict):
+            settings["email_preprocessing"] = DEFAULT_SETTINGS["email_preprocessing"].copy()
+        else:
+            # Ensure all keys exist
+            ep.setdefault("enabled", True)
+            ep.setdefault("include_subject", True)
+            ep.setdefault("extract_last_conversation", True)
+            ep.setdefault("detect_pii", False)
+
     DATA_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
 
 async def save_settings_async(settings: dict, clients=None):
@@ -131,10 +215,22 @@ async def save_settings_async(settings: dict, clients=None):
         pass
 
 def get_categories_prompt_text() -> str:
+    """Generate professional prompt text for categories with definitions and exclusions."""
     settings = load_settings()
     cats = settings.get("categories", DEFAULT_CATEGORIES)
     lines = []
     for idx, c in enumerate(cats, 1):
-        desc = f" ({c['description']})" if c.get('description') else ""
-        lines.append(f"{idx}. {c['name']}{desc}")
+        name = c.get('name', '')
+        desc = c.get('description', '')
+        excl = c.get('exclusions', '')
+
+        # Professional format without emojis
+        if desc and excl:
+            lines.append(f"{idx}. {name}")
+            lines.append(f"   DÉFINITION: {desc}")
+            lines.append(f"   EXCLUSIONS: {excl}")
+        elif desc:
+            lines.append(f"{idx}. {name}: {desc}")
+        else:
+            lines.append(f"{idx}. {name}")
     return "\n".join(lines)

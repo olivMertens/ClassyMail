@@ -73,6 +73,8 @@ const viewMode = ref('cards') // 'cards' or 'table'
 const purging = ref(false)
 const sortBy = ref('timestamp')
 const sortOrder = ref('desc')
+const exporting = ref(false)
+const exportFormat = ref('enriched') // 'minimal' or 'enriched'
 
 const pageSizeOptions = [20, 50, 100]
 
@@ -99,6 +101,42 @@ const reprocessEmail = async (email) => {
     } finally {
       reprocessingId.value = null
     }
+  }
+}
+
+const exportCsv = async (format = 'enriched') => {
+  try {
+    exporting.value = true
+    const params = new URLSearchParams({
+      status: filter.value,
+      format: format
+    })
+
+    const res = await fetch(`/api/emails/export/csv?${params}`)
+    if (!res.ok) throw new Error('Export failed')
+
+    // Trigger download
+    const blob = await res.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+
+    // Get filename from Content-Disposition header if available
+    const contentDisposition = res.headers.get('Content-Disposition')
+    const filenameMatch = contentDisposition?.match(/filename="?([^"]+)"?/)
+    const filename = filenameMatch ? filenameMatch[1] : `emails_${format}_${Date.now()}.csv`
+
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+
+    await showAlert(`CSV export successful (${format} format)`)
+  } catch (e) {
+    await showAlert(`Export failed: ${e.message}`)
+  } finally {
+    exporting.value = false
   }
 }
 
@@ -560,6 +598,31 @@ const emit = defineEmits(['open-email'])
       </div>
 
       <div class="flex-grow" />
+
+      <!-- CSV Export Dropdown -->
+      <div class="relative shrink-0 flex items-center gap-2">
+        <select
+          id="export-format"
+          v-model="exportFormat"
+          class="block rounded-md border-0 py-2 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:ring-gray-600 dark:text-white"
+        >
+          <option value="minimal">
+            Format Minimal (Client)
+          </option>
+          <option value="enriched">
+            Format Enrichi (Analyse)
+          </option>
+        </select>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary-600 text-white text-sm font-semibold shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50"
+          :disabled="exporting"
+          @click="exportCsv(exportFormat)"
+        >
+          <ArrowDownTrayIcon class="h-4 w-4" />
+          {{ exporting ? 'Export...' : 'Export CSV' }}
+        </button>
+      </div>
 
       <!-- View Mode Toggle -->
       <div class="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg shrink-0">
