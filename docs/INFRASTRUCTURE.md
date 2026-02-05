@@ -161,9 +161,9 @@ The connection between Blob Storage and Service Bus uses **Azure Event Grid**:
 
 ```mermaid
 flowchart LR
-    Blob[Blob Storage<br/>pdf-inputs] -->|BlobCreated Event| EG[Event Grid<br/>System Topic]
-    EG -->|Filtered Subscription<br/>.pdf only| SB[Service Bus Queue<br/>pdf-processing-queue]
-    SB -->|KEDA Scaler<br/>Message count| Worker[Worker Container App]
+    Blob[Blob Storage: pdf-inputs] -->|BlobCreated Event| EG[Event Grid System Topic]
+    EG -->|Filtered Subscription - .pdf only| SB[Service Bus Queue: pdf-processing-queue]
+    SB -->|KEDA Scaler - Message count| Worker[Worker Container App]
 ```
 
 ### Required Terraform Resources

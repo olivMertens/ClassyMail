@@ -33,18 +33,18 @@ flowchart TD
 
     api -->|GET| blob[(Blob Storage)]
     blob -->|Event Grid| sbq["Service Bus Queue"]
-    sbq -->|Worker| worker["Worker<br/>(async processor)"]
+    sbq -->|Worker| worker["Worker - async processor"]
 
     worker -->|Download| blob
     api -->|OCR| ocr["🔷 Mistral OCR"]
     ocr -->|Markdown| api
 
-    api -->|Estimate tokens| tokencheck{"Content tokens<br/>< 8K?"}
-    tokencheck -->|YES| phi4["🔶 Phi-4<br/>(Primary, 8K)"]
-    tokencheck -->|NO| gpt["🟢 gpt-4o-mini<br/>(Fallback, 120K)"]
+    api -->|Estimate tokens| tokencheck{"Content tokens < 8K?"}
+    tokencheck -->|YES| phi4["🔶 Phi-4 - Primary, 8K"]
+    tokencheck -->|NO| gpt["🟢 gpt-4o-mini - Fallback, 120K"]
 
-    api -->|Mode Comparaison?| compcheck{"Adversarial<br/>mode ON?"}
-    compcheck -->|YES| dual["🔶 Phi-4 ∥ 🟢 gpt4o-mini<br/>(Parallel Execution)"]
+    api -->|Mode Comparaison?| compcheck{"Adversarial mode ON?"}
+    compcheck -->|YES| dual["🔶 Phi-4 ∥ 🟢 gpt4o-mini - Parallel Execution"]
     compcheck -->|NO| primary["Primary Model Only"]
 
     phi4 -->|JSON| api

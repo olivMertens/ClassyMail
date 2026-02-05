@@ -286,7 +286,8 @@ class ChatAgent:
                 "9. NEVER output raw JSON or internal reasoning in the final response. If you use a tool, do not repeat its arguments or explain your decision process. Just provide the final answer.\n"
                 "10. CRITICAL: Do not expose your internal thinking process. Only output the final user-facing response.\n"
                 "11. NEVER output a raw JSON object as your final answer. If you want to perform a search, you MUST use the provided tools (function calling) instead of writing the JSON parameters in the text.\n"
-                "12. optimization: Call tools only when necessary. If the user greets you, just reply greeting."
+                "12. IMPORTANT: All confidence scores in the database are stored as decimals (0.0-1.0). When presenting them to users, ALWAYS multiply by 100 and add '%' symbol. For example, confidence 0.85 should be displayed as '85%', not '0.85'.\n"
+                "13. optimization: Call tools only when necessary. If the user greets you, just reply greeting."
             )
             conversation.insert(0, {"role": "developer", "content": system_prompt})
 

@@ -21,8 +21,8 @@ flowchart LR
   end
 
   subgraph ACA[Azure Container Apps]
-    API[API + UI<br/>email-poc-api]
-    W[Worker<br/>email-poc-worker]
+    API[API + UI: email-poc-api]
+    W[Worker: email-poc-worker]
   end
 
   subgraph Storage[Azure Storage]
@@ -30,12 +30,12 @@ flowchart LR
   end
 
   subgraph EG[Azure Event Grid]
-    T[System Topic<br/>Storage Account]
-    S[Subscription: .pdf<br/>→ Service Bus]
+    T[System Topic - Storage Account]
+    S[Subscription: .pdf → Service Bus]
   end
 
   subgraph SB[Azure Service Bus]
-    Q[(Queue:<br/>pdf-processing-queue)]
+    Q[(Queue: pdf-processing-queue)]
   end
 
   subgraph Foundry[Azure AI Foundry]
@@ -45,31 +45,31 @@ flowchart LR
   end
 
   subgraph DB[Azure Cosmos DB]
-    C[(Container: emails<br/>+comparison_results)]
+    C[(Container: emails + comparison_results)]
   end
 
-  U -->|1) Upload PDF (API)<br/>OR direct Blob| API
+  U -->|1) Upload PDF (API) OR direct Blob| API
   U -->|1bis) Upload direct| B
   API -->|2) Write blob| B
   B -->|3) BlobCreated| T
   T --> S
   S -->|comparison=false| Q
   Q -->|4) Dequeue message| W
-  W -->|5) Consume blob_url<br/>& tags| W
+  W -->|5) Consume blob_url & tags| W
   W -->|6) Download PDF| B
   W -->|7) OCR| OCR
   OCR -->|Markdown + usage| W
-  W -->|Token Budget<br/>Decision| W
+  W -->|Token Budget Decision| W
   W -->|8a) < 8K| Phi
   W -->|8b) ≥ 8K| GPT
   Phi -->|JSON intents| W
   GPT -->|JSON intents| W
-  W -->|Optional: POST<br/>model=both| API
+  W -->|Optional: POST model=both| API
   API -->|Parallel call| Phi
   API -->|Parallel call| GPT
   Phi -->|Result 1| API
   GPT -->|Result 2| API
-  W -->|9) Upsert<br/>comparison_results| C
+  W -->|9) Upsert comparison_results| C
   API -->|10) Read results| C
   C -->|Dual results| API
   API -->|11) UI Comparison Tab| U

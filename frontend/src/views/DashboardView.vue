@@ -65,12 +65,11 @@ const selectedDlq = ref(null)
 const chatQuery = ref('')
 const chatLoading = ref(false)
 const chatError = ref(null)
-const chatResponse = ref(null)
+const chatMessages = ref([]) // Store conversation history: [{ role: 'user'|'assistant', content: string }]
 const chatSources = ref([])
 const chatSessionId = ref(localStorage.getItem('chatSessionId') || crypto.randomUUID())
 watch(chatSessionId, (val) => localStorage.setItem('chatSessionId', val))
-const md = new MarkdownIt({ linkify: true, breaks: true })
-const chatResponseHtml = computed(() => chatResponse.value ? md.render(String(chatResponse.value) || '') : '')
+const md = new MarkdownIt({ linkify: true, breaks: false }) // breaks: false to avoid excessive <br>
 const viewMode = ref('cards') // 'cards' or 'table'
 const purging = ref(false)
 const sortBy = ref('timestamp')
@@ -185,10 +184,16 @@ const openDlqDetails = (msg) => {
 const runChatSearch = async () => {
   chatLoading.value = true
   chatError.value = null
-  chatResponse.value = null
   try {
     const q = chatQuery.value.trim()
     if (!q) return
+
+    // Add user message to conversation
+    chatMessages.value.push({ role: 'user', content: q })
+
+    // Clear input immediately after capturing query
+    chatQuery.value = ''
+
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -199,7 +204,9 @@ const runChatSearch = async () => {
       throw new Error(err.detail || `Server Error: ${res.status}`)
     }
     const data = await res.json()
-    chatResponse.value = data.content
+
+    // Add assistant response to conversation
+    chatMessages.value.push({ role: 'assistant', content: data.content })
     chatSources.value = data.sources || []
   } catch (e) {
     chatError.value = e.message
@@ -808,10 +815,10 @@ const emit = defineEmits(['open-email'])
         <div>
           <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2 flex items-center gap-2">
             <ExclamationCircleIcon class="h-6 w-6 text-red-500" />
-            {{ t('dashboard.dlq_failures.title') }}
+            {{ t('dashboard.dlq.modal_title') }}
           </h3>
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ t('dashboard.dlq_failures.subtitle') }}
+            {{ t('dashboard.dlq.modal_desc') }}
           </p>
         </div>
         <div class="flex gap-2">
@@ -828,7 +835,7 @@ const emit = defineEmits(['open-email'])
             @click="purgeDlq"
           >
             <TrashIcon class="h-4 w-4" />
-            {{ purging ? t('dashboard.dlq_failures.purging') : t('dashboard.dlq_failures.purge') }}
+            {{ purging ? t('dashboard.dlq.purging') : t('dashboard.dlq.purge') }}
           </button>
         </div>
       </div>
@@ -840,27 +847,27 @@ const emit = defineEmits(['open-email'])
               <th
                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
               >
-                {{ t('dashboard.dlq_failures.item_id') }}
+                {{ t('dashboard.dlq.item_id') }}
               </th>
               <th
                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
               >
-                {{ t('dashboard.dlq_failures.reason') }}
+                {{ t('dashboard.dlq.reason') }}
               </th>
               <th
                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
               >
-                {{ t('dashboard.dlq_failures.description') }}
+                {{ t('dashboard.dlq.description') }}
               </th>
               <th
                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
               >
-                {{ t('dashboard.dlq_failures.time') }}
+                {{ t('dashboard.dlq.time') }}
               </th>
               <th
                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
               >
-                {{ t('dashboard.dlq_failures.actions') }}
+                {{ t('dashboard.dlq.actions') }}
               </th>
             </tr>
           </thead>
@@ -886,7 +893,7 @@ const emit = defineEmits(['open-email'])
                   class="text-primary-600 dark:text-primary-400 hover:underline"
                   @click="openDlqDetails(msg)"
                 >
-                  {{ t('dashboard.dlq_failures.view') }}
+                  {{ t('dashboard.dlq.view') }}
                 </button>
               </td>
             </tr>
@@ -1219,7 +1226,7 @@ const emit = defineEmits(['open-email'])
         <!-- Content -->
         <div class="p-4 flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800/50 min-h-[200px]">
           <div
-            v-if="!chatResponse && !chatLoading"
+            v-if="chatMessages.length === 0 && !chatLoading"
             class="space-y-4"
           >
             <div
@@ -1257,20 +1264,35 @@ const emit = defineEmits(['open-email'])
             </div>
           </div>
 
+          <!-- Conversation history -->
           <div
-            v-if="chatResponse"
-            class="flex justify-start mt-2"
+            v-for="(msg, idx) in chatMessages"
+            :key="idx"
+            class="flex mt-3"
+            :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
           >
             <div
-              class="bg-white dark:bg-gray-800 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm max-w-[90%]"
+              class="px-4 py-2.5 rounded-lg border shadow-sm max-w-[85%]"
+              :class="msg.role === 'user'
+                ? 'bg-primary-600 text-white border-primary-600'
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+              "
             >
+              <div
+                v-if="msg.role === 'user'"
+                class="text-sm leading-relaxed whitespace-pre-wrap"
+              >
+                {{ msg.content }}
+              </div>
               <!-- eslint-disable-next-line vue/no-v-html -->
               <div
-                class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed prose prose-sm dark:prose-invert max-w-none"
-                v-html="chatResponseHtml"
+                v-else
+                class="text-sm text-gray-800 dark:text-gray-200 leading-relaxed prose prose-sm dark:prose-invert max-w-none"
+                v-html="md.render(msg.content || '')"
               />
+              <!-- Show sources only for last assistant message -->
               <div
-                v-if="chatSources.length"
+                v-if="msg.role === 'assistant' && idx === chatMessages.length - 1 && chatSources.length"
                 class="mt-2 text-[10px] text-gray-500 dark:text-gray-400"
               >
                 <div class="uppercase tracking-wider font-semibold">
@@ -1287,7 +1309,10 @@ const emit = defineEmits(['open-email'])
                   </li>
                 </ul>
               </div>
-              <div class="mt-2 text-[10px] text-gray-400 border-t dark:border-gray-700 pt-1 flex items-center gap-1">
+              <div
+                v-if="msg.role === 'assistant'"
+                class="mt-2 text-[10px] text-gray-400 border-t dark:border-gray-700 pt-1 flex items-center gap-1"
+              >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 20 20"

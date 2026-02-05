@@ -40,18 +40,6 @@ This document describes the enhanced classification system designed for Client G
 **Endpoint:** `GET /api/emails`
 
 **Response Format:**
-```
-
-### Best Practices for Category Definitions
-
-- **Use concrete keywords** in descriptions (for example: "foudre, surtension, court-circuit" instead of "problèmes électriques").
-- **Make exclusions explicit** with edge cases (for example: "Ne pas inclure X, Y, Z").
-- **Test ambiguous cases** and refine exclusions when categories overlap.
-- **Validate with all 3 strategies**:
-  - **Standard** for speed
-  - **Reasoning** for accuracy checks
-  - **Vision** for documents with photos
-
 ```json
 {
   "items": [
@@ -74,6 +62,16 @@ This document describes the enhanced classification system designed for Client G
   ]
 }
 ```
+
+### Best Practices for Category Definitions
+
+- **Use concrete keywords** in descriptions (for example: "foudre, surtension, court-circuit" instead of "problèmes électriques").
+- **Make exclusions explicit** with edge cases (for example: "Ne pas inclure X, Y, Z").
+- **Test ambiguous cases** and refine exclusions when categories overlap.
+- **Validate with all 3 strategies**:
+  - **Standard** for speed
+  - **Reasoning** for accuracy checks
+  - **Vision** for documents with photos
 
 ### CSV Output Requirements
 

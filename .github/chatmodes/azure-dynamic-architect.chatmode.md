@@ -144,9 +144,14 @@ Utiliser MCP pour vérifier les limites actuelles :
 - **Tool**: Mermaid (intégré) ou azure-drawio
 - **Style**: CAE Icons (Flat Design) OBLIGATOIRE
 - **Contenu**: Data flow, infrastructure layout, KEDA scaling triggers
+- **Règles Mermaid CRITIQUES**:
+  - ❌ **JAMAIS** de balises HTML (`<br/>`, `<br>`, `<b>`, `<i>`) dans les labels Mermaid
+  - ✅ Utiliser `flowchart LR/TD` (pas `graph`)
+  - ✅ Séparer labels multi-lignes avec tirets, deux-points ou espaces
+  - ✅ Valider avec: `uv run python scripts/validate_mermaid.py <files>`
 - **Exemple Architecture Current (Février 2026)**:
   ```mermaid
-  graph LR
+  flowchart LR
     Client[Client Vue.js] --> ACA[Container App API]
     ACA --> SB[Service Bus Queue]
     SB --> Worker[Container App Worker]
