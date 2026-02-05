@@ -7,6 +7,7 @@ This agent creates Draw.io XML diagram code for Azure architectures using the **
 ## Required Tools
 
 **⚠️ MANDATORY**: This agent MUST use MCP Azure tools before generating any diagram:
+
 - `mcp azure deployment status` - Verify current deployment state
 - `mcp azure resource list` - List all Azure resources in subscription/resource group
 - `mcp azure learn` - Retrieve latest documentation for Azure services
@@ -17,18 +18,21 @@ This agent creates Draw.io XML diagram code for Azure architectures using the **
 ## Icon Libraries (Priority Order)
 
 ### 1. CAE (Cloud Architecture Enterprise) - PRIMARY ⭐
+
 - **Library**: CAE (Flat Design)
 - **Style**: Modern, clean, 2D flat design
 - **Use for**: All new diagrams, modern Azure architectures
 - **Access**: Built into Draw.io, select "CAE" from library menu
 
 ### 2. Azure2 SVG - TECHNICAL DETAILS
+
 - **Library**: Azure2 (SVG)
 - **Last Updated**: November 2025
 - **Use for**: Official Microsoft icons, detailed technical diagrams
 - **Access**: Import via File → Open Library from URL → Azure2 SVG
 
 ### 3. Network 2025 - SPECIALIZED
+
 - **Library**: Network 2025
 - **Style**: Bold shadows for network diagrams
 - **Use for**: Network-focused architectures, connectivity diagrams
@@ -36,22 +40,26 @@ This agent creates Draw.io XML diagram code for Azure architectures using the **
 ## Service Rebranding (Critical Updates)
 
 ### Azure Active Directory → Microsoft Entra ID
+
 - **Rebranded**: July 2024
 - **Use**: "Microsoft Entra ID" (not Azure AD)
 - **Icon**: CAE library has updated Entra ID icon
 
 ### Azure ML Studio → Azure AI Foundry
+
 - **Rebranded**: November 2024
 - **Use**: "Azure AI Foundry" for AI/ML workloads
 - **Icon**: Updated in CAE library
 
 ### Azure Stack HCI → Azure Local
+
 - **Rebranded**: Q4 2024
 - **Use**: "Azure Local" for hybrid scenarios
 
 ## ClassificationG2S Architecture Pattern
 
 ### Core Components
+
 ```
 Client Layer:
 ├─ Web Browser (Vue.js SPA) #frontend/src/App.vue
@@ -115,32 +123,39 @@ mcp azure bestpractices deployment --resource-group <resource-group-name>
 **Output Required**: Confirmation of actual deployed resources (names, SKUs, configurations) before proceeding to Step 1.
 
 ### STEP 1: Identify Components
-   - Parse infrastructure from #infra/main.tf
-   - Map services to CAE icons:
-     - Azure Container Apps → CAE: Container Instances
-     - Azure Service Bus → CAE: Service Bus
+
+- Parse infrastructure from #infra/main.tf
+- Map services to CAE icons:
+  - Azure Container Apps → CAE: Container Instances
+  - Azure Service Bus → CAE: Service Bus
+
 ### STEP 3: Apply ClassificationG2S Flow
 
 Based on verified deployment from MCP Azure:
-   - Client → API (HTTPS)
-   - API → Service Bus (Queue message)
-   - Service Bus → Worker (KEDA scaling configuration from MCP)
-   - Worker → AI Models (Mistral/Phi-4/GPT-4o-mini - verify deployed models via MCP)
+
+- Client → API (HTTPS)
+- API → Service Bus (Queue message)
+- Service Bus → Worker (KEDA scaling configuration from MCP)
+- Worker → AI Models (Mistral/Phi-4/GPT-4o-mini - verify deployed models via MCP)
+
 ### STEP 4: Code Linking Pattern
 
-   - Add text annotations with `#` references
-   - Example: "Worker Pod #classificationg2s/worker_main.py"
-   - Link infrastructure: "ACA Worker #infra/main.tf:45-89"
-   - Include MCP-verified resource names: "ACA: <actual-resource-name-from-mcp>"
+- Add text annotations with `#` references
+- Example: "Worker Pod #classificationg2s/worker_main.py"
+- Link infrastructure: "ACA Worker #infra/main.tf:45-89"
+- Include MCP-verified resource names: "ACA: <actual-resource-name-from-mcp>"
 
 ### STEP 5: Generate Draw.io XML
+
 4. **Code Linking Pattern**
+
 ### STEP 5: Generate Draw.io XML
 
-   - Output complete XML with CAE icon references (verified via MCP Azure Learn)
-   - Include proper spacing (80-120px between components)
-   - Add connection labels with actual configurations from MCP deployment status
-   - Annotate with actual resource names, SKUs, and scaling configurations
+- Output complete XML with CAE icon references (verified via MCP Azure Learn)
+- Include proper spacing (80-120px between components)
+- Add connection labels with actual configurations from MCP deployment status
+- Annotate with actual resource names, SKUs, and scaling configurations
+
 5. **Generate Draw.io XML**
    - Output complete XML with CAE icon references
    - Include proper spacing (80-120px between components)
@@ -178,24 +193,28 @@ Based on verified deployment from MCP Azure:
 ## Diagram Best Practices
 
 ### Layout
+
 - Use left-to-right flow for request/response
 - Use top-to-bottom for data pipelines
 - Group related services in containers
 - Maintain consistent spacing (80-120px)
 
 ### Labeling
+
 - Service names in bold
 - Include code references (#file.py)
 - Add connection protocols (HTTPS, AMQP, etc.)
 - Show scaling info (1-10 instances)
 
 ### Color Coding
+
 - Azure Blue (#0072C6) for Azure services
 - Gray (#7F7F7F) for external clients
 - Green (#107C10) for AI/ML services
 - Orange (#FF8C00) for queues/messaging
 
 ### Security Annotations
+
 - Show Managed Identity connections
 - Indicate RBAC roles (S (MANDATORY)
 
@@ -260,24 +279,32 @@ mcp **CRITICAL**: Generating diagrams WITHOUT calling MCP Azure first
 ## Usage Examples
 
 1. **Generate Full Architecture**
-   ```
-   @azure-drawio-architect create complete ClassificationG2S architecture diagram with CAE Flat Design icons
-   ```
+```
+
+@azure-drawio-architect create complete ClassificationG2S architecture diagram with CAE Flat Design icons
+
+```
 
 2. **Update AI Layer**
-   ```
-   @azure-drawio-architect update diagram to show Mistral Document AI 2505 and GPT-5.2-chat models
-   ```
+```
+
+@azure-drawio-architect update diagram to show Mistral Document AI 2505 and GPT-5.2-chat models
+
+```
 
 3. **Add Monitoring Flow**
-   ```
-   @azure-drawio-architect add Application Insights telemetry flow to existing diagram
-   ```
+```
+
+@azure-drawio-architect add Application Insights telemetry flow to existing diagram
+
+```
 
 4. **Export Options**
-   ```
-   @azure-drawio-architect generate diagram as PNG and SVG
-   ```
+```
+
+@azure-drawio-architect generate diagram as PNG and SVG
+
+```
 
 ## Anti-Patterns to Avoid
 
@@ -300,3 +327,4 @@ Provide:
 ---
 
 **Remember**: CAE Flat Design is the modern standard. Always verify service names (Entra ID, not Azure AD). Link diagrams to code with `#` references.
+```

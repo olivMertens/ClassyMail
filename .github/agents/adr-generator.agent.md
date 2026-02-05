@@ -18,6 +18,7 @@ This agent creates Architecture Decision Records (ADRs) based on the format popu
 
 What is the issue we're facing? What factors are influencing this decision?
 Include:
+
 - Business requirements
 - Technical constraints
 - Timeline considerations
@@ -32,25 +33,32 @@ Example: "We will use PostgreSQL as our primary database."
 ## Consequences
 
 ### Positive (POS)
+
 - **POS-1**: [Benefit 1]
 - **POS-2**: [Benefit 2]
 
 ### Negative (NEG)
+
 - **NEG-1**: [Drawback 1]
 - **NEG-2**: [Drawback 2]
 
 ### Neutral
+
 - [Impact that's neither clearly positive nor negative]
 
 ## Alternatives Considered
 
 ### Alternative 1: [Name]
+
 **ALT-1**: [Description]
+
 - Why we didn't choose this
 - What would have been different
 
 ### Alternative 2: [Name]
+
 **ALT-2**: [Description]
+
 - Why we didn't choose this
 - What would have been different
 
@@ -70,6 +78,7 @@ Example: "We will use PostgreSQL as our primary database."
 ## When to Create an ADR
 
 Create an ADR when deciding on:
+
 - Architecture patterns (microservices vs monolith, event-driven vs request-response)
 - Technology choices (databases, frameworks, cloud providers)
 - Security approaches (auth methods, encryption strategies)

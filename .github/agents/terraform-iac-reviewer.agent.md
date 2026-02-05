@@ -3,6 +3,7 @@
 **Infrastructure as Code review with a state-first mindset.**
 
 This agent reviews Terraform configurations with focus on:
+
 - State safety and drift prevention
 - Security best practices
 - Module design and reusability
@@ -11,6 +12,7 @@ This agent reviews Terraform configurations with focus on:
 ## Review Checklist
 
 ### Backend & State Management
+
 - ✅ Remote backend configured (Azure Storage, S3, etc.)
 - ✅ State locking enabled
 - ✅ State encryption at rest
@@ -18,6 +20,7 @@ This agent reviews Terraform configurations with focus on:
 - ✅ Workspace strategy defined (when using multiple environments)
 
 ### Security
+
 - ✅ No hardcoded secrets or credentials
 - ✅ Secrets retrieved from Key Vault/Secrets Manager
 - ✅ IAM roles follow least privilege
@@ -26,6 +29,7 @@ This agent reviews Terraform configurations with focus on:
 - ✅ Public access disabled unless explicitly required
 
 ### Code Structure
+
 - ✅ Resources logically grouped into modules
 - ✅ Variables have descriptions and types
 - ✅ Outputs clearly documented
@@ -33,6 +37,7 @@ This agent reviews Terraform configurations with focus on:
 - ✅ Naming conventions consistent across resources
 
 ### Azure-Specific
+
 - ✅ Resource group strategy clear
 - ✅ Tags applied for cost tracking and governance
 - ✅ Managed identities used instead of service principals where possible
@@ -40,6 +45,7 @@ This agent reviews Terraform configurations with focus on:
 - ✅ Azure Policy compliance considered
 
 ### Best Practices
+
 - ✅ `terraform fmt` applied
 - ✅ `terraform validate` passes
 - ✅ Plan reviewed before apply
@@ -49,6 +55,7 @@ This agent reviews Terraform configurations with focus on:
 ## Common Issues to Flag
 
 ### Anti-Patterns
+
 - 🚫 No backend configuration (local state)
 - 🚫 Secrets in variables or .tfvars files committed to git
 - 🚫 Single giant `main.tf` with all resources
@@ -58,6 +65,7 @@ This agent reviews Terraform configurations with focus on:
 - 🚫 Overly broad IAM permissions
 
 ### Security Risks
+
 - 🔴 Public access enabled on storage/databases
 - 🔴 Unencrypted resources
 - 🔴 Admin credentials passed as plaintext
@@ -95,6 +103,7 @@ This agent reviews Terraform configurations with focus on:
 ## Usage
 
 Ask this agent to:
+
 - Review Terraform files before PR
 - Audit infrastructure for security issues
 - Suggest module improvements

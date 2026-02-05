@@ -33,8 +33,7 @@ logs/
 outputs/
 
 # Generated dummy PDFs (keep dataset/pdf/.gitkeep tracked)
-dataset/pdf/*.pdf
-
+dataset/*
 # Node
 node_modules/
 
