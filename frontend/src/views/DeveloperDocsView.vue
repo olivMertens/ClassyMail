@@ -1,7 +1,10 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import mermaid from 'mermaid'
 import { CodeBracketIcon, MapIcon, ServerIcon } from '@heroicons/vue/24/outline'
+
+const { t } = useI18n()
 
 const currentTab = ref('architecture')
 const isDark = ref(false)
@@ -59,38 +62,38 @@ const switchTab = (tab) => {
 
 // Architecture Diagram Definition
 // Removing strict classDefs and semi-colons which can sometimes cause parsing issues in strict mode
-const diagram = `
+const diagram = computed(() => `
 graph TD
     classDef azure fill:#0072C6,stroke:#fff,stroke-width:2px,color:#fff
     classDef app fill:#50e6ff,stroke:#333,stroke-width:2px,color:#000
     classDef db fill:#59b4d9,stroke:#333,stroke-width:2px
     classDef ai fill:#ff9900,stroke:#333,stroke-width:2px,color:#000
 
-    Client([Client Browser]) -->|HTTPS| FE[Vue Frontend]
-    FE -->|API Calls| API[FastAPI Backend]
+    Client([${t('developer_docs.diagram.client')}]) -->|HTTPS| FE[${t('developer_docs.diagram.frontend')}]
+    FE -->|API Calls| API[${t('developer_docs.diagram.backend')}]
 
-    subgraph AzureContainerApps [Azure Container Apps]
+    subgraph AzureContainerApps [${t('developer_docs.diagram.aca')}]
         API
-        Worker[Background Worker]
+        Worker[${t('developer_docs.diagram.worker')}]
     end
 
-    API -->|Save Upload| Blob[Azure Blob Storage]
-    API -->|Metadata| Cosmos[Cosmos DB]
-    API -->|Queue Job| SB[Service Bus]
+    API -->|${t('developer_docs.diagram.save_upload')}| Blob[${t('developer_docs.diagram.blob')}]
+    API -->|${t('developer_docs.diagram.metadata')}| Cosmos[${t('developer_docs.diagram.cosmos')}]
+    API -->|${t('developer_docs.diagram.queue_job')}| SB[${t('developer_docs.diagram.sb')}]
 
-    SB -->|Trigger| Worker
-    Worker -->|Read File| Blob
-    Worker -->|OCR| Mistral[Mistral AI OCR]
-    Worker -->|Classify| OPENAI[Azure OpenAI]
+    SB -->|${t('developer_docs.diagram.trigger')}| Worker
+    Worker -->|${t('developer_docs.diagram.read_file')}| Blob
+    Worker -->|${t('developer_docs.diagram.ocr')}| Mistral[${t('developer_docs.diagram.mistral')}]
+    Worker -->|${t('developer_docs.diagram.classify')}| OPENAI[${t('developer_docs.diagram.openai')}]
 
     Mistral -->|Markdown| Worker
     OPENAI -->|JSON Intent| Worker
-    Worker -->|Update| Cosmos
+    Worker -->|${t('developer_docs.diagram.update')}| Cosmos
 
     class Blob,Cosmos,SB azure
     class FE,API,Worker app
     class Mistral,OPENAI ai
-`
+`)
 </script>
 
 <template>
@@ -100,7 +103,7 @@ graph TD
         <h2
           class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight"
         >
-          Developer Documentation
+          {{ t('developer_docs.title') }}
         </h2>
       </div>
     </div>
@@ -119,7 +122,7 @@ graph TD
             class="-ml-0.5 mr-2 h-5 w-5"
             aria-hidden="true"
           />
-          Architecture
+          {{ t('developer_docs.tabs.architecture') }}
         </button>
         <button
           :class="[currentTab === 'api' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300', 'group inline-flex items-center border-b-2 py-4 px-1 text-sm font-medium']"
@@ -129,7 +132,7 @@ graph TD
             class="-ml-0.5 mr-2 h-5 w-5"
             aria-hidden="true"
           />
-          API Reference (Redoc)
+          {{ t('developer_docs.tabs.api') }}
         </button>
         <button
           :class="[currentTab === 'repo' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300', 'group inline-flex items-center border-b-2 py-4 px-1 text-sm font-medium']"
@@ -139,7 +142,7 @@ graph TD
             class="-ml-0.5 mr-2 h-5 w-5"
             aria-hidden="true"
           />
-          Repository
+          {{ t('developer_docs.tabs.repo') }}
         </button>
       </nav>
     </div>
@@ -153,14 +156,12 @@ graph TD
       >
         <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
           <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white mb-4">
-            System Architecture
+            {{ t('developer_docs.architecture.title') }}
           </h3>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
-            The ClassyMail system leverages <strong>Azure Container Apps</strong> to host two distinct microservices:
-            the <strong>FastAPI Backend</strong> (handling API requests) and the <strong>Background Worker</strong>
-            (processing long-running tasks asynchronously). This decoupling allows independent scaling:
-            the API scales on HTTP traffic, while the Worker scales based on Service Bus queue depth.
-          </p>
+          <p
+            class="text-sm text-gray-500 dark:text-gray-400 mb-6"
+            v-html="t('developer_docs.architecture.desc_html')"
+          />
 
           <div
             class="flex justify-center bg-white dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto"
@@ -173,14 +174,14 @@ graph TD
 
         <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
           <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white mb-4">
-            Reference Architecture
+            {{ t('developer_docs.architecture.ref_title') }}
           </h3>
           <div
             class="flex justify-center bg-white dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 overflow-hidden"
           >
             <img
               src="/images/architecture_app.png"
-              alt="Reference Architecture Diagram"
+              :alt="t('developer_docs.architecture.ref_alt')"
               class="max-w-full h-auto rounded"
             >
           </div>
@@ -198,7 +199,7 @@ graph TD
             target="_blank"
             class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
           >
-            Open in New Tab &nearr;
+            {{ t('developer_docs.api.open_new_tab') }}
           </a>
         </div>
         <!-- Using standard /redoc endpoint -->
@@ -214,11 +215,11 @@ graph TD
         class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6"
       >
         <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white mb-4">
-          Source Code
+          {{ t('developer_docs.repo.title') }}
         </h3>
         <div class="space-y-4">
           <p class="text-gray-600 dark:text-gray-300">
-            The source code for this Proof of Concept is hosted on GitHub.
+            {{ t('developer_docs.repo.desc') }}
           </p>
           <a
             href="https://github.com/olmertens/ClassyMail"
@@ -236,7 +237,7 @@ graph TD
                 clip-rule="evenodd"
               />
             </svg>
-            View on GitHub
+            {{ t('developer_docs.repo.cta') }}
           </a>
         </div>
       </div>

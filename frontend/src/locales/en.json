@@ -1,4 +1,9 @@
 {
+    "common": {
+        "refresh": "Refresh",
+        "loading": "Loading...",
+        "retry": "Retry Connection"
+    },
     "nav": {
         "dashboard": "Dashboard",
         "upload": "Upload",
@@ -66,7 +71,17 @@
             "warning_text": "Modifying categories changes how the AI classifies all future emails. Existing emails keep their original classification. Changes are applied immediately after saving.",
             "managed_title": "Managed Classification Categories",
             "current_categories": "Define the intent categories that the AI will use for classification.",
-            "save_button": "Save Changes to System"
+            "save_button": "Save Changes to System",
+            "assessment": {
+                "button": "Get AI Advice (GPT-5 Nano)",
+                "analyzing": "Analyzing...",
+                "title": "AI Assessment",
+                "quality": "Quality",
+                "suggestions": "Specific Suggestions:",
+                "success": "Assessment Complete!\n\nQuality: {score}\n\nReview the advice below the category.",
+                "error": "Assessment Failed: {error}"
+            },
+            "save_success": "✓ Categories Saved Successfully!\n\nChanges are now active and will be used for all future email classifications."
         }
     },
     "upload": {
@@ -87,7 +102,115 @@
         "tab_all": "All",
         "tab_review": "To Review",
         "tab_processed": "Processed",
-        "tab_errors": "Errors"
+        "tab_errors": "Errors",
+        "waiting_title": "Waiting for Data",
+        "waiting_subtitle": "If emails exist but don't appear, reconnect may be required.",
+        "no_emails_title": "No emails found",
+        "no_emails_subtitle": "Try changing filters to show more results",
+        "status": {
+            "error": "Error",
+            "processing": "Processing...",
+            "processed": "Processed",
+            "review": "Review Required"
+        },
+        "filter_all": "All",
+        "filter_review": "To Review",
+        "filter_processed": "Processed",
+        "filter_errors": "Errors",
+        "tab_dashboard": "Dashboard",
+        "tab_failures": "Failures",
+        "tab_developer": "Developer",
+        "dlq_banner_title": "Dead-letter queue has {count} message(s)",
+        "dlq_banner_button": "View Details",
+        "total_emails": "Total Emails",
+        "to_review_stat": "To Review",
+        "processed_stat": "Processed",
+        "avg_quality": "Avg. Quality",
+        "confidence_any": "Any Confidence",
+        "confidence_very_low": "Very Low (0-20%)",
+        "confidence_low": "Low (20-40%)",
+        "confidence_medium": "Medium (40-60%)",
+        "confidence_high": "High (60-80%)",
+        "confidence_very_high": "Very High (80-95%)",
+        "confidence_perfect": "Perfect (95-100%)",
+        "confidence_no_category": "No Category Detected",
+        "view_mode_cards": "Cards",
+        "view_mode_table": "Table",
+        "loading": "Loading emails...",
+        "waiting_for_data": "Waiting for Data",
+        "waiting_desc": "If emails exist but don't appear, reconnect may be required.",
+        "retry_connection": "Retry Connection",
+        "no_emails": "No emails found",
+        "no_emails_desc": "Try changing filters to show more results",
+        "status_error": "Error",
+        "status_processing": "Processing...",
+        "status_processed": "Processed",
+        "status_review_required": "Review Required",
+        "action_view": "View Details",
+        "action_reprocess": "Reprocess",
+        "dlq_failures": {
+            "title": "Dead Letter Queue (Failures)",
+            "desc": "These messages failed repeatedly and ended up in the Dead Letter Queue. Click 'View' to debug.",
+            "close": "Close View",
+            "purge": "Purge All",
+            "purging": "Purging...",
+            "item_id": "Item ID / ID",
+            "reason": "Reason",
+            "description": "Description",
+            "time": "Time",
+            "actions": "Actions",
+            "view": "View"
+        },
+        "developer": {
+            "title": "Environment",
+            "readiness": "readiness",
+            "status_ok": "OK",
+            "status_not_ready": "NOT READY"
+        },
+        "table": {
+            "subject_sender": "Subject / Sender",
+            "category": "Category",
+            "status": "Status",
+            "arrival": "Arrival",
+            "processed": "Processed",
+            "duration": "Duration",
+            "actions": "Actions",
+            "test_badge": "TEST",
+            "no_subject": "No Subject",
+            "unknown_sender": "Unknown Sender",
+            "justification": "Justification",
+            "extra_categories": "Extra Categories",
+            "none": "None",
+            "status_review": "To Review",
+            "status_processed": "Processed",
+            "status_processing": "Processing",
+            "status_error": "Error"
+        },
+        "actions": {
+            "view": "View",
+            "reprocess": "Reprocess"
+        },
+        "pagination": {
+            "per_page": "{n} / page",
+            "page_of": "Page {current} of {total}"
+        },
+        "chat": {
+            "title": "AI Assistant",
+            "how_it_works": "How it works:",
+            "how_it_works_desc": "I can search the email database using tools (search, latest errors, stats, top intents). Ask me about processed emails.",
+            "try_asking": "Try Asking:",
+            "example_invoices": "Find emails about invoices",
+            "example_errors": "Show latest errors",
+            "example_intents": "What are the top intents?",
+            "example_urgent": "Search text containing Urgent",
+            "searching": "Searching database...",
+            "sources": "Sources",
+            "chunk": "chunk",
+            "generated_by": "Generated by Azure AI",
+            "error": "Error:",
+            "placeholder": "Type your message...",
+            "send": "Send"
+        }
     },
     "costs": {
         "title": "Costs Analysis",
@@ -221,5 +344,104 @@
             "vision_desc": "The system intelligently distinguishes between a 'scanned page' (treated as text source) and 'meaningful images' (e.g. car crash photos). Redundant descriptions of the page itself are suppressed."
         },
         "flow_title": "Processing Flow"
+    },
+    "dialog": {
+        "ok": "OK",
+        "cancel": "Cancel",
+        "yes": "Yes",
+        "no": "No",
+        "alert": "Alert",
+        "confirmation": "Confirmation",
+        "input": "Input",
+        "message": "Message"
+    },
+    "layout": {
+        "toggle_sidebar": "Toggle sidebar",
+        "info": "Info"
+    },
+    "exports": {
+        "title": "Data Exports",
+        "subtitle": "Export your processed data for reporting, analysis, or fine-tuning custom AI models.",
+        "reporting": {
+            "title": "Reporting Data",
+            "desc": "Download all processed emails, including classification results, metadata, and validation status in CSV format. Ideal for Excel, PowerBI, or manual audit.",
+            "format_label": "Format",
+            "status_label": "Status",
+            "format_minimal": "Minimal Format (Client)",
+            "format_enriched": "Enriched Format (Analysis)",
+            "status_all": "All statuses",
+            "status_review": "Review Required",
+            "status_processed": "Processed",
+            "status_error": "Error",
+            "button": "Download CSV Report",
+            "button_loading": "Exporting...",
+            "empty": "No data available to export."
+        },
+        "finetune": {
+            "title": "Fine-Tuning Datasets",
+            "desc": "Export anonymized data in JSONL format compatible with OpenAI/Azure OpenAI fine-tuning. Requires at least {n} processed items.",
+            "split_hint": "Auto-split: 80% Train, 20% Test.",
+            "train": "Train Set",
+            "test": "Test Set",
+            "all": "Download Complete Dataset (JSONL)",
+            "requirement_title": "Start Requirement",
+            "requirement_desc": "You need {n} processed emails to enable dataset generation.",
+            "generate": "Generate data with GPT-5.2",
+            "generating": "Generating..."
+        }
+    },
+    "developer_docs": {
+        "title": "Developer Documentation",
+        "tabs": {
+            "architecture": "Architecture",
+            "api": "API Reference (Redoc)",
+            "repo": "Repository"
+        },
+        "architecture": {
+            "title": "System Architecture",
+            "desc_html": "The ClassyMail system leverages <strong>Azure Container Apps</strong> to host two distinct microservices: the <strong>FastAPI Backend</strong> (handling API requests) and the <strong>Background Worker</strong> (processing long-running tasks asynchronously). This decoupling allows independent scaling: the API scales on HTTP traffic, while the Worker scales based on Service Bus queue depth.",
+            "ref_title": "Reference Architecture",
+            "ref_alt": "Reference Architecture Diagram"
+        },
+        "api": {
+            "open_new_tab": "Open in New Tab ↗"
+        },
+        "repo": {
+            "title": "Source Code",
+            "desc": "The source code for this Proof of Concept is hosted on GitHub.",
+            "cta": "View on GitHub"
+        },
+        "diagram": {
+            "client": "Client Browser",
+            "frontend": "Vue Frontend",
+            "backend": "FastAPI Backend",
+            "aca": "Azure Container Apps",
+            "worker": "Background Worker",
+            "save_upload": "Save Upload",
+            "metadata": "Metadata",
+            "queue_job": "Queue Job",
+            "blob": "Azure Blob Storage",
+            "cosmos": "Cosmos DB",
+            "sb": "Service Bus",
+            "trigger": "Trigger",
+            "read_file": "Read File",
+            "ocr": "OCR",
+            "mistral": "Mistral AI OCR",
+            "classify": "Classify",
+            "openai": "Azure OpenAI",
+            "update": "Update"
+        }
+    },
+    "email_detail": {
+        "loading": "Loading...",
+        "reason_label": "Reason / Comment",
+        "reason_placeholder": "Why this correction?...",
+        "mark_garbage": "Mark as Garbage/Invalid",
+        "validate_save": "Validate & Save",
+        "reasoning": "AI Reasoning",
+        "reasoning_none": "Reasoning (No Category)",
+        "minimize_width": "Minimize width",
+        "full_width": "Full width",
+        "reprocess": "Reprocess"
     }
 }

@@ -1,4 +1,9 @@
 {
+    "common": {
+        "refresh": "Actualiser",
+        "loading": "Chargement...",
+        "retry": "Réessayer la connexion"
+    },
     "nav": {
         "dashboard": "Tableau de bord",
         "upload": "Importer",
@@ -66,7 +71,17 @@
             "warning_text": "Modifier les catégories change la façon dont l'IA classifie tous les futurs emails. Les emails existants conservent leur classification d'origine. Les changements sont appliqués immédiatement après la sauvegarde.",
             "managed_title": "Catégories de Classification Gérées",
             "current_categories": "Définir les catégories d'intention que l'IA utilisera pour la classification.",
-            "save_button": "Enregistrer dans le Système"
+            "save_button": "Enregistrer dans le Système",
+            "assessment": {
+                "button": "Obtenir des Conseils IA (GPT-5 Nano)",
+                "analyzing": "Analyse en cours...",
+                "title": "Évaluation IA",
+                "quality": "Qualité",
+                "suggestions": "Suggestions Spécifiques :",
+                "success": "Évaluation Terminée !\n\nQualité : {score}\n\nConsultez les conseils ci-dessous.",
+                "error": "Échec de l'Évaluation : {error}"
+            },
+            "save_success": "✓ Catégories Enregistrées avec Succès !\n\nLes modifications sont maintenant actives et seront utilisées pour toutes les futures classifications d'emails."
         }
     },
     "upload": {
@@ -87,7 +102,115 @@
         "tab_all": "Tout",
         "tab_review": "À Valider",
         "tab_processed": "Traités",
-        "tab_errors": "Erreurs"
+        "tab_errors": "Erreurs",
+        "waiting_title": "En attente de données",
+        "waiting_subtitle": "Si des emails existent mais n'apparaissent pas, une reconnexion peut être nécessaire.",
+        "no_emails_title": "Aucun email trouvé",
+        "no_emails_subtitle": "Essayez de modifier les filtres pour afficher plus de résultats",
+        "status": {
+            "error": "Erreur",
+            "processing": "Traitement...",
+            "processed": "Traitée",
+            "review": "Révision Requise"
+        },
+        "filter_all": "Toutes",
+        "filter_review": "À revoir",
+        "filter_processed": "Traitées",
+        "filter_errors": "Erreurs",
+        "tab_dashboard": "Tableau de bord",
+        "tab_failures": "Échecs",
+        "tab_developer": "Développeur",
+        "dlq_banner_title": "La file d'attente Dead-letter contient {count} message(s)",
+        "dlq_banner_button": "Voir Détails",
+        "total_emails": "Emails Total",
+        "to_review_stat": "À revoir",
+        "processed_stat": "Traitées",
+        "avg_quality": "Qualité Moy.",
+        "confidence_any": "Toute Confiance",
+        "confidence_very_low": "Très Faible (0-20%)",
+        "confidence_low": "Faible (20-40%)",
+        "confidence_medium": "Moyen (40-60%)",
+        "confidence_high": "Élevé (60-80%)",
+        "confidence_very_high": "Très Élevé (80-95%)",
+        "confidence_perfect": "Parfait (95-100%)",
+        "confidence_no_category": "Aucune Catégorie Détectée",
+        "view_mode_cards": "Cartes",
+        "view_mode_table": "Tableau",
+        "loading": "Chargement des emails...",
+        "waiting_for_data": "En attente de données",
+        "waiting_desc": "Si des emails existent mais n'apparaissent pas, une reconnexion peut être nécessaire.",
+        "retry_connection": "Réessayer la connexion",
+        "no_emails": "Aucun email trouvé",
+        "no_emails_desc": "Essayez de modifier les filtres pour afficher plus de résultats",
+        "status_error": "Erreur",
+        "status_processing": "Traitement...",
+        "status_processed": "Traitée",
+        "status_review_required": "Révision Requise",
+        "action_view": "Voir Détails",
+        "action_reprocess": "Retraiter",
+        "dlq_failures": {
+            "title": "Dead Letter Queue (Échecs)",
+            "desc": "Ces messages ont échoué à plusieurs reprises et se sont retrouvés dans la Dead Letter Queue. Cliquez sur 'Voir' pour déboguer.",
+            "close": "Fermer la Vue",
+            "purge": "Purger Tout",
+            "purging": "Purge en cours...",
+            "item_id": "ID d'Élément / ID",
+            "reason": "Raison",
+            "description": "Description",
+            "time": "Heure",
+            "actions": "Actions",
+            "view": "Voir"
+        },
+        "developer": {
+            "title": "Environnement",
+            "readiness": "disponibilité",
+            "status_ok": "OK",
+            "status_not_ready": "NON PRÊT"
+        },
+        "table": {
+            "subject_sender": "Sujet / Expéditeur",
+            "category": "Catégorie",
+            "status": "Statut",
+            "arrival": "Arrivée",
+            "processed": "Traitée",
+            "duration": "Durée",
+            "actions": "Actions",
+            "test_badge": "TEST",
+            "no_subject": "Sans Sujet",
+            "unknown_sender": "Expéditeur Inconnu",
+            "justification": "Justification",
+            "extra_categories": "Catégories Supplémentaires",
+            "none": "Aucune",
+            "status_review": "À revoir",
+            "status_processed": "Traitée",
+            "status_processing": "Traitement",
+            "status_error": "Erreur"
+        },
+        "actions": {
+            "view": "Voir",
+            "reprocess": "Retraiter"
+        },
+        "pagination": {
+            "per_page": "{n} / page",
+            "page_of": "Page {current} sur {total}"
+        },
+        "chat": {
+            "title": "Assistant IA",
+            "how_it_works": "Comment ça fonctionne :",
+            "how_it_works_desc": "Je peux rechercher dans la base de données d'emails en utilisant des outils (recherche, dernières erreurs, statistiques, principales intentions). Demandez-moi à propos des emails traités.",
+            "try_asking": "Essayez de demander :",
+            "example_invoices": "Trouver des emails sur les factures",
+            "example_errors": "Afficher les dernières erreurs",
+            "example_intents": "Quelles sont les principales intentions ?",
+            "example_urgent": "Rechercher du texte contenant Urgent",
+            "searching": "Recherche dans la base de données...",
+            "sources": "Sources",
+            "chunk": "fragment",
+            "generated_by": "Généré par Azure AI",
+            "error": "Erreur :",
+            "placeholder": "Tapez votre message...",
+            "send": "Envoyer"
+        }
     },
     "costs": {
         "title": "Analyse des Coûts",
@@ -221,5 +344,104 @@
             "vision_desc": "Le système distingue intelligemment une 'page scannée' (traitée comme source de texte) des 'images porteuses de sens' (ex: photo d'accident). Les descriptions redondantes de la page elle-même sont supprimées."
         },
         "flow_title": "Flux de Traitement"
+    },
+    "dialog": {
+        "ok": "OK",
+        "cancel": "Annuler",
+        "yes": "Oui",
+        "no": "Non",
+        "alert": "Alerte",
+        "confirmation": "Confirmation",
+        "input": "Saisie",
+        "message": "Message"
+    },
+    "layout": {
+        "toggle_sidebar": "Basculer la barre latérale",
+        "info": "Info"
+    },
+    "exports": {
+        "title": "Exports de données",
+        "subtitle": "Exportez vos données traitées pour le reporting, l'analyse ou le fine-tuning de modèles IA.",
+        "reporting": {
+            "title": "Données de reporting",
+            "desc": "Téléchargez tous les emails traités, incluant résultats de classification, métadonnées et statut de validation au format CSV. Idéal pour Excel, PowerBI ou audit manuel.",
+            "format_label": "Format",
+            "status_label": "Statut",
+            "format_minimal": "Format Minimal (Client)",
+            "format_enriched": "Format Enrichi (Analyse)",
+            "status_all": "Tous les statuts",
+            "status_review": "À valider",
+            "status_processed": "Traité",
+            "status_error": "Erreur",
+            "button": "Télécharger le rapport CSV",
+            "button_loading": "Export...",
+            "empty": "Aucune donnée à exporter."
+        },
+        "finetune": {
+            "title": "Jeux de données de fine-tuning",
+            "desc": "Exportez des données anonymisées en JSONL compatibles avec OpenAI/Azure OpenAI. Nécessite au moins {n} éléments traités.",
+            "split_hint": "Découpage auto : 80% Train, 20% Test.",
+            "train": "Jeu d'entraînement",
+            "test": "Jeu de test",
+            "all": "Télécharger le dataset complet (JSONL)",
+            "requirement_title": "Pré-requis",
+            "requirement_desc": "Vous avez besoin de {n} emails traités pour activer la génération.",
+            "generate": "Générer des données avec GPT-5.2",
+            "generating": "Génération..."
+        }
+    },
+    "developer_docs": {
+        "title": "Documentation Développeur",
+        "tabs": {
+            "architecture": "Architecture",
+            "api": "Référence API (Redoc)",
+            "repo": "Dépôt"
+        },
+        "architecture": {
+            "title": "Architecture Système",
+            "desc_html": "Le système ClassyMail utilise <strong>Azure Container Apps</strong> pour héberger deux microservices distincts : le <strong>Backend FastAPI</strong> (requêtes API) et le <strong>Worker</strong> (tâches longues). Cette séparation permet un scaling indépendant : l'API sur le trafic HTTP et le Worker sur la profondeur de la file Service Bus.",
+            "ref_title": "Architecture de référence",
+            "ref_alt": "Schéma d'architecture de référence"
+        },
+        "api": {
+            "open_new_tab": "Ouvrir dans un nouvel onglet ↗"
+        },
+        "repo": {
+            "title": "Code source",
+            "desc": "Le code source de cette preuve de concept est hébergé sur GitHub.",
+            "cta": "Voir sur GitHub"
+        },
+        "diagram": {
+            "client": "Navigateur Client",
+            "frontend": "Frontend Vue",
+            "backend": "Backend FastAPI",
+            "aca": "Azure Container Apps",
+            "worker": "Worker",
+            "save_upload": "Enregistrer l'upload",
+            "metadata": "Métadonnées",
+            "queue_job": "File d'attente",
+            "blob": "Azure Blob Storage",
+            "cosmos": "Cosmos DB",
+            "sb": "Service Bus",
+            "trigger": "Déclencheur",
+            "read_file": "Lire fichier",
+            "ocr": "OCR",
+            "mistral": "Mistral AI OCR",
+            "classify": "Classifier",
+            "openai": "Azure OpenAI",
+            "update": "Mise à jour"
+        }
+    },
+    "email_detail": {
+        "loading": "Chargement...",
+        "reason_label": "Raison / Commentaire",
+        "reason_placeholder": "Pourquoi cette correction ?...",
+        "mark_garbage": "Marquer comme Spam/Invalide",
+        "validate_save": "Valider & Enregistrer",
+        "reasoning": "Raisonnement IA",
+        "reasoning_none": "Raisonnement (Aucune catégorie)",
+        "minimize_width": "Minimiser la largeur",
+        "full_width": "Pleine largeur",
+        "reprocess": "Retraiter"
     }
 }

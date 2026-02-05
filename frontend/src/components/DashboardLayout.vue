@@ -229,7 +229,7 @@ const navigation = computed(() => {
       >
         <button
           class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
-          title="Toggle sidebar"
+          :title="t('layout.toggle_sidebar')"
           @click="sidebarCollapsed = !sidebarCollapsed"
         >
           <Bars3Icon class="h-6 w-6" />
@@ -238,7 +238,7 @@ const navigation = computed(() => {
           <button
             v-if="uiConfig.show_info_modal"
             class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
-            title="Info"
+            :title="t('layout.info')"
             @click="showInfoModal = true"
           >
             <InformationCircleIcon class="h-6 w-6" />

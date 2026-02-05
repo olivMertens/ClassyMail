@@ -28,6 +28,7 @@ from classymail.api.routers.costs import router as costs_router
 from classymail.api.routers.docs import router as docs_router
 from classymail.api.routers.admin import router as admin_router
 from classymail.api.routers.chat import router as chat_router
+from classymail.api.category_assessment import router as category_assessment_router
 
 
 from contextlib import asynccontextmanager
@@ -106,6 +107,7 @@ def create_app() -> FastAPI:
     app.include_router(costs_router)
     app.include_router(admin_router)
     app.include_router(chat_router)
+    app.include_router(category_assessment_router)
     # UI router must be last to handle catch-all for SPA
     app.include_router(ui_router)
 

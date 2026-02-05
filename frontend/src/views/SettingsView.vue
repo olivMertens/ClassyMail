@@ -84,6 +84,8 @@ const useAoaiEnhancement = ref(false)
 const expandedCategories = ref(new Set())
 const newCategory = ref({ name: '', slug: '', description: '', exclusions: '' })
 const newCategoryExpanded = ref(false)
+const categoryAssessments = ref(new Map()) // Map<categoryIndex, { advice, quality_score, specific_suggestions, loading }>
+const assessingCategory = ref(null) // Current category being assessed
 
 const sanitizeInput = (str, type) => {
   if (!str) return ''
@@ -138,7 +140,51 @@ const removeCategory = async (index) => {
   if (await confirm('Are you sure you want to remove this category?')) {
     settings.value.categories.splice(index, 1)
     expandedCategories.value.delete(index)
+    categoryAssessments.value.delete(index)
     saveSettings()
+  }
+}
+
+const assessCategory = async (index) => {
+  const category = settings.value.categories[index]
+  if (!category) return
+
+  assessingCategory.value = index
+  categoryAssessments.value.set(index, { loading: true })
+
+  try {
+    const res = await fetch('/api/admin/assess-category', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: category.name,
+        slug: category.slug,
+        description: category.description || '',
+        exclusions: category.exclusions || ''
+      })
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      categoryAssessments.value.set(index, {
+        loading: false,
+        advice: data.advice,
+        quality_score: data.quality_score,
+        specific_suggestions: data.specific_suggestions || []
+      })
+      await showAlert(`Assessment Complete!\n\nQuality: ${data.quality_score}\n\nReview the advice below the category.`)
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
+      categoryAssessments.value.delete(index)
+      await showAlert(`Assessment Failed: ${err.detail || 'Unknown error'}`)
+    }
+  } catch (e) {
+    console.error(e)
+    trackException(e)
+    categoryAssessments.value.delete(index)
+    await showAlert(`Assessment Error: ${e.message}`)
+  } finally {
+    assessingCategory.value = null
   }
 }
 
@@ -196,18 +242,30 @@ const saveSettings = async () => {
       categories: settings.value.categories
     }
 
-    await fetch('/api/settings', {
+    const res = await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
-    localStorage.setItem('ClassyMail-settings', JSON.stringify(payload))
-    saved.value = true
-    setTimeout(() => saved.value = false, 3000)
+
+    if (res.ok) {
+      localStorage.setItem('ClassyMail-settings', JSON.stringify(payload))
+      saved.value = true
+
+      // Show success dialog for categories tab
+      if (activeTab.value === 'classification') {
+        await showAlert('✓ Categories Saved Successfully!\n\nChanges are now active and will be used for all future email classifications.')
+      }
+
+      setTimeout(() => saved.value = false, 3000)
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
+      await showAlert(`Failed to save settings: ${err.detail || 'Unknown error'}`)
+    }
   } catch (e) {
     console.error(e)
     trackException(e)
-    showAlert('Failed to save settings: ' + e.message)
+    await showAlert('Failed to save settings: ' + e.message)
   } finally {
     loading.value = false
   }
@@ -945,7 +1003,9 @@ onMounted(() => {
             </div>
           </div>
 
-          <div class="mt-4 rounded-md bg-amber-50 dark:bg-amber-900/20 p-3 border border-amber-200 dark:border-amber-800">
+          <div
+            class="mt-4 rounded-md bg-amber-50 dark:bg-amber-900/20 p-3 border border-amber-200 dark:border-amber-800"
+          >
             <div class="flex">
               <div class="flex-shrink-0">
                 <InformationCircleIcon
@@ -954,7 +1014,10 @@ onMounted(() => {
                 />
               </div>
               <div class="ml-3 text-sm text-amber-700 dark:text-amber-300">
-                <p><strong>Professional Mode:</strong> Prompts use structured DEFINITION/EXCLUSIONS format without emojis for business compatibility</p>
+                <p>
+                  <strong>Professional Mode:</strong> Prompts use structured DEFINITION/EXCLUSIONS format without
+                  emojis for business compatibility
+                </p>
               </div>
             </div>
           </div>
@@ -1191,16 +1254,27 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="flex justify-between items-center">
+        <div class="flex justify-between items-center mb-6">
           <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
             {{ t('settings.categories.managed_title') }}
           </h3>
           <button
             type="button"
-            class="text-sm text-primary-600 hover:text-primary-500"
+            :disabled="loading"
+            class="inline-flex items-center rounded-md bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             @click="saveSettings"
           >
-            {{ t('settings.categories.save_button') }}
+            <CheckCircleIcon
+              v-if="!loading"
+              class="-ml-0.5 mr-1.5 h-5 w-5"
+              aria-hidden="true"
+            />
+            <ArrowPathIcon
+              v-else
+              class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
+              aria-hidden="true"
+            />
+            {{ loading ? t('settings.saving') : t('settings.categories.save_button') }}
           </button>
         </div>
 
@@ -1268,7 +1342,8 @@ onMounted(() => {
                     <div class="grid grid-cols-1 gap-4">
                       <div class="grid grid-cols-2 gap-3">
                         <div>
-                          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Name (Display)</label>
+                          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Name
+                            (Display)</label>
                           <input
                             v-model="cat.name"
                             type="text"
@@ -1277,7 +1352,8 @@ onMounted(() => {
                           >
                         </div>
                         <div>
-                          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Slug (Technical ID for CSV)</label>
+                          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Slug (Technical
+                            ID for CSV)</label>
                           <input
                             v-model="cat.slug"
                             type="text"
@@ -1313,11 +1389,117 @@ onMounted(() => {
                           @change="updateCategory(idx, 'exclusions', cat.exclusions)"
                         />
                       </div>
-                      <div class="flex justify-end pt-2">
+
+                      <!-- AI Assessment Button -->
+                      <div class="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-600">
+                        <button
+                          type="button"
+                          :disabled="assessingCategory === idx"
+                          class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                          @click="assessCategory(idx)"
+                        >
+                          <CpuChipIcon
+                            v-if="assessingCategory !== idx"
+                            class="-ml-0.5 mr-1.5 h-4 w-4"
+                            aria-hidden="true"
+                          />
+                          <ArrowPathIcon
+                            v-else
+                            class="-ml-0.5 mr-1.5 h-4 w-4 animate-spin"
+                            aria-hidden="true"
+                          />
+                          {{ assessingCategory === idx ? t('settings.categories.assessment.analyzing') :
+                            t('settings.categories.assessment.button') }}
+                        </button>
                         <span class="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 italic">
                           <ExclamationTriangleIcon class="h-3 w-3" />
-                          Changes are applied locally. Click "Save Changes to System" above to commit.
+                          Changes are applied locally. Click "Save Changes" above to commit.
                         </span>
+                      </div>
+                    </div>
+
+                    <!-- AI Assessment Results -->
+                    <div
+                      v-if="categoryAssessments.get(idx) && !categoryAssessments.get(idx).loading"
+                      class="mt-4 rounded-md border-2 transition-all"
+                      :class="[
+                        categoryAssessments.get(idx).quality_score === 'Good' ? 'border-green-400 bg-green-50 dark:bg-green-900/20' : '',
+                        categoryAssessments.get(idx).quality_score === 'Needs Improvement' ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : '',
+                        categoryAssessments.get(idx).quality_score === 'Poor' ? 'border-red-400 bg-red-50 dark:bg-red-900/20' : '',
+                        !['Good', 'Needs Improvement', 'Poor'].includes(categoryAssessments.get(idx).quality_score) ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' : ''
+                      ]"
+                    >
+                      <div class="p-4">
+                        <div class="flex items-start gap-3">
+                          <div class="flex-shrink-0">
+                            <CheckCircleIcon
+                              v-if="categoryAssessments.get(idx).quality_score === 'Good'"
+                              class="h-6 w-6 text-green-600 dark:text-green-400"
+                            />
+                            <ExclamationTriangleIcon
+                              v-else-if="categoryAssessments.get(idx).quality_score === 'Needs Improvement'"
+                              class="h-6 w-6 text-amber-600 dark:text-amber-400"
+                            />
+                            <ExclamationTriangleIcon
+                              v-else-if="categoryAssessments.get(idx).quality_score === 'Poor'"
+                              class="h-6 w-6 text-red-600 dark:text-red-400"
+                            />
+                            <InformationCircleIcon
+                              v-else
+                              class="h-6 w-6 text-blue-600 dark:text-blue-400"
+                            />
+                          </div>
+                          <div class="flex-1">
+                            <h4
+                              class="text-sm font-bold mb-1"
+                              :class="[
+                                categoryAssessments.get(idx).quality_score === 'Good' ? 'text-green-800 dark:text-green-300' : '',
+                                categoryAssessments.get(idx).quality_score === 'Needs Improvement' ? 'text-amber-800 dark:text-amber-300' : '',
+                                categoryAssessments.get(idx).quality_score === 'Poor' ? 'text-red-800 dark:text-red-300' : '',
+                                !['Good', 'Needs Improvement', 'Poor'].includes(categoryAssessments.get(idx).quality_score) ? 'text-blue-800 dark:text-blue-300' : ''
+                              ]"
+                            >
+                              {{ t('settings.categories.assessment.title') }}: {{
+                                categoryAssessments.get(idx).quality_score }}
+                            </h4>
+                            <div
+                              class="text-xs space-y-2"
+                              :class="[
+                                categoryAssessments.get(idx).quality_score === 'Good' ? 'text-green-700 dark:text-green-200' : '',
+                                categoryAssessments.get(idx).quality_score === 'Needs Improvement' ? 'text-amber-700 dark:text-amber-200' : '',
+                                categoryAssessments.get(idx).quality_score === 'Poor' ? 'text-red-700 dark:text-red-200' : '',
+                                !['Good', 'Needs Improvement', 'Poor'].includes(categoryAssessments.get(idx).quality_score) ? 'text-blue-700 dark:text-blue-200' : ''
+                              ]"
+                            >
+                              <p class="whitespace-pre-wrap">
+                                {{ categoryAssessments.get(idx).advice }}
+                              </p>
+
+                              <div
+                                v-if="categoryAssessments.get(idx).specific_suggestions?.length"
+                                class="mt-3 pt-3 border-t"
+                                :class="[
+                                  categoryAssessments.get(idx).quality_score === 'Good' ? 'border-green-300 dark:border-green-700' : '',
+                                  categoryAssessments.get(idx).quality_score === 'Needs Improvement' ? 'border-amber-300 dark:border-amber-700' : '',
+                                  categoryAssessments.get(idx).quality_score === 'Poor' ? 'border-red-300 dark:border-red-700' : '',
+                                  !['Good', 'Needs Improvement', 'Poor'].includes(categoryAssessments.get(idx).quality_score) ? 'border-blue-300 dark:border-blue-700' : ''
+                                ]"
+                              >
+                                <p class="font-semibold mb- 1">
+                                  {{ t('settings.categories.assessment.suggestions') }}
+                                </p>
+                                <ul class="list-disc list-inside space-y-1 ml-2">
+                                  <li
+                                    v-for="(suggestion, sidx) in categoryAssessments.get(idx).specific_suggestions"
+                                    :key="sidx"
+                                  >
+                                    {{ suggestion }}
+                                  </li>
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1353,7 +1535,8 @@ onMounted(() => {
             >
               <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
                 <div class="sm:col-span-3">
-                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Name (Display)</label>
+                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Name
+                    (Display)</label>
                   <div class="mt-1">
                     <input
                       v-model="newCategory.name"
@@ -1364,7 +1547,8 @@ onMounted(() => {
                   </div>
                 </div>
                 <div class="sm:col-span-3">
-                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Slug (Technical ID)</label>
+                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Slug (Technical
+                    ID)</label>
                   <div class="mt-1">
                     <input
                       v-model="newCategory.slug"
@@ -1380,7 +1564,8 @@ onMounted(() => {
                 </div>
                 <div class="sm:col-span-6">
                   <div class="flex justify-between">
-                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Definition (What it IS)</label>
+                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Definition
+                      (What it IS)</label>
                     <span class="text-xs text-gray-500">{{ newCategory.description?.length || 0 }}/2000</span>
                   </div>
                   <div class="mt-1">
@@ -1395,7 +1580,8 @@ onMounted(() => {
                 </div>
                 <div class="sm:col-span-6">
                   <div class="flex justify-between">
-                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Exclusions (What it ISN'T)</label>
+                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Exclusions
+                      (What it ISN'T)</label>
                     <span class="text-xs text-gray-500">{{ newCategory.exclusions?.length || 0 }}/2000</span>
                   </div>
                   <div class="mt-1">

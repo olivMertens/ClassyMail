@@ -1,11 +1,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   ArrowDownTrayIcon,
   QuestionMarkCircleIcon,
   TableCellsIcon,
   DocumentTextIcon
 } from '@heroicons/vue/24/outline'
+
+const { t } = useI18n()
 
 const stats = ref({
   total: 0,
@@ -15,6 +18,10 @@ const stats = ref({
 const loading = ref(false)
 const generating = ref(false) // Added generating state
 const error = ref(null)
+
+const exportFormat = ref('enriched')
+const statusFilter = ref('all')
+const exporting = ref(false)
 
 const downloadFile = async (url, filename) => {
   try {
@@ -50,8 +57,17 @@ const downloadFile = async (url, filename) => {
   }
 }
 
-const exportCsv = () => {
-  downloadFile('/api/emails/export', 'emails.csv')
+const exportCsv = async () => {
+  exporting.value = true
+  try {
+    const params = new URLSearchParams({
+      status: statusFilter.value,
+      format: exportFormat.value
+    })
+    await downloadFile(`/api/emails/export/csv?${params.toString()}`)
+  } finally {
+    exporting.value = false
+  }
 }
 
 const exportJsonl = (split = 'all') => {
@@ -129,10 +145,10 @@ onMounted(() => {
   <div class="w-full mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
     <div>
       <h2 class="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">
-        Data Exports
+        {{ t('exports.title') }}
       </h2>
       <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-        Export your processed data for reporting, analysis, or fine-tuning custom AI models.
+        {{ t('exports.subtitle') }}
       </p>
     </div>
 
@@ -147,33 +163,76 @@ onMounted(() => {
               <TableCellsIcon class="h-6 w-6" />
             </div>
             <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
-              Reporting Data
+              {{ t('exports.reporting.title') }}
             </h3>
           </div>
         </div>
         <div class="px-4 py-5 sm:p-6 space-y-4">
           <p class="text-sm text-gray-500 dark:text-gray-300">
-            Download all processed emails, including classification results, metadata, and validation status in CSV
-            format.
-            Ideal for Excel, PowerBI, or manual audit.
+            {{ t('exports.reporting.desc') }}
           </p>
-          <div class="pt-2">
-            <button
-              class="inline-flex w-full justify-center items-center gap-x-2 rounded-md bg-white dark:bg-gray-700 px-3.5 py-2.5 text-sm font-semibold text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
-              :disabled="stats.total === 0"
-              @click="exportCsv"
-            >
-              <ArrowDownTrayIcon
-                class="-ml-0.5 h-5 w-5 text-gray-400"
-                aria-hidden="true"
-              />
-              Download CSV Report
-            </button>
+          <div class="pt-2 space-y-3">
+            <div class="flex flex-col sm:flex-row gap-3">
+              <div class="flex-1">
+                <label
+                  class="sr-only"
+                  for="export-format"
+                >{{ t('exports.reporting.format_label') }}</label>
+                <select
+                  id="export-format"
+                  v-model="exportFormat"
+                  class="block w-full rounded-md border-0 py-2 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:ring-gray-600 dark:text-white"
+                >
+                  <option value="minimal">
+                    {{ t('exports.reporting.format_minimal') }}
+                  </option>
+                  <option value="enriched">
+                    {{ t('exports.reporting.format_enriched') }}
+                  </option>
+                </select>
+              </div>
+              <div class="flex-1">
+                <label
+                  class="sr-only"
+                  for="export-status"
+                >{{ t('exports.reporting.status_label') }}</label>
+                <select
+                  id="export-status"
+                  v-model="statusFilter"
+                  class="block w-full rounded-md border-0 py-2 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:ring-gray-600 dark:text-white"
+                >
+                  <option value="all">
+                    {{ t('exports.reporting.status_all') }}
+                  </option>
+                  <option value="REVIEW_REQUIRED">
+                    {{ t('exports.reporting.status_review') }}
+                  </option>
+                  <option value="PROCESSED">
+                    {{ t('exports.reporting.status_processed') }}
+                  </option>
+                  <option value="ERROR">
+                    {{ t('exports.reporting.status_error') }}
+                  </option>
+                </select>
+              </div>
+              <button
+                type="button"
+                class="inline-flex w-full sm:w-auto justify-center items-center gap-x-2 rounded-md bg-white dark:bg-gray-700 px-3.5 py-2.5 text-sm font-semibold text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
+                :disabled="stats.total === 0 || exporting"
+                @click="exportCsv"
+              >
+                <ArrowDownTrayIcon
+                  class="-ml-0.5 h-5 w-5 text-gray-400"
+                  aria-hidden="true"
+                />
+                {{ exporting ? t('exports.reporting.button_loading') : t('exports.reporting.button') }}
+              </button>
+            </div>
             <p
               v-if="stats.total === 0"
               class="mt-2 text-xs text-amber-500 text-center"
             >
-              No data available to export.
+              {{ t('exports.reporting.empty') }}
             </p>
           </div>
         </div>
@@ -189,15 +248,14 @@ onMounted(() => {
               <DocumentTextIcon class="h-6 w-6" />
             </div>
             <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
-              Fine-Tuning Datasets
+              {{ t('exports.finetune.title') }}
             </h3>
           </div>
         </div>
         <div class="px-4 py-5 sm:p-6 space-y-4">
           <p class="text-sm text-gray-500 dark:text-gray-300">
-            Export anonymized data in JSONL format compatible with OpenAI/Azure OpenAI fine-tuning.
-            Requires at least {{ stats.finetune_min_required }} processed items.
-            <span class="block mt-1 text-xs text-gray-400">Auto-split: 80% Train, 20% Test.</span>
+            {{ t('exports.finetune.desc', { n: stats.finetune_min_required }) }}
+            <span class="block mt-1 text-xs text-gray-400">{{ t('exports.finetune.split_hint') }}</span>
           </p>
 
           <div class="flex flex-col gap-2 pt-2">
@@ -211,7 +269,7 @@ onMounted(() => {
                   class="h-4 w-4"
                   aria-hidden="true"
                 />
-                Train Set
+                {{ t('exports.finetune.train') }}
               </button>
               <button
                 class="flex-1 inline-flex justify-center items-center gap-x-1.5 rounded-md bg-purple-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 disabled:opacity-50 disabled:bg-gray-300 dark:disabled:bg-gray-700"
@@ -222,7 +280,7 @@ onMounted(() => {
                   class="h-4 w-4"
                   aria-hidden="true"
                 />
-                Test Set
+                {{ t('exports.finetune.test') }}
               </button>
             </div>
             <button
@@ -234,7 +292,7 @@ onMounted(() => {
                 class="h-4 w-4 text-gray-400"
                 aria-hidden="true"
               />
-              Download Complete Dataset (JSONL)
+              {{ t('exports.finetune.all') }}
             </button>
           </div>
 
@@ -251,10 +309,10 @@ onMounted(() => {
               </div>
               <div class="ml-3">
                 <h3 class="text-sm font-medium text-amber-800 dark:text-amber-300">
-                  Start Requirement
+                  {{ t('exports.finetune.requirement_title') }}
                 </h3>
                 <div class="mt-2 text-sm text-amber-700 dark:text-amber-200">
-                  <p>You need {{ stats.finetune_min_required }} processed emails to enable dataset generation.</p>
+                  <p>{{ t('exports.finetune.requirement_desc', { n: stats.finetune_min_required }) }}</p>
                 </div>
                 <!-- Generator Button -->
                 <div class="mt-3">
@@ -264,8 +322,8 @@ onMounted(() => {
                     :disabled="generating"
                     @click="generateSyntheticData"
                   >
-                    <span v-if="!generating">Generate data with GPT-5.2</span>
-                    <span v-else>Generating...</span>
+                    <span v-if="!generating">{{ t('exports.finetune.generate') }}</span>
+                    <span v-else>{{ t('exports.finetune.generating') }}</span>
                   </button>
                 </div>
               </div>

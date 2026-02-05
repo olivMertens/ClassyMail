@@ -1,6 +1,7 @@
 <script setup>
 /* eslint-disable vue/no-v-html */
 import { ref, onMounted, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import MarkdownIt from 'markdown-it'
 import {
   MagnifyingGlassIcon,
@@ -24,6 +25,7 @@ import DlqDetailModal from '@/components/DlqDetailModal.vue'
 import { useDialog } from '@/composables/useDialog'
 
 const { confirm, alert: showAlert } = useDialog()
+const { t } = useI18n()
 
 defineProps({
   active: {
@@ -73,19 +75,17 @@ const viewMode = ref('cards') // 'cards' or 'table'
 const purging = ref(false)
 const sortBy = ref('timestamp')
 const sortOrder = ref('desc')
-const exporting = ref(false)
-const exportFormat = ref('enriched') // 'minimal' or 'enriched'
 
 const pageSizeOptions = [20, 50, 100]
 
 const allProcessed = computed(() => stats.value.total > 0 && stats.value.total === stats.value.processed)
 
-const filters = [
-  { id: 'all', label: 'Toutes', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
-  { id: 'REVIEW_REQUIRED', label: 'À revoir', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
-  { id: 'PROCESSED', label: 'Traitées', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
-  { id: 'ERROR', label: 'Erreurs', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
-]
+const filters = computed(() => [
+  { id: 'all', label: t('dashboard.filters.all'), color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
+  { id: 'REVIEW_REQUIRED', label: t('dashboard.filters.review'), color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
+  { id: 'PROCESSED', label: t('dashboard.filters.processed'), color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
+  { id: 'ERROR', label: t('dashboard.filters.errors'), color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
+])
 
 const reprocessEmail = async (email) => {
   if (await confirm('Are you sure you want to reprocess this email? It will be re-queued.')) {
@@ -101,42 +101,6 @@ const reprocessEmail = async (email) => {
     } finally {
       reprocessingId.value = null
     }
-  }
-}
-
-const exportCsv = async (format = 'enriched') => {
-  try {
-    exporting.value = true
-    const params = new URLSearchParams({
-      status: filter.value,
-      format: format
-    })
-
-    const res = await fetch(`/api/emails/export/csv?${params}`)
-    if (!res.ok) throw new Error('Export failed')
-
-    // Trigger download
-    const blob = await res.blob()
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-
-    // Get filename from Content-Disposition header if available
-    const contentDisposition = res.headers.get('Content-Disposition')
-    const filenameMatch = contentDisposition?.match(/filename="?([^"]+)"?/)
-    const filename = filenameMatch ? filenameMatch[1] : `emails_${format}_${Date.now()}.csv`
-
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    window.URL.revokeObjectURL(url)
-    document.body.removeChild(a)
-
-    await showAlert(`CSV export successful (${format} format)`)
-  } catch (e) {
-    await showAlert(`Export failed: ${e.message}`)
-  } finally {
-    exporting.value = false
   }
 }
 
@@ -356,6 +320,12 @@ const formatMetric = (num) => {
   }).format(num)
 }
 
+// Helper to get sorted intents by confidence (highest first)
+const getSortedIntents = (email) => {
+  const intents = email.classification?.detected_intents || []
+  return [...intents].sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
+}
+
 const emit = defineEmits(['open-email'])
 </script>
 
@@ -369,7 +339,7 @@ const emit = defineEmits(['open-email'])
         :class="['px-3 py-1 rounded-md text-sm font-medium', currentTab === 'dashboard' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300']"
         @click="currentTab = 'dashboard'"
       >
-        Dashboard
+        {{ t('dashboard.tabs.dashboard') }}
       </button>
       <button
         v-if="dlq.count > 0"
@@ -377,13 +347,13 @@ const emit = defineEmits(['open-email'])
         @click="currentTab = 'failures'"
       >
         <ExclamationCircleIcon class="h-4 w-4" />
-        Failures ({{ dlq.count }})
+        {{ t('dashboard.tabs.failures', { count: dlq.count }) }}
       </button>
       <button
         :class="['px-3 py-1 rounded-md text-sm font-medium', currentTab === 'developer' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300']"
         @click="currentTab = 'developer'"
       >
-        Developer
+        {{ t('dashboard.tabs.developer') }}
       </button>
     </div>
     <div
@@ -392,7 +362,7 @@ const emit = defineEmits(['open-email'])
     >
       <button
         class="absolute top-2 right-2 text-red-400 hover:text-red-600 dark:text-red-300 dark:hover:text-red-100"
-        title="Dismiss"
+        :title="t('common.dismiss')"
         @click="dlqDismissed = true"
       >
         <XMarkIcon class="h-5 w-5" />
@@ -401,15 +371,15 @@ const emit = defineEmits(['open-email'])
         <ExclamationCircleIcon class="h-5 w-5 text-red-400 mt-0.5" />
         <div class="ml-3">
           <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
-            Dead-letter queue has {{ dlq.count }} message(s)
+            {{ t('dashboard.dlq.title', { count: dlq.count }) }}
           </h3>
           <p class="mt-1 text-sm text-red-700 dark:text-red-200">
-            Processing failed for some items.
+            {{ t('dashboard.dlq.subtitle') }}
             <button
               class="font-semibold underline ml-1 hover:text-red-900 dark:hover:text-red-100"
               @click="currentTab = 'failures'"
             >
-              View Details
+              {{ t('dashboard.dlq.view_details') }}
             </button>
           </p>
         </div>
@@ -423,7 +393,7 @@ const emit = defineEmits(['open-email'])
         <ExclamationCircleIcon class="h-5 w-5 text-amber-400 mt-0.5" />
         <div class="ml-3">
           <h3 class="text-sm font-medium text-amber-800 dark:text-amber-200">
-            Dead-letter status unavailable
+            {{ t('dashboard.dlq.unavailable') }}
           </h3>
           <p class="mt-2 text-sm text-amber-700 dark:text-amber-200">
             {{ dlqError }}
@@ -438,7 +408,7 @@ const emit = defineEmits(['open-email'])
     >
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-          Total Emails
+          {{ t('dashboard.stats.total') }}
         </dt>
         <dd
           class="mt-1 text-3xl font-semibold text-gray-900 dark:text-white"
@@ -449,7 +419,7 @@ const emit = defineEmits(['open-email'])
       </div>
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-          To Review
+          {{ t('dashboard.stats.to_review') }}
         </dt>
         <dd
           class="mt-1 text-3xl font-semibold text-amber-600 dark:text-amber-400"
@@ -460,7 +430,7 @@ const emit = defineEmits(['open-email'])
       </div>
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
         <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-          Processed
+          {{ t('dashboard.stats.processed') }}
         </dt>
         <dd
           class="mt-1 text-3xl font-semibold text-green-600 dark:text-green-400"
@@ -472,9 +442,9 @@ const emit = defineEmits(['open-email'])
       <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">
         <dt
           class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate"
-          title="The average AI confidence score for all processed emails. A higher score (+85%) indicates better classification accuracy and reliability."
+          :title="t('dashboard.stats.quality_tooltip')"
         >
-          Avg. Quality
+          {{ t('dashboard.stats.quality') }}
         </dt>
         <dd class="mt-1 text-3xl font-semibold text-indigo-600 dark:text-indigo-400">
           {{ (stats.average_confidence * 100).toFixed(1) }}%
@@ -491,15 +461,16 @@ const emit = defineEmits(['open-email'])
       class="mb-4"
     >
       <div class="flex justify-between mb-1">
-        Pipeline Progress
+        {{ t('dashboard.progress.title') }}
         <span
           v-if="stats.queue_depth > 0 || stats.pending > 0"
           class="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400"
         >
-          ({{ stats.pending }} processing, {{ stats.queue_depth }} queued in Service Bus)
+          {{ t('dashboard.progress.pending', { processing: stats.pending, queued: stats.queue_depth }) }}
         </span>
 
-        <span class="text-sm font-medium text-primary-700 dark:text-primary-400">Pipeline Progress</span>
+        <span class="text-sm font-medium text-primary-700 dark:text-primary-400">{{ t('dashboard.progress.title')
+        }}</span>
         <span class="text-sm font-medium text-primary-700 dark:text-primary-400">{{ progressPercentage }}%</span>
       </div>
       <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
@@ -513,7 +484,7 @@ const emit = defineEmits(['open-email'])
       v-else
       class="mb-4 text-sm text-gray-500 text-center italic"
     >
-      No data available yet.
+      {{ t('common.no_data') }}
     </div>
   </div>
 
@@ -547,7 +518,7 @@ const emit = defineEmits(['open-email'])
           v-model="search"
           type="text"
           class="block w-full rounded-md border-0 py-2.5 pl-10 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:ring-gray-600 dark:text-white dark:placeholder-gray-400"
-          placeholder="Rechercher sujet, expéditeur..."
+          :placeholder="t('dashboard.search_placeholder')"
         >
       </div>
     </div>
@@ -562,67 +533,42 @@ const emit = defineEmits(['open-email'])
           class="block w-full rounded-md border-0 py-2 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:ring-gray-600 dark:text-white"
         >
           <option value="">
-            Any Confidence
+            {{ t('dashboard.confidence.any') }}
           </option>
           <option disabled>
-            -- Low Confidence --
+            {{ t('dashboard.confidence.low_header') }}
           </option>
           <option value="lt_10">
-            &lt; 10% (Very Low)
+            {{ t('dashboard.confidence.very_low') }}
           </option>
           <option value="lt_30">
-            &lt; 30%
+            {{ t('dashboard.confidence.lt_30') }}
           </option>
           <option value="lt_50">
-            &lt; 50%
+            {{ t('dashboard.confidence.lt_50') }}
           </option>
           <option value="lt_85">
-            &lt; 85% (Review Required)
+            {{ t('dashboard.confidence.review_required') }}
           </option>
           <option disabled>
-            -- High Confidence --
+            {{ t('dashboard.confidence.high_header') }}
           </option>
           <option value="gt_85">
-            &gt; 85% (High)
+            {{ t('dashboard.confidence.high') }}
           </option>
           <option value="gt_90">
-            &gt; 90% (Very High)
+            {{ t('dashboard.confidence.very_high') }}
           </option>
           <option value="eq_100">
-            100% (Perfect)
+            {{ t('dashboard.confidence.perfect') }}
           </option>
           <option value="none">
-            No Category Detected
+            {{ t('dashboard.confidence.none') }}
           </option>
         </select>
       </div>
 
       <div class="flex-grow" />
-
-      <!-- CSV Export Dropdown -->
-      <div class="relative shrink-0 flex items-center gap-2">
-        <select
-          id="export-format"
-          v-model="exportFormat"
-          class="block rounded-md border-0 py-2 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:ring-gray-600 dark:text-white"
-        >
-          <option value="minimal">
-            Format Minimal (Client)
-          </option>
-          <option value="enriched">
-            Format Enrichi (Analyse)
-          </option>
-        </select>
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary-600 text-white text-sm font-semibold shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50"
-          :disabled="exporting"
-          @click="exportCsv(exportFormat)"
-        >
-          <ArrowDownTrayIcon class="h-4 w-4" />
-          {{ exporting ? 'Export...' : 'Export CSV' }}
-        </button>
-      </div>
 
       <!-- View Mode Toggle -->
       <div class="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg shrink-0">
@@ -637,7 +583,7 @@ const emit = defineEmits(['open-email'])
           @click="viewMode = 'cards'"
         >
           <Squares2X2Icon class="h-4 w-4" />
-          Cards
+          {{ t('dashboard.view_mode.cards') }}
         </button>
         <button
           type="button"
@@ -650,7 +596,7 @@ const emit = defineEmits(['open-email'])
           @click="viewMode = 'table'"
         >
           <TableCellsIcon class="h-4 w-4" />
-          Table
+          {{ t('dashboard.view_mode.table') }}
         </button>
       </div>
     </div>
@@ -663,7 +609,7 @@ const emit = defineEmits(['open-email'])
   >
     <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto" />
     <p class="mt-4 text-gray-500 dark:text-gray-400">
-      Loading emails...
+      {{ t('common.loading') }}
     </p>
   </div>
 
@@ -678,10 +624,10 @@ const emit = defineEmits(['open-email'])
       />
     </div>
     <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
-      Waiting for Data
+      {{ t('dashboard.waiting_title') }}
     </h3>
     <p class="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-4">
-      The dashboard cannot retrieve emails. This usually means the database is initializing or empty.
+      {{ t('dashboard.waiting_subtitle') }}
     </p>
     <p
       class="text-xs text-gray-400 font-mono bg-white dark:bg-gray-900 px-3 py-2 rounded border border-gray-200 dark:border-gray-700"
@@ -692,7 +638,7 @@ const emit = defineEmits(['open-email'])
       class="mt-6 inline-flex items-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
       @click="fetchEmails"
     >
-      Retry Connection
+      {{ t('common.retry') }}
     </button>
   </div>
 
@@ -702,10 +648,10 @@ const emit = defineEmits(['open-email'])
   >
     <ArrowDownTrayIcon class="mx-auto h-12 w-12 text-gray-400" />
     <h3 class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
-      No emails found
+      {{ t('dashboard.no_emails_title') }}
     </h3>
     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-      Upload PDF documents to start the classification pipeline (ensure Cloud Storage is connected).
+      {{ t('dashboard.no_emails_subtitle') }}
     </p>
   </div>
 
@@ -727,36 +673,33 @@ const emit = defineEmits(['open-email'])
     >
       <div class="p-3 flex-1 flex flex-col gap-2">
         <!-- Header: Status + Actions -->
-        <div
-          class="flex justify-between items-start"
-          :title="email.classification?.detected_intents?.length > 1 ? 'Autres: ' + email.classification.detected_intents.slice(1).map(i => `${i.intent} (${Math.round((i.confidence || 0) * 100)}%)`).join(', ') : ''"
-        >
+        <div class="flex justify-between items-start">
           <div class="flex items-center gap-2">
             <span
               v-if="email.status === 'ERROR'"
               class="text-red-500"
-              title="Error"
+              :title="t('dashboard.status.error')"
             >
               <ExclamationCircleIcon class="h-4 w-4" />
             </span>
             <span
               v-else-if="email.status === 'PENDING' || email.status === 'uploaded' || email.status === 'PROCESSING'"
               class="text-blue-500 animate-pulse"
-              title="Processing..."
+              :title="t('dashboard.status.processing')"
             >
               <ArrowPathIcon class="h-4 w-4 animate-spin" />
             </span>
             <span
               v-else-if="email.status === 'PROCESSED'"
               class="text-green-500"
-              title="Processed"
+              :title="t('dashboard.status.processed')"
             >
               <CheckCircleIcon class="h-4 w-4" />
             </span>
             <span
               v-else-if="email.status === 'REVIEW_REQUIRED'"
               class="text-amber-500"
-              title="Review Required"
+              :title="t('dashboard.status.review')"
             >
               <ClockIcon class="h-4 w-4" />
             </span>
@@ -765,6 +708,7 @@ const emit = defineEmits(['open-email'])
               v-if="email.classification?.detected_intents?.length"
               class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ring-1 ring-inset"
               :class="getScoreColor(email)"
+              :title="`${getSortedIntents(email)[0]?.intent}: ${getScore(email)}`"
             >
               {{ getScore(email) }}
             </span>
@@ -773,14 +717,14 @@ const emit = defineEmits(['open-email'])
           <!-- Minimal Actions -->
           <div class="flex gap-2 opacity-100 transition-opacity">
             <button
-              title="View Details"
+              :title="t('dashboard.actions.view')"
               class="text-gray-400 hover:text-primary-600"
               @click.stop="emit('open-email', email)"
             >
               <EyeIcon class="h-5 w-5" />
             </button>
             <button
-              title="Reprocess"
+              :title="t('dashboard.actions.reprocess')"
               :disabled="reprocessingId === email.id"
               class="text-gray-400 hover:text-green-600"
               @click.stop="reprocessEmail(email)"
@@ -815,22 +759,25 @@ const emit = defineEmits(['open-email'])
             #{{ email.id.slice(0, 6) }}
           </div>
           <div
-            v-if="email.classification?.detected_intents?.length"
-            class="flex-shrink-0 flex items-center gap-1"
+            v-if="getSortedIntents(email).length"
+            class="flex-shrink-0 flex flex-wrap items-center gap-1 justify-end max-w-[60%]"
           >
             <span
-              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800 max-w-[100px] truncate"
-              :title="email.classification.detected_intents[0].justification || ''"
+              v-for="(intent, idx) in getSortedIntents(email).slice(0, 2)"
+              :key="intent.intent"
+              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] border"
+              :class="idx === 0 ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-blue-100 dark:border-blue-800 font-medium' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700'"
+              :title="`${intent.intent}: ${Math.round((intent.confidence || 0) * 100)}%${intent.justification ? '\n' + intent.justification : ''}`"
             >
-              {{ email.classification.detected_intents[0].intent }} ({{
-                Math.round((email.classification.detected_intents[0].confidence || 0) * 100) }}%)
+              <span class="truncate max-w-[80px]">{{ intent.intent }}</span>
+              <span class="ml-0.5 font-semibold">{{ Math.round((intent.confidence || 0) * 100) }}%</span>
             </span>
             <span
-              v-if="email.classification.detected_intents.length > 1"
-              class="inline-flex items-center px-1 py-0.5 rounded-full text-[9px] bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 cursor-help"
-              :title="'Other intents:\n' + email.classification.detected_intents.slice(1).map(i => `- ${i.intent} (${Math.round((i.confidence || 0) * 100)}%)`).join('\n')"
+              v-if="getSortedIntents(email).length > 2"
+              class="inline-flex items-center px-1 py-0.5 rounded-full text-[9px] bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 cursor-help font-medium"
+              :title="'Additional intents:\n' + getSortedIntents(email).slice(2).map(i => `- ${i.intent}: ${Math.round((i.confidence || 0) * 100)}%`).join('\n')"
             >
-              +{{ email.classification.detected_intents.length - 1 }}
+              +{{ getSortedIntents(email).length - 2 }}
             </span>
           </div>
           <div
@@ -861,10 +808,10 @@ const emit = defineEmits(['open-email'])
         <div>
           <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2 flex items-center gap-2">
             <ExclamationCircleIcon class="h-6 w-6 text-red-500" />
-            Dead Letter Queue (Failures)
+            {{ t('dashboard.dlq_failures.title') }}
           </h3>
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            These items failed processing and were moved to the Dead Letter Queue in Azure Service Bus.
+            {{ t('dashboard.dlq_failures.subtitle') }}
           </p>
         </div>
         <div class="flex gap-2">
@@ -873,7 +820,7 @@ const emit = defineEmits(['open-email'])
             @click="currentTab = 'dashboard'"
           >
             <XMarkIcon class="h-4 w-4" />
-            Close View
+            {{ t('common.close') }}
           </button>
           <button
             class="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50"
@@ -881,7 +828,7 @@ const emit = defineEmits(['open-email'])
             @click="purgeDlq"
           >
             <TrashIcon class="h-4 w-4" />
-            {{ purging ? 'Purging...' : 'Purge All' }}
+            {{ purging ? t('dashboard.dlq_failures.purging') : t('dashboard.dlq_failures.purge') }}
           </button>
         </div>
       </div>
@@ -893,27 +840,27 @@ const emit = defineEmits(['open-email'])
               <th
                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
               >
-                Item ID / ID
+                {{ t('dashboard.dlq_failures.item_id') }}
               </th>
               <th
                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
               >
-                Reason
+                {{ t('dashboard.dlq_failures.reason') }}
               </th>
               <th
                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
               >
-                Description
+                {{ t('dashboard.dlq_failures.description') }}
               </th>
               <th
                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
               >
-                Time
+                {{ t('dashboard.dlq_failures.time') }}
               </th>
               <th
                 class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
               >
-                Actions
+                {{ t('dashboard.dlq_failures.actions') }}
               </th>
             </tr>
           </thead>
@@ -939,7 +886,7 @@ const emit = defineEmits(['open-email'])
                   class="text-primary-600 dark:text-primary-400 hover:underline"
                   @click="openDlqDetails(msg)"
                 >
-                  View
+                  {{ t('dashboard.dlq_failures.view') }}
                 </button>
               </td>
             </tr>
@@ -956,13 +903,13 @@ const emit = defineEmits(['open-email'])
     <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
       <div class="flex items-center justify-between">
         <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-          Environment
+          {{ t('dashboard.developer.title') }}
         </h3>
         <button
           class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100"
           @click="fetchDiagnostics"
         >
-          <ArrowPathIcon class="h-4 w-4 mr-1" /> Refresh
+          {{ t('common.refresh') }}
         </button>
       </div>
       <div
@@ -990,11 +937,12 @@ const emit = defineEmits(['open-email'])
           </tr>
           <tr>
             <td class="py-1 font-mono text-gray-500 dark:text-gray-300">
-              readiness
+              {{ t('dashboard.developer.readiness') }}
             </td>
             <td class="py-1">
               <span :class="diagnostics.ok ? 'text-green-600 dark:text-green-300' : 'text-red-600 dark:text-red-300'">{{
-                diagnostics.ok ? 'OK' : 'NOT READY' }}</span>
+                diagnostics.ok ? t('dashboard.developer.status_ok') : t('dashboard.developer.status_not_ready')
+              }}</span>
               <pre
                 v-if="diagnostics.readiness && Object.keys(diagnostics.readiness).length"
                 class="mt-1 bg-gray-100 dark:bg-gray-900 p-2 rounded text-xs text-gray-700 dark:text-gray-200"
@@ -1017,19 +965,19 @@ const emit = defineEmits(['open-email'])
           <th
             class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
           >
-            Sujet / Expéditeur
+            {{ t('dashboard.table.subject_sender') }}
           </th>
           <th
             class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
           >
-            Catégorie
+            {{ t('dashboard.table.category') }}
           </th>
           <th
             class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-700 dark:hover:text-gray-200"
             @click="toggleSort('status')"
           >
             <div class="flex items-center gap-1">
-              Statut
+              {{ t('dashboard.table.status') }}
               <span v-if="sortBy === 'status'">
                 <BarsArrowDownIcon
                   v-if="sortOrder === 'desc'"
@@ -1047,7 +995,7 @@ const emit = defineEmits(['open-email'])
             @click="toggleSort('timestamp')"
           >
             <div class="flex items-center gap-1">
-              Arrivée
+              {{ t('dashboard.table.arrival') }}
               <span v-if="sortBy === 'timestamp'">
                 <BarsArrowDownIcon
                   v-if="sortOrder === 'desc'"
@@ -1063,14 +1011,14 @@ const emit = defineEmits(['open-email'])
           <th
             class="hidden lg:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
           >
-            Traitée
+            {{ t('dashboard.table.processed') }}
           </th>
           <th
             class="hidden md:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-700 dark:hover:text-gray-200"
             @click="toggleSort('processing_time')"
           >
             <div class="flex items-center gap-1">
-              Durée
+              {{ t('dashboard.table.duration') }}
               <span v-if="sortBy === 'processing_time'">
                 <BarsArrowDownIcon
                   v-if="sortOrder === 'desc'"
@@ -1086,7 +1034,7 @@ const emit = defineEmits(['open-email'])
           <th
             class="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
           >
-            Actions
+            {{ t('dashboard.table.actions') }}
           </th>
         </tr>
       </thead>
@@ -1105,7 +1053,7 @@ const emit = defineEmits(['open-email'])
                 v-if="email.test_mode"
                 class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 rounded"
               >
-                TEST
+                {{ t('dashboard.table.test_badge') }}
               </div>
               <div>
                 <button
@@ -1113,10 +1061,10 @@ const emit = defineEmits(['open-email'])
                   @click="emit('open-email', email)"
                 >
                   <div class="text-sm font-medium text-gray-900 dark:text-white hover:underline">
-                    {{ email.subject || 'No Subject' }}
+                    {{ email.subject || t('dashboard.table.no_subject') }}
                   </div>
                   <div class="text-sm text-gray-500 dark:text-gray-400 hover:underline">
-                    {{ email.sender || 'Unknown Sender' }}
+                    {{ email.sender || t('dashboard.table.unknown_sender') }}
                   </div>
                 </button>
               </div>
@@ -1124,30 +1072,30 @@ const emit = defineEmits(['open-email'])
           </td>
           <td class="px-6 py-4">
             <div
-              v-if="email.classification?.detected_intents?.length"
+              v-if="getSortedIntents(email).length"
               class="flex flex-wrap gap-1"
             >
               <span
-                v-for="(intent, idx) in email.classification.detected_intents.slice(0, 2)"
+                v-for="(intent, idx) in getSortedIntents(email).slice(0, 2)"
                 :key="idx"
                 class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
-                :title="intent.justification ? `Justification: ${intent.justification}` : ''"
+                :title="`${intent.intent}: ${Math.round(intent.confidence * 100)}%${intent.justification ? '\n' + t('dashboard.table.justification') + ': ' + intent.justification : ''}`"
               >
                 {{ intent.intent }} ({{ Math.round(intent.confidence * 100) }}%)
               </span>
               <span
-                v-if="email.classification.detected_intents.length > 2"
+                v-if="getSortedIntents(email).length > 2"
                 class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 cursor-help"
-                :title="'Extra Categories:\n' + email.classification.detected_intents.slice(2).map(i => `${i.intent} (${Math.round((i.confidence || 0) * 100)}%)`).join('\n')"
+                :title="t('dashboard.table.extra_categories') + ':\n' + getSortedIntents(email).slice(2).map(i => `${i.intent}: ${Math.round(i.confidence * 100)}%`).join('\n')"
               >
-                +{{ email.classification.detected_intents.length - 2 }}
+                +{{ getSortedIntents(email).length - 2 }}
               </span>
             </div>
             <span
               v-else
               class="text-sm text-gray-400 dark:text-gray-500"
             >
-              None
+              {{ t('dashboard.table.none') }}
             </span>
           </td>
           <td class="px-3 sm:px-6 py-4 whitespace-nowrap">
@@ -1163,9 +1111,10 @@ const emit = defineEmits(['open-email'])
                       : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
               ]"
             >
-              {{ email.status === 'REVIEW_REQUIRED' ? 'To Review' : email.status === 'PROCESSED' ? 'Processed' :
-                (email.status === 'PENDING' || email.status === 'uploaded' || email.status === 'PROCESSING') ?
-                  'Processing' : 'Error' }}
+              {{ email.status === 'REVIEW_REQUIRED' ? t('dashboard.table.status_review') : email.status === 'PROCESSED'
+                ? t('dashboard.table.status_processed') :
+                  (email.status === 'PENDING' || email.status === 'uploaded' || email.status === 'PROCESSING') ?
+                    t('dashboard.table.status_processing') : t('dashboard.table.status_error') }}
             </span>
           </td>
           <td class="hidden lg:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -1183,7 +1132,7 @@ const emit = defineEmits(['open-email'])
               @click="emit('open-email', email)"
             >
               <EyeIcon class="h-4 w-4" />
-              View
+              {{ t('dashboard.actions.view') }}
             </button>
             <button
               class="inline-flex items-center gap-1 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300"
@@ -1194,7 +1143,7 @@ const emit = defineEmits(['open-email'])
                 class="h-4 w-4"
                 :class="{ 'animate-spin': reprocessingId === email.id }"
               />
-              Reprocess
+              {{ t('dashboard.actions.reprocess') }}
             </button>
           </td>
         </tr>
@@ -1214,7 +1163,7 @@ const emit = defineEmits(['open-email'])
           :key="opt"
           :value="opt"
         >
-          {{ opt }} / page
+          {{ t('dashboard.pagination.per_page', { n: opt }) }}
         </option>
       </select>
     </div>
@@ -1227,7 +1176,7 @@ const emit = defineEmits(['open-email'])
         <ChevronLeftIcon class="h-5 w-5" />
       </button>
       <span class="text-sm text-gray-700 dark:text-gray-300">
-        Page <span class="font-medium">{{ page }}</span> of <span class="font-medium">{{ totalPages }}</span>
+        {{ t('dashboard.pagination.page_of', { current: page, total: totalPages }) }}
       </span>
       <button
         :disabled="page >= totalPages"
@@ -1248,7 +1197,7 @@ const emit = defineEmits(['open-email'])
         <div class="bg-primary-600 px-4 py-3 flex justify-between items-center text-white">
           <div class="flex items-center gap-2">
             <ChatBubbleLeftRightIcon class="h-5 w-5" />
-            <span class="font-medium text-sm">AI Assistant</span>
+            <span class="font-medium text-sm">{{ t('dashboard.chat.title') }}</span>
           </div>
           <button
             class="text-primary-100 hover:text-white"
@@ -1276,17 +1225,16 @@ const emit = defineEmits(['open-email'])
             <div
               class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200"
             >
-              <span class="font-bold block mb-1">How it works:</span>
-              I can search the email database using tools (search, latest errors, stats, top intents). Ask me about
-              processed emails.
+              <span class="font-bold block mb-1">{{ t('dashboard.chat.how_it_works') }}</span>
+              {{ t('dashboard.chat.how_it_works_desc') }}
             </div>
             <div>
               <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">
-                Try Asking:
+                {{ t('dashboard.chat.try_asking') }}
               </p>
               <div class="grid gap-2">
                 <button
-                  v-for="ex in ['Find emails about invoices', 'Show latest errors', 'What are the top intents?', 'Search text containing Urgent']"
+                  v-for="ex in [t('dashboard.chat.example_invoices'), t('dashboard.chat.example_errors'), t('dashboard.chat.example_intents'), t('dashboard.chat.example_urgent')]"
                   :key="ex"
                   class="text-left text-xs bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 transition-colors shadow-sm"
                   @click="useExample(ex)"
@@ -1305,7 +1253,7 @@ const emit = defineEmits(['open-email'])
               class="bg-white dark:bg-gray-800 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-2"
             >
               <div class="animate-spin h-3 w-3 border-2 border-primary-600 border-t-transparent rounded-full" />
-              <span class="text-xs text-gray-500">Searching database...</span>
+              <span class="text-xs text-gray-500">{{ t('dashboard.chat.searching') }}</span>
             </div>
           </div>
 
@@ -1326,14 +1274,15 @@ const emit = defineEmits(['open-email'])
                 class="mt-2 text-[10px] text-gray-500 dark:text-gray-400"
               >
                 <div class="uppercase tracking-wider font-semibold">
-                  Sources
+                  {{ t('dashboard.chat.sources') }}
                 </div>
                 <ul class="list-disc ml-4">
                   <li
                     v-for="s in chatSources"
                     :key="(s.parent_id || '') + ':' + (s.chunk_index || 0)"
                   >
-                    {{ s.subject || s.parent_id }} <span v-if="s.chunk_index !== undefined">(chunk {{ s.chunk_index
+                    {{ s.subject || s.parent_id }} <span v-if="s.chunk_index !== undefined">({{
+                      t('dashboard.chat.chunk') }} {{ s.chunk_index
                     }})</span>
                   </li>
                 </ul>
@@ -1351,7 +1300,7 @@ const emit = defineEmits(['open-email'])
                     clip-rule="evenodd"
                   />
                 </svg>
-                Generated by Azure AI
+                {{ t('dashboard.chat.generated_by') }}
               </div>
             </div>
           </div>
@@ -1360,7 +1309,7 @@ const emit = defineEmits(['open-email'])
             v-if="chatError"
             class="mt-2 text-xs text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-100 dark:border-red-800"
           >
-            Error: {{ chatError }}
+            {{ t('dashboard.chat.error') }} {{ chatError }}
           </div>
         </div>
 
@@ -1371,7 +1320,7 @@ const emit = defineEmits(['open-email'])
               v-model="chatQuery"
               rows="1"
               class="block w-full rounded-md border-0 py-2.5 pr-10 pl-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white resize-none"
-              placeholder="Type your message..."
+              :placeholder="t('dashboard.chat.placeholder')"
               @keydown.enter.exact.prevent="runChatSearch"
             />
             <button
@@ -1379,7 +1328,7 @@ const emit = defineEmits(['open-email'])
               class="absolute bottom-1.5 right-1.5 p-1.5 rounded-md text-primary-600 hover:text-primary-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-700 transition"
               @click="runChatSearch"
             >
-              <span class="sr-only">Send</span>
+              <span class="sr-only">{{ t('dashboard.chat.send') }}</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 20 20"

@@ -497,15 +497,16 @@ Ta tâche est d'analyser le contenu de l'email (fourni en markdown) et d'identif
 - Le sujet principal (Subject).
 - L'expéditeur (Sender) si identifiable.
 
-LISTE DES INTENTIONS POSSIBLES (NOM + DESCRIPTION) :
+LISTE DES INTENTIONS POSSIBLES (NOM + DÉFINITION + EXCLUSIONS) :
 {categories_text}
 
 RÈGLES DE CLASSIFICATION :
-- Choisis les intentions dont la DESCRIPTION correspond le mieux au contenu. Appuie-toi sur les mots/phrases clés des descriptions.
+- Choisis les intentions dont la DÉFINITION correspond le mieux au contenu. Appuie-toi sur les mots/phrases clés des définitions.
+- Les EXCLUSIONS précisent ce que chaque catégorie ne doit PAS inclure. Utilise-les pour éliminer les faux positifs.
 - Un email peut contenir UNE SEULE intention OU PLUSIEURS intentions.
 - Si aucune intention ne correspond vraiment, retourne une liste vide (detected_intents: []). NE PAS deviner.
 - Assigne un score de confiance (0.0 à 1.0) pour CHAQUE intention détectée.
-- La justification DOIT citer un extrait du texte et/ou la description de la catégorie correspondante.
+- La justification DOIT citer un extrait du texte et/ou la définition de la catégorie correspondante.
 
 FORMAT DE RÉPONSE ATTENDU (JSON UNIQUEMENT) :
 {{
