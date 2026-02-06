@@ -133,7 +133,7 @@
             "developer": "Développeur"
         },
         "confidence": {
-            "any": "Toute Confiance",
+            "any": "Tout Niveau",
             "very_low": "Très Faible (0-20%)",
             "low": "Faible (20-40%)",
             "medium": "Moyen (40-60%)",
@@ -141,13 +141,18 @@
             "very_high": "Très Élevé (80-95%)",
             "perfect": "Parfait (95-100%)",
             "no_category": "Aucune Catégorie Détectée",
-            "low_header": "Faible Confiance (<60%)",
-            "high_header": "Haute Confiance (>60%)",
+            "low_header": "Niveau de Confiance Faible (<60%)",
+            "high_header": "Niveau de Confiance Élevé (>60%)",
             "lt_30": "< 30%",
             "lt_50": "< 50%",
             "lt_60": "< 60%",
             "review_required": "Révision Requise (<50%)",
             "none": "Aucune"
+        },
+        "pii": {
+            "badge": "DCP",
+            "detected": "Données à caractère personnel détectées",
+            "tooltip": "Cet email contient des données à caractère personnel (DCP/PII)"
         },
         "view_mode": {
             "cards": "Cartes",

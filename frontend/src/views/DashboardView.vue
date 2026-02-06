@@ -19,7 +19,8 @@ import {
   Squares2X2Icon,
   TrashIcon,
   BarsArrowDownIcon,
-  BarsArrowUpIcon
+  BarsArrowUpIcon,
+  ShieldExclamationIcon
 } from '@heroicons/vue/24/outline'
 import DlqDetailModal from '@/components/DlqDetailModal.vue'
 import { useDialog } from '@/composables/useDialog'
@@ -730,6 +731,13 @@ const emit = defineEmits(['open-email'])
 
           <!-- Minimal Actions -->
           <div class="flex gap-2 opacity-100 transition-opacity">
+            <span
+              v-if="email.pii_detected"
+              class="text-amber-500"
+              :title="t('dashboard.pii.detected')"
+            >
+              <ShieldExclamationIcon class="h-5 w-5" />
+            </span>
             <button
               :title="t('dashboard.actions.view')"
               class="text-gray-400 hover:text-primary-600"
@@ -1074,6 +1082,14 @@ const emit = defineEmits(['open-email'])
         >
           <td class="px-3 sm:px-6 py-4">
             <div class="flex items-center gap-2">
+              <div
+                v-if="email.pii_detected"
+                class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 rounded-full"
+                :title="t('dashboard.pii.tooltip')"
+              >
+                <ShieldExclamationIcon class="h-3.5 w-3.5 mr-1" />
+                {{ t('dashboard.pii.badge') }}
+              </div>
               <div
                 v-if="email.test_mode"
                 class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 rounded"

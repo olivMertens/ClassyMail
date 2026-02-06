@@ -149,6 +149,11 @@
             "review_required": "Review Required (<50%)",
             "none": "None"
         },
+        "pii": {
+            "badge": "PII",
+            "detected": "Personal information detected",
+            "tooltip": "This email contains personal identifiable information (PII)"
+        },
         "view_mode": {
             "cards": "Cards",
             "table": "Table"
