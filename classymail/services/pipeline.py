@@ -225,11 +225,12 @@ async def run_classification_pipeline(
 
     llm_usage = classification_raw.get("usage") if isinstance(classification_raw, dict) else None
     fallback_used = bool(classification_raw.get("fallback_used")) if isinstance(classification_raw, dict) else False
+    model_name = classification_raw.get("model") if isinstance(classification_raw, dict) else None
 
-    # Calculate costs
-    llm_cost = compute_cost_llm(llm_usage, fallback_used=fallback_used, overrides=final_overrides)
+    # Calculate costs with model-aware pricing
+    llm_cost = compute_cost_llm(llm_usage, fallback_used=fallback_used, model_name=model_name, overrides=final_overrides)
     # Add extraction cost (uses same model/pricing approx)
-    extraction_cost = compute_cost_llm(entities_usage, fallback_used=False, overrides=final_overrides) if entities_usage else 0.0
+    extraction_cost = compute_cost_llm(entities_usage, fallback_used=False, model_name=model_name, overrides=final_overrides) if entities_usage else 0.0
 
     total_phi4_cost = llm_cost + extraction_cost
 

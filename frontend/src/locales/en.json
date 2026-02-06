@@ -262,6 +262,13 @@
         "emails_usage": "Emails priced (usage telemetry)",
         "proc_vs_usage": "Processed: {processed} · Priced: {priced}",
         "counts_hint": "All emails are processed by Mistral OCR and Phi-4 classification. Pricing uses usage telemetry; counts may differ if data is missing or deduplicated.",
+        "pricing_assumptions": {
+            "title": "⚠️ Pricing Assumptions & Limitations",
+            "model_pricing": "Costs use model-specific pricing when available. If you changed models in Settings, ensure environment variables match (PHI4_COST_PER_1K_INPUT/OUTPUT).",
+            "reprocessing": "Reprocessing emails accumulates new costs but overwrites old telemetry. Historical spending is not preserved per email.",
+            "adversarial": "Adversarial comparison costs are NOT tracked. Running dual-model comparisons doubles token usage but only primary model costs appear here.",
+            "env_override": "For accurate pricing, update environment variables to match your deployed models or consult Azure Cost Management for authoritative data."
+        },
         "avg_cost": "Avg AI Cost / Email",
         "actual_spend": "Actual AI Spend (Repo History)",
         "total_ai": "Total AI",

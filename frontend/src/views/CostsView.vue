@@ -94,6 +94,31 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Pricing Assumptions Warning -->
+    <div class="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <ExclamationCircleIcon
+            class="h-5 w-5 text-amber-400"
+            aria-hidden="true"
+          />
+        </div>
+        <div class="ml-3 flex-1">
+          <h3 class="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            {{ t('costs.pricing_assumptions.title') }}
+          </h3>
+          <div class="mt-2 text-sm text-amber-700 dark:text-amber-200 space-y-1">
+            <p>{{ t('costs.pricing_assumptions.model_pricing') }}</p>
+            <p>{{ t('costs.pricing_assumptions.reprocessing') }}</p>
+            <p>{{ t('costs.pricing_assumptions.adversarial') }}</p>
+            <p class="mt-2 text-xs italic">
+              💡 {{ t('costs.pricing_assumptions.env_override') }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div
       v-if="loading && !costs"
       class="text-center py-12"

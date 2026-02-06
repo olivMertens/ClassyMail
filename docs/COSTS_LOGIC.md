@@ -177,6 +177,52 @@ La logique actuelle est **correcte et pertinente** pour un POC:
 2. **Alertes de budget**: Notification si projection > seuil
 3. **Optimisations suggérées**: Recommandations pour réduire les coûts
 
+---
+
+## Règles d'Estimation par Stratégie et Modèle
+
+### **Coûts par 10,000 Emails** (PDFs typiques 2 pages)
+
+#### Mode Standard (Text/OCR Optimized)
+
+| Modèle | Coût / 10K | Précision | Usage Recommandé |
+|--------|-----------|-----------|------------------|
+| **Phi-4** | $2-5 | 0.82 | POC, coûts prévisibles |
+| **gpt-4o-mini** | $2-4 | 0.84 | Production cost-conscious |
+| **gpt-5-nano** | $1-2 | 0.79 | Ultra low-cost |
+| **gpt-4.1-nano** | $1-2 | 0.72 | Budget extrême |
+| **gpt-5-mini** | $8-12 | 0.89 | Catégories complexes |
+| **gpt-4o** | $30-60 | 0.92 | Précision critique |
+
+**⚠️ Note**: Si vous changez de modèle dans Settings, mettez à jour les variables d'environnement:
+```bash
+PHI4_COST_PER_1K_INPUT=0.0004  # Exemple gpt-5-mini
+PHI4_COST_PER_1K_OUTPUT=0.0016
+FALLBACK_COST_PER_1K_INPUT=0.00015  # gpt-4o-mini
+FALLBACK_COST_PER_1K_OUTPUT=0.0006
+```
+
+#### Mode Reasoning (Chain-of-Thought)
+- **Tokens 2-3x supérieur** → **Coût 2-3x**
+- **Usage**: Contrats juridiques, analyse complexe
+- **Exemple**: gpt-5-mini $8-12 → Reasoning **$16-36**
+
+#### Mode Vision (Visual Analysis)
+- **Tokens 4-6x supérieur** → **Coût 4-6x**
+- **Usage**: Documents scannés, images
+- **Exemple**: Phi-4 $2-5 → Vision **$8-30**
+
+### Impact du Reprocessing
+- **Chaque reprocess = coût pipeline complet**
+- **Changement stratégie = coût multiplié**
+- ⚠️ **Coûts historiques écrasés** (seul dernier coût conservé)
+
+### Impact Comparaison Adversariale
+⚠️ **Coûts adversariaux NON suivis actuellement**
+- Exécute 2 modèles → **2x coûts réels**
+- **Seul modèle primaire affiché** dans Costs
+- **Recommandation**: Activer uniquement pour audits
+
 ## Configuration pour la Production
 
 ### 1. Ajuster les coûts fixes

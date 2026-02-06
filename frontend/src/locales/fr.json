@@ -261,7 +261,14 @@
         "processed_emails": "Emails traités (OCR + Classification)",
         "emails_usage": "Emails tarifés (télémétrie d’usage)",
         "proc_vs_usage": "Traités : {processed} · Tarifés : {priced}",
-        "counts_hint": "Tous les emails sont traités par Mistral OCR et classification Phi-4. La tarification repose sur la télémétrie d’usage ; les compteurs peuvent différer en cas de données manquantes ou dédupliquées.",
+        "counts_hint": "Tous les emails sont traités par Mistral OCR et classification Phi-4. La tarification repose sur la télémétrie d'usage ; les compteurs peuvent différer en cas de données manquantes ou dédupliquées.",
+        "pricing_assumptions": {
+            "title": "⚠️ Hypothèses de Tarification & Limites",
+            "model_pricing": "Les coûts utilisent la tarification spécifique au modèle lorsque disponible. Si vous avez changé de modèles dans Paramètres, assurez-vous que les variables d'environnement correspondent (PHI4_COST_PER_1K_INPUT/OUTPUT).",
+            "reprocessing": "Le retraitement des emails accumule de nouveaux coûts mais écrase l'ancienne télémétrie. L'historique des dépenses n'est pas préservé par email.",
+            "adversarial": "Les coûts de comparaison adversariale ne sont PAS suivis. L'exécution de comparaisons à deux modèles double l'usage de tokens mais seuls les coûts du modèle primaire apparaissent ici.",
+            "env_override": "Pour une tarification précise, mettez à jour les variables d'environnement pour correspondre à vos modèles déployés ou consultez Azure Cost Management pour des données autoritatives."
+        },
         "avg_cost": "Coût IA Moyen / Email",
         "actual_spend": "Dépense IA Réelle (Historique)",
         "total_ai": "Total IA",
