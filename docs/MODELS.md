@@ -5,6 +5,94 @@ This repo uses a 2-step AI pipeline:
 1) OCR: Mistral Document AI → Markdown
 2) Classification: LLM → strict JSON multi-intents
 3) Vector Search: Text Embedding for RAG (Chatbot)
+4) Category Assessment: GPT-5 Nano → AI-powered category quality analysis
+
+---
+
+## Required Models for POC
+
+**MANDATORY deployments in your Azure AI Foundry / Azure OpenAI resource:**
+
+| Model | Deployment Name | Purpose | Max Tokens | Required |
+|-------|----------------|---------|------------|----------|
+| **Mistral Document AI 2505** | `mistral-document-ai-2505` | OCR + Vision extraction | N/A (page-based) | ✅ YES |
+| **Phi-4** | `Phi-4` or `phi-4` | Primary classification (8K context) | 8,000 | ✅ YES |
+| **GPT-4o-mini** | `gpt-4o-mini` | Fallback classification (120K context) | 120,000 | ✅ YES |
+| **text-embedding-3-small** | `text-embedding-3-small` | Vector embeddings for RAG chatbot | N/A (embeddings) | ✅ YES |
+| **GPT-5.2-chat** or **GPT-5-mini** | `gpt-5.2-chat` or `gpt-5-mini` | Chatbot + Category Assessment | 200,000 | ⚠️ RECOMMENDED |
+| **GPT-5-nano** | `gpt-5-nano` | Category assessment (reasoning model) | 200,000 | ⚠️ RECOMMENDED |
+
+**API Version Requirements:**
+- Mistral OCR: Uses Foundry serverless endpoint (not OpenAI API)
+- Classification models: OpenAI Chat Completions API (`2024-08-01-preview` or later)
+- Embeddings: OpenAI Embeddings API (`2024-08-01-preview` or later)
+- Chatbot: OpenAI Chat Completions API (`2024-08-01-preview` or later)
+
+**Cost Implications:**
+- **OCR**: ~1 €/1K pages (Mistral Document AI pricing)
+- **Classification**: ~0.11 €/1M input tokens (Phi-4), ~0.43 €/1M output tokens
+- **Fallback**: ~0.15 €/1M input tokens (GPT-4o-mini), ~0.60 €/1M output tokens
+- **Embeddings**: ~0.02 €/1M tokens (text-embedding-3-small)
+- **Reasoning Models**: ~3.00 €/1M input tokens (GPT-5-mini), ~12.00 €/1M output tokens
+
+---
+
+## API Parameter Differences: Standard vs Reasoning Models
+
+**CRITICAL:** GPT-5.x and GPT-4.1+ reasoning models use DIFFERENT API parameters than GPT-4.x models.
+
+### Standard Models (GPT-4o, GPT-4o-mini, Phi-4)
+
+**Supported Parameters:**
+```json
+{
+  "model": "gpt-4o-mini",
+  "messages": [...],
+  "max_tokens": 1500,        // ✅ Use max_tokens
+  "temperature": 0.3,        // ✅ Temperature supported
+  "top_p": 1.0,              // ✅ Top-p supported
+  "response_format": {"type": "json_object"}
+}
+```
+
+### Reasoning Models (GPT-5.x, GPT-4.1+, o1, o3)
+
+**Supported Parameters:**
+```json
+{
+  "model": "gpt-5-nano",
+  "messages": [...],
+  "max_completion_tokens": 1500,  // ✅ Use max_completion_tokens (NOT max_tokens)
+  // ❌ NO temperature parameter
+  // ❌ NO top_p parameter
+  "response_format": {"type": "json_object"}
+}
+```
+
+**Why the Difference?**
+- Reasoning models use internal Chain-of-Thought (CoT) processing
+- They generate intermediate reasoning tokens before the final answer
+- `max_completion_tokens` limits only the VISIBLE output tokens
+- Temperature/top_p would interfere with the reasoning process
+
+**Code Detection Pattern:**
+```python
+# Detect reasoning model by deployment name
+is_reasoning_model = any(x in deployment.lower() for x in ["gpt-5", "gpt-4.1", "o1", "o3"])
+
+if is_reasoning_model:
+    payload["max_completion_tokens"] = 1500
+    # No temperature parameter
+else:
+    payload["max_tokens"] = 1500
+    payload["temperature"] = 0.3
+```
+
+**Implementation References:**
+- [chat_agent.py](../classymail/services/chat_agent.py#L508-L515): Correct implementation for chatbot
+- [category_assessment.py](../classymail/api/category_assessment.py#L140-L163): Correct implementation for category assessment
+
+---
 
 ## Vector Search & Embeddings
 

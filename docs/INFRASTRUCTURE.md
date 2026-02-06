@@ -23,6 +23,49 @@ Terraform provisions the complete Azure infrastructure:
 - Cosmos DB (serverless) + database/container
 - Azure AI Foundry / Azure AI Services + project
 - User-Assigned Managed Identity + RBAC roles
+- **Required AI Model Deployments** (see below)
+
+---
+
+## Required AI Model Deployments
+
+**CRITICAL:** The following model deployments MUST exist in your Azure AI Foundry / Azure OpenAI resource for the POC to function:
+
+| Model | Deployment Name | Environment Variable | Purpose | Required |
+|-------|----------------|---------------------|---------|----------|
+| **Mistral Document AI 2505** | `mistral-document-ai-2505` | `MISTRAL_DEPLOYMENT` | OCR + Vision extraction | ✅ MANDATORY |
+| **Phi-4** | `Phi-4` | `PHI_DEPLOYMENT` | Primary classification (8K) | ✅ MANDATORY |
+| **GPT-4o-mini** | `gpt-4o-mini` | `PHI_FALLBACK_DEPLOYMENT` | Fallback classification (120K) | ✅ MANDATORY |
+| **text-embedding-3-small** | `text-embedding-3-small` | `EMBEDDING_DEPLOYMENT` | Vector embeddings (RAG) | ✅ MANDATORY |
+| **GPT-5.2-chat** | `gpt-5.2-chat` | `CHAT_DEPLOYMENT` | Chatbot conversational AI | ⚠️ RECOMMENDED |
+| **GPT-5-nano** | `gpt-5-nano` | *(hardcoded in category_assessment.py)* | Category assessment AI | ⚠️ RECOMMENDED |
+
+**Deployment Instructions:**
+
+1. **Navigate to Azure AI Foundry**: https://ai.azure.com/
+2. **Select your AI Hub**: `<your-project>-aihub` (created by Terraform)
+3. **Go to Deployments** → **+ Create Deployment**
+4. **Deploy each model** with the EXACT deployment names shown above
+
+**Why Exact Names Matter:**
+- The application code references these deployment names directly
+- Mismatch between deployment name and environment variable will cause 404 errors
+- Default configuration assumes standard naming convention (e.g., `Phi-4`, `gpt-4o-mini`)
+
+**Terraform Note:**
+- Terraform creates the AI Foundry account and project
+- Model deployments must be created manually via Azure Portal/CLI (not yet supported in azurerm provider)
+- Future enhancement: Use `azapi_resource` to automate model deployments
+
+**Verification:**
+```bash
+# List all deployments in your AI Foundry project
+az cognitiveservices account deployment list \
+  --name <ai-foundry-account-name> \
+  --resource-group <resource-group> \
+  --query "[].{Name:name, Model:properties.model.name, Version:properties.model.version}" \
+  --output table
+```
 
 ---
 

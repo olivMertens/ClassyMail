@@ -1,6 +1,114 @@
-# Implementation Summary: Adversarial Model Comparison Feature
+# Implementation Summary: Feature Status & Roadmap
 
-> 📋 **Phase Completion Status**: Backend & Documentation ✅ | Frontend 🔄 | Worker Handler 🔄
+> 📋 **Last Updated**: February 2026
+> **Status Overview**: Core Features ✅ | Advanced Features 🔄 | Future Enhancements 📋
+
+---
+
+## Recently Completed Features ✅
+
+### 1. **Category Assessment AI Advice** (Feb 2026) ✅
+- **Location**: [category_assessment.py](../classymail/api/category_assessment.py), [SettingsView.vue](../frontend/src/views/SettingsView.vue)
+- **Endpoint**: `POST /api/settings/categories/assess`
+- **Model**: GPT-5 Nano (reasoning model)
+- **Features**:
+  - AI-powered category definition quality assessment
+  - Rates categories as Good / Needs Improvement / Poor
+  - Actionable advice with concrete rewriting examples
+  - Explains WHY suggestions improve LLM classification accuracy
+  - Copy-paste ready text snippets for prompts
+  - Considers Standard, Reasoning, and Vision processing strategies
+  - French/English UI support (settings.categories.form.*)
+- **Implementation**:
+  - Correct API parameters for GPT-5 reasoning models (`max_completion_tokens`, no `temperature`)
+  - Comprehensive system prompt focused on LLM prompt engineering best practices
+  - JSON response format with fields: quality_rating, strengths, weaknesses, suggestions, examples
+- **Commit**: ca11109 (GPT-5 API parameters fix)
+
+### 2. **Per-Email Reprocessing Modal** (Feb 2026) ✅
+- **Location**: [emails.py](../classymail/api/routers/emails.py#L298), [DashboardView.vue](../frontend/src/views/DashboardView.vue)
+- **Endpoint**: `POST /api/emails/{id}/reclassify`
+- **Parameters**:
+  ```json
+  {
+    "model": "phi-4" | "gpt-4o-mini" | "gpt-5-mini" | "both",
+    "strategy": "standard" | "reasoning" | "vision",
+    "mode": "sync" | "async"
+  }
+  ```
+- **Features**:
+  - Reprocess individual emails with different model/strategy combinations
+  - Sync mode: Wait for results (~20-30s), returns immediately
+  - Async mode: Queue message, returns 202 Accepted, check back later
+  - Comparison mode: Run both models in parallel (when model="both")
+  - Strategy override: Change processing approach per email
+- **Use Cases**:
+  - Test different models on edge cases
+  - Fix OCR errors by re-running with vision mode
+  - Compare Phi-4 vs GPT-4o-mini vs GPT-5-mini on same email
+  - A/B testing for fine-tuning data selection
+- **Commits**: 1fd6861, 53f1d80
+
+### 3. **PII Detection & Dashboard Indicators** (Feb 2026) ✅
+- **Location**: [DashboardView.vue](../frontend/src/views/DashboardView.vue), [llm_pipeline.py](../classymail/services/llm_pipeline.py#L642)
+- **Database**: `EmailRecord.pii_detected`, `EmailRecord.pii_data`
+- **Features**:
+  - Automatic PII detection during email preprocessing
+  - Visual indicators in dashboard:
+    - Card view: Amber shield icon (ShieldExclamationIcon) with tooltip
+    - Table view: "DCP" badge (FR) / "PII" badge (EN)
+  - Stores structured PII metadata for GDPR compliance
+  - Configurable via `email_preprocessing.detect_pii` setting
+  - Detects: names, emails, phone numbers, addresses, NIR, IBAN
+- **Translations**:
+  - dashboard.pii.detected, dashboard.pii.badge_label, dashboard.pii.tooltip
+  - French: "Données à Caractère Personnel (DCP)"
+  - English: "Personal Identifiable Information (PII)"
+- **Commit**: c2c9763
+
+### 4. **Dynamic Model-Aware Cost Tracking** (Feb 2026) ✅
+- **Location**: [costing.py](../classymail/services/costing.py), [CostsView.vue](../frontend/src/views/CostsView.vue)
+- **Features**:
+  - MODEL_PRICING map with 12+ models (Phi-4, GPT-4o/4o-mini, GPT-5-mini/nano, GPT-4.1-nano, Mistral)
+  - Dynamic pricing based on actual model used (not hardcoded assumptions)
+  - Tracks input/output tokens separately per model
+  - Cost breakdown per email: OCR + Classification + Embeddings
+  - Export CSV with cost columns for financial audit
+  - Configurable pricing via Settings UI (region/tenant-specific)
+  - Disclaimer: "Costs are configurable and region-dependent"
+- **Pricing Sources**: Azure AI Foundry Models pricing page (as of Feb 2026)
+- **Documentation**: [COSTS_LOGIC.md](../docs/COSTS_LOGIC.md)
+- **Commit**: 7b99c7d
+
+### 5. **French Translation Improvements** (Feb 2026) ✅
+- **Location**: [fr.json](../frontend/src/locales/fr.json), [SettingsView.vue](../frontend/src/views/SettingsView.vue)
+- **Changes**:
+  - Category form fields fully translated (14 new keys: settings.categories.form.*)
+  - Confidence level terminology refined:
+    - "Tout Niveau" (Any Level) - more natural than "Toute Confiance"
+    - "Niveau de Confiance Faible/Élevé" (Low/High Confidence Level) - more professional
+  - PII indicator translations: "DCP" badge, tooltips
+  - Synchronization verified: `check_i18n.py` passes (500+ keys EN/FR)
+- **Commits**: 16e85a4, c2c9763
+
+### 6. **CSV Export Bug Fix** (Feb 2026) ✅
+- **Location**: [emails.py](../classymail/api/routers/emails.py#L820), [repository.py](../classymail/services/repository.py#L558)
+- **Issue**: `enable_cross_partition_query=True` caused error (deprecated parameter in azure-cosmos 4.7.0+)
+- **Fix**: Removed deprecated parameter (cross-partition queries enabled by default in SDK 4.7.0+)
+- **Impact**: Both CSV export and RAG vector queries now work correctly
+- **Commit**: 7fbd13f
+
+### 7. **GPT-5 Reasoning Model Support** (Feb 2026) ✅
+- **Location**: [category_assessment.py](../classymail/api/category_assessment.py#L140-L163), [chat_agent.py](../classymail/services/chat_agent.py#L508-L515)
+- **API Parameter Handling**:
+  - Standard models (GPT-4o, Phi-4): `max_tokens`, `temperature` supported
+  - Reasoning models (GPT-5.x, GPT-4.1+, o1, o3): `max_completion_tokens` only, NO `temperature`
+- **Detection Logic**:
+  ```python
+  is_reasoning_model = any(x in deployment.lower() for x in ["gpt-5", "gpt-4.1", "o1", "o3"])
+  ```
+- **Implementation**: Both chat_agent.py and category_assessment.py correctly handle reasoning models
+- **Commit**: ca11109
 
 ---
 
@@ -50,21 +158,14 @@
 
 ### 4. **Documentation** (Complete)
 - **Updated Files**:
-  - ✅ [README.md](../README.md#-adversarial-model-comparison) - Quick start guide
+  - ✅ [README.md](../README.md) - Added all new features section
+  - ✅ [docs/USER_INTERFACE.md](../docs/USER_INTERFACE.md) - Comprehensive UI guide with new features
+  - ✅ [docs/MODELS.md](../docs/MODELS.md) - Required models + API parameter differences
+  - ✅ [docs/INFRASTRUCTURE.md](../docs/INFRASTRUCTURE.md) - Required AI model deployments section
   - ✅ [docs/COMPARISON_ADVERSARIAL.md](../docs/COMPARISON_ADVERSARIAL.md) - Full guide (when/how/why)
   - ✅ [docs/RBAC_AUDIT.md](../docs/RBAC_AUDIT.md) - Identity & permissions
+  - ✅ [docs/COSTS_LOGIC.md](../docs/COSTS_LOGIC.md) - Dynamic cost tracking logic
   - ✅ [classymail/core/config.py](../classymail/core/config.py) - Data Zone config
-
-- **Updated Diagrams** (9 total):
-  1. ✅ README.md: Main pipeline flowchart (token decision + comparison fork)
-  2. ✅ ARCHITECTURE.md: Solution flowchart (token + comparison)
-  3. ✅ ARCHITECTURE.md: Sequence diagram (comparison message path)
-  4. ✅ ARCHITECTURE.md: API/Worker separation (comparison handler note)
-  5. ✅ ARCHITECTURE.md: Identity flow (unchanged, reference only)
-  6. ✅ PIPELINE.md: High-level pipeline included in ARCHITECTURE.md (token + comparison fork)
-  7. ✅ PIPELINE.md: Message-driven sequence included in ARCHITECTURE.md (opt-in comparison)
-  8. ✅ INFRASTRUCTURE.md: Event Grid config (comparison note)
-  9. ✅ SCENARIO_E2E.md: Complete E2E flow (comparison path)
 
 ---
 
