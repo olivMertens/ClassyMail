@@ -817,7 +817,7 @@ async def export_emails_csv(
 
         # Fetch items
         items = []
-        async for item in cosmos_container.query_items(query=query_sql, parameters=params, enable_cross_partition_query=True):
+        async for item in cosmos_container.query_items(query=query_sql, parameters=params):
             items.append(item)
 
         logger.info(f"Found {len(items)} emails for export")

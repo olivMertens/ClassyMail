@@ -555,7 +555,7 @@ async def get_cache_entry(vector: list[float], similarity_score: float = 0.99, n
         {"name": "@num_results", "value": num_results},
         {"name": "@similarity_score", "value": similarity_score},
     ]
-    results = clients.cosmos_cache_container.query_items(query, parameters=params, enable_cross_partition_query=True, populate_query_metrics=True)
+    results = clients.cosmos_cache_container.query_items(query, parameters=params, populate_query_metrics=True)
     return [x async for x in results]
 
 
