@@ -108,9 +108,9 @@ resource "azurerm_servicebus_namespace" "sb" {
 
   tags = local.common_tags
 
-  # Beaucoup d'environnements (policies) désactivent l'auth locale (SAS keys).
-  # Le provider peut lire une valeur différente de la valeur par défaut, ce qui crée du drift.
-  local_auth_enabled = false
+  # Event Grid → Service Bus delivery requires local auth (connection string).
+  # KEDA scaler also requires it since azurerm provider doesn't yet support managed identity for KEDA.
+  local_auth_enabled = true
 }
 
 resource "azurerm_servicebus_queue" "q" {

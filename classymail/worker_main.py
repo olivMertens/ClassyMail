@@ -23,6 +23,7 @@ logging.getLogger("azure").setLevel(logging.WARNING)
 logging.getLogger("opentelemetry").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
+logger.info("🚀 Worker starting - listening for Event Grid → Service Bus messages")
 
 
 async def main():

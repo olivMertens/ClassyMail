@@ -71,11 +71,13 @@ async def lifespan(app: FastAPI):
         )
 
     init_telemetry(app)
+    logger.info("🚀 API starting - uploads will trigger Event Grid → Service Bus flow")
 
     clients = Clients()
     await clients.init()
     app.state.clients = clients
     set_default_clients(clients)
+    logger.info("✅ Azure clients initialized (storage, cosmos, service bus)")
 
     # Run worker inside API only when explicitly enabled (local dev convenience)
     if os.getenv("ENABLE_WORKER", "false").lower() in {"1", "true", "yes"}:
