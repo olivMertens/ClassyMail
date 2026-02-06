@@ -9,6 +9,7 @@ from typing import Optional
 from classymail.models import EmailRecord
 from classymail.services.azure_clients import Clients, get_default_clients
 from classymail.services.anonymizer import anonymize_markdown_for_finetune
+from classymail.services.settings_store import get_categories_prompt_text
 from classymail.services.llm_pipeline import generate_embedding
 from classymail.core import config
 
@@ -151,12 +152,47 @@ async def export_finetune_jsonl_iter(
     if not include_unreviewed:
         where.append("(IS_DEFINED(c.reviewed) AND c.reviewed = true)")
 
-    query = "SELECT c.id, c.markdown, c.classification, c.updated_at, c.reviewed, c.correction_reason, c.classification_history FROM c WHERE " + " AND ".join(where)
+    query = "SELECT c.id, c.markdown, c.classification, c.updated_at, c.reviewed, c.correction_reason, c.classification_history, c.subject, c.sender FROM c WHERE " + " AND ".join(where)
     it = clients.cosmos_container.query_items(query)
+
+    # Get production-grade system prompt with categories (matches inference exactly)
+    categories_text = await get_categories_prompt_text(clients=clients)
 
     system_prompt = os.getenv(
         "FINETUNE_SYSTEM_PROMPT",
-        "You classify insurance emails into intents and output strict JSON only.",
+        f"""Tu es un assistant expert en classification d'emails d'assurance.
+Ta tâche est d'analyser le contenu de l'email (fourni en markdown) et d'identifier :
+- TOUTES les intentions présentes.
+- Le sujet principal (Subject).
+- L'expéditeur (Sender) si identifiable.
+
+LISTE DES INTENTIONS POSSIBLES (NOM + DÉFINITION + EXCLUSIONS) :
+{categories_text}
+
+RÈGLES DE CLASSIFICATION :
+- Choisis les intentions dont la DÉFINITION correspond le mieux au contenu. Appuie-toi sur les mots/phrases clés des définitions.
+- Les EXCLUSIONS précisent ce que chaque catégorie ne doit PAS inclure. Utilise-les pour éliminer les faux positifs.
+- Un email peut contenir UNE SEULE intention OU PLUSIEURS intentions.
+- Si aucune intention ne correspond vraiment, retourne une liste vide (detected_intents: []). NE PAS deviner.
+- Assigne un score de confiance (0.0 à 1.0) pour CHAQUE intention détectée.
+- La justification DOIT citer un extrait du texte et/ou la définition de la catégorie correspondante.
+
+FORMAT DE RÉPONSE ATTENDU (JSON UNIQUEMENT) :
+{{
+    "detected_intents": [
+        {{
+            "intent": "Nom de l'intention",
+            "confidence": 0.95,
+            "justification": "Court extrait du texte ou référence à la description justifiant ce choix"
+        }}
+    ],
+    "global_complexity": "Simple|Complexe",
+    "classification_reason": "Explication courte si detected_intents est vide (ex: 'Aucune intention ne correspond car le contenu est hors périmètre assurance')",
+    "subject": "Sujet ou Objet de l'email extrait du texte",
+    "sender": "Nom ou Email de l'expéditeur extrait"
+}}
+
+IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason avec une explication claire."""
     )
 
     written = 0
@@ -202,11 +238,23 @@ async def export_finetune_jsonl_iter(
             except Exception:
                 continue
 
-        target = {"detected_intents": intents}
-        if classification.get("global_complexity"):
-            target["global_complexity"] = classification.get("global_complexity")
+        # Build complete response matching production inference format
+        target = {
+            "detected_intents": intents,
+            "global_complexity": classification.get("global_complexity") or "Simple",
+        }
 
-        assistant_content = json.dumps(target, ensure_ascii=False)
+        # Include classification_reason if available (especially for empty intents)
+        if classification.get("classification_reason"):
+            target["classification_reason"] = classification.get("classification_reason")
+
+        # Include subject and sender from email metadata if available
+        if item.get("subject"):
+            target["subject"] = item.get("subject")
+        if item.get("sender"):
+            target["sender"] = item.get("sender")
+
+        assistant_content = json.dumps(target, ensure_ascii=False, indent=None)
         example = {
             "messages": [
                 {"role": "system", "content": system_prompt},

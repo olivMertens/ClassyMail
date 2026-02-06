@@ -4,6 +4,8 @@
 **Last Updated**: 2026-02-06
 **Related**: [FINE_TUNING_DATA.md](FINE_TUNING_DATA.md), [MODELS.md](MODELS.md)
 
+> ⚠️ **CRITICAL FIX (2026-02-06)**: Previous versions exported **incorrect format** for fine-tuning. Fixed to match production inference exactly. **Regenerate all existing JSONL datasets**.
+
 ---
 
 ## Executive Summary
@@ -448,6 +450,104 @@ example = {
 
 ## Format Validation
 
+### ✅ Critical Fix: Production-Inference Alignment (2026-02-06)
+
+**Previous Implementation** (❌ INCORRECT):
+- **System Prompt**: Generic 1-line prompt: `"You classify insurance emails into intents and output strict JSON only."`
+- **Assistant Response**: Minimal structure missing `subject`, `sender`, `classification_reason`
+- **Result**: Model learned wrong format, caused inference failures
+
+**Current Implementation** (✅ CORRECT):
+
+**1. System Prompt** (matches production exactly):
+```python
+system_prompt = f"""Tu es un assistant expert en classification d'emails d'assurance.
+Ta tâche est d'analyser le contenu de l'email (fourni en markdown) et d'identifier :
+- TOUTES les intentions présentes.
+- Le sujet principal (Subject).
+- L'expéditeur (Sender) si identifiable.
+
+LISTE DES INTENTIONS POSSIBLES (NOM + DÉFINITION + EXCLUSIONS) :
+{categories_text}  # ← Full category definitions with descriptions/exclusions
+
+RÈGLES DE CLASSIFICATION :
+- Choisis les intentions dont la DÉFINITION correspond le mieux au contenu.
+- Les EXCLUSIONS précisent ce que chaque catégorie ne doit PAS inclure.
+- Un email peut contenir UNE SEULE intention OU PLUSIEURS intentions.
+- Si aucune intention ne correspond, retourne une liste vide. NE PAS deviner.
+- Assigne un score de confiance (0.0 à 1.0) pour CHAQUE intention.
+- La justification DOIT citer un extrait du texte.
+
+FORMAT DE RÉPONSE ATTENDU (JSON UNIQUEMENT) :
+{{
+    "detected_intents": [
+        {{"intent": "...", "confidence": 0.95, "justification": "..."}}
+    ],
+    "global_complexity": "Simple|Complexe",
+    "classification_reason": "Explication si detected_intents est vide",
+    "subject": "Sujet de l'email",
+    "sender": "Expéditeur"
+}}
+"""
+```
+
+**2. Assistant Response** (complete structure):
+```json
+{
+  "detected_intents": [
+    {"intent": "ACTION_RESILIER", "confidence": 1.0, "justification": "Manually selected by user"},
+    {"intent": "MUST GO", "confidence": 0.95, "justification": "..."}
+  ],
+  "global_complexity": "Simple",
+  "classification_reason": "Aucune intention ne correspond (empty intents only)",
+  "subject": "Demande de résiliation contrat habitation",
+  "sender": "client@example.com"
+}
+```
+
+**Code Changes** ([repository.py#L158-L226](../classymail/services/repository.py)):
+```python
+# Before: Generic prompt
+system_prompt = "You classify insurance emails into intents and output strict JSON only."
+
+# After: Production-grade prompt with full categories
+categories_text = await get_categories_prompt_text(clients=clients)
+system_prompt = f"""Tu es un assistant expert en classification d'emails d'assurance...
+LISTE DES INTENTIONS POSSIBLES:
+{categories_text}
+...
+"""
+
+# Before: Minimal target
+target = {"detected_intents": intents}
+if classification.get("global_complexity"):
+    target["global_complexity"] = classification.get("global_complexity")
+
+# After: Complete target matching production
+target = {
+    "detected_intents": intents,
+    "global_complexity": classification.get("global_complexity") or "Simple",
+}
+if classification.get("classification_reason"):
+    target["classification_reason"] = classification.get("classification_reason")
+if item.get("subject"):
+    target["subject"] = item.get("subject")
+if item.get("sender"):
+    target["sender"] = item.get("sender")
+```
+
+**Why This Matters**:
+1. ✅ **Consistency**: Training and inference use identical format
+2. ✅ **Learning**: Model learns to provide justifications and confidence scores
+3. ✅ **Completeness**: Model learns to extract subject/sender metadata
+4. ✅ **Context**: Full category definitions teach nuanced classification
+
+**Action Required**: If you exported JSONL before 2026-02-06, **regenerate datasets** with the fixed format:
+```bash
+curl "http://localhost:8000/api/v1/emails/export/finetune?split=train" > train_fixed.jsonl
+curl "http://localhost:8000/api/v1/emails/export/finetune?split=test" > test_fixed.jsonl
+```
+
 ### Azure AI Foundry Compatibility ✅
 
 **Our JSONL format meets all Microsoft requirements**:
@@ -681,5 +781,12 @@ corrected_lines = [
 
 ## Changelog
 
+- **2026-02-06 (v2.0 - CRITICAL FIX)**: 🔴 **Fixed critical format mismatch** between fine-tuning export and production inference. Previous versions exported incomplete assistant responses and generic system prompts, causing models to learn wrong output format. **Breaking change**: Regenerate all existing JSONL datasets.
+  - System prompt: Now includes full category definitions (493 lines) matching production exactly
+  - Assistant response: Now includes `subject`, `sender`, `classification_reason` fields
+  - Format validation: Added production-inference alignment verification section
+  - Code changes: [repository.py#L158-L226](../classymail/services/repository.py)
+
 - **2026-02-06 (v1.1)**: Verified against [official Microsoft Azure AI Foundry documentation](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning). Added clarification on two "weight" concepts: Microsoft's binary `weight` parameter (0/1) vs our metadata-based implicit weighting. Added format validation section and optional enhancement guidance. Confirmed full compatibility with Azure OpenAI fine-tuning requirements.
+
 - **2026-02-06 (v1.0)**: Initial documentation (verified production implementation)
