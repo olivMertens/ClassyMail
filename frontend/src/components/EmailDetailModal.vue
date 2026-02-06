@@ -991,18 +991,18 @@ const renderMarkdown = (text) => md.render(text || '')
             :key="s"
             class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all"
             :class="reprocessStrategy === s
-              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-400'
-              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'"
+              ? 'border-primary-500 bg-primary-50 text-gray-900 dark:bg-primary-900/30 dark:border-primary-400 dark:text-white'
+              : 'border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-700/50 dark:text-white hover:border-gray-300 dark:hover:border-gray-600'"
           >
             <input
               v-model="reprocessStrategy"
               type="radio"
               :value="s"
-              class="mt-0.5 text-primary-600 focus:ring-primary-500"
+              class="mt-0.5 accent-primary-600"
             >
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <span class="text-sm font-medium text-gray-900 dark:text-white">
+                <span class="text-sm font-medium">
                   {{ t('dashboard.strategy.' + s) }}
                 </span>
                 <span

@@ -475,17 +475,16 @@ const emit = defineEmits(['open-email'])
       v-if="stats.total > 0"
       class="mb-4"
     >
-      <div class="flex justify-between mb-1">
-        {{ t('dashboard.progress.title') }}
-        <span
-          v-if="stats.queue_depth > 0 || stats.pending > 0"
-          class="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400"
-        >
-          {{ t('dashboard.progress.pending', { processing: stats.pending, queued: stats.queue_depth }) }}
-        </span>
-
-        <span class="text-sm font-medium text-primary-700 dark:text-primary-400">{{ t('dashboard.progress.title')
-        }}</span>
+      <div class="flex justify-between items-center mb-1">
+        <div class="flex items-center gap-1">
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('dashboard.progress.title') }}</span>
+          <span
+            v-if="stats.queue_depth > 0 || stats.pending > 0"
+            class="text-xs font-normal text-gray-500 dark:text-gray-400"
+          >
+            {{ t('dashboard.progress.pending', { processing: stats.pending, queued: stats.queue_depth }) }}
+          </span>
+        </div>
         <span class="text-sm font-medium text-primary-700 dark:text-primary-400">{{ progressPercentage }}%</span>
       </div>
       <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
@@ -1459,18 +1458,18 @@ const emit = defineEmits(['open-email'])
             :key="s"
             class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all"
             :class="reprocessStrategy === s
-              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-400'
-              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'"
+              ? 'border-primary-500 bg-primary-50 text-gray-900 dark:bg-primary-900/30 dark:border-primary-400 dark:text-white'
+              : 'border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-700/50 dark:text-white hover:border-gray-300 dark:hover:border-gray-600'"
           >
             <input
               v-model="reprocessStrategy"
               type="radio"
               :value="s"
-              class="mt-0.5 text-primary-600 focus:ring-primary-500"
+              class="mt-0.5 accent-primary-600"
             >
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <span class="text-sm font-medium text-gray-900 dark:text-white">
+                <span class="text-sm font-medium">
                   {{ t('dashboard.strategy.' + s) }}
                 </span>
                 <span
