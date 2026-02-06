@@ -41,12 +41,18 @@ The system uses **two-level protection** to ensure no personal information leaks
    - Removes: emails, IP addresses, phone numbers, IBANs
    - Uses: Fast regex patterns
    - Speed: <1ms per document
+   - Applied to: Email body (markdown), subject field, sender field
 
 2. anonymize_markdown_for_finetune(markdown: str) -> str
    - Removes: Names, companies, addresses, contract IDs, sensitive context
    - Uses: GPT-4o with 600+ char system prompt
    - Preserves: Markdown structure, formatting, intent labels
    - Speed: ~2-5s per document (async)
+   - Applied to: Email body (markdown) only
+
+CRITICAL: When anonymize=True, BOTH levels are applied to email body,
+and Level 1 (regex) is applied to subject/sender fields in assistant response
+to prevent PII leakage in model outputs.
 ```
 
 #### System Prompt (40 lines)
@@ -505,6 +511,14 @@ FORMAT DE RÉPONSE ATTENDU (JSON UNIQUEMENT) :
 }
 ```
 
+**PII Protection**: When `anonymize=True`, subject and sender fields are scrubbed with `basic_pii_scrub()`:
+```json
+{
+  "subject": "Demande de résiliation contrat habitation by [Email]",
+  "sender": "[Email]"
+}
+```
+
 **Code Changes** ([repository.py#L158-L226](../classymail/services/repository.py)):
 ```python
 # Before: Generic prompt
@@ -523,7 +537,7 @@ target = {"detected_intents": intents}
 if classification.get("global_complexity"):
     target["global_complexity"] = classification.get("global_complexity")
 
-# After: Complete target matching production
+# After: Complete target matching production (with PII protection)
 target = {
     "detected_intents": intents,
     "global_complexity": classification.get("global_complexity") or "Simple",
@@ -531,9 +545,11 @@ target = {
 if classification.get("classification_reason"):
     target["classification_reason"] = classification.get("classification_reason")
 if item.get("subject"):
-    target["subject"] = item.get("subject")
+    subject = item.get("subject")
+    target["subject"] = basic_pii_scrub(subject) if anonymize else subject
 if item.get("sender"):
-    target["sender"] = item.get("sender")
+    sender = item.get("sender")
+    target["sender"] = basic_pii_scrub(sender) if anonymize else sender
 ```
 
 **Why This Matters**:
@@ -780,6 +796,13 @@ corrected_lines = [
 ---
 
 ## Changelog
+
+- **2026-02-06 (v2.1 - PII LEAK FIX)**: 🔴 **Fixed PII leak in subject/sender fields**. Previous v2.0 anonymized email body content but exported raw subject and sender fields in assistant responses, potentially leaking email addresses and names. **Action required**: Regenerate datasets if exported after v2.0 release.
+  - Subject field: Now scrubbed with `basic_pii_scrub()` when `anonymize=True`
+  - Sender field: Now scrubbed with `basic_pii_scrub()` when `anonymize=True`
+  - Protection: Removes emails, phones, IPs, IBANs from metadata fields
+  - Code changes: [repository.py#L9](../classymail/services/repository.py) (added import), [repository.py#L251-L255](../classymail/services/repository.py) (conditional scrubbing)
+  - Documentation: Updated PII protection section with subject/sender anonymization details
 
 - **2026-02-06 (v2.0 - CRITICAL FIX)**: 🔴 **Fixed critical format mismatch** between fine-tuning export and production inference. Previous versions exported incomplete assistant responses and generic system prompts, causing models to learn wrong output format. **Breaking change**: Regenerate all existing JSONL datasets.
   - System prompt: Now includes full category definitions (493 lines) matching production exactly

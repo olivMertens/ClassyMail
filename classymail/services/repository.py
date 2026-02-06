@@ -8,7 +8,7 @@ from typing import Optional
 
 from classymail.models import EmailRecord
 from classymail.services.azure_clients import Clients, get_default_clients
-from classymail.services.anonymizer import anonymize_markdown_for_finetune
+from classymail.services.anonymizer import anonymize_markdown_for_finetune, basic_pii_scrub
 from classymail.services.settings_store import get_categories_prompt_text
 from classymail.services.llm_pipeline import generate_embedding
 from classymail.core import config
@@ -249,10 +249,13 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
             target["classification_reason"] = classification.get("classification_reason")
 
         # Include subject and sender from email metadata if available
+        # Apply PII scrubbing if anonymize is enabled to prevent leaking raw emails/names
         if item.get("subject"):
-            target["subject"] = item.get("subject")
+            subject = item.get("subject")
+            target["subject"] = basic_pii_scrub(subject) if anonymize else subject
         if item.get("sender"):
-            target["sender"] = item.get("sender")
+            sender = item.get("sender")
+            target["sender"] = basic_pii_scrub(sender) if anonymize else sender
 
         assistant_content = json.dumps(target, ensure_ascii=False, indent=None)
         example = {
