@@ -308,6 +308,12 @@ resource "azurerm_cosmosdb_account" "db" {
 }
 
 # Cosmos SQL data-plane RBAC (built-in Data Contributor)
+# IMPORTANT: scope MUST be at the account level (not db/collection level)
+# because the Python SDK calls readMetadata on the account before any
+# data-plane operation.  A db-scoped assignment triggers:
+#   "principal does not have required RBAC permissions to perform action
+#    Microsoft.DocumentDB/databaseAccounts/readMetadata"
+# See: https://aka.ms/cosmos-native-rbac
 resource "azurerm_cosmosdb_sql_role_assignment" "aca_cosmos_sql_contrib" {
   count               = var.cosmos_use_rbac ? 1 : 0
   name                = random_uuid.cosmos_sql_contrib_assignment.result
@@ -315,9 +321,7 @@ resource "azurerm_cosmosdb_sql_role_assignment" "aca_cosmos_sql_contrib" {
   account_name        = azurerm_cosmosdb_account.db.name
   principal_id        = azurerm_user_assigned_identity.app_id.principal_id
   role_definition_id  = "${azurerm_cosmosdb_account.db.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
-  # Format attendu par l'API dans ce tenant: un préfixe ARM (subscriptions/.../databaseAccounts/...) + segments data-plane (dbs/.../colls/...).
-  # IMPORTANT: db-scope is required in some tenants for metadata access (readMetadata).
-  scope = "${azurerm_cosmosdb_account.db.id}/dbs/${azurerm_cosmosdb_sql_database.sql.name}"
+  scope               = azurerm_cosmosdb_account.db.id
 }
 
 resource "azurerm_cosmosdb_sql_database" "sql" {

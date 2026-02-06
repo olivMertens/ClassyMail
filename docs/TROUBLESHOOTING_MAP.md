@@ -75,7 +75,65 @@ The identity used by GitHub Actions (`email-poc-id`) lacks permissions to **read
 *   **Error:** `The resource with name '...acr...' could not be found.`
     *   **Fix:** Grant **Reader** role on the ACR to the Managed Identity (in addition to `AcrPush`).
 
-### Scenario C: "Worker is crashing loop" (ProvisioningState: Failed)
+### Scenario C: Cosmos DB "readMetadata" Forbidden (RBAC Scope Bug)
+
+**Error:**
+```
+Request blocked by Auth email-poc-cosmos : Request is blocked because principal [...]
+does not have required RBAC permissions to perform action
+[Microsoft.DocumentDB/databaseAccounts/readMetadata] on resource [dbs/emailsdb].
+```
+
+**Root cause:** The Cosmos SQL role assignment (`Cosmos DB Built-in Data Contributor`) is scoped to the **database** level (`dbs/emailsdb`) instead of the **account** level. The Python SDK calls `readMetadata` at the account level before any data-plane operation, and a database-scoped assignment doesn't cover it.
+
+**Verify current assignments:**
+```bash
+# List all Cosmos SQL role assignments
+az cosmosdb sql role assignment list \
+  --account-name email-poc-cosmos \
+  --resource-group email-poc-rg \
+  -o table
+
+# Check scope — must be the account ID, NOT .../dbs/emailsdb
+az cosmosdb sql role assignment list \
+  --account-name email-poc-cosmos \
+  --resource-group email-poc-rg \
+  --query "[].{name:name, principal:principalId, scope:scope}" \
+  -o table
+```
+
+**Fix (CLI — immediate):**
+```bash
+# Get the managed identity principal
+PRINCIPAL=$(az identity show -n email-poc-id -g email-poc-rg --query principalId -o tsv)
+
+# Create account-scoped role assignment
+ACCOUNT_ID=$(az cosmosdb show -n email-poc-cosmos -g email-poc-rg --query id -o tsv)
+az cosmosdb sql role assignment create \
+  --account-name email-poc-cosmos \
+  --resource-group email-poc-rg \
+  --role-definition-id "00000000-0000-0000-0000-000000000002" \
+  --principal-id "$PRINCIPAL" \
+  --scope "$ACCOUNT_ID"
+```
+
+**Fix (Terraform — permanent):** In `infra/main.tf`, the `azurerm_cosmosdb_sql_role_assignment` scope must be:
+```hcl
+scope = azurerm_cosmosdb_account.db.id  # account-level, NOT .../dbs/emailsdb
+```
+
+**Verify fix:**
+```bash
+# Test a simple read — should return documents or empty list, not 403
+az rest --method POST \
+  --uri "https://email-poc-cosmos.documents.azure.com/dbs/emailsdb/colls/emails/docs" \
+  --headers "x-ms-version=2018-12-31" "x-ms-documentdb-query=true" \
+  --body '{"query": "SELECT TOP 1 * FROM c"}'
+# Or simply restart the Container App and check logs
+az containerapp revision restart -n email-poc-api -g email-poc-rg
+```
+
+### Scenario D: "Worker is crashing loop" (ProvisioningState: Failed)
 
 If manual updates corrupted the configuration (e.g., wiped env vars):
 
@@ -90,7 +148,7 @@ If manual updates corrupted the configuration (e.g., wiped env vars):
     ```
 4.  **Restore Config:** Use the `worker-restore.yaml` file (if available) or copy env vars from the API app (`email-poc-api`).
 
-### Scenario D: Authentication/Login Failures (AADSTS700213)
+### Scenario E: Authentication/Login Failures (AADSTS700213)
 
 GitHub Action fails to login via OIDC.
 
