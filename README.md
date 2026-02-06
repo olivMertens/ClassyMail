@@ -160,6 +160,30 @@ Configuration avancée pour le traitement professionnel des emails :
 *   **Export CSV Dual** : Format minimal (client) et enrichi (audit)
 *   👉 **Guide Complet :** [docs/INTEGRATION_CLIENT_G2S.md](docs/INTEGRATION_CLIENT_G2S.md)
 
+### 🔒 PII Anonymization & Fine-Tuning Export (NEW)
+**Protection des données personnelles avec système dual-band pour fine-tuning** :
+*   **Niveau 1 - Regex** : Suppression rapide (<1ms) des emails, téléphones, IPs, IBANs
+*   **Niveau 2 - LLM (GPT-4o)** : Anonymisation contextuelle des noms, sociétés, adresses, montants
+*   **Protection en couches** : L'IA anonymisatrice ne voit jamais les emails bruts (déjà scrubés par regex)
+*   **Export JSONL sécurisé** : Format Azure AI Foundry avec anonymisation automatique (subject/sender inclus)
+*   **Corrections utilisateur** : Tracking complet des modifications manuelles avec feedback AI
+*   **Fail-safe design** : Si anonymisation échoue, l'exemple est ignoré (jamais de PII dans l'export)
+*   **Dataset synthétique** : Génération de PDFs/emails réalistes pour tests sans données réelles
+*   👉 **Documentation complète :** [docs/PII_ANONYMIZATION_AND_USER_CORRECTIONS.md](docs/PII_ANONYMIZATION_AND_USER_CORRECTIONS.md)
+
+**Commandes rapides :**
+```bash
+# Export JSONL anonymisé pour fine-tuning (par défaut anonymize=true)
+curl "http://localhost:8000/api/v1/emails/export-finetune-jsonl?split=train" > train.jsonl
+curl "http://localhost:8000/api/v1/emails/export-finetune-jsonl?split=test" > test.jsonl
+
+# Générer des emails synthétiques pour tests (fake data)
+uv run python scripts/generate_realistic_emails.py --count 50 --out dataset/test_pdfs
+
+# Uploader et traiter les PDFs générés
+uv run python scripts/test_e2e_flow.py --count 50
+```
+
 ### 🌍 Internationalization (i18n)
 Interface multilingue complète :
 *   **Français & Anglais** : Traductions exhaustives (500+ clés synchronisées)

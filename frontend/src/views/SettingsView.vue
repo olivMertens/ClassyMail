@@ -455,7 +455,7 @@ const validateACAConfig = async () => {
   try {
     const res = await fetch('/api/admin/validate-aca-env')
     if (res.ok) {
-      acaValidationResults.value = await res. json()
+      acaValidationResults.value = await res.json()
       if (acaValidationResults.value.all_required_present) {
         showAlert('✓ ACA Configuration Valid: All required variables are present')
       } else {
@@ -1895,12 +1895,15 @@ onMounted(() => {
                   <span
                     :class="acaValidationResults.all_required_present ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
                   >
-                    {{ acaValidationResults.all_required_present ? '✓ All Required Variables Present' : '✗ Missing Required Variables' }}
+                    {{ acaValidationResults.all_required_present ? '✓ All Required Variables Present' : '✗ Missing
+                    Required Variables' }}
                   </span>
                 </p>
                 <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                  Required: {{ acaValidationResults.summary?.required_present || 0 }}/{{ acaValidationResults.summary?.required_count || 0 }} •
-                  Optional: {{ acaValidationResults.summary?.optional_present || 0 }}/{{ acaValidationResults.summary?.optional_count || 0 }}
+                  Required: {{ acaValidationResults.summary?.required_present || 0 }}/{{
+                    acaValidationResults.summary?.required_count || 0 }} •
+                  Optional: {{ acaValidationResults.summary?.optional_present || 0 }}/{{
+                    acaValidationResults.summary?.optional_count || 0 }}
                 </p>
               </div>
 

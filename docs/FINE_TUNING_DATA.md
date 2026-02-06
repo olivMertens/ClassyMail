@@ -116,13 +116,135 @@ Optionnel :
 
 - `FINETUNE_SYSTEM_PROMPT` (contrôle le message `system` dans le JSONL exporté)
 
+### Architecture de l'anonymisation dual-band
+
+L'anonymisation utilise un système à **deux niveaux** pour garantir qu'aucune donnée personnelle n'est exportée :
+
+#### Niveau 1 : Scrubbing regex (`basic_pii_scrub`)
+- **Vitesse** : <1ms par document
+- **Méthode** : Expressions régulières déterministes
+- **Cible** : Patterns structurés (emails, IPs, téléphones, IBANs)
+- **Appliqué à** :
+  - Corps de l'email (markdown) avant envoi au LLM
+  - Champs `subject` et `sender` dans la réponse de l'assistant (quand `anonymize=true`)
+- **Avantage** : Le LLM anonymisateur ne voit jamais les adresses email brutes
+
+#### Niveau 2 : Anonymisation contextuelle LLM (`anonymize_markdown_for_finetune`)
+- **Vitesse** : ~2-5s par document
+- **Modèle** : GPT-4o avec prompt système spécialisé (600+ caractères)
+- **Cible** : PII contextuelle (noms, sociétés, adresses, contrats, montants)
+- **Préservation** : Structure Markdown complète (headers, listes, tableaux, liens)
+- **Appliqué à** : Corps de l'email uniquement (après level 1)
+
+**Important** : Si l'anonymisation échoue (LLM down, erreur réseau), l'exemple est **ignoré** (jamais exporté avec PII).
+
+**Fichier source** : [classymail/services/anonymizer.py](../classymail/services/anonymizer.py)
+
 ## Génération de dataset MVP (PDFs synthétiques)
 
-Pour le MVP/demo (pas de données de prod), le repo inclut un générateur de PDFs "email-like" volontairement bruités.
-C'est pratique pour bootstrapper rapidement le pipeline et générer suffisamment d'exemples à reviewer afin de tester l'export fine-tuning.
+Pour le MVP/demo (pas de données de prod), le repo inclut **deux scripts** pour générer des données de test :
 
-- Script : [scripts/generate_dummy_pdfs.py](../scripts/generate_dummy_pdfs.py)
-- Exécution typique : 50–100 PDFs, corps longs (~300 mots)
+### Option 1 : PDFs synthétiques complets (recommandé)
+
+**Script** : [scripts/generate_realistic_emails.py](../scripts/generate_realistic_emails.py)
+
+Génère des PDFs d'emails réalistes avec :
+- Templates par catégorie (Attestation, Résiliation, Sinistre, etc.)
+- Variantes de formulation
+- Coordonnées fictives mais réalistes
+- Formatage email authentique (From:, Subject:, Date:)
+
+```bash
+# Générer 50 emails aléatoires
+uv run python scripts/generate_realistic_emails.py --count 50
+
+# Générer pour catégories spécifiques
+uv run python scripts/generate_realistic_emails.py --count 20 --categories "Attestation habitation" "Résiliation"
+
+# Dossier de sortie personnalisé
+uv run python scripts/generate_realistic_emails.py --count 100 --out dataset/fake_emails
+```
+
+### Option 2 : PDFs bruités via LLM (legacy)
+
+**Script** : [scripts/generate_dummy_pdfs.py](../scripts/generate_dummy_pdfs.py)
+
+Génère des PDFs avec contenu étendu par Azure OpenAI (typos, argot, scans flous).
+Utile pour tester la robustesse du pipeline OCR.
+
+```bash
+# Génération simple
+uv run python scripts/generate_dummy_pdfs.py --count 50
+
+# Génération via LLM (nécessite AZURE_OPENAI_ENDPOINT)
+uv run python scripts/generate_dummy_pdfs.py --count 50 --use-aoai --require-aoai
+```
+
+### Workflow complet : Fake dataset → JSONL anonymisé
+
+Pour générer un dataset de fine-tuning entièrement synthétique et anonymisé :
+
+#### Option A : Génération et upload automatique (recommandé)
+
+```bash
+# 1. Lancer l'API + Worker
+uv run uvicorn main:app --reload  # Terminal 1
+# (Worker démarre automatiquement en background)
+
+# 2. Générer et uploader des emails en une commande
+uv run python scripts/test_e2e_flow.py --count 100 --wait 2
+
+# Les PDFs sont générés, uploadés et traités automatiquement
+# Vous pouvez suivre le progrès dans le dashboard: http://localhost:8000
+```
+
+#### Option B : Génération puis upload manuel
+
+```bash
+# 1. Générer des PDFs réalistes (fake data) dans un dossier
+uv run python scripts/generate_realistic_emails.py --count 100 --out dataset/fake_emails
+
+# 2. Lancer l'API + Worker
+uv run uvicorn main:app --reload
+
+# 3. Uploader les PDFs via l'interface web ou l'API
+# Web: http://localhost:8000 → Upload button
+# API: curl -X POST http://localhost:8000/api/upload -F "file=@dataset/fake_emails/email_001.pdf"
+```
+
+#### Étapes communes (après upload et traitement)
+
+```bash
+# 4. Reviewer/corriger les classifications dans l'UI (optionnel mais recommandé)
+# http://localhost:8000 → Dashboard → Corriger les erreurs
+# Marquez les emails comme "reviewed" après vérification
+
+# 5. Exporter le JSONL anonymisé (inclut dual-band PII protection)
+curl "http://localhost:8000/api/v1/emails/export-finetune-jsonl?split=train&anonymize=true" > train_fake.jsonl
+curl "http://localhost:8000/api/v1/emails/export-finetune-jsonl?split=test&anonymize=true" > test_fake.jsonl
+
+# 6. Vérifier l'anonymisation (ne doit trouver aucun email réel)
+grep -E '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' train_fake.jsonl | wc -l  # doit retourner 0
+grep '\[Email\]' train_fake.jsonl | wc -l  # doit retourner > 0 (placeholders présents)
+
+# 7. Vérifier le format JSONL (v2.1+ avec subject/sender anonymisé)
+head -1 train_fake.jsonl | jq '.messages[0].content | length'  # prompt ~3000+ chars
+head -1 train_fake.jsonl | jq '.messages[2].content | fromjson | keys | sort'  # ["classification_reason","detected_intents","global_complexity","sender","subject"]
+head -1 train_fake.jsonl | jq '.messages[2].content | fromjson | .sender'  # doit montrer "[Email]" ou valeur scrubbed
+```
+
+**Avantages du workflow fake data** :
+- ✅ **Zéro données réelles** : Aucun risque GDPR
+- ✅ **Anonymisation testée** : Vérifie que le système fonctionne correctement
+- ✅ **Reproductible** : Peut générer 1000+ exemples en quelques minutes
+- ✅ **Contrôle qualité** : Templates garantissent des données cohérentes
+- ✅ **Split déterministe** : Train/test split stable basé sur hash SHA-256 des IDs
+
+**Alternative rapide (sans review manuelle, NOT RECOMMENDED)** :
+```bash
+# Exporter même les non-reviewed (peut contenir des erreurs de classification)
+curl "http://localhost:8000/api/v1/emails/export-finetune-jsonl?split=train&include_unreviewed=true" > train_auto.jsonl
+```
 
 ### Génération optionnelle via LLM
 

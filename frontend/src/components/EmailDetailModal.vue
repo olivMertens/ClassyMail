@@ -841,7 +841,8 @@ const renderMarkdown = (text) => md.render(text || '')
                       No comparison data
                     </h3>
                     <p class="mt-1 text-sm text-gray-500">
-                      Run an adversarial check to compare {{ primaryModel }} with {{ adversarialModel || 'configured model' }}.
+                      Run an adversarial check to compare {{ primaryModel }} with {{ adversarialModel || 'configured
+                      model' }}.
                     </p>
                     <div class="mt-6 flex flex-col items-center gap-2">
                       <button

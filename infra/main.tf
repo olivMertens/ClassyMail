@@ -228,12 +228,12 @@ resource "azurerm_cognitive_account" "language" {
   location            = var.location
   resource_group_name = azurerm_resource_group.rg.name
   kind                = "TextAnalytics"
-  sku_name            = "S"  # Standard tier for production (F0 free tier available but with limits)
+  sku_name            = "S" # Standard tier for production (F0 free tier available but with limits)
 
   tags = local.common_tags
 
   public_network_access_enabled = true
-  local_auth_enabled            = false  # Force Managed Identity (RBAC-only)
+  local_auth_enabled            = false # Force Managed Identity (RBAC-only)
 
   identity {
     type = "SystemAssigned"
