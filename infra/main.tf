@@ -10,10 +10,14 @@ locals {
   # If not provided, rely on the active Azure CLI subscription.
   subscription_id = try(trimspace(var.subscription_id), "")
 
-  # Some tenants enforce tagging via Azure Policy. Apply safe defaults for POC.
+  # Tags obligatoires G2S pour toutes les ressources déployées
   common_tags = {
-    SecurityControl = "ignore"
-    CostControl     = "ignore"
+    "cp-code-sa"       = "devin"
+    "cp-deploiement"   = "terraform"
+    "cp-environnement" = "d"
+    "cp-proprietaire"  = "g2s-dtpo-iaf"
+    "cp-responsable"   = "g2s-dtpo-iaf"
+    "cp-supervision"   = "oui"
   }
 }
 

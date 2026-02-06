@@ -5,12 +5,13 @@
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Terraform Deployment](#terraform-deployment)
-3. [Resource Configuration](#resource-configuration)
-4. [Event Grid Configuration](#event-grid-configuration)
-5. [RBAC & Managed Identity](#rbac--managed-identity)
-6. [Network Strategy](#network-strategy)
-7. [Verification & Troubleshooting](#verification--troubleshooting)
+2. [G2S Mandatory Tags](#g2s-mandatory-tags)
+3. [Terraform Deployment](#terraform-deployment)
+4. [Resource Configuration](#resource-configuration)
+5. [Event Grid Configuration](#event-grid-configuration)
+6. [RBAC & Managed Identity](#rbac--managed-identity)
+7. [Network Strategy](#network-strategy)
+8. [Verification & Troubleshooting](#verification--troubleshooting)
 
 ---
 
@@ -24,6 +25,54 @@ Terraform provisions the complete Azure infrastructure:
 - Azure AI Foundry / Azure AI Services + project
 - User-Assigned Managed Identity + RBAC roles
 - **Required AI Model Deployments** (see below)
+
+---
+
+## G2S Mandatory Tags
+
+🏷️ **Toutes les ressources Azure déployées sont automatiquement tagées avec les standards G2S :**
+
+| Tag | Valeur | Description |
+|-----|--------|-------------|
+| `cp-code-sa` | `devin` | Code service applicatif - Projet DEVIN (email classification POC) |
+| `cp-deploiement` | `terraform` | Méthode de déploiement (Infrastructure as Code) |
+| `cp-environnement` | `d` | Environnement : **d** (développement), **t** (test), **p** (production) |
+| `cp-proprietaire` | `g2s-dtpo-iaf` | Propriétaire de la ressource (Direction Technique - Plateforme & Outils) |
+| `cp-responsable` | `g2s-dtpo-iaf` | Responsable technique de la ressource |
+| `cp-supervision` | `oui` | Activer la supervision/monitoring (Application Insights, Azure Monitor) |
+
+### Application des Tags
+
+**1. Via Terraform** (`infra/main.tf`):
+```terraform
+locals {
+  common_tags = {
+    "cp-code-sa"      = "devin"
+    "cp-deploiement"  = "terraform"
+    "cp-environnement" = "d"
+    "cp-proprietaire" = "g2s-dtpo-iaf"
+    "cp-responsable"  = "g2s-dtpo-iaf"
+    "cp-supervision"  = "oui"
+  }
+}
+
+# Tags propagés à toutes les ressources via `tags = local.common_tags`
+```
+
+**2. Via Azure Policy** (`infra/policy.tf`):
+- **Policy Definition**: `add-g2s-mandatory-tags`
+- **Scope**: Resource Group ou Subscription (configurable via `var.tag_policy_scope`)
+- **Action**: Ajout automatique des tags manquants sur les ressources existantes
+- **Remediation**: Tâche de réparation pour appliquer les tags aux ressources pré-existantes
+
+**Vérification des tags :**
+```bash
+# Lister les tags sur une ressource
+az resource show --ids <RESOURCE_ID> --query tags -o json
+
+# Lister toutes les ressources avec un tag spécifique
+az resource list --tag "cp-code-sa=devin" --query "[].{name:name, type:type}" -o table
+```
 
 ---
 
