@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
+import sys
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -33,6 +35,18 @@ from classymail.api.categories_import import router as categories_import_router
 
 
 from contextlib import asynccontextmanager
+
+# Ensure application-level logs (upload, SB enqueue, pipeline) reach
+# container stdout alongside uvicorn's access-log output.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    stream=sys.stdout,
+)
+logging.getLogger("azure").setLevel(logging.WARNING)
+logging.getLogger("opentelemetry").setLevel(logging.WARNING)
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
