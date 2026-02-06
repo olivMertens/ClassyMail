@@ -17,7 +17,8 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   CommandLineIcon,
-  InformationCircleIcon
+  InformationCircleIcon,
+  ArrowUpTrayIcon
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '../composables/useDialog'
@@ -185,6 +186,62 @@ const assessCategory = async (index) => {
     await showAlert(`Assessment Error: ${e.message}`)
   } finally {
     assessingCategory.value = null
+  }
+}
+
+const handleExcelImport = async (event) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  // Validate file type
+  if (!file.name.toLowerCase().endsWith('.xlsx') && !file.name.toLowerCase().endsWith('.xls')) {
+    await showAlert(t('settings.categories.import.error', { error: 'Invalid file type. Please select an Excel file (.xlsx or .xls)' }))
+    event.target.value = '' // Reset input
+    return
+  }
+
+  const replaceMode = await confirm(
+    'Import Mode:\n\n' +
+    '• Click OK to REPLACE all existing categories with imported ones\n' +
+    '• Click Cancel to MERGE (update existing + add new categories)'
+  )
+
+  loading.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const res = await fetch(`/api/settings/categories/import?replace_mode=${replaceMode}`, {
+      method: 'POST',
+      body: formData
+    })
+
+    if (res.ok) {
+      const result = await res.json()
+
+      // Reload settings to get updated categories
+      await loadSettings()
+
+      // Show results
+      await showAlert(
+        t('settings.categories.import.success', {
+          added: result.created,
+          updated: result.updated,
+          skipped: result.skipped,
+          total: result.total_rows
+        })
+      )
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
+      await showAlert(t('settings.categories.import.error', { error: err.detail || 'Unknown error' }))
+    }
+  } catch (e) {
+    console.error(e)
+    trackException(e)
+    await showAlert(t('settings.categories.import.error', { error: e.message }))
+  } finally {
+    loading.value = false
+    event.target.value = '' // Reset input for re-upload
   }
 }
 
@@ -1257,24 +1314,45 @@ onMounted(() => {
           <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
             {{ t('settings.categories.managed_title') }}
           </h3>
-          <button
-            type="button"
-            :disabled="loading"
-            class="inline-flex items-center rounded-md bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            @click="saveSettings"
-          >
-            <CheckCircleIcon
-              v-if="!loading"
-              class="-ml-0.5 mr-1.5 h-5 w-5"
-              aria-hidden="true"
-            />
-            <ArrowPathIcon
-              v-else
-              class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
-              aria-hidden="true"
-            />
-            {{ loading ? t('settings.saving') : t('settings.categories.save_button') }}
-          </button>
+          <div class="flex items-center gap-3">
+            <!-- Import Excel Button -->
+            <label
+              class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ArrowUpTrayIcon
+                class="-ml-0.5 mr-1.5 h-5 w-5"
+                aria-hidden="true"
+              />
+              {{ t('settings.categories.import_button') }}
+              <input
+                ref="excelFileInput"
+                type="file"
+                accept=".xlsx,.xls"
+                class="hidden"
+                @change="handleExcelImport"
+              >
+            </label>
+
+            <!-- Save Button -->
+            <button
+              type="button"
+              :disabled="loading"
+              class="inline-flex items-center rounded-md bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              @click="saveSettings"
+            >
+              <CheckCircleIcon
+                v-if="!loading"
+                class="-ml-0.5 mr-1.5 h-5 w-5"
+                aria-hidden="true"
+              />
+              <ArrowPathIcon
+                v-else
+                class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
+                aria-hidden="true"
+              />
+              {{ loading ? t('settings.saving') : t('settings.categories.save_button') }}
+            </button>
+          </div>
         </div>
 
         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">

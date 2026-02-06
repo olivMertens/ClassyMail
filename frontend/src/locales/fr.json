@@ -96,6 +96,13 @@
                 "success": "Évaluation Terminée !\n\nQualité : {score}\n\nConsultez les conseils ci-dessous.",
                 "error": "Échec de l'Évaluation : {error}"
             },
+            "import": {
+                "button": "Importer depuis Excel (.xlsx)",
+                "importing": "Importation en cours...",
+                "help": "Téléchargez un fichier Excel avec les colonnes : Nom, Slug, Définition, Exclusions. Les slugs correspondants seront mis à jour, les nouvelles catégories seront ajoutées.",
+                "success": "✓ Importation Réussie !\n\nAjoutés : {added}\nMis à jour : {updated}\nIgnorés : {skipped}\nTotal de catégories : {total}",
+                "error": "Échec de l'Importation : {error}"
+            },
             "save_success": "✓ Catégories Enregistrées avec Succès !\n\nLes modifications sont maintenant actives et seront utilisées pour toutes les futures classifications d'emails."
         }
     },

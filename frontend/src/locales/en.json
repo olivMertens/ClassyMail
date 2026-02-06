@@ -96,6 +96,13 @@
                 "success": "Assessment Complete!\n\nQuality: {score}\n\nReview the advice below the category.",
                 "error": "Assessment Failed: {error}"
             },
+            "import": {
+                "button": "Import from Excel (.xlsx)",
+                "importing": "Importing...",
+                "help": "Upload an Excel file with columns: Name, Slug, Description, Exclusions. Matching slugs will be updated, new categories will be added.",
+                "success": "✓ Import Successful!\n\nAdded: {added}\nUpdated: {updated}\nSkipped: {skipped}\nTotal Categories: {total}",
+                "error": "Import Failed: {error}"
+            },
             "save_success": "✓ Categories Saved Successfully!\n\nChanges are now active and will be used for all future email classifications."
         }
     },
