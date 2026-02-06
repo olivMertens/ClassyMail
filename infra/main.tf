@@ -383,6 +383,9 @@ resource "azurerm_cosmosdb_sql_container" "chat_history" {
 
 # Use AzApi for Vector Search (Preview feature support)
 resource "azapi_resource" "vector_cache" {
+  # Schema validation disabled: vectorIndexes / vectorEmbeddingPolicy not fully GA yet
+  schema_validation_enabled = false
+
   type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15"
   name      = "vector_cache"
   parent_id = azurerm_cosmosdb_sql_database.sql.id

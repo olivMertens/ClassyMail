@@ -74,6 +74,10 @@ const connTestResults = ref(null)
 const llmTestLoading = ref(false)
 const llmTestResults = ref(null)
 
+// ACA Validation State
+const acaValidationLoading = ref(false)
+const acaValidationResults = ref(null)
+
 // Simulate Flow State
 const simulatingFlow = ref(false)
 const useAoaiEnhancement = ref(false)
@@ -413,7 +417,8 @@ const runLLMTests = async () => {
     const requests = [
       fetch('/api/admin/test-phi4'),
       fetch('/api/admin/test-mistral-ocr'),
-      fetch('/api/admin/test-gpt')
+      fetch('/api/admin/test-gpt'),
+      fetch('/api/admin/test-language-service')
     ]
     if (adversarialModel) {
       requests.push(fetch(`/api/admin/test-gpt?model=${encodeURIComponent(adversarialModel)}`))
@@ -423,12 +428,13 @@ const runLLMTests = async () => {
     const responses = await Promise.all(requests)
     const data = await Promise.all(responses.map(r => r.json()))
 
-    const [phi4Data, mistralData, gptData, maybeAdversarial, chatData] = data
+    const [phi4Data, mistralData, gptData, languageData, maybeAdversarial, chatData] = data
 
     llmTestResults.value = {
       phi4: phi4Data,
       mistral: mistralData,
       gpt: gptData,
+      language: languageData
     }
     if (adversarialModel) {
       llmTestResults.value.adversarial = maybeAdversarial
@@ -439,6 +445,32 @@ const runLLMTests = async () => {
     showAlert(`LLM Test Error: ${e.message}`)
   } finally {
     llmTestLoading.value = false
+  }
+}
+
+
+const validateACAConfig = async () => {
+  acaValidationLoading.value = true
+  acaValidationResults.value = null
+  try {
+    const res = await fetch('/api/admin/validate-aca-env')
+    if (res.ok) {
+      acaValidationResults.value = await res. json()
+      if (acaValidationResults.value.all_required_present) {
+        showAlert('✓ ACA Configuration Valid: All required variables are present')
+      } else {
+        const missing = acaValidationResults.value.missing_required || []
+        showAlert(`⚠ ACA Configuration Issue: Missing ${missing.length} required variable(s): ${missing.join(', ')}`)
+      }
+    } else {
+      const err = await res.json()
+      showAlert(`ACA Validation Failed: ${err.detail || 'Request failed'}`)
+    }
+  } catch (e) {
+    trackException(e)
+    showAlert(`ACA Validation Error: ${e.message}`)
+  } finally {
+    acaValidationLoading.value = false
   }
 }
 
@@ -1823,6 +1855,123 @@ onMounted(() => {
             class="mt-4 p-3 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded text-xs font-mono overflow-auto max-h-40"
           >
             <pre>{{ JSON.stringify(llmTestResults, null, 2) }}</pre>
+          </div>
+        </div>
+
+        <!-- ACA Environment Validation -->
+        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+          <h4 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+            <CommandLineIcon class="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            ACA Environment Validation
+          </h4>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Validate that all required Azure Container Apps environment variables are configured correctly.
+          </p>
+          <div class="mt-3">
+            <button
+              type="button"
+              class="inline-flex items-center rounded-md bg-gray-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600 disabled:opacity-50"
+              :disabled="acaValidationLoading"
+              @click="validateACAConfig"
+            >
+              <ArrowPathIcon
+                v-if="acaValidationLoading"
+                class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin"
+                aria-hidden="true"
+              />
+              Validate ACA Configuration
+            </button>
+          </div>
+
+          <div
+            v-if="acaValidationResults"
+            class="mt-4"
+          >
+            <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+              <!-- Summary -->
+              <div class="mb-3 pb-3 border-b border-gray-200 dark:border-gray-700">
+                <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Status:
+                  <span
+                    :class="acaValidationResults.all_required_present ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+                  >
+                    {{ acaValidationResults.all_required_present ? '✓ All Required Variables Present' : '✗ Missing Required Variables' }}
+                  </span>
+                </p>
+                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Required: {{ acaValidationResults.summary?.required_present || 0 }}/{{ acaValidationResults.summary?.required_count || 0 }} •
+                  Optional: {{ acaValidationResults.summary?.optional_present || 0 }}/{{ acaValidationResults.summary?.optional_count || 0 }}
+                </p>
+              </div>
+
+              <!-- Required Variables -->
+              <div class="mb-3">
+                <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Required Variables
+                </h5>
+                <div class="space-y-1">
+                  <div
+                    v-for="item in acaValidationResults.required"
+                    :key="item.name"
+                    class="flex items-center text-xs font-mono"
+                  >
+                    <span
+                      :class="item.present ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+                      class="w-4"
+                    >
+                      {{ item.present ? '✓' : '✗' }}
+                    </span>
+                    <span class="text-gray-700 dark:text-gray-300 flex-1">{{ item.name }}</span>
+                    <span
+                      v-if="item.present"
+                      class="text-gray-500 dark:text-gray-500 text-xs truncate max-w-xs"
+                    >
+                      {{ item.value }}
+                    </span>
+                    <span
+                      v-else
+                      class="text-red-500 dark:text-red-400 text-xs"
+                    >
+                      NOT SET
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Optional Variables -->
+              <div>
+                <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Optional Variables
+                </h5>
+                <div class="space-y-1">
+                  <div
+                    v-for="item in acaValidationResults.optional"
+                    :key="item.name"
+                    class="flex items-center text-xs font-mono"
+                  >
+                    <span
+                      :class="item.present ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-400 dark:text-gray-600'"
+                      class="w-4"
+                    >
+                      {{ item.present ? '○' : '○' }}
+                    </span>
+                    <span class="text-gray-700 dark:text-gray-300 flex-1">{{ item.name }}</span>
+                    <span
+                      v-if="item.present"
+                      class="text-gray-500 dark:text-gray-500 text-xs truncate max-w-xs"
+                    >
+                      {{ item.value }}
+                    </span>
+                    <span
+                      v-else
+                      class="text-gray-500 dark:text-gray-600 text-xs"
+                    >
+                      not configured
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

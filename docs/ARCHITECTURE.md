@@ -32,6 +32,10 @@ flowchart TD
     OCR --> Check{"Token Budget Decision"}
     Check -->|< 8K| Phi["🔶 Phi-4 Primary"]
     Check -->|≥ 8K| GPT["🟢 gpt-4o-mini Fallback"]
+    OCR --> PII{"PII Detection?"}
+    PII -->|LLM| GPT_PII["GPT-4o-mini PII"]
+    PII -->|Azure| Lang["🔷 Azure AI Language"]
+    PII -->|Both| Hybrid["LLM + Azure Hybrid"]
     OCR --> Comp{"Comparison Enabled?"}
     Comp -->|YES| Dual["🔶 Phi-4 ∥ 🟢 gpt4o-mini Parallel"]
     Comp -->|NO| Single[Single Model]
@@ -39,9 +43,16 @@ flowchart TD
     GPT -->|JSON| API
     Dual -->|Dual Results| API
     Single -->|Classification| API
+    GPT_PII -->|PII Data| API
+    Lang -->|PII Data| API
+    Hybrid -->|Merged PII| API
     API --> Cosmos[(Cosmos DB - comparison_results)]
     Cosmos --> API
     API --> UI[Dashboard - Comparison Tab]
+
+    style Lang fill:#e1f5fe
+    style GPT_PII fill:#e8f5e9
+    style Hybrid fill:#fff3e0
 ```
 
 ## 2. Séquence de traitement
@@ -95,7 +106,8 @@ L'identité managée assignée aux Container Apps (`api` et `worker`) doit dispo
 | **Service Bus** | `Azure Service Bus Data Receiver` | `4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0` | Permet au `worker` de consommer les messages de la queue. |
 | **Service Bus** | `Azure Service Bus Data Sender` | `69a216fc-b8fb-44d8-bc22-1f3c2cd27a39` | Permet à l'API (et DLQ retry) d'envoyer des messages. |
 | **Cosmos DB (SQL)** | `Cosmos DB Built-in Data Contributor` | `00000000-0000-0000-0000-000000000002` | **Data Plane RBAC**. Lecture/Écriture des documents JSON. *Note: Ce n'est pas un rôle IAM Azure classique, mais un rôle SQL natif Cosmos.* |
-| **AI Foundry Project** | `Cognitive Services User` | `a97b65f3-2400-443d-9d23-a1288a8760ba` | **Modèles Déployés**: <br/>• **Phi-4 v7** (Classification primaire)<br/>• **Mistral Document AI 2505** (OCR + Vision)<br/>• **GPT-5.1 / GPT-5.2-chat** (Conversational AI)<br/>• **GPT-4o-mini** (Fallback)<br/>• **text-embedding-3-small** (Embeddings) |
+| **AI Foundry Project** | `Cognitive Services User` | `a97b65f3-2400-443d-9d23-a1288a8760ba` | **Modèles Déployés**: <br/>• **Phi-4 v7** (Classification primaire)<br/>• **Mistral Document AI 2505** (OCR + Vision)<br/>• **GPT-5.1 / GPT-5.2-chat** (Conversational AI)<br/>• **GPT-4o-mini** (Fallback + PII)<br/>• **text-embedding-3-small** (Embeddings) |
+| **Azure AI Language** ⚙️ | `Cognitive Services Language Reader` | `36e80216-4058-40c5-bf25-3b30a0199a10` | **PII Detection Native API** (optionnel, `deploy_language_service=true`). Service TextAnalytics avec 43+ catégories PII prédéfinies. |
 | **Container Registry**| `AcrPull` | `7f951dda-4ed3-4680-a7ca-43fe172d538d` | Pull de l'image Docker par l'environnement Container Apps. |
 | **Application Insights** | `Monitoring Metrics Publisher` | `3913510d-42f4-4e42-8a64-420c390055eb` | Télémétrie OpenTelemetry (traces distribuées, métriques). |
 | **Event Grid System Topic** | `EventGrid EventSubscription Contributor` | `428e0ff0-5e57-4d9c-a221-2c70d0e0a443` | Abonnement aux événements Blob Storage → Service Bus. |

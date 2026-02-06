@@ -835,6 +835,166 @@ async def test_gpt_connection(model: str | None = None, clients: Clients = Depen
         }
 
 
+@router.get("/test-language-service")
+async def test_language_service(clients: Clients = Depends(get_clients)):
+    """
+    Test Azure AI Language service connection for PII detection.
+    """
+    try:
+        import httpx
+        from classymail.services.azure_clients import auth_headers
+
+        language_endpoint = getattr(config, "AZURE_LANGUAGE_ENDPOINT", None)
+
+        if not language_endpoint:
+            return {
+                "status": "not_configured",
+                "message": "AZURE_LANGUAGE_ENDPOINT not configured (optional service)"
+            }
+
+        api_version = "2023-04-01"
+        headers = await auth_headers(clients, model_type="cognitive")
+        headers["Content-Type"] = "application/json"
+
+        endpoint = f"{language_endpoint.rstrip('/')}/language/:analyze-text?api-version={api_version}"
+
+        # Test payload for PII detection
+        payload = {
+            "kind": "PiiEntityRecognition",
+            "parameters": {
+                "modelVersion": "latest"
+            },
+            "analysisInput": {
+                "documents": [
+                    {
+                        "id": "1",
+                        "language": "fr",
+                        "text": "Test de connexion"
+                    }
+                ]
+            }
+        }
+
+        logger.info(f"[TEST-LANGUAGE] Testing Azure AI Language at {endpoint}")
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(endpoint, json=payload, headers=headers)
+
+            if response.is_error:
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_message = error_json.get("error", {}).get("message", error_detail)
+                except Exception:
+                    error_message = error_detail
+
+                logger.error(f"Language service error response: {error_message}")
+                return {
+                    "status": "error",
+                    "error": f"HTTP {response.status_code}: {error_message}",
+                    "endpoint": language_endpoint,
+                    "details": "Check if Language service is deployed and has proper RBAC permissions (Cognitive Services Language Reader)"
+                }
+
+            data = response.json()
+            documents = data.get("results", {}).get("documents", [])
+            categories_detected = len(documents[0].get("entities", [])) if documents else 0
+
+        return {
+            "status": "success",
+            "endpoint": language_endpoint,
+            "categories_detected": categories_detected,
+            "api_version": api_version,
+            "status_code": response.status_code,
+            "message": "Azure AI Language service is accessible"
+        }
+    except Exception as e:
+        logger.error(f"Language service connection test failed: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "endpoint": getattr(config, "AZURE_LANGUAGE_ENDPOINT", "not configured")
+        }
+
+
+@router.get("/validate-aca-env")
+async def validate_aca_environment():
+    """
+    Validate Azure Container Apps environment variables.
+    Returns status of required and optional variables for operational visibility.
+    """
+    try:
+        required_vars = [
+            "AZURE_CLIENT_ID",
+            "COSMOS_ENDPOINT",
+            "COSMOS_DATABASE_NAME",
+            "COSMOS_CONTAINER_NAME",
+            "COSMOS_CHAT_CONTAINER",
+            "STORAGE_ACCOUNT_NAME",
+            "CONTAINER_NAME_PDF",
+            "SERVICE_BUS_FQDN",
+            "QUEUE_NAME_PDF",
+            "AI_ENDPOINT",
+            "AI_API_VERSION",
+            "PHI_DEPLOYMENT",
+            "PHI_FALLBACK_DEPLOYMENT",
+            "MISTRAL_DEPLOYMENT",
+            "MISTRAL_MODE",
+            "APPLICATIONINSIGHTS_CONNECTION_STRING",
+            "LOG_ANALYTICS_WORKSPACE_ID",
+            "OTEL_SERVICE_NAME"
+        ]
+
+        optional_vars = [
+            "AZURE_LANGUAGE_ENDPOINT",
+            "CHAT_DEPLOYMENT",
+            "GPT_DEPLOYMENT",
+            "OCR_DEPLOYMENT",
+            "UI_SHOW_INFO_MODAL",
+            "UI_SHOW_DEVELOPER_TAB",
+            "ORGANIZATION_NAME"
+        ]
+
+        def check_var(var_name: str) -> dict:
+            value = os.getenv(var_name)
+            present = value is not None and value != ""
+            masked_value = None
+            if present and value:
+                # Mask sensitive values (show first 20 chars)
+                masked_value = value[:20] + "..." if len(value) > 20 else value
+            return {
+                "name": var_name,
+                "present": present,
+                "value": masked_value
+            }
+
+        required_status = [check_var(var) for var in required_vars]
+        optional_status = [check_var(var) for var in optional_vars]
+
+        all_required_present = all(item["present"] for item in required_status)
+        missing_required = [item["name"] for item in required_status if not item["present"]]
+
+        return {
+            "status": "ok" if all_required_present else "missing_required",
+            "required": required_status,
+            "optional": optional_status,
+            "all_required_present": all_required_present,
+            "missing_required": missing_required,
+            "summary": {
+                "required_count": len(required_vars),
+                "required_present": sum(1 for item in required_status if item["present"]),
+                "optional_count": len(optional_vars),
+                "optional_present": sum(1 for item in optional_status if item["present"])
+            }
+        }
+    except Exception as e:
+        logger.error(f"ACA environment validation failed: {e}")
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+
 @router.get("/metrics/queue", response_model=QueueMetricsResponse)
 async def queue_metrics(clients: Clients = Depends(get_clients)):
     """

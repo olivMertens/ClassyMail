@@ -30,6 +30,11 @@ Il valide une architecture moderne sur Azure :
 flowchart TD
     user[User] -->|Upload PDF| ui["SPA Vue 3 + Tailwind"]
     ui -->|API| api["FastAPI API"]
+    mi["🔑 Managed Identity<br/>email-poc-id"] -.->|RBAC| blob
+    mi -.->|RBAC| sbq
+    mi -.->|RBAC| cosmos
+    mi -.->|RBAC| ai
+    mi -.->|RBAC| lang
 
     api -->|GET| blob[(Blob Storage)]
     blob -->|Event Grid| sbq["Service Bus Queue"]
@@ -43,17 +48,29 @@ flowchart TD
     tokencheck -->|YES| phi4["🔶 Phi-4 - Primary, 8K"]
     tokencheck -->|NO| gpt["🟢 gpt-4o-mini - Fallback, 120K"]
 
+    api -->|PII Detection?| piicheck{"Method?"}
+    piicheck -->|LLM| gpt_pii["GPT-4o-mini PII"]
+    piicheck -->|Azure| lang["🔷 Azure AI Language"]
+    piicheck -->|Hybrid| both["Both + Merge"]
+
     api -->|Mode Comparaison?| compcheck{"Adversarial mode ON?"}
     compcheck -->|YES| dual["🔶 Phi-4 ∥ 🟢 gpt4o-mini - Parallel Execution"]
     compcheck -->|NO| primary["Primary Model Only"]
 
     phi4 -->|JSON| api
     gpt -->|JSON| api
+    gpt_pii -->|PII Data| api
+    lang -->|PII Data| api
+    both -->|Merged PII| api
     dual -->|Dual results| api
     primary -->|Classification| api
 
     api --> cosmos["📊 Cosmos DB"]
+    api --> ai["AI Foundry Project"]
     cosmos --> ui
+
+    style mi fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style lang fill:#e1f5fe,stroke:#01579b,stroke-width:2px
 ```
 
 ---

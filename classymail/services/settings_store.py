@@ -7,33 +7,33 @@ DATA_FILE = Path(project_root()) / "data" / "settings.json"
 DEFAULT_CATEGORIES = [
     {
         "name": "Attestation habitation",
-        "slug": "attestation_habitation",
-        "description": "Documents certifiant la résidence ou l'assurance habitation",
-        "exclusions": "Ne concerne pas les attestations professionnelles ou véhicules"
-    },
-    {
-        "name": "Attestation scolaire",
-        "slug": "attestation_scolaire",
-        "description": "Documents liés à la scolarité et à l'éducation",
-        "exclusions": "Ne concerne pas les attestations de travail ou formation professionnelle"
+        "slug": "ddedoc_habitation",
+        "description": "- Demande d'attestation habitation pour son logement résidentiel.\n- Demande d'attestation habitation pour son logement résidentiel locatif.\n- Demande d'attestation habitation pour son local ou lieu professionnel.\n- Demande d'attestation habitation pour un logement étudiant.",
+        "exclusions": "- Demande d'attestation habitation avec pour motif le télétravail.\n- Demande d'attestation habitation pour une location de salle de fête.\n- Demande d'attestation habitation avec pour motif une résidence de villégiature (location saisonnière avec une date de fin, séjour temporaire avec mention d'une durée ou d'une date de fin).\n- Demande d'attestation ne portant pas sur l'assurance habitation.\n- Autres demandes.\n- Demande vague de document"
     },
     {
         "name": "Relevé de compte",
-        "slug": "releve_compte",
-        "description": "Relevés bancaires et transactions financières",
-        "exclusions": "Ne concerne pas les factures ou contrats"
+        "slug": "ddedoc_relevecompte",
+        "description": "Demande de document Relevé de compte",
+        "exclusions": ""
+    },
+    {
+        "name": "Attestation scolaire",
+        "slug": "ddedoc_scolaire",
+        "description": "Demande de doc attestation scolaire",
+        "exclusions": ""
     },
     {
         "name": "Dommages électriques",
-        "slug": "dommages_electriques",
-        "description": "Sinistres liés aux équipements électriques",
-        "exclusions": "Ne concerne pas les dommages structurels ou naturels"
+        "slug": "dommageselectriques",
+        "description": "L'assuré déclare qu'un de ses biens a des problèmes de surtension, court-circuit, court-jus\nL'assuré déclare qu'un de ses biens a des problèmes de coupure électrique, coupure de courant\nL'assuré parle d'avarie sur le réseau, enedis, ERDF\nRenvoi d'Enedis vers l'assureur\nL'assuré déclare des dégâts suite à la chute de la foudre\nL'assuré déclare une situation où il n'y a pas de dommages visuels, mais où le matériel ne fonctionne plus.\nDommage lié au remplacement de la platine, de pièces ou de composants électriques.\nRebobinage du moteur.",
+        "exclusions": "Problème électrique sur un véhicule\nIncendie quel que soit la cause\nDommages suite à une tempête.\nSouscription d'un contrat dommages électriques (et d'un contrat sinistre de manière générale)."
     },
     {
         "name": "Événements naturels",
-        "slug": "evenements_naturels",
-        "description": "Sinistres causés par des phénomènes naturels (inondations, tempêtes, etc.)",
-        "exclusions": "Ne concerne pas les dommages causés par l'homme ou les équipements"
+        "slug": "evenementsnaturels",
+        "description": "L'assuré est victime d'inondations, tempêtes, grêles, vent, sécheresse, éboulement, tornade, ouragan.\nL'assuré parle d'intempérie.\nLe client vient d'être victime d'une catastrophe naturelles (arrêté de catastrophe naturelle) : d'inondations, tempêtes, vent, sécheresse, éboulement.\nL'habitation du client a été touchée suite à un orage\nLe client vient d'être victime d'un « Dommage de mouilles », infiltration suite à une tempête.",
+        "exclusions": "Souscription à un contrat d'assurance intempéries.\nSouscription à un contrat d'assurance événements naturels.\nDéclaration d'un sinistre incendie.\nL'assuré est victime d'inondations, tempêtes, grêles, vent, sécheresse, éboulement sur sa voiture."
     }
 ]
 
