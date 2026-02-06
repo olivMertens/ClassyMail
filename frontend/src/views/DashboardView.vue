@@ -639,10 +639,10 @@ const emit = defineEmits(['open-email'])
       />
     </div>
     <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
-      {{ t('dashboard.waiting_title') }}
+      {{ t('dashboard.waiting.title') }}
     </h3>
     <p class="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-4">
-      {{ t('dashboard.waiting_subtitle') }}
+      {{ t('dashboard.waiting.subtitle') }}
     </p>
     <p
       class="text-xs text-gray-400 font-mono bg-white dark:bg-gray-900 px-3 py-2 rounded border border-gray-200 dark:border-gray-700"
