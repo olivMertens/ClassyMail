@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import uuid
 import logging
@@ -7,10 +8,11 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, Depends
 from azure.core.exceptions import AzureError
+from azure.servicebus import ServiceBusMessage
 
 from classymail.core import config
 # from classymail.core.rate_limit import limiter  # TODO: Re-enable for rate limiting
-from classymail.services.azure_clients import get_blob_service_client
+from classymail.services.azure_clients import get_blob_service_client, get_sb_client
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,11 @@ router = APIRouter(prefix="/api", tags=["upload"])
 
 @router.post("/upload")
 # @limiter.limit("20/hour")  # TODO: Re-enable once slowapi integration is completed
-async def upload_pdfs(files: list[UploadFile] = File(...), blob_service_client=Depends(get_blob_service_client)):
+async def upload_pdfs(
+    files: list[UploadFile] = File(...),
+    blob_service_client=Depends(get_blob_service_client),
+    sb_client=Depends(get_sb_client),
+):
     if len(files) > 10:
         raise HTTPException(status_code=400, detail="Max 10 fichiers")
 
@@ -67,6 +73,17 @@ async def upload_pdfs(files: list[UploadFile] = File(...), blob_service_client=D
         try:
             await blob_client.upload_blob(f.file, overwrite=True, content_type="application/pdf")
             results.append({"name": f.filename, "status": status, "blob_url": blob_client.url})
+            # Enqueue Service Bus message so the worker picks up the file
+            try:
+                sender = sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
+                async with sender:
+                    msg = ServiceBusMessage(json.dumps({"blob_url": blob_client.url}))
+                    await sender.send_messages(msg)
+                logger.info(f"Enqueued SB message for {f.filename} → {blob_client.url}")
+            except Exception as sb_err:
+                logger.error(f"Failed to enqueue SB message for {f.filename}: {sb_err}")
+                # File is uploaded but not enqueued — flag it
+                results[-1]["warning"] = "Uploaded but failed to enqueue for processing"
         except AzureError as e:
             logger.error(f"Azure Storage Upload Failed for {f.filename}: {str(e)}")
             results.append({"name": f.filename, "status": "error", "error": f"Storage Error: {type(e).__name__}"})

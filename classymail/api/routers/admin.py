@@ -175,6 +175,60 @@ async def generate_synthetic_data(
         logger.error(f"Failed to generate synthetic data: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.post("/enqueue-blobs", status_code=status.HTTP_200_OK)
+async def enqueue_existing_blobs(clients: Clients = Depends(get_clients)):
+    """
+    Scan blob storage for uploaded PDFs and enqueue any that don't yet
+    have a corresponding Cosmos DB record.  Useful after a DB wipe or
+    when uploads were stored before the SB integration was added.
+    """
+    container_name = config.BLOB_CONTAINER_INPUT
+    container_client = clients.blob_service_client.get_container_client(container_name)
+
+    # Collect blob URLs
+    blob_urls: list[str] = []
+    async for blob in container_client.list_blobs(name_starts_with="uploads/"):
+        if blob.name.lower().endswith(".pdf"):
+            blob_urls.append(f"{clients.blob_service_client.url}{container_name}/{blob.name}")
+
+    if not blob_urls:
+        return {"status": "empty", "message": "No PDF blobs found in storage."}
+
+    # Check which ones already exist in Cosmos (by blob_id derived from URL)
+    existing_ids: set[str] = set()
+    try:
+        await clients.ensure_cosmos_container()
+        query = "SELECT c.id FROM c WHERE IS_DEFINED(c.file_url)"
+        async for item in clients.cosmos_container.query_items(query=query, enable_cross_partition_query=True):
+            existing_ids.add(item["id"])
+    except Exception as e:
+        logger.warning(f"Could not check Cosmos for existing records: {e}")
+
+    # Enqueue new ones
+    enqueued = 0
+    skipped = 0
+    sender = clients.sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
+    async with sender:
+        for url in blob_urls:
+            bid = blob_id_from_url(url)
+            if bid in existing_ids:
+                skipped += 1
+                continue
+            msg = ServiceBusMessage(json.dumps({"blob_url": url}))
+            await sender.send_messages(msg)
+            enqueued += 1
+
+    logger.info(f"Enqueue-blobs: enqueued={enqueued}, skipped={skipped}, total_blobs={len(blob_urls)}")
+    return {
+        "status": "success",
+        "enqueued": enqueued,
+        "skipped_existing": skipped,
+        "total_blobs": len(blob_urls),
+        "message": f"Enqueued {enqueued} blob(s) for processing ({skipped} already in Cosmos)."
+    }
+
+
 @router.get("/ui-config", response_model=UIConfigResponse)
 async def get_ui_config():
     """Returns UI feature flags based on environment variables."""
