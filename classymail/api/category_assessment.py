@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from typing import Any
 
 import httpx
@@ -167,9 +169,12 @@ Focus on: keyword density, boundary precision, prompt structure, and LLM compreh
 
                 content = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
 
-                # Parse JSON response
-                import json
-                result = json.loads(content)
+                # Parse JSON response – strip markdown code fences if present
+                cleaned = content.strip()
+                fence_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", cleaned, re.DOTALL)
+                if fence_match:
+                    cleaned = fence_match.group(1).strip()
+                result = json.loads(cleaned)
 
                 span.set_status(Status(StatusCode.OK))
                 logger.info(f"[assessment] Category '{request.name}' assessed with score: {result.get('quality_score', 'Unknown')}")
@@ -188,11 +193,11 @@ Focus on: keyword density, boundary precision, prompt structure, and LLM compreh
                 detail=f"LLM assessment failed: {e.response.text[:200]}"
             )
         except json.JSONDecodeError as e:
-            logger.error(f"[assessment] JSON parse error: {e}")
+            logger.error(f"[assessment] JSON parse error: {e} | raw content: {content[:500]}")
             span.set_status(Status(StatusCode.ERROR, str(e)))
             raise HTTPException(
                 status_code=500,
-                detail="Failed to parse LLM response"
+                detail=f"Failed to parse LLM response: {str(e)[:100]}"
             )
         except Exception as e:
             logger.error(f"[assessment] Unexpected error: {e}")

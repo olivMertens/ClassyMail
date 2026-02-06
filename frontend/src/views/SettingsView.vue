@@ -1387,7 +1387,7 @@ onMounted(() => {
                 class="-ml-0.5 mr-1.5 h-5 w-5"
                 aria-hidden="true"
               />
-              {{ t('settings.categories.import_button') }}
+              {{ t('settings.categories.import.button') }}
               <input
                 ref="excelFileInput"
                 type="file"
