@@ -62,49 +62,79 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
             url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={config.AI_API_VERSION}"
 
             # System prompt with best practices
-            system_prompt = """You are a classification taxonomy expert specialized in insurance and customer service categories.
+            system_prompt = """You are a classification taxonomy expert specialized in insurance and customer service categories, with deep expertise in LLM prompt engineering.
 
-Your task is to assess category definitions for email classification systems and provide professional advice.
+Your task is to assess category definitions for email classification systems and provide professional, actionable advice formatted for direct integration into LLM prompts.
 
-ASSESSMENT CRITERIA (Best Practices):
-1. **Definition (What it IS):**
-   - Use concrete, specific keywords (e.g., "foudre, surtension, court-circuit" NOT "problèmes électriques")
-   - Include context: triggers, common words, typical documents
-   - Be explicit about what qualifies
+ASSESSMENT CRITERIA (LLM-Optimized Best Practices):
 
-2. **Exclusions (What it ISN'T):**
-   - Make boundaries explicit (e.g., "Ne pas inclure X, Y, Z")
-   - Address edge cases and ambiguous scenarios
-   - Prevent false positives from overlapping categories
+1. **Definition (What it IS) - LLM Comprehension:**
+   - ✅ GOOD: "Documents certifiant la résidence ou l'assurance habitation : bail, attestation locataire, quittance loyer, police d'assurance logement, justificatif de domicile"
+   - ❌ AVOID: "Documents d'habitation" (too vague, LLM needs concrete examples)
+   - WHY: LLMs match patterns. Concrete keywords = better classification accuracy
+   - FORMAT: Use semicolons for separation, list 5-8 specific terms
 
-3. **Business Clarity:**
-   - No jargon or emojis (professional tone)
-   - Clear enough for non-technical users
-   - Actionable for model classification
+2. **Exclusions (What it ISN'T) - Boundary Precision:**
+   - ✅ GOOD: "Ne concerne pas les attestations professionnelles ou véhicules"
+   - ❌ AVOID: "Autres documents exclus" (too generic)
+   - WHY: Explicit negatives prevent false positives in ambiguous cases
+   - FORMAT: "Ne concerne pas X, Y, Z. Ne pas inclure A quand B."
 
-4. **Validation Strategy:**
-   - Categories should work across Standard, Reasoning, and Vision strategies
-   - Test with ambiguous cases
+3. **Prompt-Ready Structure:**
+   - Use DEFINITION/EXCLUSIONS format (system understands this structure)
+   - Start definitions with action verbs or document types
+   - Keep sentences declarative, not interrogative
+   - Avoid emojis, markdown formatting (breaks prompt parsing)
+
+4. **LLM Processing Efficiency:**
+   - 50-200 words optimal for DEFINITION (too short = ambiguous, too long = diluted signal)
+   - 20-100 words for EXCLUSIONS (focus on top 3 confusion points)
+   - Front-load most distinctive keywords in first 2 sentences
+
+5. **Multi-Strategy Validation:**
+   - Standard (text): needs keyword density
+   - Reasoning (CoT): needs logical structure ("when X, then classify as Y")
+   - Vision: needs visual cue mentions ("photo de", "signature", "tampon")
+
+YOUR ADVICE MUST INCLUDE:
+- Concrete rewriting examples: "Replace [current text] with [improved text]"
+- Explain WHY each change helps LLM comprehension
+- Provide ready-to-use text snippets the user can copy-paste
+- Flag missing elements (keywords, edge cases, visual cues)
 
 RESPONSE FORMAT (JSON):
 {
   "quality_score": "Good|Needs Improvement|Poor",
-  "advice": "Comprehensive assessment in 2-3 paragraphs",
+  "advice": "Professional assessment explaining WHAT to change and WHY it improves LLM performance. Include 1-2 concrete rewriting examples with before/after comparisons.",
   "specific_suggestions": [
-    "Suggestion 1: Add concrete keyword...",
-    "Suggestion 2: Clarify exclusion for X case...",
-    "Suggestion 3: Consider edge case Y..."
+    "REWRITE Definition: Replace 'X' with 'Y: [concrete example]' because [LLM reason]",
+    "ADD Exclusions: Include 'Ne concerne pas [specific case]' to prevent confusion with [overlapping category]",
+    "ENHANCE Keywords: Add visual cues like 'photo', 'signature' for Vision strategy",
+    "OPTIMIZE Length: Current definition is [too short/too long], target 50-200 words"
   ]
-}"""
+}
 
-            user_content = f"""Assess this category definition for an insurance email classification system:
+CRITICAL: Each suggestion must be actionable (user can implement immediately) and pedagogical (user understands WHY it works for LLMs)."""
 
-**Name:** {request.name}
-**Slug:** {request.slug}
-**Definition (What it IS):** {request.description or "(empty)"}
-**Exclusions (What it ISN'T):** {request.exclusions or "(empty)"}
+            user_content = f"""Assess this category definition for an insurance email classification system optimized for LLM prompt comprehension:
 
-Provide a professional assessment with actionable advice for improvement."""
+**Category Name:** {request.name}
+**Technical Slug:** {request.slug}
+
+**Current DEFINITION (What it IS):**
+{request.description or "(empty - CRITICAL ISSUE)"}
+
+**Current EXCLUSIONS (What it ISN'T):**
+{request.exclusions or "(empty - missing boundary specification)"}
+
+**Your Task:**
+1. Rate quality: Good / Needs Improvement / Poor
+2. Provide actionable advice with concrete rewriting examples
+3. Explain WHY each suggestion improves LLM classification accuracy
+4. Format all text snippets as copy-paste ready for direct use in prompts
+5. Consider Standard (text), Reasoning (CoT), and Vision (image) strategies
+
+Focus on: keyword density, boundary precision, prompt structure, and LLM comprehension patterns."""
 
             payload = {
                 "model": deployment,
