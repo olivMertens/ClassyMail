@@ -463,7 +463,9 @@
             "requirement_title": "Pré-requis",
             "requirement_desc": "Vous avez besoin de {n} emails traités pour activer la génération.",
             "generate": "Générer des données avec GPT-5.2",
-            "generating": "Génération..."
+            "generating": "Génération...",
+            "generate_confirm": "Cela utilisera GPT-5.2 pour générer des emails synthétiques à partir de vos données existantes afin d'atteindre le seuil minimum. Continuer ?",
+            "generate_error": "Échec de la génération : {error}"
         }
     },
     "developer_docs": {

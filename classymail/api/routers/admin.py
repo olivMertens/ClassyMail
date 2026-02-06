@@ -144,7 +144,10 @@ async def generate_synthetic_data(
         # 2. Fetch seed examples
         seeds = await get_seed_examples_for_synthesis(limit=20, clients=clients)
         if not seeds:
-            raise HTTPException(status_code=400, detail="Not enough existing processed data to use as seed (need at least 1).")
+            raise HTTPException(
+                status_code=400,
+                detail="No processed emails found to use as seed data. Upload and process at least 1 email via the Upload page before generating synthetic data."
+            )
 
         # 3. Generate synthetic data
         # We limit generation to avoid timeouts.
@@ -166,6 +169,8 @@ async def generate_synthetic_data(
             "message": f"Generated {saved_count} synthetic items based on {len(seeds)} seeds."
         }
 
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
     except Exception as e:
         logger.error(f"Failed to generate synthetic data: {e}")
         raise HTTPException(status_code=500, detail=str(e))

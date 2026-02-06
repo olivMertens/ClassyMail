@@ -463,7 +463,9 @@
             "requirement_title": "Start Requirement",
             "requirement_desc": "You need {n} processed emails to enable dataset generation.",
             "generate": "Generate data with GPT-5.2",
-            "generating": "Generating..."
+            "generating": "Generating...",
+            "generate_confirm": "This will use GPT-5.2 to generate synthetic emails based on your existing data to help you reach the minimum requirement. Continue?",
+            "generate_error": "Generation Failed: {error}"
         }
     },
     "developer_docs": {

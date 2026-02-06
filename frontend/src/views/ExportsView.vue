@@ -7,8 +7,10 @@ import {
   TableCellsIcon,
   DocumentTextIcon
 } from '@heroicons/vue/24/outline'
+import { useDialog } from '../composables/useDialog'
 
 const { t } = useI18n()
+const { confirm: confirmDialog, alert: showAlert } = useDialog()
 
 const stats = ref({
   total: 0,
@@ -53,7 +55,7 @@ const downloadFile = async (url, filename) => {
     window.URL.revokeObjectURL(downloadUrl)
   } catch (e) {
     console.error(e)
-    alert(e.message)
+    showAlert(e.message)
   }
 }
 
@@ -75,7 +77,11 @@ const exportJsonl = (split = 'all') => {
 }
 
 const generateSyntheticData = async () => {
-  if (!confirm("This will use GPT-5.2 to generate synthetic emails based on your existing data to help you reach the minimum requirement. Continue?")) return;
+  const ok = await confirmDialog(
+    t('exports.finetune.generate_confirm',
+      { fallback: 'This will use GPT-5.2 to generate synthetic emails based on your existing data to help you reach the minimum requirement. Continue?' })
+  )
+  if (!ok) return
 
   generating.value = true
   try {
@@ -90,14 +96,14 @@ const generateSyntheticData = async () => {
 
     if (res.ok) {
       const data = await res.json()
-      alert(data.message)
+      await showAlert(data.message)
       fetchStats() // refresh
     } else {
-      const err = await res.json()
-      alert(`Generation failed: ${err.detail || 'Unknown error'}`)
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
+      await showAlert(t('exports.finetune.generate_error', { error: err.detail || 'Unknown error' }))
     }
   } catch (e) {
-    alert(`Error: ${e.message}`)
+    await showAlert(t('exports.finetune.generate_error', { error: e.message }))
   } finally {
     generating.value = false
   }
