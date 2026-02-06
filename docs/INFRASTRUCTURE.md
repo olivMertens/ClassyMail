@@ -1,6 +1,8 @@
 # Infrastructure & Deployment Guide
 
 > 🏗️ **Comprehensive Guide**: Terraform provisioning, resource configuration, Event Grid setup, RBAC, and network strategy.
+>
+> 📌 **Note**: This project originated as a POC but has evolved into a production-ready MVP with enterprise-grade features including vector search, PII detection, multi-model classification, and comprehensive monitoring.
 
 ## Table of Contents
 
@@ -35,7 +37,7 @@ Terraform provisions the complete Azure infrastructure:
 
 | Tag | Valeur | Description |
 |-----|--------|-------------|
-| `cp-code-sa` | `devin` | Code service applicatif - Projet DEVIN (email classification POC) |
+| `cp-code-sa` | `devin` | Code service applicatif - Projet DEVIN (email classification MVP) |
 | `cp-deploiement` | `terraform` | Méthode de déploiement (Infrastructure as Code) |
 | `cp-environnement` | `d` | Environnement : **d** (développement), **t** (test), **p** (production) |
 | `cp-proprietaire` | `g2s-dtpo-iaf` | Propriétaire de la ressource (Direction Technique - Plateforme & Outils) |
@@ -79,7 +81,7 @@ az resource list --tag "cp-code-sa=devin" --query "[].{name:name, type:type}" -o
 
 ## Required AI Model Deployments
 
-**CRITICAL:** The following model deployments MUST exist in your Azure AI Foundry / Azure OpenAI resource for the POC to function:
+**CRITICAL:** The following model deployments MUST exist in your Azure AI Foundry / Azure OpenAI resource for the MVP to function:
 
 | Model | Deployment Name | Environment Variable | Purpose | Required |
 |-------|----------------|---------------------|---------|----------|
@@ -445,13 +447,13 @@ az cosmosdb sql role assignment list \
 
 ## Network Strategy
 
-### Current (Public POC)
+### Current (Production MVP)
 
 - All services accessible via public endpoints
 - Cosmos DB: Firewall allows `0.0.0.0` (Azure services)
 - Container Apps: External ingress enabled
 
-This is the POC configuration.
+This is the production-ready MVP configuration, designed for seamless scalability and enterprise deployment. For additional security hardening, consider the Private VNet strategy below.
 
 ### Production (Private VNet)
 

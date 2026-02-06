@@ -128,7 +128,7 @@ This restricted area allows administrators to reset the environment for testing.
 - **Delete All Data**: Completely wipes the database and storage.
     - **Atomic Nuke**: Deletes Cosmos DB items and Blob Storage files in a single transactional operation where possible.
     - **Safety**: Copilot-style confirmation ("I authorize...") required to proceed.
-    - **Use Case**: Cleaning up after a POC session or before a new demo run.
+    - **Use Case**: Cleaning up after testing or before a new demo run.
 - **Test Connectivity**:
     - **Test GPT-4o**: Verifies connectivity to the OpenAI endpoint.
     - **Test New Models**: Validates availability of GPT-5/4.1 deployments if configured.

@@ -9,7 +9,7 @@ This repo uses a 2-step AI pipeline:
 
 ---
 
-## Required Models for POC
+## Required Models for MVP
 
 **MANDATORY deployments in your Azure AI Foundry / Azure OpenAI resource:**
 

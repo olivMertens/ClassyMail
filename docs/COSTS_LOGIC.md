@@ -4,7 +4,7 @@
 
 L'UI de coûts dans l'onglet "Costs" permet de projeter les coûts mensuels de l'infrastructure Azure en fonction du volume d'emails projeté. Elle propose deux modes de calcul:
 
-1. **Fixed Estimate (POC)** - Mode par défaut
+1. **Fixed Estimate (MVP Demo)** - Mode par défaut
 2. **Azure Retail Prices API** - Mode avancé
 
 ## Architecture de la Logique
@@ -63,7 +63,7 @@ projected_ai_usd = avg_ai_usd_per_email * emails_per_month
 
 #### Étape 3: Ajout des coûts fixes d'infrastructure
 
-##### Mode "Fixed Estimate (POC)"
+##### Mode "Fixed Estimate (MVP Demo)"
 
 Utilise des estimations fixes configurables via variables d'environnement:
 
@@ -154,22 +154,22 @@ tests/test_costs_analysis.py::test_costs_breakdown_consistency PASSED
 
 ### ✅ Logique Valide
 
-La logique actuelle est **correcte et pertinente** pour un POC:
+La logique actuelle est **correcte et pertinente** pour un MVP:
 
 1. **Coûts AI réels**: Basés sur l'usage observé (très précis)
 2. **Projection linéaire**: Simple et efficace pour les estimations
 3. **Coûts fixes**: Appropriés pour l'infrastructure stable
-4. **Deux modes**: Permet flexibilité (POC vs Production)
+4. **Deux modes**: Permet flexibilité (MVP Demo vs Production Scale)
 
 ### 📊 Usage Recommandé
 
-#### Pour un POC (≤ 1000 emails/mois)
-→ Utiliser **"Fixed Estimate (POC)"**
+#### Pour un MVP/Demo (≤ 1000 emails/mois)
+→ Utiliser **"Fixed Estimate (MVP Demo)"**
 - Estimations rapides et simples
 - Pas besoin d'API externe
 - Coûts fixes suffisamment précis
 
-#### Pour la Production (> 1000 emails/mois)
+#### Pour la Production Scale (> 1000 emails/mois)
 → Utiliser **"Azure Retail Prices API"**
 - Calculs basés sur tarification réelle par région
 - Tient compte de l'usage réel (vCPU, GiB, opérations)
@@ -205,7 +205,7 @@ La logique actuelle est **correcte et pertinente** pour un POC:
 
 | Modèle | Coût / 10K | Précision | Usage Recommandé |
 |--------|-----------|-----------|------------------|
-| **Phi-4** | $2-5 | 0.82 | POC, coûts prévisibles |
+| **Phi-4** | $2-5 | 0.82 | MVP, coûts prévisibles |
 | **gpt-4o-mini** | $2-4 | 0.84 | Production cost-conscious |
 | **gpt-5-nano** | $1-2 | 0.79 | Ultra low-cost |
 | **gpt-4.1-nano** | $1-2 | 0.72 | Budget extrême |
@@ -274,8 +274,8 @@ az costmanagement query \
 ## Conclusion
 
 ✅ **La logique est solide et bien testée**
-✅ **Pertinente pour POC et Production**
+✅ **Pertinente pour MVP et Production**
 ✅ **Facilement configurable via variables d'environnement**
 ✅ **Deux modes adaptés aux différents besoins**
 
-**Recommandation**: Conserver la logique actuelle et utiliser le mode "Fixed Estimate (POC)" pour les démonstrations, puis passer au mode "Retail" pour les projections de production.
+**Recommandation**: Conserver la logique actuelle et utiliser le mode "Fixed Estimate (MVP Demo)" pour les démonstrations, puis passer au mode "Retail" pour les projections de production.

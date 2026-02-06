@@ -114,9 +114,9 @@ Optionnel :
 
 - `FINETUNE_SYSTEM_PROMPT` (contrôle le message `system` dans le JSONL exporté)
 
-## Génération de dataset POC (PDFs synthétiques)
+## Génération de dataset MVP (PDFs synthétiques)
 
-Pour le POC/demo (pas de données de prod), le repo inclut un générateur de PDFs “email-like” volontairement bruités.
+Pour le MVP/demo (pas de données de prod), le repo inclut un générateur de PDFs "email-like" volontairement bruités.
 C'est pratique pour bootstrapper rapidement le pipeline et générer suffisamment d'exemples à reviewer afin de tester l'export fine-tuning.
 
 - Script : [scripts/generate_dummy_pdfs.py](../scripts/generate_dummy_pdfs.py)
