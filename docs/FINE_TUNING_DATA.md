@@ -6,6 +6,8 @@ Ce document répond aux questions suivantes :
 - à quoi ressemble un bon dataset JSON/JSONL pour fine-tuner un classifieur
 - comment gérer la confidentialité (PII) et l'anonymisation du contenu email + markdown OCR
 
+> 📚 **Voir aussi** : [PII_ANONYMIZATION_AND_USER_CORRECTIONS.md](PII_ANONYMIZATION_AND_USER_CORRECTIONS.md) pour une documentation détaillée sur l'anonymisation PII et le système de corrections utilisateur (implémentation complète, stratégies de fine-tuning, FAQ).
+
 ## Modèles supportés pour le fine-tuning
 
 Ce repo recommande **Phi-4 avec LoRA** comme approche principale pour le fine-tuning de la classification. Plusieurs options sont disponibles :

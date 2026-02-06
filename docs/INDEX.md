@@ -28,6 +28,7 @@
 - [SCENARIO_E2E](SCENARIO_E2E.md) - Scénarios end-to-end
 - [TESTING_EMAIL_GENERATION](TESTING_EMAIL_GENERATION.md) - Génération d'emails de test
 - [FINE_TUNING_DATA](FINE_TUNING_DATA.md) - Génération de datasets fine-tuning
+- [PII_ANONYMIZATION_AND_USER_CORRECTIONS](PII_ANONYMIZATION_AND_USER_CORRECTIONS.md) - Anonymisation PII et système de corrections utilisateur
 - [COMPARISON_ADVERSARIAL](COMPARISON_ADVERSARIAL.md) - Guide comparaison adversariale Phi-4 vs GPT-4o-mini
 
 ### 📱 Interface & Features

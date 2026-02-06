@@ -589,6 +589,7 @@ These scripts check:
 - [Infrastructure Overview](INFRASTRUCTURE.md) - Full infrastructure architecture
 - [Models Documentation](MODELS.md) - Detailed model specifications
 - [RBAC Audit](RBAC_AUDIT.md) - Role-based access control setup
+- [PII Anonymization & User Corrections](PII_ANONYMIZATION_AND_USER_CORRECTIONS.md) - PII protection in fine-tuning data
 - [Troubleshooting Map](TROUBLESHOOTING_MAP.md) - Common issues and solutions
 
 ---
