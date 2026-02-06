@@ -1,16 +1,17 @@
 """
 PII Detection Service for GDPR Compliance
 
-LLM-based detection and extraction of Personal Identifiable Information (PII):
-- Names (first name, last name, full names)
-- Email addresses
-- Phone numbers
-- Physical addresses
-- Contract/policy IDs
-- Dates (birth dates, contract dates)
-- Other sensitive identifiers
+Supports multiple detection methods:
+1. LLM-based (GPT-4o-mini): Contextual understanding, flexible extraction (~$0.002/email)
+2. Azure AI Language: Native service with 40+ predefined categories (~$0.001/email)
+3. Hybrid: Combines both methods for maximum accuracy
 
-Uses JSON mode for structured extraction.
+Detection methods controlled by settings.email_preprocessing.pii_detection_method:
+- "llm": LLM-based only (default)
+- "azure_language": Azure AI Language service only
+- "both": Hybrid mode (run both, merge results)
+
+Uses JSON mode for LLM extraction.
 Optional feature controlled by email_preprocessing.detect_pii setting.
 """
 
@@ -101,7 +102,7 @@ async def detect_pii_with_llm(
 
     # Use GPT-4o-mini for PII detection (cost-effective)
     deployment = "gpt-4o-mini"
-    endpoint = config.AI_ENDPOINT
+    endpoint = config.PHI_ENDPOINT  # Fixed: was config.AI_ENDPOINT (doesn't exist)
 
     if not endpoint or not deployment:
         logger.warning("No LLM endpoint available for PII detection. Returning empty result.")
@@ -198,3 +199,119 @@ Return the PII in JSON format as specified."""
             logger.error(f"PII detection failed: {e}")
             span.record_exception(e)
             return PIIDetectionResult()
+
+
+def _merge_pii_results(llm_result: PIIDetectionResult, azure_result: PIIDetectionResult) -> PIIDetectionResult:
+    """
+    Merge PII results from LLM and Azure Language, deduplicating similar entries.
+
+    Uses case-insensitive comparison and fuzzy matching to avoid duplicates.
+    """
+    def deduplicate(items: List[str]) -> List[str]:
+        """Remove duplicates (case-insensitive) while preserving order."""
+        seen = set()
+        result = []
+        for item in items:
+            item_lower = item.lower().strip()
+            if item_lower and item_lower not in seen:
+                seen.add(item_lower)
+                result.append(item)
+        return result
+
+    return PIIDetectionResult(
+        names=deduplicate(llm_result.names + azure_result.names),
+        emails=deduplicate(llm_result.emails + azure_result.emails),
+        phones=deduplicate(llm_result.phones + azure_result.phones),
+        addresses=deduplicate(llm_result.addresses + azure_result.addresses),
+        contract_ids=deduplicate(llm_result.contract_ids + azure_result.contract_ids),
+        dates=deduplicate(llm_result.dates + azure_result.dates),
+        other=deduplicate(llm_result.other + azure_result.other),
+    )
+
+
+async def detect_pii(
+    text_content: str,
+    *,
+    method: str = "llm",
+    clients: Clients | None = None,
+    language: str = "en",
+) -> PIIDetectionResult:
+    """
+    Detect PII using the specified method(s).
+
+    Args:
+        text_content: Text to analyze for PII
+        method: Detection method - "llm", "azure_language", or "both"
+        clients: Azure clients for authentication
+        language: Language code for Azure Language service (en, fr, etc.)
+
+    Returns:
+        PIIDetectionResult with detected PII entities
+
+    Raises:
+        ValueError: If method is invalid
+    """
+    if not text_content or len(text_content.strip()) < 10:
+        return PIIDetectionResult()
+
+    method = method.lower()
+
+    if method == "llm":
+        return await detect_pii_with_llm(text_content, clients=clients)
+
+    elif method == "azure_language":
+        # Import here to avoid circular dependency and optional dependency
+        try:
+            from classymail.services.pii_detection_azure import detect_pii_with_azure_language
+            return await detect_pii_with_azure_language(text_content, clients=clients, language=language)
+        except ImportError as e:
+            logger.error(f"Azure AI Language service not available: {e}. Install: pip install azure-ai-textanalytics")
+            logger.warning("Falling back to LLM-based PII detection")
+            return await detect_pii_with_llm(text_content, clients=clients)
+
+    elif method == "both":
+        # Hybrid mode: run both methods and merge results
+        with tracer.start_as_current_span("detect_pii_hybrid") as span:
+            span.set_attribute("pii.detection.method", "hybrid")
+
+            try:
+                # Run both methods in parallel
+                llm_task = detect_pii_with_llm(text_content, clients=clients)
+
+                from classymail.services.pii_detection_azure import detect_pii_with_azure_language
+                azure_task = detect_pii_with_azure_language(text_content, clients=clients, language=language)
+
+                import asyncio
+                llm_result, azure_result = await asyncio.gather(llm_task, azure_task, return_exceptions=True)
+
+                # Handle exceptions
+                if isinstance(llm_result, Exception):
+                    logger.error(f"LLM PII detection failed in hybrid mode: {llm_result}")
+                    llm_result = PIIDetectionResult()
+
+                if isinstance(azure_result, Exception):
+                    logger.error(f"Azure Language PII detection failed in hybrid mode: {azure_result}")
+                    azure_result = PIIDetectionResult()
+
+                # Merge results
+                merged = _merge_pii_results(llm_result, azure_result)
+
+                span.set_attribute("pii.detected", merged.has_pii)
+                span.set_attribute("pii.total_count", merged.total_count)
+                span.set_attribute("pii.llm_count", llm_result.total_count)
+                span.set_attribute("pii.azure_count", azure_result.total_count)
+
+                logger.info(
+                    f"Hybrid PII detection complete: {merged.total_count} items "
+                    f"(LLM: {llm_result.total_count}, Azure: {azure_result.total_count})"
+                )
+
+                return merged
+
+            except ImportError as e:
+                logger.error(f"Azure AI Language service not available for hybrid mode: {e}")
+                logger.warning("Falling back to LLM-only PII detection")
+                return await detect_pii_with_llm(text_content, clients=clients)
+
+    else:
+        raise ValueError(f"Invalid PII detection method: {method}. Must be 'llm', 'azure_language', or 'both'")

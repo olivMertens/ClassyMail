@@ -43,6 +43,24 @@ projected_ai_usd = avg_ai_usd_per_email * emails_per_month
 
 **Exemple**: Pour 10,000 emails/mois → 0.015 × 10,000 = **150 USD/mois**
 
+##### Détail des Coûts AI par Composant
+
+**LLM-based PII Detection** (optionnel):
+- Modèle: GPT-4o-mini JSON mode
+- Coût moyen: ~€0.002/email (~0.500 tokens input + 100 tokens output)
+- Inclus dans `avg_ai_usd_per_email` si activé
+
+**Azure AI Language PII Detection** (optionnel):
+- Service: Azure AI Language Text Analytics API
+- Coût: €1.00 par 1,000 text records (Standard tier)
+- Estimation: 1 email = 1 text record → €0.001/email
+- Déploiement: Contrôlé par `deploy_language_service` (Terraform)
+- **Note**: Non inclus dans les coûts actuels (requires telemetry update)
+
+**Hybrid Mode** (both methods):
+- Coût combiné: ~€0.003/email (LLM + Azure Language)
+- Avantage: Meilleure précision, dédupication automatique
+
 #### Étape 3: Ajout des coûts fixes d'infrastructure
 
 ##### Mode "Fixed Estimate (POC)"

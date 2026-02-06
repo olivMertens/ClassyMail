@@ -139,6 +139,30 @@ wheels = [
 ]
 
 [[package]]
+name = "azure-ai-textanalytics"
+version = "5.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-common" },
+    { name = "azure-core" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3c/f4/459094eca3819b5dbe01d816a135b71eb37f16b5b50944d8e1eaaa79b88a/azure-ai-textanalytics-5.3.0.zip", hash = "sha256:4f7d067d5bb08422599ca6175510d39b0911c711301647e5f18e904a5027bf58", size = 538663, upload-time = "2023-06-15T21:14:32.483Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fa/29/58c3ec979ba9b6ce14db7f8bc96792d8c240e490704864bda39f06110964/azure_ai_textanalytics-5.3.0-py3-none-any.whl", hash = "sha256:69bb736d93de81060e9075d42b6f0b92c25be0fb106da5cb6a6d30e772168221", size = 298631, upload-time = "2023-06-15T21:14:36.369Z" },
+]
+
+[[package]]
+name = "azure-common"
+version = "1.1.28"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3e/71/f6f71a276e2e69264a97ad39ef850dca0a04fce67b12570730cb38d0ccac/azure-common-1.1.28.zip", hash = "sha256:4ac0cd3214e36b6a1b6a442686722a5d8cc449603aa833f3f0f40bda836704a3", size = 20914, upload-time = "2022-02-03T19:39:44.373Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/62/55/7f118b9c1b23ec15ca05d15a578d8207aa1706bc6f7c87218efffbbf875d/azure_common-1.1.28-py2.py3-none-any.whl", hash = "sha256:5c12d3dcf4ec20599ca6b0d3e09e86e146353d443e7fcc050c9a19c1f9df20ad", size = 14462, upload-time = "2022-02-03T19:39:42.417Z" },
+]
+
+[[package]]
 name = "azure-core"
 version = "1.38.0"
 source = { registry = "https://pypi.org/simple" }
@@ -343,6 +367,7 @@ dependencies = [
     { name = "aiohttp" },
     { name = "aiolimiter" },
     { name = "azure-ai-inference" },
+    { name = "azure-ai-textanalytics" },
     { name = "azure-cosmos" },
     { name = "azure-identity" },
     { name = "azure-monitor-opentelemetry-exporter" },
@@ -391,6 +416,7 @@ requires-dist = [
     { name = "aiohttp", specifier = "==3.13.3" },
     { name = "aiolimiter", specifier = "==1.1.0" },
     { name = "azure-ai-inference", specifier = ">=1.0.0b9" },
+    { name = "azure-ai-textanalytics", specifier = ">=5.3.0" },
     { name = "azure-cosmos", specifier = "==4.7.0" },
     { name = "azure-identity", specifier = "==1.17.0" },
     { name = "azure-monitor-opentelemetry-exporter", specifier = "==1.0.0b46" },

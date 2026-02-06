@@ -46,6 +46,10 @@ EMBEDDING_ENDPOINT = os.getenv("EMBEDDING_ENDPOINT") or PHI_ENDPOINT
 EMBEDDING_DEPLOYMENT = os.getenv("EMBEDDING_DEPLOYMENT", "text-embedding-3-small")
 EMBEDDING_API_VERSION = os.getenv("EMBEDDING_API_VERSION", AI_API_VERSION)
 
+# Azure AI Language Service for PII Detection (optional, alternative to LLM-based)
+LANGUAGE_ENDPOINT = os.getenv("AZURE_LANGUAGE_ENDPOINT")  # https://xxx.cognitiveservices.azure.com/
+LANGUAGE_KEY = os.getenv("AZURE_LANGUAGE_KEY")  # Optional key-based auth (prefer MI)
+
 
 # Vision model for image description (parallel flow with OCR)
 VISION_ENDPOINT = os.getenv("VISION_ENDPOINT") or PHI_ENDPOINT

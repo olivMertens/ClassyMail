@@ -40,7 +40,12 @@
                 "vision": "Vision (Visual Analysis - Experimental)"
             },
             "ocr_retries": "Max OCR Attempts",
-            "ocr_retries_help": "Number of OCR retry attempts (exponential backoff on network errors)."
+            "ocr_retries_help": "Number of OCR retry attempts (exponential backoff on network errors).",
+            "pii_detection_method": "PII Detection Method",
+            "pii_method_llm": "LLM-based (GPT-4o-mini) - Contextual",
+            "pii_method_azure": "Azure AI Language Service - Native API",
+            "pii_method_both": "Hybrid (Both) - Maximum Accuracy",
+            "pii_method_description": "LLM: Contextual understanding (~€0.002/email). Azure: 40+ predefined categories (~€0.001/email). Hybrid: Combines both for comprehensive detection."
         },
         "finetuning": {
             "title": "Fine-tuning Configuration",

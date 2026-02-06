@@ -40,7 +40,12 @@
                 "vision": "Vision (Analyse Visuelle - Expérimental)"
             },
             "ocr_retries": "Tentatives Max OCR",
-            "ocr_retries_help": "Nombre de tentatives OCR (retry exponentiel sur erreur réseau)."
+            "ocr_retries_help": "Nombre de tentatives OCR (retry exponentiel sur erreur réseau).",
+            "pii_detection_method": "Méthode de Détection PII",
+            "pii_method_llm": "Basé LLM (GPT-4o-mini) - Contextuel",
+            "pii_method_azure": "Service Azure AI Language - API Native",
+            "pii_method_both": "Hybride (Les deux) - Précision Maximale",
+            "pii_method_description": "LLM : Compréhension contextuelle (~€0.002/email). Azure : 40+ catégories prédéfinies (~€0.001/email). Hybride : Combine les deux pour détection complète."
         },
         "finetuning": {
             "title": "Configuration Fine-tuning",

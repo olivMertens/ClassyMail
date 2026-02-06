@@ -296,7 +296,8 @@ const saveSettings = async () => {
       finetune_min_examples: settings.value.finetune_min_examples ? Number(settings.value.finetune_min_examples) : 50,
       ocr_max_attempts: settings.value.ocr_max_attempts ? Number(settings.value.ocr_max_attempts) : 3,
       review_confidence_threshold: settings.value.review_confidence_threshold ? Number(settings.value.review_confidence_threshold) : 0.85,
-      categories: settings.value.categories
+      categories: settings.value.categories,
+      email_preprocessing: settings.value.email_preprocessing  // FIX: Include email_preprocessing settings
     }
 
     const res = await fetch('/api/settings', {
@@ -1055,6 +1056,37 @@ onMounted(() => {
                     Extract names, emails, phones, addresses for GDPR compliance (~€0.002/email)
                   </p>
                 </div>
+              </div>
+
+              <!-- PII Detection Method Dropdown (shown when PII detection enabled) -->
+              <div
+                v-if="settings.email_preprocessing.detect_pii"
+                class="ml-11 mt-3"
+              >
+                <label
+                  for="pii-method"
+                  class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                >
+                  {{ t('settings.processing.pii_detection_method') }}
+                </label>
+                <select
+                  id="pii-method"
+                  v-model="settings.email_preprocessing.pii_detection_method"
+                  class="block w-full rounded-md border-gray-300 py-1.5 pl-3 pr-10 text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                >
+                  <option value="llm">
+                    {{ t('settings.processing.pii_method_llm') }}
+                  </option>
+                  <option value="azure_language">
+                    {{ t('settings.processing.pii_method_azure') }}
+                  </option>
+                  <option value="both">
+                    {{ t('settings.processing.pii_method_both') }}
+                  </option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('settings.processing.pii_method_description') }}
+                </p>
               </div>
             </div>
           </div>

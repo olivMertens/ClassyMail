@@ -47,6 +47,12 @@ variable "cosmos_use_rbac" {
   default     = true
 }
 
+variable "deploy_language_service" {
+  type        = bool
+  description = "Deploy Azure AI Language service for native PII detection (optional). Uses Standard SKU (S tier). Free tier (F0) can be used manually if preferred."
+  default     = false
+}
+
 variable "organization_name" {
   type        = string
   description = "Organization/destination name displayed in the UI (e.g., G2S, Groupama, ClassyMail)"
@@ -211,6 +217,35 @@ resource "azapi_resource" "deployment_mistral_ocr" {
       model = { format = "Mistral", name = "mistral-ocr-2505", version = "25.05" }
     }
   })
+}
+
+# --- Optional: Azure AI Language Service for PII Detection ---
+# Provides native PII detection API as alternative to LLM-based detection
+# Enable via: deploy_language_service = true
+resource "azurerm_cognitive_account" "language" {
+  count               = var.deploy_language_service ? 1 : 0
+  name                = "${var.prefix}-language"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  kind                = "TextAnalytics"
+  sku_name            = "S"  # Standard tier for production (F0 free tier available but with limits)
+
+  tags = local.common_tags
+
+  public_network_access_enabled = true
+  local_auth_enabled            = false  # Force Managed Identity (RBAC-only)
+
+  identity {
+    type = "SystemAssigned"
+  }
+}
+
+# Grant Managed Identity access to Language service (Cognitive Services Language Reader)
+resource "azurerm_role_assignment" "aca_language_reader" {
+  count                = var.deploy_language_service ? 1 : 0
+  scope                = azurerm_cognitive_account.language[0].id
+  role_definition_name = "Cognitive Services Language Reader"
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
 # RBAC Assignments
@@ -412,6 +447,8 @@ resource "azurerm_role_assignment" "rbac_ai" {
 # Output pour la config de l'app
 output "SERVICEBUS_NAMESPACE" { value = azurerm_servicebus_namespace.sb.name }
 output "AI_ENDPOINT" { value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, null) }
+output "LANGUAGE_ENDPOINT" { value = var.deploy_language_service ? azurerm_cognitive_account.language[0].endpoint : null }
+output "LANGUAGE_SERVICE_NAME" { value = var.deploy_language_service ? azurerm_cognitive_account.language[0].name : null }
 output "APP_ID_CLIENT_ID" { value = azurerm_user_assigned_identity.app_id.client_id }
 
 output "AZURE_SERVICE_BUS_FQDN" { value = "${azurerm_servicebus_namespace.sb.name}.servicebus.windows.net" }
@@ -588,6 +625,10 @@ resource "azurerm_container_app" "api" {
         name  = "AZURE_AI_API_VERSION"
         value = "2024-08-01-preview"
       }
+      env {
+        name  = "AZURE_LANGUAGE_ENDPOINT"
+        value = var.deploy_language_service ? azurerm_cognitive_account.language[0].endpoint : ""
+      }
 
       # Telemetry
       env {
@@ -757,6 +798,10 @@ resource "azurerm_container_app" "worker" {
       env {
         name  = "AZURE_AI_API_VERSION"
         value = "2024-08-01-preview"
+      }
+      env {
+        name  = "AZURE_LANGUAGE_ENDPOINT"
+        value = var.deploy_language_service ? azurerm_cognitive_account.language[0].endpoint : ""
       }
 
       env {

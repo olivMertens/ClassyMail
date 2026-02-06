@@ -17,7 +17,7 @@ from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.settings_store import get_categories_prompt_text, load_settings
 from classymail.services.annotations import ImageDescription
 from classymail.services.email_preprocessing import preprocess_email_content
-from classymail.services.pii_detection import detect_pii_with_llm
+from classymail.services.pii_detection import detect_pii
 from classymail.core.llm_limits import get_limiter
 # from classymail.services.circuit_breaker import with_ocr_circuit_breaker, with_classification_circuit_breaker
 
@@ -641,7 +641,9 @@ async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False
     # PII Detection if enabled
     if preprocessing_config.get("detect_pii", False):
         try:
-            pii_result = await detect_pii_with_llm(text_markdown, clients=clients)
+            pii_method = preprocessing_config.get("pii_detection_method", "llm")
+            logger.info(f"Running PII detection with method: {pii_method}")
+            pii_result = await detect_pii(text_markdown, method=pii_method, clients=clients)
             logger.info(f"PII detection: {pii_result.total_count} items ({', '.join(pii_result.pii_types)})")
         except Exception as e:
             logger.warning(f"PII detection failed: {e}")

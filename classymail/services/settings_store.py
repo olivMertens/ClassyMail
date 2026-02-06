@@ -49,7 +49,8 @@ DEFAULT_SETTINGS = {
         "enabled": True,
         "include_subject": True,
         "extract_last_conversation": True,
-        "detect_pii": False
+        "detect_pii": False,  # Enable PII detection
+        "pii_detection_method": "llm",  # llm | azure_language | both
     }
 }
 PROCESSING_STRATEGY_ENV = "PROCESSING_STRATEGY"

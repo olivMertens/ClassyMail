@@ -23,6 +23,7 @@ Terraform provisions the complete Azure infrastructure:
 - Service Bus namespace + queue
 - Cosmos DB (serverless) + database/container
 - Azure AI Foundry / Azure AI Services + project
+- **Optional: Azure AI Language** service for native PII detection (TextAnalytics kind, Standard SKU)
 - User-Assigned Managed Identity + RBAC roles
 - **Required AI Model Deployments** (see below)
 
@@ -84,10 +85,44 @@ az resource list --tag "cp-code-sa=devin" --query "[].{name:name, type:type}" -o
 |-------|----------------|---------------------|---------|----------|
 | **Mistral Document AI 2505** | `mistral-document-ai-2505` | `MISTRAL_DEPLOYMENT` | OCR + Vision extraction | ✅ MANDATORY |
 | **Phi-4** | `Phi-4` | `PHI_DEPLOYMENT` | Primary classification (8K) | ✅ MANDATORY |
-| **GPT-4o-mini** | `gpt-4o-mini` | `PHI_FALLBACK_DEPLOYMENT` | Fallback classification (120K) | ✅ MANDATORY |
+| **GPT-4o-mini** | `gpt-4o-mini` | `PHI_FALLBACK_DEPLOYMENT` | Fallback classification (120K) + PII detection (LLM mode) | ✅ MANDATORY |
 | **text-embedding-3-small** | `text-embedding-3-small` | `EMBEDDING_DEPLOYMENT` | Vector embeddings (RAG) | ✅ MANDATORY |
 | **GPT-5.2-chat** | `gpt-5.2-chat` | `CHAT_DEPLOYMENT` | Chatbot conversational AI | ⚠️ RECOMMENDED |
 | **GPT-5-nano** | `gpt-5-nano` | *(hardcoded in category_assessment.py)* | Category assessment AI | ⚠️ RECOMMENDED |
+
+---
+
+## Optional Azure Services
+
+### Azure AI Language (PII Detection)
+
+**Purpose:** Native PII/PHI detection with 43+ predefined entity categories (SSN, passport, credit cards, etc.)
+
+**Deployment:**
+```terraform
+# In terraform.tfvars
+deploy_language_service = true  # Default: false
+```
+
+**Configuration:**
+- **Kind:** `TextAnalytics` (Cognitive Services)
+- **SKU:** `S` (Standard)
+- **Authentication:** Managed Identity (RBAC) - `Cognitive Services Language Reader` role
+- **Fallback:** API key via `AZURE_LANGUAGE_KEY` environment variable (optional)
+
+**Usage:** Settings > Processing > Detection Method → "Azure AI Language Service" or "Both (Hybrid)"
+
+**Cost:** ~€1.00 per 1,000 text records (1 email = 1 record) → ~€0.001/email
+
+**When to Use:**
+- ✅ Compliance requirements (GDPR, HIPAA, industry regulatory)
+- ✅ Need for 43+ predefined PII categories
+- ✅ Budget allows (~€0.001/email fixed cost)
+- ❌ Cost-sensitive deployments (use LLM-based method instead)
+
+---
+
+## Required AI Model Deployments (continued)
 
 **Deployment Instructions:**
 

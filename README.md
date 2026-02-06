@@ -111,13 +111,15 @@ Comparez en temps réel les performances de deux modèles (ex: Phi-4 vs GPT-4o-m
 *   **Fine-Tuning** : Identifiez les cas limites pour réentraîner votre modèle.
 *   👉 **Détails :** [docs/COMPARISON_ADVERSARIAL.md](docs/COMPARISON_ADVERSARIAL.md)
 
-### 🛡️ PII Detection & Indicators (NEW)
-Protection GDPR des données personnelles :
-*   **Détection Automatique** : Identifie noms, emails, téléphones, adresses, NIR, IBAN
+### 🛡️ PII Detection & Indicators (ENHANCED)
+**Protection GDPR avec 3 méthodes configurables (Settings > Processing)** :
+*   **LLM-based (default)** : Extraction contextuelle via GPT-4o-mini (~€0.002/email) - Détecte noms, emails, téléphones, adresses, NIR, IBAN
+*   **Azure AI Language** : Service natif 43+ catégories prédéfinies (SSN, passeports, cartes bancaires) (~€0.001/email) - Requires `deploy_language_service=true` in Terraform
+*   **Hybrid Mode** : Combine les deux méthodes, déduplique les résultats (précision maximale, ~€0.003/email)
 *   **Indicateurs Visuels** : Shield icon (🛡️) dans les cards + badge "DCP" dans les tables
 *   **Métadonnées Structurées** : Stockage JSON des entités PII détectées
 *   **Anonymisation** : Support pour anonymiser les données avant export
-*   👉 **Activation :** Configure via `email_preprocessing.detect_pii` setting
+*   👉 **Activation :** Configure via `email_preprocessing.detect_pii` setting + method selector
 
 ### 📊 Dynamic Cost Tracking (NEW)
 Suivi précis des coûts par email et par modèle :

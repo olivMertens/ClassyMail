@@ -134,6 +134,16 @@ Pour isoler totalement le système d'Internet (VNet Injection), l'architecture c
     - Configurer des zones **Private DNS** (`privatelink.documents.azure.com`, `privatelink.blob.core.windows.net`, etc.) pour que l'URI standard résolve vers l'IP privée.
 4.  **Flux** : Le trafic sortant des Container Apps restera dans le backbone Azure privé via les Private Endpoints. L'exception pare-feu `0.0.0.0` sur Cosmos DB devra être retirée.
 
+## 4.1. PII Detection (GDPR Compliance)
+
+Trois méthodes de détection PII configurables (Settings > Processing):
+
+1. **LLM-based (default)**: GPT-4o-mini JSON mode. Contextuel (~€0.002/email).
+2. **Azure AI Language**: Service natif 40+ catégories (SSN, cartes, passeports). ~€0.001/email. Terraform: `deploy_language_service=true`.
+3. **Hybrid**: Combine LLM + Azure Language, déduplique résultats.
+
+**Architecture**: `pii_detection.py` dispatcher → `pii_detection_azure.py` (TextAnalyticsClient + MI). Résultats: `EmailRecord.pii_detected` + `pii_data`.
+
 ## 5. Observabilité & Coûts
 
 - OpenTelemetry spans custom `gen_ai.*` : pages (Mistral), tokens (Phi‑4).
