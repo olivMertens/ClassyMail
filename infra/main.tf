@@ -300,6 +300,7 @@ resource "azurerm_cosmosdb_account" "db" {
   # On aligne le comportement Terraform avec ce mode; vous pouvez forcer cosmos_use_rbac=false uniquement si vous avez le droit d'activer l'auth locale.
   local_authentication_disabled = var.cosmos_use_rbac
   capabilities { name = "EnableServerless" } # Mode économique pour POC
+  capabilities { name = "EnableNoSQLVectorSearch" } # Nécessaire pour vector_cache (quantizedFlat / cosine embeddings)
   geo_location {
     location          = var.location
     failover_priority = 0
@@ -390,7 +391,7 @@ resource "azapi_resource" "vector_cache" {
   # Schema validation disabled: vectorIndexes / vectorEmbeddingPolicy not fully GA yet
   schema_validation_enabled = false
 
-  type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15"
+  type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15"
   name      = "vector_cache"
   parent_id = azurerm_cosmosdb_sql_database.sql.id
 
@@ -716,6 +717,16 @@ resource "azurerm_container_app" "api" {
     }
   }
 
+  # Ensure RBAC roles are provisioned before first boot; without this the ACA may
+  # start before Azure AD propagates the role assignments, causing 403 errors.
+  depends_on = [
+    azurerm_role_assignment.aca_storage_contrib,
+    azurerm_role_assignment.aca_sb_receiver,
+    azurerm_role_assignment.aca_sb_sender,
+    azurerm_role_assignment.rbac_ai,
+    azurerm_cosmosdb_sql_role_assignment.aca_cosmos_sql_contrib,
+  ]
+
   lifecycle {
     ignore_changes = [
       template[0].container[0].image
@@ -846,7 +857,12 @@ resource "azurerm_container_app" "worker" {
       }
     }
 
-    min_replicas = 0
+    # min_replicas = 1 (not 0): the KEDA azure-servicebus scaler cannot
+    # authenticate to a Service Bus namespace that has local_auth_enabled=false
+    # because the azurerm provider does not yet support identity-based auth on
+    # custom_scale_rule.  With min_replicas = 0 the worker would never scale up.
+    # TODO: switch back to 0 once azurerm supports `identity` on custom_scale_rule.
+    min_replicas = 1
     max_replicas = 10
 
     custom_scale_rule {
@@ -854,11 +870,20 @@ resource "azurerm_container_app" "worker" {
       custom_rule_type = "azure-servicebus"
       metadata = {
         queueName    = azurerm_servicebus_queue.q.name
-        namespace    = azurerm_servicebus_namespace.sb.name
+        namespace    = "${azurerm_servicebus_namespace.sb.name}.servicebus.windows.net"
         messageCount = "5"
       }
     }
   }
+
+  # Ensure RBAC roles are provisioned before first boot.
+  depends_on = [
+    azurerm_role_assignment.aca_storage_contrib,
+    azurerm_role_assignment.aca_sb_receiver,
+    azurerm_role_assignment.aca_sb_sender,
+    azurerm_role_assignment.rbac_ai,
+    azurerm_cosmosdb_sql_role_assignment.aca_cosmos_sql_contrib,
+  ]
 
   lifecycle {
     ignore_changes = [
