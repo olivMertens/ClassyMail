@@ -137,7 +137,7 @@ const addNewCategory = () => {
 }
 
 const removeCategory = async (index) => {
-  if (await confirm('Are you sure you want to remove this category?')) {
+  if (await confirm(t('settings.categories.form.remove_confirm'))) {
     settings.value.categories.splice(index, 1)
     expandedCategories.value.delete(index)
     categoryAssessments.value.delete(index)
@@ -483,7 +483,7 @@ onMounted(() => {
           @click="activeTab = 'classification'"
         >
           <QueueListIcon class="h-4 w-4" />
-          Categories
+          {{ t('settings.categories.tab_name') }}
         </button>
         <button
           :class="[activeTab === 'design' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
@@ -1341,8 +1341,7 @@ onMounted(() => {
                     <div class="grid grid-cols-1 gap-4">
                       <div class="grid grid-cols-2 gap-3">
                         <div>
-                          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Name
-                            (Display)</label>
+                          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{{ t('settings.categories.form.name_label') }}</label>
                           <input
                             v-model="cat.name"
                             type="text"
@@ -1351,8 +1350,7 @@ onMounted(() => {
                           >
                         </div>
                         <div>
-                          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Slug (Technical
-                            ID for CSV)</label>
+                          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{{ t('settings.categories.form.slug_label') }}</label>
                           <input
                             v-model="cat.slug"
                             type="text"
@@ -1364,26 +1362,26 @@ onMounted(() => {
                       </div>
                       <div>
                         <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Definition (What it IS) - {{ cat.description?.length || 0 }}/2000
+                          {{ t('settings.categories.form.definition_label') }} - {{ cat.description?.length || 0 }}/2000
                         </label>
                         <textarea
                           v-model="cat.description"
                           rows="2"
                           maxlength="2000"
-                          placeholder="Describe what this category includes..."
+                          :placeholder="t('settings.categories.form.definition_placeholder')"
                           class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono text-xs"
                           @change="updateCategory(idx, 'description', cat.description)"
                         />
                       </div>
                       <div>
                         <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Exclusions (What it ISN'T) - {{ cat.exclusions?.length || 0 }}/2000
+                          {{ t('settings.categories.form.exclusions_label') }} - {{ cat.exclusions?.length || 0 }}/2000
                         </label>
                         <textarea
                           v-model="cat.exclusions"
                           rows="2"
                           maxlength="2000"
-                          placeholder="Describe what this category does NOT include..."
+                          :placeholder="t('settings.categories.form.exclusions_placeholder')"
                           class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono text-xs"
                           @change="updateCategory(idx, 'exclusions', cat.exclusions)"
                         />
@@ -1412,7 +1410,7 @@ onMounted(() => {
                         </button>
                         <span class="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 italic">
                           <ExclamationTriangleIcon class="h-3 w-3" />
-                          Changes are applied locally. Click "Save Changes" above to commit.
+                          {{ t('settings.categories.form.local_changes_warning') }}
                         </span>
                       </div>
                     </div>
@@ -1525,7 +1523,7 @@ onMounted(() => {
                 :is="newCategoryExpanded ? ChevronUpIcon : PlusIcon"
                 class="h-5 w-5"
               />
-              {{ newCategoryExpanded ? 'Cancel Adding Category' : 'Add New Category' }}
+              {{ newCategoryExpanded ? t('settings.categories.form.cancel_adding') : t('settings.categories.form.add_new_category') }}
             </button>
 
             <div
@@ -1534,8 +1532,7 @@ onMounted(() => {
             >
               <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
                 <div class="sm:col-span-3">
-                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Name
-                    (Display)</label>
+                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{ t('settings.categories.form.name_label') }}</label>
                   <div class="mt-1">
                     <input
                       v-model="newCategory.name"
@@ -1546,8 +1543,7 @@ onMounted(() => {
                   </div>
                 </div>
                 <div class="sm:col-span-3">
-                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Slug (Technical
-                    ID)</label>
+                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{ t('settings.categories.form.slug_label') }}</label>
                   <div class="mt-1">
                     <input
                       v-model="newCategory.slug"
@@ -1558,13 +1554,12 @@ onMounted(() => {
                     >
                   </div>
                   <p class="mt-1 text-xs text-gray-500">
-                    Auto-generated if left empty
+                    {{ t('settings.categories.form.slug_help') }}
                   </p>
                 </div>
                 <div class="sm:col-span-6">
                   <div class="flex justify-between">
-                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Definition
-                      (What it IS)</label>
+                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{ t('settings.categories.form.definition_label') }}</label>
                     <span class="text-xs text-gray-500">{{ newCategory.description?.length || 0 }}/2000</span>
                   </div>
                   <div class="mt-1">
@@ -1573,14 +1568,13 @@ onMounted(() => {
                       rows="2"
                       maxlength="2000"
                       class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono text-xs"
-                      placeholder="Describe what this category includes..."
+                      :placeholder="t('settings.categories.form.definition_placeholder')"
                     />
                   </div>
                 </div>
                 <div class="sm:col-span-6">
                   <div class="flex justify-between">
-                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Exclusions
-                      (What it ISN'T)</label>
+                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{ t('settings.categories.form.exclusions_label') }}</label>
                     <span class="text-xs text-gray-500">{{ newCategory.exclusions?.length || 0 }}/2000</span>
                   </div>
                   <div class="mt-1">
@@ -1589,7 +1583,7 @@ onMounted(() => {
                       rows="2"
                       maxlength="2000"
                       class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-600 font-mono text-xs"
-                      placeholder="Describe what this category does NOT include..."
+                      :placeholder="t('settings.categories.form.exclusions_placeholder')"
                     />
                   </div>
                 </div>
@@ -1601,7 +1595,7 @@ onMounted(() => {
                   @click="addNewCategory"
                 >
                   <PlusIcon class="h-5 w-5 mr-1" />
-                  Add Category
+                  {{ t('settings.categories.form.add_button') }}
                 </button>
               </div>
             </div>

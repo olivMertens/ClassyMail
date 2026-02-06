@@ -406,7 +406,8 @@ const renderMarkdown = (text) => md.render(text || '')
                 :class="strategyBadge(email.processing_strategy).color"
                 :title="t('email_detail.processing_mode') + ': ' + t('dashboard.strategy.' + email.processing_strategy)"
               >
-                {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' + email.processing_strategy) }}
+                {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' +
+                  email.processing_strategy) }}
               </span>
               <button
                 type="button"

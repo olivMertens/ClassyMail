@@ -67,11 +67,26 @@
         "strategy_reasoning_help": "Analyse Profonde. Utilise le 'Chain-of-Thought' pour justifier avant de classifier. Utile pour les cas ambigus.",
         "strategy_vision_help": "Multimodal. Analyse les éléments visuels (images, mise en page). Idéal pour les documents avec photos ou structures complexes.",
         "categories": {
+            "tab_name": "Catégories",
             "warning_title": "⚠️ Avertissement Comportement Système",
             "warning_text": "Modifier les catégories change la façon dont l'IA classifie tous les futurs emails. Les emails existants conservent leur classification d'origine. Les changements sont appliqués immédiatement après la sauvegarde.",
             "managed_title": "Catégories de Classification Gérées",
             "current_categories": "Définir les catégories d'intention que l'IA utilisera pour la classification.",
             "save_button": "Enregistrer dans le Système",
+            "form": {
+                "name_label": "Nom (Affichage)",
+                "slug_label": "Slug (ID Technique pour CSV)",
+                "slug_help": "Auto-généré si laissé vide",
+                "definition_label": "Définition (Ce que c'EST)",
+                "definition_placeholder": "Décrivez ce que cette catégorie inclut...",
+                "exclusions_label": "Exclusions (Ce que ce N'EST PAS)",
+                "exclusions_placeholder": "Décrivez ce que cette catégorie n'inclut PAS...",
+                "local_changes_warning": "Les modifications sont appliquées localement. Cliquez sur \"Enregistrer dans le Système\" ci-dessus pour valider.",
+                "add_button": "Ajouter Catégorie",
+                "add_new_category": "Ajouter Nouvelle Catégorie",
+                "cancel_adding": "Annuler l'Ajout de Catégorie",
+                "remove_confirm": "Êtes-vous sûr de vouloir supprimer cette catégorie ?"
+            },
             "assessment": {
                 "button": "Obtenir des Conseils IA (GPT-5 Nano)",
                 "analyzing": "Analyse en cours...",

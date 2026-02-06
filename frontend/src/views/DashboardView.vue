@@ -808,7 +808,8 @@ const emit = defineEmits(['open-email'])
               :class="strategyBadge(email.processing_strategy).color"
               :title="t('dashboard.strategy.' + (email.processing_strategy || 'standard'))"
             >
-              {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' + strategyBadge(email.processing_strategy).key) }}
+              {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' +
+                strategyBadge(email.processing_strategy).key) }}
             </span>
             <div
               v-if="formatDuration(email)"
@@ -1156,7 +1157,8 @@ const emit = defineEmits(['open-email'])
                 :class="strategyBadge(email.processing_strategy).color"
                 :title="t('dashboard.strategy.' + (email.processing_strategy || 'standard'))"
               >
-                {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' + strategyBadge(email.processing_strategy).key) }}
+                {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' +
+                  strategyBadge(email.processing_strategy).key) }}
               </span>
             </div>
           </td>

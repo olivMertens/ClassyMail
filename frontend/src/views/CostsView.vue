@@ -164,7 +164,8 @@ onMounted(() => {
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
             {{ t('costs.proc_vs_usage', {
               processed: costs.counts?.processed ?? 0, priced:
-                costs.counts?.emails_with_usage ?? 0 }) }}
+                costs.counts?.emails_with_usage ?? 0
+            }) }}
           </p>
         </div>
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg px-4 py-5 sm:p-6">

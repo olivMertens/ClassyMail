@@ -67,11 +67,26 @@
         "strategy_reasoning_help": "Deep Analysis. Uses Chain-of-Thought to justify decisions before classifying. Useful for ambiguous cases.",
         "strategy_vision_help": "Multimodal. Analyzes visual elements (images, layouts) in addition to text. Best for documents with photos or complex structures.",
         "categories": {
+            "tab_name": "Categories",
             "warning_title": "⚠️ System Behavior Warning",
             "warning_text": "Modifying categories changes how the AI classifies all future emails. Existing emails keep their original classification. Changes are applied immediately after saving.",
             "managed_title": "Managed Classification Categories",
             "current_categories": "Define the intent categories that the AI will use for classification.",
             "save_button": "Save Changes to System",
+            "form": {
+                "name_label": "Name (Display)",
+                "slug_label": "Slug (Technical ID for CSV)",
+                "slug_help": "Auto-generated if left empty",
+                "definition_label": "Definition (What it IS)",
+                "definition_placeholder": "Describe what this category includes...",
+                "exclusions_label": "Exclusions (What it ISN'T)",
+                "exclusions_placeholder": "Describe what this category does NOT include...",
+                "local_changes_warning": "Changes are applied locally. Click \"Save Changes\" above to commit.",
+                "add_button": "Add Category",
+                "add_new_category": "Add New Category",
+                "cancel_adding": "Cancel Adding Category",
+                "remove_confirm": "Are you sure you want to remove this category?"
+            },
             "assessment": {
                 "button": "Get AI Advice (GPT-5 Nano)",
                 "analyzing": "Analyzing...",
