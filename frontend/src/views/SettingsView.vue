@@ -1419,7 +1419,8 @@ onMounted(() => {
                     <div class="grid grid-cols-1 gap-4">
                       <div class="grid grid-cols-2 gap-3">
                         <div>
-                          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{{ t('settings.categories.form.name_label') }}</label>
+                          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{{
+                            t('settings.categories.form.name_label') }}</label>
                           <input
                             v-model="cat.name"
                             type="text"
@@ -1428,7 +1429,8 @@ onMounted(() => {
                           >
                         </div>
                         <div>
-                          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{{ t('settings.categories.form.slug_label') }}</label>
+                          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{{
+                            t('settings.categories.form.slug_label') }}</label>
                           <input
                             v-model="cat.slug"
                             type="text"
@@ -1601,7 +1603,8 @@ onMounted(() => {
                 :is="newCategoryExpanded ? ChevronUpIcon : PlusIcon"
                 class="h-5 w-5"
               />
-              {{ newCategoryExpanded ? t('settings.categories.form.cancel_adding') : t('settings.categories.form.add_new_category') }}
+              {{ newCategoryExpanded ? t('settings.categories.form.cancel_adding') :
+                t('settings.categories.form.add_new_category') }}
             </button>
 
             <div
@@ -1610,7 +1613,8 @@ onMounted(() => {
             >
               <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
                 <div class="sm:col-span-3">
-                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{ t('settings.categories.form.name_label') }}</label>
+                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{
+                    t('settings.categories.form.name_label') }}</label>
                   <div class="mt-1">
                     <input
                       v-model="newCategory.name"
@@ -1621,7 +1625,8 @@ onMounted(() => {
                   </div>
                 </div>
                 <div class="sm:col-span-3">
-                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{ t('settings.categories.form.slug_label') }}</label>
+                  <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{
+                    t('settings.categories.form.slug_label') }}</label>
                   <div class="mt-1">
                     <input
                       v-model="newCategory.slug"
@@ -1637,7 +1642,8 @@ onMounted(() => {
                 </div>
                 <div class="sm:col-span-6">
                   <div class="flex justify-between">
-                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{ t('settings.categories.form.definition_label') }}</label>
+                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{
+                      t('settings.categories.form.definition_label') }}</label>
                     <span class="text-xs text-gray-500">{{ newCategory.description?.length || 0 }}/2000</span>
                   </div>
                   <div class="mt-1">
@@ -1652,7 +1658,8 @@ onMounted(() => {
                 </div>
                 <div class="sm:col-span-6">
                   <div class="flex justify-between">
-                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{ t('settings.categories.form.exclusions_label') }}</label>
+                    <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{
+                      t('settings.categories.form.exclusions_label') }}</label>
                     <span class="text-xs text-gray-500">{{ newCategory.exclusions?.length || 0 }}/2000</span>
                   </div>
                   <div class="mt-1">

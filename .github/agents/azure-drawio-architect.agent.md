@@ -66,22 +66,22 @@ Client Layer:
 └─ REST API Client
 
 API Layer:
-├─ FastAPI Application #classificationg2s/app.py
+├─ FastAPI Application #classymail/app.py
 ├─ Health Endpoints (/healthz, /readyz)
-└─ Upload Handler #classificationg2s/api/routers/
+└─ Upload Handler #classymail/api/routers/
 
 Message Queue:
 └─ Azure Service Bus #sb_client
 
 Worker Layer:
-├─ KEDA-scaled Worker (1-10 instances) #classificationg2s/worker_main.py
-└─ Message Handler #classificationg2s/services/worker.py
+├─ KEDA-scaled Worker (1-10 instances) #classymail/worker_main.py
+└─ Message Handler #classymail/services/worker.py
 
 AI Processing Layer:
-├─ Mistral Document AI 2505 (OCR) #classificationg2s/services/pipeline.py
-├─ Phi-4 (Classification, 8K context) #classificationg2s/services/llm_pipeline.py
+├─ Mistral Document AI 2505 (OCR) #classymail/services/pipeline.py
+├─ Phi-4 (Classification, 8K context) #classymail/services/llm_pipeline.py
 ├─ GPT-4o-mini (Fallback, 120K context)
-└─ GPT-5.2-chat (Chatbot) #classificationg2s/services/chat_agent.py
+└─ GPT-5.2-chat (Chatbot) #classymail/services/chat_agent.py
 
 Data Layer:
 ├─ Azure Blob Storage (PDFs, images) #azure_clients.py
@@ -141,7 +141,7 @@ Based on verified deployment from MCP Azure:
 ### STEP 4: Code Linking Pattern
 
 - Add text annotations with `#` references
-- Example: "Worker Pod #classificationg2s/worker_main.py"
+- Example: "Worker Pod #classymail/worker_main.py"
 - Link infrastructure: "ACA Worker #infra/main.tf:45-89"
 - Include MCP-verified resource names: "ACA: <actual-resource-name-from-mcp>"
 
@@ -172,7 +172,7 @@ Based on verified deployment from MCP Azure:
         <mxCell id="1" parent="0"/>
 
         <!-- Example: Azure Container App with CAE icon -->
-        <mxCell id="2" value="API Container&#xa;#classificationg2s/app.py"
+        <mxCell id="2" value="API Container&#xa;#classymail/app.py"
                 style="shape=mxgraph.azure.container_apps;fillColor=#0072C6"
                 vertex="1" parent="1">
           <mxGeometry x="100" y="100" width="80" height="80" as="geometry"/>

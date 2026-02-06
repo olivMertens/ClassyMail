@@ -62,7 +62,7 @@ The worker is likely crashing or configured incorrectly.
     ```bash
     az containerapp logs show --name email-poc-worker --resource-group email-poc-rg --tail 50
     ```
-    *   **Look for `ModuleNotFoundError`**: The startup command is wrong (e.g., using old `classificationg2s` instead of `classymail`).
+    *   **Look for `ModuleNotFoundError`**: The startup command is wrong (e.g., using old package name instead of `classymail`).
     *   **Look for `AttributeError: 'NoneType' object has no attribute 'strip'`**: Missing Environment Variables (likely `AZURE_SERVICE_BUS_FQDN`).
     *   **Look for `AzureIdentityCredentialAdapter` errors**: The RBAC role is missing on the resource.
 

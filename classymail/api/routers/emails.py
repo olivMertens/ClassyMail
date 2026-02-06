@@ -831,7 +831,7 @@ async def export_emails_csv(
         output = io.StringIO()
 
         if format == "minimal":
-            # Client G2S compatible format: ID;INTENTIONS;CONFIDENCE_MOYENNE
+            #  compatible format: ID;INTENTIONS;CONFIDENCE_MOYENNE
             writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
             writer.writerow(['ID', 'INTENTIONS', 'CONFIDENCE_MOYENNE'])
 

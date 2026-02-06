@@ -249,5 +249,5 @@ flowchart LR
 
 - API expose `/healthz` `/readyz` (alias `/health` `/ready`).
 - Worker scale via KEDA (azure-servicebus, managed identity).
-- Même image pour API/Worker; worker: `python -m classificationg2s.worker_main`.
+- Même image pour API/Worker; worker: `python -m classymail.worker_main`.
 - MI `app_id` a les rôles: Storage Blob Data Contributor, Azure Service Bus Data Receiver/Sender, Cosmos DB SQL Data Contributor, Cognitive Services User.

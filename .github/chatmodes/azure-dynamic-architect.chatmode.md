@@ -167,9 +167,9 @@ Utiliser MCP pour vérifier les limites actuelles :
 ### Documentation
 
 - **Code Linking**: Utilise `#` pour référencer le code source
-  - Exemple: "Le pipeline LLM (`#classificationg2s/services/llm_pipeline.py`) intègre..."
+  - Exemple: "Le pipeline LLM (`#classymail/services/llm_pipeline.py`) intègre..."
   - Infrastructure: `#infra/main.tf`, `#infra/policy.tf`
-  - Config: `#classificationg2s/core/config.py`
+  - Config: `#classymail/core/config.py`
 - **Format**: Markdown avec sections claires
 - **Langue**: Français pour la documentation, anglais pour le code/commentaires
 - **MCP Citations**: Toujours citer les sources Microsoft Learn obtenues via MCP
@@ -179,7 +179,7 @@ Utiliser MCP pour vérifier les limites actuelles :
 - **Linting**: TOUJOURS exécuter `uv run ruff check .` avant de finaliser
 - **Tests**: Exécuter `uv run pytest` si modifications fonctionnelles
 - **Health Checks**: Utiliser `/healthz` et `/readyz` (aliases: `/health`, `/ready`)
-- **Main.py**: NE PAS modifier sauf pour déléguer à `classificationg2s.app:app`
+- **Main.py**: NE PAS modifier sauf pour déléguer à `classymail.app:app`
 - **DI Pattern**: Toujours injecter `Clients` via `Depends(get_clients)`
 
 ## Architecture Patterns
