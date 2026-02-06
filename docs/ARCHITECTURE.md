@@ -156,10 +156,70 @@ Trois méthodes de détection PII configurables (Settings > Processing):
 
 **Architecture**: `pii_detection.py` dispatcher → `pii_detection_azure.py` (TextAnalyticsClient + MI). Résultats: `EmailRecord.pii_detected` + `pii_data`.
 
-## 5. Observabilité & Coûts
+## 5. Observabilité & Monitoring
 
-- OpenTelemetry spans custom `gen_ai.*` : pages (Mistral), tokens (Phi‑4).
-- Coûts par email (UI & CSV) : pricing dépend du tenant/région. Les coûts sont configurables via variables d’environnement et doivent être alignés sur la page officielle Azure.
+### OpenTelemetry Stack
+
+ClassyMail uses the **Azure Monitor OpenTelemetry Distro** (`azure-monitor-opentelemetry`) for full observability: distributed tracing, metrics, logging, and Live Metrics.  The telemetry module (`classymail/core/telemetry.py`) supports a two-tier setup:
+
+| Tier | Package | Features |
+|:-----|:--------|:---------|
+| **Full distro** (production) | `azure-monitor-opentelemetry` | Application Map, Agents View, Live Metrics, GenAI tracing, auto-instrumentation |
+| **Exporter-only** (local dev) | `azure-monitor-opentelemetry-exporter` | Trace-only, lighter footprint |
+
+### Application Map
+
+[Application Map](https://learn.microsoft.com/en-us/azure/azure-monitor/app/app-map) shows the full topology of ClassyMail's distributed components:
+
+```mermaid
+flowchart LR
+    API["classymail-api - Container App"] --> SB["Service Bus"]
+    API --> Cosmos["Cosmos DB"]
+    API --> Storage["Blob Storage"]
+    API --> Foundry["AI Foundry - Phi-4 / Mistral"]
+    Worker["classymail-worker - Container App"] --> SB
+    Worker --> Cosmos
+    Worker --> Storage
+    Worker --> Foundry
+```
+
+Application Map automatically discovers these nodes using **cloud role names** from OpenTelemetry resource attributes:
+
+| Resource Attribute | Value | Purpose |
+|:-------------------|:------|:--------|
+| `service.name` | `classymail-api` / `classymail-worker` | Cloud role name (each node on the map) |
+| `service.namespace` | `classymail` | Groups both roles under one logical application |
+| `service.instance.id` | hostname (auto) | Differentiates replicas for drill-down |
+
+These are set via `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` environment variables in Terraform (`#infra/main.tf`).
+
+### Agents View (Preview)
+
+[Agents View](https://learn.microsoft.com/en-us/azure/azure-monitor/app/agents-view) provides GenAI-specific monitoring in **Application Insights > Agents (Preview)**:
+
+- **Token usage & costs** per model (Phi-4, Mistral OCR, GPT-4o-mini)
+- **Tool calls** and model invocation patterns
+- **End-to-end transaction details** with GenAI-aware simple view
+- **Error analysis** for LLM pipeline failures
+
+Enable via the environment variable `AZURE_MONITOR_ENABLE_GENAI_TRACES=true` (already set in Terraform).
+
+The LLM pipeline (`#classymail/services/llm_pipeline.py`) and anonymizer (`#classymail/services/anonymizer.py`) emit `gen_ai.*` span attributes following [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/):
+
+| Attribute | Example |
+|:----------|:--------|
+| `gen_ai.system` | `azure_openai`, `mistral` |
+| `gen_ai.operation` | `chat.completions`, `document.ocr` |
+| `gen_ai.request.model` | `Phi-4`, `mistral-document-ai-2505` |
+| `gen_ai.usage.input_tokens` | 3500 |
+| `gen_ai.usage.output_tokens` | 250 |
+
+> **AI Foundry Integration**: To see agents in AI Foundry Monitoring tab as well, connect the Application Insights resource to the AI Foundry Project in the Azure Portal.
+
+### Custom Metrics
+
+- OpenTelemetry spans with `gen_ai.*` attributes: pages (Mistral), tokens (Phi-4)
+- Per-email cost calculation (UI & CSV export): pricing configurable via environment variables
 
 ## 5. Fine-tuning LoRA (Phi‑4)
 

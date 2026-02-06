@@ -633,10 +633,22 @@ resource "azurerm_container_app" "api" {
         value = var.deploy_language_service ? azurerm_cognitive_account.language[0].endpoint : ""
       }
 
-      # Telemetry
+      # --- Telemetry: Application Map + Agents View ---
+      # service.name  → cloud role name on Application Map
+      # service.namespace → groups API + Worker under one logical app
+      # AZURE_MONITOR_ENABLE_GENAI_TRACES → enables GenAI tracing
+      #   (Agents View in Application Insights → "Agents (Preview)")
       env {
         name  = "OTEL_SERVICE_NAME"
         value = "classymail-api"
+      }
+      env {
+        name  = "OTEL_RESOURCE_ATTRIBUTES"
+        value = "service.namespace=classymail"
+      }
+      env {
+        name  = "AZURE_MONITOR_ENABLE_GENAI_TRACES"
+        value = "true"
       }
       env {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
@@ -807,9 +819,18 @@ resource "azurerm_container_app" "worker" {
         value = var.deploy_language_service ? azurerm_cognitive_account.language[0].endpoint : ""
       }
 
+      # --- Telemetry: Application Map + Agents View ---
       env {
         name  = "OTEL_SERVICE_NAME"
         value = "classymail-worker"
+      }
+      env {
+        name  = "OTEL_RESOURCE_ATTRIBUTES"
+        value = "service.namespace=classymail"
+      }
+      env {
+        name  = "AZURE_MONITOR_ENABLE_GENAI_TRACES"
+        value = "true"
       }
       env {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
