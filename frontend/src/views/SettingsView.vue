@@ -713,11 +713,18 @@ onMounted(() => {
               </div>
               <div class="ml-3 flex-1 text-sm">
                 <p class="font-medium text-blue-800 dark:text-blue-300 mb-1">
-                  Model Comparison (Azure Foundry Benchmarks)
+                  Model Comparison — Estimated Quality & Cost
+                </p>
+                <p class="text-xs italic text-blue-600 dark:text-blue-300 mb-2">
+                  💡 Prices vary by region, volume, and caching. Verify with the <a
+                    href="https://azure.microsoft.com/en-us/pricing/calculator/"
+                    target="_blank"
+                    class="underline font-semibold"
+                  >Azure Pricing Calculator</a>.
                 </p>
                 <div class="text-blue-700 dark:text-blue-200 space-y-1">
                   <div class="flex items-center justify-between gap-2">
-                    <span><strong>gpt-4o:</strong> Quality 0.92 ⭐⭐, Cost ~$120/10K emails</span>
+                    <span><strong>gpt-4o:</strong> Quality 0.92 ⭐⭐, Cost ~$30-60/10K emails</span>
                     <div class="flex gap-2 shrink-0">
                       <span
                         v-if="settings.ai_model === 'gpt-4o'"
@@ -734,7 +741,7 @@ onMounted(() => {
                     </div>
                   </div>
                   <div class="flex items-center justify-between gap-2">
-                    <span><strong>gpt-5-mini:</strong> Quality 0.89 ⭐, Cost ~$70/10K emails</span>
+                    <span><strong>gpt-5-mini:</strong> Quality 0.89 ⭐, Cost ~$8-12/10K emails</span>
                     <div class="flex gap-2 shrink-0">
                       <span
                         v-if="settings.ai_model === 'gpt-5-mini'"
@@ -751,7 +758,7 @@ onMounted(() => {
                     </div>
                   </div>
                   <div class="flex items-center justify-between gap-2">
-                    <span><strong>gpt-5-nano:</strong> Quality 0.79 ⭐, Cost ~$35/10K emails</span>
+                    <span><strong>gpt-5-nano:</strong> Quality 0.79 ⭐, Cost ~$1-2/10K emails</span>
                     <div class="flex gap-2 shrink-0">
                       <span
                         v-if="settings.ai_model === 'gpt-5-nano'"
@@ -768,7 +775,7 @@ onMounted(() => {
                     </div>
                   </div>
                   <div class="flex items-center justify-between gap-2">
-                    <span><strong>Phi-4 (base):</strong> Quality 0.82, Cost ~$12/10K emails</span>
+                    <span><strong>Phi-4 (base):</strong> Quality 0.82, Cost ~$2-5/10K emails</span>
                     <div class="flex gap-2 shrink-0">
                       <span
                         v-if="settings.ai_model === 'phi4'"
@@ -785,7 +792,7 @@ onMounted(() => {
                     </div>
                   </div>
                   <div class="flex items-center justify-between gap-2">
-                    <span><strong>gpt-4o-mini:</strong> Quality 0.84, Cost ~$22/10K emails</span>
+                    <span><strong>gpt-4o-mini:</strong> Quality 0.84, Cost ~$2-4/10K emails</span>
                     <div class="flex gap-2 shrink-0">
                       <span
                         v-if="settings.ai_model === 'gpt-4o-mini'"
@@ -802,7 +809,7 @@ onMounted(() => {
                     </div>
                   </div>
                   <div class="flex items-center justify-between gap-2">
-                    <span><strong>gpt-4.1-nano:</strong> Quality 0.69, Cost ~$17/10K emails</span>
+                    <span><strong>gpt-4.1-nano:</strong> Quality 0.72, Cost ~$1-2/10K emails</span>
                     <div class="flex gap-2 shrink-0">
                       <span
                         v-if="settings.ai_model === 'gpt-4.1-nano'"
@@ -818,14 +825,6 @@ onMounted(() => {
                       </span>
                     </div>
                   </div>
-                  <p class="mt-2 text-xs italic border-t border-blue-200 dark:border-blue-700 pt-2">
-                    💡 <strong>Strategy:</strong> Prices may vary by region and volume. Please verify with the
-                    <a
-                      href="https://azure.microsoft.com/en-us/pricing/calculator/"
-                      target="_blank"
-                      class="underline font-bold"
-                    >Azure Pricing Calculator</a>.
-                  </p>
                 </div>
               </div>
             </div>
@@ -1423,10 +1422,10 @@ onMounted(() => {
                       v-if="categoryAssessments.get(idx) && !categoryAssessments.get(idx).loading"
                       class="mt-4 rounded-md border-2 transition-all"
                       :class="[
-                        categoryAssessments.get(idx).quality_score === 'Good' ? 'border-green-400 bg-green-50 dark:bg-green-900/20' : '',
-                        categoryAssessments.get(idx).quality_score === 'Needs Improvement' ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : '',
-                        categoryAssessments.get(idx).quality_score === 'Poor' ? 'border-red-400 bg-red-50 dark:bg-red-900/20' : '',
-                        !['Good', 'Needs Improvement', 'Poor'].includes(categoryAssessments.get(idx).quality_score) ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' : ''
+                        categoryAssessments.get(idx).quality_score === 'Good' ? 'border-green-400 bg-green-50/30 dark:bg-green-900/10' : '',
+                        categoryAssessments.get(idx).quality_score === 'Needs Improvement' ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-900/10' : '',
+                        categoryAssessments.get(idx).quality_score === 'Poor' ? 'border-red-400 bg-red-50/30 dark:bg-red-900/10' : '',
+                        !['Good', 'Needs Improvement', 'Poor'].includes(categoryAssessments.get(idx).quality_score) ? 'border-blue-400 bg-blue-50/30 dark:bg-blue-900/10' : ''
                       ]"
                     >
                       <div class="p-4">
