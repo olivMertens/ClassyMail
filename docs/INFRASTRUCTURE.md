@@ -548,6 +548,62 @@ az cosmosdb sql role assignment create \
   --scope "/dbs/emailsdb"
 ```
 
+### Troubleshooting: Cosmos DB "Request originated from IP ... through public internet"
+
+**Error:**
+```
+(Forbidden) Request originated from IP 4.225.209.140 through public internet.
+This is blocked by your Cosmos DB account firewall settings.
+```
+
+**Root Cause:**
+
+This error occurs when **both** of the following conditions are met:
+1. **Terraform Drift**: `publicNetworkAccess` is set to `Disabled` in Azure, but Terraform configuration expects `Enabled`
+2. **Container App Outbound IP**: The Container App's outbound IP (`4.225.209.140`) is not in the firewall allowlist
+
+**Critical Finding:**
+Even with `ip_range_filter = ["0.0.0.0"]` (Allow Azure Services), if `publicNetworkAccess = Disabled`, **ALL connections are blocked**.
+
+**Verification:**
+```bash
+# Check current public network access status
+az cosmosdb show --name email-poc-cosmos --resource-group email-poc-rg \
+  --query "{publicAccess:publicNetworkAccess, ipRules:ipRules}" -o json
+
+# Should show:
+# "publicAccess": "Enabled"
+# "ipRules": [{"ipAddressOrRange": "0.0.0.0"}, ...]
+
+# Check Container App outbound IP
+az containerapp show --name email-poc-api --resource-group email-poc-rg \
+  --query properties.outboundIpAddresses -o json
+```
+
+**Fix (Immediate - CLI):**
+```bash
+# Enable public network access
+az cosmosdb update \
+  --name email-poc-cosmos \
+  --resource-group email-poc-rg \
+  --public-network-access Enabled
+```
+
+**Fix (Permanent - Terraform):**
+```bash
+# Verify Terraform configuration (should already be correct)
+grep -A2 "public_network_access_enabled" infra/main.tf
+# Expected: public_network_access_enabled = true
+
+# Apply Terraform to fix drift
+cd infra
+terraform plan -out=tfplan
+terraform apply tfplan
+```
+
+**Why This Happens:**
+Someone may have manually disabled public network access via Azure Portal or CLI, causing Terraform state drift. Always use `terraform apply` after manual changes to restore the infrastructure to the desired state.
+
 ---
 
 ## See Also

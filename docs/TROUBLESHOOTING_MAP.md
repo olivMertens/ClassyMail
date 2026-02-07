@@ -167,13 +167,55 @@ This is blocked by your Cosmos DB account firewall settings.
 ```
 
 **Root Cause:**
-The Cosmos DB Firewall is enabled (`ip_range_filter` is set), but your specific public IP address is missing from the allowlist. This often happens when running local scripts (`test_e2e_flow.py`) from a developer machine.
-Note: Azure Container Apps work because `0.0.0.0` (Azure Cloud access) is allowed, but your home/office IP is not automatically included.
+This error has **TWO** distinct causes:
+
+#### Cause 1: Public Network Access Disabled (Terraform Drift)
+
+**Critical Issue:** `publicNetworkAccess` is set to `Disabled` in Azure, even though Terraform expects `Enabled`.
+
+**Impact:** Even with `ip_range_filter = ["0.0.0.0"]` (Allow Azure Services), **ALL public connections are blocked** when `publicNetworkAccess = Disabled`.
+
+**Verification:**
+```bash
+# Check if public network access is disabled
+az cosmosdb show --name email-poc-cosmos --resource-group email-poc-rg \
+  --query publicNetworkAccess -o tsv
+
+# Should return: Enabled
+# If it returns: Disabled → This is the root cause
+```
 
 **Fix (Immediate - CLI):**
-Add your current public IP to the firewall rules.
 ```bash
-# Update firewall to include your current IP (plus 0.0.0.0 for Azure services)
+# Enable public network access
+az cosmosdb update \
+  --name email-poc-cosmos \
+  --resource-group email-poc-rg \
+  --public-network-access Enabled
+```
+
+**Fix (Permanent - Terraform):**
+```bash
+# Verify Terraform is correct (should already have this)
+grep "public_network_access_enabled" infra/main.tf
+# Expected: public_network_access_enabled = true
+
+# Apply Terraform to restore desired state
+cd infra
+terraform plan -out=tfplan
+terraform apply tfplan
+```
+
+#### Cause 2: Missing IP in Firewall Allowlist
+
+**Scenario:** Public network access is enabled, but your specific IP is not in the allowlist.
+
+This often happens when running local scripts (`test_e2e_flow.py`) from a developer machine.
+Note: Azure Container Apps work because `0.0.0.0` (Azure Cloud access) is in the allowlist.
+
+**Fix (Immediate - CLI):**
+```bash
+# Add your current IP to the firewall
 az cosmosdb update \
   --name email-poc-cosmos \
   --resource-group email-poc-rg \
@@ -181,8 +223,23 @@ az cosmosdb update \
 ```
 
 **Fix (Terraform - Permanent):**
-Add your IP to the `allowed_ip_ranges` variable in `infra/terraform.tfvars`.
+Add your IP to `infra/terraform.tfvars`:
 ```hcl
 allowed_ip_ranges = ["xxx.xxx.xxx.xxx"]
 ```
 Then run `terraform apply`.
+
+**Diagnostic Decision Tree:**
+```
+Error: "Request originated from IP X.X.X.X through public internet"
+  ↓
+1. Check: az cosmosdb show --query publicNetworkAccess
+  ↓
+  If "Disabled" → Run: az cosmosdb update --public-network-access Enabled
+  If "Enabled" → Continue to step 2
+  ↓
+2. Check: az cosmosdb show --query ipRules
+  ↓
+  If "0.0.0.0" is missing → Add it via terraform or CLI
+  If "0.0.0.0" is present but your IP is not → Add your IP
+```
