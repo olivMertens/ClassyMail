@@ -275,10 +275,9 @@ print_subheader "Step 10/12: RBAC Role Assignments"
 if [ -n "$IDENTITY_ID" ]; then
     echo "Checking role assignments for managed identity..."
 
-    # Required roles
+    # Required roles (Cognitive + Storage are standard)
     REQUIRED_ROLES=(
         "Storage Blob Data Contributor"
-        "Azure Service Bus Data Owner"
         "Cognitive Services User"
     )
 
@@ -300,6 +299,17 @@ if [ -n "$IDENTITY_ID" ]; then
                 print_status "error" "  Role '$ROLE' not assigned to managed identity"
             fi
         done
+
+        # Service Bus Check (Owner OR Sender+Receiver)
+        if echo "$ROLE_ASSIGNMENTS" | grep -q "Azure Service Bus Data Owner"; then
+            echo -e "    ${GREEN}${CHECK_MARK}${NC} Azure Service Bus Data Owner"
+        elif echo "$ROLE_ASSIGNMENTS" | grep -q "Azure Service Bus Data Sender" && echo "$ROLE_ASSIGNMENTS" | grep -q "Azure Service Bus Data Receiver"; then
+            echo -e "    ${GREEN}${CHECK_MARK}${NC} Azure Service Bus Data Sender & Receiver"
+        else
+            echo -e "    ${RED}${CROSS_MARK}${NC} Service Bus Roles (MISSING)"
+            print_status "error" "  Service Bus RBAC roles missing (Need 'Owner' OR 'Sender' + 'Receiver')"
+        fi
+
     else
         print_status "error" "No role assignments found for managed identity"
         echo "  Action: Run 'cd infra && terraform apply' to assign RBAC roles"

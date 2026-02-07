@@ -89,7 +89,21 @@ try {
     exit 1
 }
 
-# Get resource group name if not provided
+# Get resource group name
+if (-not $ResourceGroup) {
+    # Try to load from secrets.env first
+    if (Test-Path "secrets.env") {
+        $envContent = Get-Content "secrets.env"
+        foreach ($line in $envContent) {
+            if ($line -match "^AZURE_RESOURCE_GROUP=(.*)") {
+                $ResourceGroup = $matches[1]
+                Write-Host "Auto-detected Resource Group from secrets.env: $ResourceGroup" -ForegroundColor Cyan
+                break
+            }
+        }
+    }
+}
+
 if (-not $ResourceGroup) {
     Write-Host ""
     Write-Host "Available resource groups:"
@@ -303,12 +317,7 @@ Write-SubHeader "Step 10/12: RBAC Role Assignments"
 if ($identityId) {
     Write-Host "Checking role assignments for managed identity..."
 
-    # Required roles
-    $requiredRoles = @(
-        "Storage Blob Data Contributor",
-        "Azure Service Bus Data Owner",
-        "Cognitive Services User"
-    )
+    # Required roles check logic is handled below dynamically
 
     # Get all role assignments for the managed identity
     try {
@@ -324,14 +333,38 @@ if ($identityId) {
             # Check for required roles
             Write-Host ""
             Write-Host "  Checking required roles:"
-            foreach ($role in $requiredRoles) {
-                if ($assignedRoles -contains $role) {
-                    Write-Host "    ✓ $role" -ForegroundColor Green
-                } else {
-                    Write-Host "    ✗ $role (MISSING)" -ForegroundColor Red
-                    Write-Status -Status error -Message "  Role '$role' not assigned to managed identity"
-                }
+
+            # Storage Check
+            if ($assignedRoles -contains "Storage Blob Data Contributor") {
+                 Write-Host "    ✓ Storage Blob Data Contributor" -ForegroundColor Green
+            } else {
+                 Write-Host "    ✗ Storage Blob Data Contributor (MISSING)" -ForegroundColor Red
+                 $script:Failed++
             }
+
+            # Cognitive Services Check
+            if ($assignedRoles -contains "Cognitive Services User") {
+                 Write-Host "    ✓ Cognitive Services User" -ForegroundColor Green
+            } else {
+                 Write-Host "    ✗ Cognitive Services User (MISSING)" -ForegroundColor Red
+                 $script:Failed++
+            }
+
+            # Service Bus Check (Accept Owner OR (Sender + Receiver))
+            $hasOwner = $assignedRoles -contains "Azure Service Bus Data Owner"
+            $hasSender = $assignedRoles -contains "Azure Service Bus Data Sender"
+            $hasReceiver = $assignedRoles -contains "Azure Service Bus Data Receiver"
+
+            if ($hasOwner) {
+                Write-Host "    ✓ Azure Service Bus Data Owner (Found)" -ForegroundColor Green
+            } elseif ($hasSender -and $hasReceiver) {
+                Write-Host "    ✓ Azure Service Bus Data Sender & Receiver (Found)" -ForegroundColor Green
+            } else {
+                Write-Host "    ✗ Service Bus Roles (MISSING)" -ForegroundColor Red
+                Write-Host "      Expected: 'Azure Service Bus Data Owner' OR ('Sender' + 'Receiver')"
+                Write-Status -Status error -Message "  Service Bus RBAC roles missing"
+            }
+
         } else {
             Write-Status -Status error -Message "No role assignments found for managed identity"
             Write-Host "  Action: Run 'cd infra && terraform apply' to assign RBAC roles"

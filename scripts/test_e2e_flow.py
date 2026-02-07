@@ -32,12 +32,12 @@ def upload_pdf(api_url: str, pdf_bytes: bytes, filename: str) -> dict:
     """Upload a PDF via the API."""
     url = f"{api_url.rstrip('/')}/api/upload"
 
-    files = {
-        "file": (filename, pdf_bytes, "application/pdf")
+    files_data = {
+        "files": (filename, pdf_bytes, "application/pdf")
     }
 
     try:
-        response = httpx.post(url, files=files, timeout=30.0)
+        response = httpx.post(url, files=files_data, timeout=30.0)
         response.raise_for_status()
         return {"success": True, "data": response.json()}
     except Exception as e:

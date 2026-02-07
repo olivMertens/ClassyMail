@@ -62,7 +62,8 @@ async def run_diagnostics(pdf_path: str = None):
         print("\n--- 2. Environment Config Check ---")
         print(f"MISTRAL_ENDPOINT: {config.MISTRAL_ENDPOINT}")
         print(f"PHI_ENDPOINT: {config.PHI_ENDPOINT}")
-        print(f"EMBEDDING_ENDPOINT: {config.EMBEDDING_ENDPOINT}")
+        print(f"CHAT_DEPLOYMENT: {config.CHAT_DEPLOYMENT}")
+        print(f"EMBEDDING_DEPLOYMENT: {config.EMBEDDING_DEPLOYMENT}")
         print(f"STORAGE_ACCOUNT_URL: {config.BLOB_ACCOUNT_URL}")
 
         if not pdf_path:
@@ -126,7 +127,7 @@ Examples:
     args = parser.parse_args()
 
     # Load env vars from .env if present
-    load_dotenv()
+    load_dotenv("secrets.env")
 
     if args.show_errors:
         asyncio.run(show_error_records(limit=args.limit, include_processing_log=not args.no_log))

@@ -1,13 +1,13 @@
 param(
-  [string]$ResourceGroup = $env:RESOURCE_GROUP -or "email-poc-rg",
-  [string]$Prefix = $env:PREFIX -or "email-poc",
+  [string]$ResourceGroup = $(if ($env:RESOURCE_GROUP) {$env:RESOURCE_GROUP} else {"email-poc-rg"}),
+  [string]$Prefix = $(if ($env:PREFIX) {$env:PREFIX} else {"email-poc"}),
   [string]$IdentityName = $env:IDENTITY_NAME,
   [string]$CosmosAccount = $env:COSMOS_ACCOUNT,
-  [string]$CosmosDb = $env:COSMOS_DB -or "emailsdb",
+  [string]$CosmosDb = $(if ($env:COSMOS_DB) {$env:COSMOS_DB} else {"emailsdb"}),
   [string[]]$CosmosContainers = $(if ($env:COSMOS_CONTAINERS) { $env:COSMOS_CONTAINERS.Split(' ') } else { @("emails","chat_history","vector_cache") }),
   [string]$StorageAccount = $env:STORAGE_ACCOUNT,
   [string]$ServiceBusNamespace = $env:SERVICEBUS_NAMESPACE,
-  [string]$ServiceBusQueue = $env:SERVICEBUS_QUEUE -or "pdf-processing-queue",
+  [string]$ServiceBusQueue = $(if ($env:SERVICEBUS_QUEUE) {$env:SERVICEBUS_QUEUE} else {"pdf-processing-queue"}),
   [string]$AiAccount = $env:AI_ACCOUNT,
   [string]$ContainerAppApi = $env:CONTAINER_APP_API,
   [string]$ContainerAppWorker = $env:CONTAINER_APP_WORKER
@@ -15,24 +15,61 @@ param(
 
 if (-not $IdentityName) { $IdentityName = "$Prefix-id" }
 if (-not $CosmosAccount) { $CosmosAccount = "$Prefix-cosmos" }
-if (-not $StorageAccount) { $StorageAccount = "$Prefix`st" }
+if (-not $StorageAccount) {
+    # Remove hyphens/underscores for default storage name
+    $cleanPrefix = $Prefix -replace "[-_]", ""
+    $StorageAccount = "${cleanPrefix}st"
+}
 if (-not $ServiceBusNamespace) { $ServiceBusNamespace = "$Prefix-sbus" }
 if (-not $AiAccount) { $AiAccount = "$Prefix-aifoundry" }
 if (-not $ContainerAppApi) { $ContainerAppApi = "$Prefix-api" }
 if (-not $ContainerAppWorker) { $ContainerAppWorker = "$Prefix-worker" }
+
+# Load from secrets.env if available and params not set
+$AuthEnvPath = Join-Path $PSScriptRoot "../secrets.env"
+if (Test-Path $AuthEnvPath) {
+    $envContent = Get-Content $AuthEnvPath
+    if (-not $ResourceGroup) {
+        $rgMatch = $envContent | Select-String "AZURE_RESOURCE_GROUP=(.+)"
+        if ($rgMatch) { $ResourceGroup = $rgMatch.Matches.Groups[1].Value.Trim() }
+    }
+    # Try to derive usage from known FQDN patterns in secrets.env if needed
+    if (-not $ServiceBusNamespace) {
+        $sbMatch = $envContent | Select-String "AZURE_SERVICE_BUS_FQDN=(.+)\.servicebus"
+        if ($sbMatch) { $ServiceBusNamespace = $sbMatch.Matches.Groups[1].Value.Trim() }
+    }
+    if (-not $StorageAccount) {
+        $stMatch = $envContent | Select-String "AZURE_STORAGE_ACCOUNT_URL=https://(.+)\.blob\.core\.windows\.net"
+        if ($stMatch) { $StorageAccount = $stMatch.Matches.Groups[1].Value.Trim() }
+    }
+    if (-not $CosmosAccount) {
+        $cosmosMatch = $envContent | Select-String "AZURE_COSMOS_ENDPOINT=https://(.+)\.documents\.azure\.com"
+        if ($cosmosMatch) { $CosmosAccount = $cosmosMatch.Matches.Groups[1].Value.Trim() }
+    }
+    if (-not $AiAccount) {
+        $aiMatch = $envContent | Select-String "AZURE_AI_ENDPOINT=https://(.+)\.cognitiveservices\.azure\.com"
+        if ($aiMatch) { $AiAccount = $aiMatch.Matches.Groups[1].Value.Trim() }
+    }
+}
 
 function Info($msg){ Write-Host "[INFO] $msg" -ForegroundColor Cyan }
 function Ok($msg){ Write-Host "[OK] $msg" -ForegroundColor Green }
 function Warn($msg){ Write-Host "[WARN] $msg" -ForegroundColor Yellow }
 function Err($msg){ Write-Host "[ERR] $msg" -ForegroundColor Red }
 
+Info "Configuration:"
+Write-Host "  Resource Group: '$ResourceGroup'"
+Write-Host "  Identity Name : '$IdentityName'"
+Write-Host "  Prefix        : '$Prefix'"
+
 Info "Checking az login"
 az account show *> $null; if ($LASTEXITCODE -ne 0) { az login *> $null }
 $subId = az account show --query id -o tsv
 Ok "Logged in to $subId"
 
-Info "Fetching Managed Identity $IdentityName"
-$principalId = az identity show -g $ResourceGroup -n $IdentityName --query principalId -o tsv 2>$null
+Info "Fetching Managed Identity $IdentityName in RG $ResourceGroup"
+# Removed 2>$null to show error if any
+$principalId = az identity show -g $ResourceGroup -n $IdentityName --query principalId -o tsv
 if (-not $principalId) { Err "Identity not found"; exit 1 }
 Ok "PrincipalId: $principalId"
 
@@ -69,7 +106,11 @@ az containerapp show -g $ResourceGroup -n $ContainerAppWorker *> $null; if ($LAS
 if ($aiId){ Ensure-Role $aiId "Cognitive Services User" "Cognitive Services" }
 if ($storageId){ Ensure-Role $storageId "Storage Blob Data Contributor" "Storage" }
 if ($sbId){ Ensure-Role $sbId "Azure Service Bus Data Sender" "Service Bus"; Ensure-Role $sbId "Azure Service Bus Data Receiver" "Service Bus" }
-if ($cosmosId){ Ensure-Role $cosmosId "Cosmos DB Built-in Data Contributor" "Cosmos" }
+if ($cosmosId){
+  Info "Checking Cosmos DB SQL Role Assignments..."
+  $cosmosAssignments = az cosmosdb sql role assignment list --account-name $CosmosAccount --resource-group $ResourceGroup --query "[?principalId=='$principalId']" -o tsv 2>$null
+  if ($cosmosAssignments) { Ok "Cosmos DB SQL Role assigned" } else { Warn "Cosmos DB SQL Role MISSING. Run Terraform to fix." }
+}
 $acrId = az acr list -g $ResourceGroup --query "[0].id" -o tsv 2>$null; if ($acrId){ Ensure-Role $acrId "AcrPull" "ACR" }
 
 Warn "Policy check: TODO - awaiting policy level details for RG policies."

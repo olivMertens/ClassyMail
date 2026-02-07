@@ -8,7 +8,7 @@ IDENTITY_NAME=${IDENTITY_NAME:-${PREFIX}-id}
 COSMOS_ACCOUNT=${COSMOS_ACCOUNT:-${PREFIX}-cosmos}
 COSMOS_DB=${COSMOS_DB:-emailsdb}
 COSMOS_CONTAINERS=${COSMOS_CONTAINERS:-"emails chat_history vector_cache"}
-STORAGE_ACCOUNT=${STORAGE_ACCOUNT:-${PREFIX}st}
+STORAGE_ACCOUNT=${STORAGE_ACCOUNT:-${PREFIX//-/}st}
 SERVICEBUS_NAMESPACE=${SERVICEBUS_NAMESPACE:-${PREFIX}-sbus}
 SERVICEBUS_QUEUE=${SERVICEBUS_QUEUE:-pdf-processing-queue}
 AI_ACCOUNT=${AI_ACCOUNT:-${PREFIX}-aifoundry}
@@ -85,7 +85,14 @@ az containerapp show -g "$RESOURCE_GROUP" -n "$CONTAINER_APP_WORKER" >/dev/null 
 if [[ -n "$AI_ID" ]]; then assign_role "$AI_ID" "Cognitive Services User" "Cognitive Services"; fi
 if [[ -n "$STORAGE_ID" ]]; then assign_role "$STORAGE_ID" "Storage Blob Data Contributor" "Storage"; fi
 if [[ -n "$SB_ID" ]]; then assign_role "$SB_ID" "Azure Service Bus Data Sender" "Service Bus"; assign_role "$SB_ID" "Azure Service Bus Data Receiver" "Service Bus"; fi
-if [[ -n "$COSMOS_ID" ]]; then assign_role "$COSMOS_ID" "Cosmos DB Built-in Data Contributor" "Cosmos"; fi
+if [[ -n "$COSMOS_ID" ]]; then
+  info "Checking Cosmos DB SQL Role Assignments..."
+  if az cosmosdb sql role assignment list --account-name "$COSMOS_ACCOUNT" --resource-group "$RESOURCE_GROUP" --query "[?principalId=='$PRINCIPAL_ID']" -o tsv | grep -q "$PRINCIPAL_ID"; then
+    success "Cosmos DB SQL Role assigned"
+  else
+    warn "Cosmos DB SQL Role MISSING. Run Terraform to fix."
+  fi
+fi
 # Optional: ACR if present
 ACR_ID=$(az acr list -g "$RESOURCE_GROUP" --query "[0].id" -o tsv 2>/dev/null || true)
 if [[ -n "$ACR_ID" ]]; then assign_role "$ACR_ID" "AcrPull" "ACR"; fi
