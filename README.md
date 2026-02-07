@@ -81,10 +81,22 @@ flowchart TD
 *   Python 3.12 (uv recommandé)
 *   Node.js 18+ (Frontend)
 *   Azure CLI (`az login`)
+*   **Variables d'environnement** : Voir [ENVIRONMENT_VARIABLES_AUDIT.md](ENVIRONMENT_VARIABLES_AUDIT.md) pour la liste complète
 
 ### Lancement Local
-Voir [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) pour la configuration détaillée (`secrets.env`).
+Voir [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) pour la configuration détaillée.
 
+**Configuration des secrets :**
+```bash
+# Option 1: Générer automatiquement depuis Azure (recommandé)
+.\scripts\write_secrets_env.ps1 -ResourceGroup "email-poc-rg" -Force
+
+# Option 2: Copier l'exemple et ajuster manuellement
+cp secrets.env.example secrets.env
+# Puis éditer secrets.env avec vos valeurs
+```
+
+**Démarrage :**
 ```bash
 # 1. Backend (API + Worker)
 uv sync
@@ -93,6 +105,15 @@ uv run uvicorn main:app --reload
 # 2. Frontend (dans un autre terminal)
 cd frontend
 npm install && npm run dev
+```
+
+**Vérification :**
+```bash
+# Santé de l'API
+curl http://localhost:8000/healthz
+
+# Diagnostics complets
+curl http://localhost:8000/api/admin/diagnostics
 ```
 
 ---
@@ -201,6 +222,14 @@ Le dossier `scripts/` contient des outils pour le développement, le déploiemen
 
 #### `verify-mvp-setup` (.ps1 / .sh) — **Vérification Infrastructure Complète**
 Valide l'ensemble de l'infrastructure Azure déployée.
+
+**⚠️ Important : Configuration Firewall Cosmos DB**
+Pour que les scripts locaux (`verify_chat_vector.py`, `diagnose_pipeline.py`) puissent interroger Cosmos DB, votre IP publique doit être autorisée.
+Si vous rencontrez des erreurs **403 Forbidden**, ajoutez votre IP :
+```bash
+# Ajouter votre IP actuelle au firewall Cosmos DB
+az cosmosdb update --name email-poc-cosmos --resource-group email-poc-rg --ip-range-filter "$(curl -s ifconfig.me)"
+```
 
 **Usage :**
 ```bash
@@ -638,9 +667,11 @@ uv run python scripts/simulate_corrupted_pdf.py
 L'index complet est disponible ici : **[docs/INDEX.md](docs/INDEX.md)**.
 - [CLI_SETUP](docs/CLI_SETUP.md)
 - [CLI_RAG](docs/CLI_RAG.md)
+- **[ENVIRONMENT_VARIABLES_AUDIT](ENVIRONMENT_VARIABLES_AUDIT.md)** - Liste complète des variables d'environnement
 
 ### Parcours Recommandé
 
+0.  **Configuration** : [ENVIRONMENT_VARIABLES_AUDIT.md](ENVIRONMENT_VARIABLES_AUDIT.md) (Variables d'environnement complètes)
 1.  **Démarrer** : [docs/SCENARIO_E2E.md](docs/SCENARIO_E2E.md) (Test complet end-to-end)
 2.  **Développer** : [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) (Configuration, Env Vars, Build)
 3.  **Comprendre** : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (Composants, Flux, Sécurité)

@@ -21,18 +21,14 @@ The Terraform configuration (`infra/main.tf`) assigns the following roles to the
 
 | # | Role Name | Scope | Purpose | Resource |
 |---|-----------|-------|---------|----------|
-| 1 | **Storage Blob Data Reader** | Blob Storage (pdf-inputs) | Download PDFs for OCR/classification | `Storage Account` |
-| 2 | **Storage Blob Data Contributor** | Blob Storage (pdf-inputs, pdf-outputs) | Upload results, error logs | `Storage Account` |
-| 3 | **Service Bus Data Receiver** | Service Bus Queue | Consume messages from pdf-processing-queue | `Service Bus` |
-| 4 | **Service Bus Data Sender** | Service Bus Queue | Send messages (retry, async comparison) | `Service Bus` |
-| 5 | **Cosmos DB Account Reader Role** | Cosmos DB | Query email records / metadata | `Cosmos DB Account` |
-| 6 | **Cosmos DB Built-in Data Contributor** | Cosmos DB (emailsdb/emails) | Create, update, delete email records | `Cosmos DB Database/Container` |
-| 7 | **Cognitive Services OpenAI Contributor** | Azure AI Foundry (model deployments) | Call classification & OCR endpoints | `Foundry Account` |
-| 8 | **Cognitive Services OpenAI User** | Azure AI Foundry | Read model metadata | `Foundry Account` |
-| 9 | **Reader** | Resource Group | List resources (health checks, discovery) | `Resource Group` |
-| 10 | **Event Grid Data Sender** (optional) | Event Grid | Send events (if worker publishes) | `Event Grid Topic` |
+| 1 | **Storage Blob Data Contributor** | Blob Storage (all containers) | Download inputs, upload results/logs | `Storage Account` |
+| 2 | **Service Bus Data Receiver** | Service Bus Queue | Consume messages from pdf-processing-queue | `Service Bus` |
+| 3 | **Service Bus Data Sender** | Service Bus Queue | Send messages (retry, async comparison) | `Service Bus` |
+| 4 | **Custom App Role** | Cosmos DB Account | Custom role: `readMetadata` + Data R/W | `Cosmos DB Account` |
+| 5 | **Cognitive Services User** | Azure AI Foundry | Inference (Chat, Embeddings, OCR) | `Foundry Account` |
+| 6 | **AcrPull** | Container Registry | Pull Docker images (optional if using ACR) | `Azure Container Registry` |
 
-**Note**: Roles #1-10 are essential. Role #10 is optional unless worker publishes events.
+**Note**: The Python SDK requires Cosmos DB permissions at the **Account Scope** to perform metadata operations. Database-level scoping will cause SDK failures.
 
 ---
 
@@ -351,7 +347,23 @@ az role assignment create \
 
 ---
 
-## 8. References
+## 9. Security Best Practices & Design Decisions
+
+### Why a Custom Role for Cosmos DB?
+
+In typical Azure Cosmos DB deployments, the **"Cosmos DB Built-in Data Contributor"** role is commonly used. However, this role grants broader permissions than minimal necessary, and bundling permissions can sometimes violate the principle of least privilege.
+
+**Design Decision:**
+We use a **Custom Role** (`Custom App Role`) defined in Terraform for two key reasons:
+1. **SDK Requirement**: The Azure Cosmos DB Python SDK executes a `readMetadata` operation on the **Account scope** upon initialization. Without this permission at the account level, the application crashes on startup.
+2. **Security Granularity**: By creating a custom role, we explicitly grant `readMetadata` (Account Scope) while restricting data operations strictly to standard CRUD (Create, Read, Update, Delete) and Query operations. This avoids granting administrative privileges over the account or other databases that might exist in shared environments.
+
+### Why Account Scope?
+
+While Database-level scope (`/dbs/emailsdb`) is theoretically more secure, it breaks the Python SDK's initialization logic.
+**The "Strict" Compromise**: We assign the role at the **Account Scope** to satisfy the SDK's metadata needs, but we limit the *actions* the role can perform via the Custom Role definition. This ensures the application works reliably without being an unrestricted admin.
+
+## 10. References
 
 - [Azure Managed Identities](https://learn.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/)
 - [DefaultAzureCredential](https://learn.microsoft.com/en-us/python/api/azure-identity/azure.identity.defaultazurecredential)

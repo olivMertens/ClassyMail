@@ -413,20 +413,17 @@ resource "azurerm_role_assignment" "ai_user" {
 }
 ```
 
-### Cosmos DB RBAC (Data-Plane) - Database Scope Assignment
+### Cosmos DB RBAC (Data-Plane) - Account Scope Assignment
 
-This project uses ** Cosmos SQL data-plane RBAC** (`azurerm_cosmosdb_sql_role_assignment`).
+This project uses **Cosmos SQL data-plane RBAC** (`azurerm_cosmosdb_sql_role_assignment`).
 
-**Important:** The Cosmos DB role assignment is configured at the **database scope** (`/dbs/emailsdb`), not at the account level. This is intentional to:
-- Follow principle of least privilege
-- Avoid granting excessive permissions to other databases in the same account
-- Ensure metadata operations (`readMetadata`) work correctly
+**Important:** The Cosmos DB role assignment is configured at the **Account scope** (`/`), not at the database scope.
+This is required because the Azure Cosmos DB Python SDK performs a `readMetadata` operation on the account before accessing the database, which requires account-level permissions.
 
 **Deployed Configuration:**
 ```plaintext
-Principal ID: fdf02fa5-2cd5-42f9-9b78-5cb7905d94d0
-Role: Cosmos DB Built-in Data Contributor (00000000-0000-0000-0000-000000000002)
-Scope: /subscriptions/ec8bd34d-34d2-4b35-a587-2904775884b1/resourceGroups/email-poc-rg/providers/Microsoft.DocumentDB/databaseAccounts/email-poc-cosmos/dbs/emailsdb
+Role: Custom App Role (readMetadata + data actions)
+Scope: /subscriptions/.../resourceGroups/email-poc-rg/providers/Microsoft.DocumentDB/databaseAccounts/email-poc-cosmos
 ```
 
 **Verification Command:**
@@ -434,16 +431,7 @@ Scope: /subscriptions/ec8bd34d-34d2-4b35-a587-2904775884b1/resourceGroups/email-
 az cosmosdb sql role assignment list \
   --account-name email-poc-cosmos \
   --resource-group email-poc-rg \
-  --query "[?principalId=='fdf02fa5-2cd5-42f9-9b78-5cb7905d94d0']"
-```
-
-### Policy-Compatible Defaults
-
-- Storage: OAuth-only (no Shared Key)
-- Service Bus: Local auth enabled for Event Grid compatibility
-- Cosmos: Entra ID (RBAC) by default; no Cosmos key required
-
----
+  --query "[?principalId=='<managed-identity-principal-id>'].roleDefinitionId"
 
 ## Network Strategy
 
