@@ -299,7 +299,7 @@ resource "azurerm_cosmosdb_account" "db" {
   # Beaucoup de tenants désactivent l'auth locale (clé) par policy.
   # On aligne le comportement Terraform avec ce mode; vous pouvez forcer cosmos_use_rbac=false uniquement si vous avez le droit d'activer l'auth locale.
   local_authentication_disabled = var.cosmos_use_rbac
-  capabilities { name = "EnableServerless" } # Mode économique pour POC
+  capabilities { name = "EnableServerless" }        # Mode économique pour POC
   capabilities { name = "EnableNoSQLVectorSearch" } # Nécessaire pour vector_cache (quantizedFlat / cosine embeddings)
   geo_location {
     location          = var.location
@@ -308,20 +308,37 @@ resource "azurerm_cosmosdb_account" "db" {
   consistency_policy { consistency_level = "Session" }
 }
 
-# Cosmos SQL data-plane RBAC (built-in Data Contributor)
-# IMPORTANT: scope MUST be at the account level (not db/collection level)
-# because the Python SDK calls readMetadata on the account before any
-# data-plane operation.  A db-scoped assignment triggers:
-#   "principal does not have required RBAC permissions to perform action
-#    Microsoft.DocumentDB/databaseAccounts/readMetadata"
-# See: https://aka.ms/cosmos-native-rbac
+# Strict Custom Role Definition
+# Required for SDK metadata operations + data access without account-wide admin permissions
+resource "azurerm_cosmosdb_sql_role_definition" "app_role" {
+  name                = "${var.prefix}-app-role"
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.db.name
+  type                = "CustomRole"
+  assignable_scopes   = [azurerm_cosmosdb_account.db.id]
+
+  permissions {
+    data_actions = [
+      "Microsoft.DocumentDB/databaseAccounts/readMetadata",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/executeQuery",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/readChangeFeed",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/read",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/upsert",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/create",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/replace",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/delete"
+    ]
+  }
+}
+
+# Assign Custom Role at Account Scope
 resource "azurerm_cosmosdb_sql_role_assignment" "aca_cosmos_sql_contrib" {
   count               = var.cosmos_use_rbac ? 1 : 0
   name                = random_uuid.cosmos_sql_contrib_assignment.result
   resource_group_name = azurerm_resource_group.rg.name
   account_name        = azurerm_cosmosdb_account.db.name
   principal_id        = azurerm_user_assigned_identity.app_id.principal_id
-  role_definition_id  = "${azurerm_cosmosdb_account.db.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
+  role_definition_id  = azurerm_cosmosdb_sql_role_definition.app_role.id
   scope               = azurerm_cosmosdb_account.db.id
 }
 
@@ -682,6 +699,28 @@ resource "azurerm_container_app" "api" {
         value = "10"
       }
 
+      # Secondary models (explicitly defined)
+      env {
+        name  = "CHAT_DEPLOYMENT"
+        value = "gpt-5.2-chat"
+      }
+      env {
+        name  = "EMBEDDING_DEPLOYMENT"
+        value = "text-embedding-3-small"
+      }
+      env {
+        name  = "PHI_FALLBACK_DEPLOYMENT"
+        value = "gpt-4o-mini"
+      }
+      env {
+        name  = "ANONYMIZER_DEPLOYMENT"
+        value = "gpt-4o-mini"
+      }
+      env {
+        name  = "VISION_DEPLOYMENT"
+        value = "gpt-4o-mini"
+      }
+
       liveness_probe {
         transport     = "HTTP"
         port          = 8000
@@ -854,6 +893,28 @@ resource "azurerm_container_app" "worker" {
       env {
         name  = "LOG_ANALYTICS_WORKSPACE_ID"
         value = azurerm_log_analytics_workspace.log.workspace_id
+      }
+
+      # Secondary models (explicitly defined)
+      env {
+        name  = "CHAT_DEPLOYMENT"
+        value = "gpt-5.2-chat"
+      }
+      env {
+        name  = "EMBEDDING_DEPLOYMENT"
+        value = "text-embedding-3-small"
+      }
+      env {
+        name  = "PHI_FALLBACK_DEPLOYMENT"
+        value = "gpt-4o-mini"
+      }
+      env {
+        name  = "ANONYMIZER_DEPLOYMENT"
+        value = "gpt-4o-mini"
+      }
+      env {
+        name  = "VISION_DEPLOYMENT"
+        value = "gpt-4o-mini"
       }
     }
 
