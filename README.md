@@ -193,7 +193,447 @@ Interface multilingue complète :
 
 ---
 
-## 📚 Documentation
+## �️ Scripts & Outils de Développement
+
+Le dossier `scripts/` contient des outils pour le développement, le déploiement et le débogage. Les scripts sont disponibles en versions **PowerShell (.ps1)** et **Bash (.sh)** pour la compatibilité cross-platform.
+
+### 📋 Scripts de Vérification & Diagnostic
+
+#### `verify-mvp-setup` (.ps1 / .sh) — **Vérification Infrastructure Complète**
+Valide l'ensemble de l'infrastructure Azure déployée.
+
+**Usage :**
+```bash
+# PowerShell
+.\scripts\verify-mvp-setup.ps1 -ResourceGroup "email-poc-rg"
+
+# Bash
+./scripts/verify-mvp-setup.sh email-poc-rg
+```
+
+**Vérifications effectuées :**
+- ✅ Azure CLI authentication
+- ✅ Resource Group existence
+- ✅ Managed Identity (Principal ID, Client ID)
+- ✅ Storage Account + containers
+- ✅ Cosmos DB + databases + RBAC assignments
+- ✅ Service Bus + queues + message counts
+- ✅ Azure AI Foundry + model deployments
+- ✅ Container Apps (API + Worker) running status
+- ✅ RBAC role assignments (12 critical roles)
+- ✅ API endpoints health checks (/health, /readyz, /admin/validate-aca-env)
+
+**💡 À lancer après :** `terraform apply` ou tout changement d'infrastructure
+
+---
+
+#### `verify_infra` (.ps1 / .sh) — **Vérification RBAC Rapide**
+Version allégée pour vérifier les rôles RBAC et la connectivité Azure.
+
+**Usage :**
+```bash
+# PowerShell
+.\scripts\verify_infra.ps1 -ResourceGroup "email-poc-rg"
+
+# Bash
+export RESOURCE_GROUP=email-poc-rg
+./scripts/verify_infra.sh
+```
+
+**💡 À lancer après :** Changements de rôles ou problèmes d'authentification
+
+---
+
+#### `diagnose_pipeline.py` — **Diagnostics Pipeline OCR/Classification**
+Teste le pipeline complet avec un PDF local.
+
+**Usage :**
+```bash
+# Test avec un PDF local
+uv run python scripts/diagnose_pipeline.py --pdf dataset/pdf/test.pdf
+
+# Afficher les erreurs Cosmos DB (5 dernières)
+uv run python scripts/diagnose_pipeline.py --show-errors
+
+# Afficher 10 erreurs sans les logs détaillés
+uv run python scripts/diagnose_pipeline.py --show-errors --limit 10 --no-log
+```
+
+**Prérequis :** `secrets.env` configuré avec les endpoints AI
+
+---
+
+#### `diagnose_failures.py` — **Analyse des Erreurs Cosmos DB**
+Analyse les items en status ERROR dans Cosmos DB et catégorise les erreurs.
+
+**Usage :**
+```bash
+uv run python scripts/diagnose_failures.py
+```
+
+**Détecte :**
+- ⏱️ Timeouts (LLM/Network)
+- 🔄 Worker restarts (deployment interruptions)
+- 503/502 Service Unavailable
+- 429 Rate limiting
+- 📄 PDF corrompus
+
+**Prérequis :** Connexion Cosmos DB configurée
+
+---
+
+#### `verify_chat_vector.py` — **Validation Embeddings + RAG**
+Vérifie que le système d'embeddings et le chat RAG fonctionnent.
+
+**Usage :**
+```bash
+uv run python scripts/verify_chat_vector.py
+```
+
+**Teste :**
+- ✅ Génération d'embeddings (text-embedding-3-small)
+- ✅ Recherche vectorielle dans Cosmos DB
+- ✅ Agent de chat RAG avec requête test
+
+**Prérequis :** `EMBEDDING_ENDPOINT` et `COSMOS_ENDPOINT` configurés
+
+---
+
+#### `verify_logs.py` — **Vérification Azure Monitor Logs**
+Interroge Log Analytics pour récupérer les traces d'exécution.
+
+**Usage :**
+```bash
+uv run python scripts/verify_logs.py
+```
+
+**Prérequis :** `LOG_ANALYTICS_WORKSPACE_ID` dans `secrets.env`
+
+---
+
+#### `verify_telemetry.py` — **Validation Application Insights**
+Envoie un span de test vers Application Insights.
+
+**Usage :**
+```bash
+uv run python scripts/verify_telemetry.py
+```
+
+**Prérequis :** `APPLICATIONINSIGHTS_CONNECTION_STRING` dans `secrets.env`
+
+---
+
+### 🔧 Scripts de Configuration
+
+#### `write_secrets_env.ps1` — **Génération Fichier secrets.env**
+Génère automatiquement le fichier `secrets.env` en interrogeant Azure CLI.
+
+**Usage :**
+```powershell
+.\scripts\write_secrets_env.ps1 -ResourceGroup "email-poc-rg" -Prefix "email-poc"
+
+# Écraser un fichier existant
+.\scripts\write_secrets_env.ps1 -Force
+```
+
+**Génère :**
+- Azure Client ID (Managed Identity)
+- Service Bus FQDN + Queue
+- Storage Account URL + Container
+- Cosmos DB Endpoint + Database + Container
+- AI Endpoint + Deployments
+
+**💡 À lancer après :** `terraform apply` (première fois) ou changement de ressources
+
+---
+
+#### `check_i18n.py` — **Validation Locales i18n**
+Vérifie que les fichiers `en.json` et `fr.json` sont synchronisés.
+
+**Usage :**
+```bash
+uv run python scripts/check_i18n.py
+```
+
+**Intégré dans :** Pre-push hook (`.git/hooks/pre-push`)
+
+---
+
+### 🚢 Scripts de Déploiement
+
+#### `build_acr` (.ps1 / .sh) — **Build & Push Image Docker**
+Build une image Docker et la pousse vers Azure Container Registry.
+
+**Usage :**
+```bash
+# PowerShell (méthode ACR build)
+.\scripts\build_acr.ps1 -AcrName "emailpocacr" -ImageName "ClassyMail-agent" -Tag "v1.0" -PushMethod acr
+
+# PowerShell (méthode Docker local)
+.\scripts\build_acr.ps1 -AcrName "emailpocacr" -PushMethod docker
+
+# Bash
+export ACR_NAME=emailpocacr
+export IMAGE_NAME=ClassyMail-agent
+export TAG=v1.0
+./scripts/build_acr.sh
+```
+
+**Méthodes disponibles :**
+- `acr` : Build distant via `az acr build` (recommandé, pas besoin de Docker local)
+- `docker` : Build local + push (nécessite Docker Desktop)
+
+**Prérequis :**
+- `az login` effectué
+- Droits `AcrPush` sur le registry
+
+---
+
+#### `assign_storage_reader` (.ps1 / .sh) — **Assignation Rôle Storage**
+Assigne le rôle "Storage Blob Data Reader" à une Managed Identity.
+
+**Usage :**
+```bash
+# PowerShell
+.\scripts\assign_storage_reader.ps1 `
+  -ManagedIdentityClientId "12345678-abcd-1234-abcd-1234567890ab" `
+  -StorageAccountName "emailpocstorage"
+
+# Bash
+./scripts/assign_storage_reader.sh \
+  "12345678-abcd-1234-abcd-1234567890ab" \
+  "emailpocstorage"
+```
+
+**💡 Note :** Généralement géré par Terraform, à utiliser uniquement pour debug
+
+---
+
+#### `fetch_vue_runtime` (.ps1 / .sh) — **Téléchargement Vue.js Runtime**
+Télécharge le runtime Vue.js pour le frontend (offline fallback).
+
+**Usage :**
+```bash
+# PowerShell
+.\scripts\fetch_vue_runtime.ps1 -Version "3.5.13" -OutFile "static/js/vue.global.prod.js"
+
+# Bash
+./scripts/fetch_vue_runtime.sh "3.5.13" "static/js/vue.global.prod.js"
+```
+
+**Utilisé par :** Frontend build (automatique via npm scripts)
+
+---
+
+### 🧪 Scripts de Test & Génération de Données
+
+#### `generate_dummy_pdfs.py` — **Génération PDFs de Test Bruités**
+Génère des PDFs d'emails réalistes avec typos, argot, multilangue, et données fictives.
+
+**Usage :**
+```bash
+# Génération standard (75 PDFs avec ~300 mots chacun)
+uv run python scripts/generate_dummy_pdfs.py --count 75 --out dataset/pdf_test
+
+# Génération avec Azure OpenAI (emails plus réalistes)
+uv run python scripts/generate_dummy_pdfs.py --count 50 --use-aoai --aoai-deployment gpt-4o-mini
+
+# Génération courte pour tests rapides
+uv run python scripts/generate_dummy_pdfs.py --count 10 --target-words 100
+```
+
+**Prérequis pour --use-aoai :**
+- `AZURE_OPENAI_ENDPOINT` dans `secrets.env`
+- `AZURE_OPENAI_API_KEY` ou authentification Entra ID
+
+**Catégories générées :**
+- habitation, scolaire, releve_compte, domm_elec, evt_naturel
+- Catégories mixtes (multi-intent)
+- hors_sujet, incompréhensible
+
+---
+
+#### `generate_realistic_emails.py` — **Génération Emails Professionnels**
+Génère des PDFs d'emails professionnels français pour tests réalistes.
+
+**Usage :**
+```bash
+# Génération standard (10 PDFs variés)
+uv run python scripts/generate_realistic_emails.py --count 10 --out dataset/pdf
+
+# Génération ciblée sur certaines catégories
+uv run python scripts/generate_realistic_emails.py --count 20 \
+  --categories "Attestation habitation" "Résiliation" "Réclamation"
+```
+
+**Catégories disponibles :**
+- Attestation habitation, Résiliation, Dommages électriques
+- Sinistre dégât des eaux, Modification contrat, Demande de devis, Réclamation
+
+---
+
+#### `test_e2e_flow.py` — **Test End-to-End Complet**
+Upload des PDFs générés vers l'API et vérifie le traitement.
+
+**Usage :**
+```bash
+# Test local (API sur localhost:8000)
+uv run python scripts/test_e2e_flow.py --count 5 --wait 10
+
+# Test sur environnement déployé
+uv run python scripts/test_e2e_flow.py --count 10 \
+  --api-url "https://email-poc-api.azurecontainerapps.io" \
+  --use-aoai
+```
+
+**Workflow :**
+1. Génère des PDFs réalistes
+2. Upload via `/api/upload`
+3. Attend traitement (configurable avec --wait)
+4. Affiche résumé avec IDs pour suivi
+
+**Prérequis :** API démarrée (`uvicorn main:app`)
+
+---
+
+#### `test_e2e_local.py` — **Test End-to-End Local Automatisé**
+Lance l'API + Worker en arrière-plan, génère et upload un PDF, puis vérifie le traitement.
+
+**Usage :**
+```bash
+uv run python scripts/test_e2e_local.py
+```
+
+**Workflow automatique :**
+1. Génère 1 PDF de test
+2. Démarre API + Worker (port 8001)
+3. Upload le PDF
+4. Poll Cosmos DB jusqu'à status=PROCESSED ou ERROR
+5. Affiche le résultat final
+
+**Prérequis :** `secrets.env` complet (Cosmos, AI, Storage, Service Bus)
+
+---
+
+#### `simulate_corrupted_pdf.py` — **Test de Fichier Corrompu**
+Upload un fichier corrompu (non-PDF) pour tester la gestion d'erreur.
+
+**Usage :**
+```bash
+# Test local
+uv run python scripts/simulate_corrupted_pdf.py
+
+# Test sur environnement déployé
+uv run python scripts/simulate_corrupted_pdf.py \
+  --base-url "https://email-poc-api.azurecontainerapps.io"
+```
+
+**Résultat attendu :** Status ERROR avec `error_stage=download`
+
+---
+
+### 🔍 Scripts de Validation
+
+#### `validate_mermaid.py` — **Validation Diagrammes Mermaid**
+Vérifie la syntaxe des diagrammes Mermaid dans les fichiers Markdown.
+
+**Usage :**
+```bash
+# Valider un fichier
+uv run python scripts/validate_mermaid.py docs/ARCHITECTURE.md
+
+# Valider plusieurs fichiers
+uv run python scripts/validate_mermaid.py docs/*.md
+```
+
+**Vérifie :**
+- ❌ Pas de tags HTML (`<br/>`, `<b>`) dans les labels
+- ✅ Types de diagrammes valides (flowchart, sequenceDiagram, etc.)
+- ✅ Indentation cohérente
+- ✅ Syntaxe des flèches
+
+**Intégré dans :** Pre-push hook (automatique)
+
+---
+
+#### `pre-push` (.ps1 / .sh) — **Pre-Push Hook Git**
+Script de vérification avant chaque `git push`.
+
+**Usage :**
+```bash
+# Installation du hook
+ln -s ../../scripts/pre-push.sh .git/hooks/pre-push  # Linux/Mac
+# ou copier manuellement pre-push.ps1 dans .git/hooks/ (Windows)
+
+# Exécution manuelle (test)
+./scripts/pre-push.sh
+```
+
+**Vérifications :**
+1. ✅ Ruff linting (`uv run ruff check .`)
+2. ✅ Tests smoke (`uv run pytest -q tests/test_smoke.py`)
+3. ✅ Synchronisation i18n (`python scripts/check_i18n.py`)
+
+**Résultat :** Bloque le push si erreurs détectées
+
+---
+
+### 📦 Ordre d'Exécution Recommandé
+
+#### **🏗️ Setup Initial (après `terraform apply`)**
+```bash
+# 1. Générer secrets.env avec les ressources Azure
+.\scripts\write_secrets_env.ps1 -ResourceGroup "email-poc-rg" -Force
+
+# 2. Vérifier l'infrastructure complète
+.\scripts\verify-mvp-setup.ps1 -ResourceGroup "email-poc-rg"
+
+# 3. Tester les endpoints AI
+uv run python scripts/verify_chat_vector.py
+uv run python scripts/verify_telemetry.py
+```
+
+#### **🧪 Développement & Tests**
+```bash
+# 1. Générer des données de test
+uv run python scripts/generate_realistic_emails.py --count 20
+
+# 2. Tester le pipeline complet
+uv run python scripts/test_e2e_local.py
+
+# 3. Debug si problèmes
+uv run python scripts/diagnose_pipeline.py --pdf dataset/pdf/test.pdf
+uv run python scripts/diagnose_failures.py
+```
+
+#### **🚀 Avant Deployment**
+```bash
+# 1. Vérifications qualité (automatique via pre-push hook)
+.\scripts\pre-push.ps1  # ou ./scripts/pre-push.sh
+
+# 2. Build & Push image Docker
+.\scripts\build_acr.ps1 -AcrName "emailpocacr" -Tag "v1.0.0" -PushMethod acr
+
+# 3. Vérification post-déploiement
+.\scripts\verify-mvp-setup.ps1 -ResourceGroup "email-poc-rg"
+```
+
+#### **🔧 Troubleshooting**
+```bash
+# Erreurs de traitement
+uv run python scripts/diagnose_failures.py
+uv run python scripts/diagnose_pipeline.py --show-errors --limit 10
+
+# Logs Azure Monitor
+uv run python scripts/verify_logs.py
+
+# Test fichier corrompu
+uv run python scripts/simulate_corrupted_pdf.py
+```
+
+---
+
+## �📚 Documentation
 
 L'index complet est disponible ici : **[docs/INDEX.md](docs/INDEX.md)**.
 - [CLI_SETUP](docs/CLI_SETUP.md)

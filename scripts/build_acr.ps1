@@ -11,11 +11,11 @@ if (-not $AcrName -and -not $Registry) {
   exit 1
 }
 if (-not $Registry) { $Registry = "$AcrName.azurecr.io" }
-$Image = "$Registry/$ImageName:$Tag"
+$Image = "$Registry/$ImageName`:$Tag"
 
 if ($PushMethod -eq 'acr') {
   Write-Host "[build] Remote build via az acr build -> $Image"
-  az acr build --registry $AcrName --image "$ImageName:$Tag" .
+  az acr build --registry $AcrName --image "$ImageName`:$Tag" .
 } elseif ($PushMethod -eq 'docker') {
   Write-Host "[build] Local docker build & push -> $Image"
   az acr login -n $AcrName | Out-Null
