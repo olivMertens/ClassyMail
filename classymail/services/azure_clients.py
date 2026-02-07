@@ -272,7 +272,7 @@ async def get_cosmos_container(clients: Clients = Depends(get_clients)):
         if HTTPException:
             raise HTTPException(
                 status_code=503,
-                detail=f"Database unavailable: {str(e)}. Ensure Cosmos DB is provisioned and identity has 'Cosmos DB Built-in Data Contributor' role.",
+                detail=f"Database unavailable: {str(e)}. Ensure Cosmos DB is provisioned and identity has correct roles (Data Contributor/Custom Role). Check Firewall if IP is blocked.",
             )
         raise
 

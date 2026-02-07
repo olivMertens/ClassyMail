@@ -157,3 +157,32 @@ GitHub Action fails to login via OIDC.
     ```bash
     az identity show -n email-poc-id -g email-poc-rg --query clientId
     ```
+
+### Scenario F: Cosmos DB 403 "Request originated from IP ... through public internet"
+
+**Error:**
+```
+(Forbidden) Request originated from IP xxx.xxx.xxx.xxx through public internet.
+This is blocked by your Cosmos DB account firewall settings.
+```
+
+**Root Cause:**
+The Cosmos DB Firewall is enabled (`ip_range_filter` is set), but your specific public IP address is missing from the allowlist. This often happens when running local scripts (`test_e2e_flow.py`) from a developer machine.
+Note: Azure Container Apps work because `0.0.0.0` (Azure Cloud access) is allowed, but your home/office IP is not automatically included.
+
+**Fix (Immediate - CLI):**
+Add your current public IP to the firewall rules.
+```bash
+# Update firewall to include your current IP (plus 0.0.0.0 for Azure services)
+az cosmosdb update \
+  --name email-poc-cosmos \
+  --resource-group email-poc-rg \
+  --ip-range-filter "0.0.0.0,$(curl -s ifconfig.me)"
+```
+
+**Fix (Terraform - Permanent):**
+Add your IP to the `allowed_ip_ranges` variable in `infra/terraform.tfvars`.
+```hcl
+allowed_ip_ranges = ["xxx.xxx.xxx.xxx"]
+```
+Then run `terraform apply`.

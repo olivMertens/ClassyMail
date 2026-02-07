@@ -294,6 +294,8 @@ resource "azurerm_cosmosdb_account" "db" {
   # "0.0.0.0" is the magic IP to "Allow access from Azure Datacenters"
   # This serves as the firewall exception for Container Apps without VNet injection.
   # We also append any client IPs provided via variables.
+  # CRITICAL: If running local scripts/debug, your IP must be in `allowed_ip_ranges`.
+  # Otherwise you will get a 403 Forbidden with "Request originated from IP ... through public internet".
   ip_range_filter = concat(["0.0.0.0"], var.allowed_ip_ranges)
 
   # Beaucoup de tenants désactivent l'auth locale (clé) par policy.
