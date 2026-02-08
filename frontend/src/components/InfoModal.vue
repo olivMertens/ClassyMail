@@ -89,6 +89,7 @@ const { t } = useI18n()
                   <li>{{ t('info.features.adversarial') }}</li>
                   <li>{{ t('info.features.dark_mode') }}</li>
                   <li>{{ t('info.features.retail_prices') }}</li>
+                  <li>{{ t('info.features.error_handling') }}</li>
                 </ul>
 
                 <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">

@@ -339,7 +339,7 @@
         "date": "Février 2026",
         "poc_header": "Ce Proof of Concept (POC) - {org} ({date})",
         "subtitle": "ClassyMail Agent",
-        "tagline": "L'IA générative qui sait exactement où va chaque email.",
+        "tagline": "GenAI that knows exactly where every email belongs.",
         "contact": "Contact",
         "est_monthly": "Estimation coûts (approx./mois)",
         "est_email": "Estimation coûts / email",
@@ -366,7 +366,8 @@
             "title": "Points forts",
             "adversarial": "Évaluation adversariale bi-modèle (Phi-4 vs personnalisé)",
             "dark_mode": "Cache sémantique + recherche vectorielle Cosmos",
-            "retail_prices": "Pipeline scoré : métriques de file, probes de santé, identité managée"
+            "retail_prices": "Pipeline scoré : métriques de file, probes de santé, identité managée",
+            "error_handling": "Observabilité complète & Récupération d'erreurs (DLQ)"
         }
     },
     "guide": {

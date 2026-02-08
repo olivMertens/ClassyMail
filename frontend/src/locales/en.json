@@ -365,7 +365,8 @@
             "title": "Highlights",
             "adversarial": "Dual-model adversarial evaluation (Phi-4 vs custom)",
             "dark_mode": "Semantic cache + vector search with Cosmos",
-            "retail_prices": "Health-scored pipeline: queue metrics, readiness probes, managed identity"
+            "retail_prices": "Health-scored pipeline: queue metrics, readiness probes, managed identity",
+            "error_handling": "Full Observability & Error Recovery (DLQ)"
         },
         "close": "Close"
     },

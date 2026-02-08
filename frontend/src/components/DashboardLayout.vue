@@ -162,6 +162,13 @@ const navigation = computed(() => {
         <!-- User/Footer area -->
         <div class="flex-shrink-0 flex border-t border-gray-200 dark:border-gray-700 p-4">
           <div class="flex items-center w-full">
+            <!-- Info Modal Trigger (Circle at bottom left) -->
+            <button
+              class="flex-shrink-0 bg-gray-100 dark:bg-gray-700 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              @click="showInfoModal = true"
+            >
+              <InformationCircleIcon class="h-6 w-6 text-gray-500 dark:text-gray-400" />
+            </button>
             <div class="ml-3">
               <p
                 v-if="!sidebarCollapsed"
