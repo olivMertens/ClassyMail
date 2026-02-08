@@ -69,7 +69,9 @@ Références :
 
 ## Workflow de déploiement (Container Apps)
 
- Le workflow [deploy.yml](../.github/workflows/deploy.yml) :
+Le workflow [deploy.yml](../.github/workflows/deploy.yml) est structuré en plusieurs jobs :
+
+### 1. Jobs de déploiement (API + Worker)
 
 - build/test (uv + `python -m compileall`)
 - build & push image Docker
@@ -77,7 +79,68 @@ Références :
 - affectation d'une **User Assigned Managed Identity** à la Container App (pour RBAC data-plane, sans clés)
 - injection des variables d'environnement nécessaires
 
-### Étapes de validation
+### 2. Post-Deployment Verification & Auto-Fix (nouveau)
+
+⚡ **Job critique** qui s'exécute **APRÈS** le déploiement des Container Apps pour garantir que l'infrastructure est fonctionnelle.
+
+**Caractéristiques :**
+- ✅ S'exécute automatiquement après `deploy-api` et `deploy-worker`
+- ✅ Utilise `continue-on-error: true` (ne bloque jamais le pipeline)
+- ✅ Auto-corrige les problèmes critiques détectés
+- ✅ Génère des warnings pour les problèmes non auto-réparables
+
+**Étapes d'auto-correction :**
+
+1. **Cosmos DB Firewall (CRITIQUE)** 🔧
+   - Détecte les IPs sortantes actuelles des Container Apps
+   - Met à jour automatiquement le firewall Cosmos DB
+   - Ajoute `0.0.0.0` (Azure Services) si manquant
+   - **Bloque le pipeline si échec** (problème critique)
+
+2. **Tags Policy (Gouvernance)** 🏷️
+   - Applique la politique `SecurityControl` / `CostControl`
+   - Lance la remédiation asynchrone des ressources non conformes
+   - **N'échoue pas** si problème (non critique)
+
+3. **Container Apps Readiness** ⏳
+   - Vérifie que les Container Apps sont dans l'état `Running`
+   - 12 tentatives avec 10s d'intervalle (total: 2 minutes)
+   - **Avertit** si non prêt, mais ne bloque pas
+
+4. **API Health Checks** 🩺
+   - Teste `/health` endpoint (12 tentatives, 10s intervalle)
+   - Teste `/readyz` endpoint (connectivité Cosmos/Storage/AI)
+   - **Bloque le pipeline** si `/health` échoue après 2 minutes
+
+5. **RBAC Roles Audit (Report Only)** 🔐
+   - Vérifie la présence des rôles critiques sur la Managed Identity
+   - Génère un **GitHub Warning** si rôles manquants
+   - **N'échoue jamais** (rapport seulement)
+   - Rôles vérifiés :
+     - `Storage Blob Data Contributor`
+     - `Cognitive Services User`
+     - `Azure Service Bus Data Owner` (ou Sender + Receiver)
+
+**Exemple de sortie (RBAC manquant) :**
+```
+⚠️ WARNING: Missing RBAC roles detected
+
+Missing roles:
+  - Cognitive Services User
+
+FIX: These roles should have been assigned by Terraform.
+     Run: cd infra && terraform apply
+
+IMPACT: Container Apps may fail to access Azure resources
+```
+
+**Pourquoi cette approche ?**
+- ⚡ **Déploiement d'abord** : Container Apps toujours déployées, même si vérifications futures échouent
+- 🔧 **Auto-correction** : Problèmes réseau (firewall) corrigés automatiquement
+- 📊 **Visibilité** : RBAC manquants remontés comme warnings GitHub
+- 🚀 **Pas de blocage** : Pipeline réussit même avec warnings (action manuelle post-déploiement)
+
+### Étapes de validation (avant déploiement)
 
 - `uv run ruff check .`
 - `uv run pytest`

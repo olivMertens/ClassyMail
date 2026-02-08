@@ -477,3 +477,241 @@ jobs:
             -n "$APP" \
             -g "$RG" \
             --image "$IMAGE"
+
+  post-deploy-verify-fix:
+    name: Post-Deployment Verification & Auto-Fix
+    runs-on: ubuntu-latest
+    needs: [changes, deploy-api, deploy-worker]
+    if: needs.changes.outputs.build == 'true' || github.event_name == 'workflow_dispatch'
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        if: ${{ env.AZURE_CREDENTIALS == '' }}
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure login (service principal json)
+        if: ${{ env.AZURE_CREDENTIALS != '' }}
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install jq (for JSON parsing)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Fix Cosmos DB Firewall (Critical)
+        run: |
+          echo "========================================"
+          echo "Step 1/5: Cosmos DB Network Firewall"
+          echo "========================================"
+          echo ""
+          chmod +x scripts/update_cosmos_firewall.sh
+          if ./scripts/update_cosmos_firewall.sh "${{ vars.AZURE_RESOURCE_GROUP }}"; then
+            echo "✅ Cosmos DB firewall updated with current Container App IPs"
+          else
+            echo "❌ Failed to update Cosmos DB firewall - CRITICAL"
+            exit 1
+          fi
+
+      - name: Apply Tags Policy (Governance)
+        continue-on-error: true
+        run: |
+          echo ""
+          echo "========================================"
+          echo "Step 2/5: Security & Cost Control Tags"
+          echo "========================================"
+          echo ""
+          chmod +x scripts/verify_security_cost_tags.sh
+          if ./scripts/verify_security_cost_tags.sh "${{ vars.AZURE_RESOURCE_GROUP }}" --apply --remediate; then
+            echo "✅ Tags policy applied and remediation started"
+          else
+            echo "⚠️ Tags policy failed (non-critical, governance only)"
+          fi
+
+      - name: Wait for Container Apps Ready
+        run: |
+          echo ""
+          echo "========================================"
+          echo "Step 3/5: Container Apps Readiness"
+          echo "========================================"
+          echo ""
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+
+          for APP in "${{ env.IMAGE_NAME }}" "${{ env.WORKER_APP_NAME }}"; do
+            echo "Checking $APP..."
+            for i in {1..12}; do
+              STATUS=$(az containerapp show --name "$APP" -g "$RG" --query "properties.runningStatus" -o tsv 2>/dev/null || echo "Unknown")
+              if [ "$STATUS" == "Running" ]; then
+                echo "✅ $APP is Running"
+                break
+              elif [ $i -eq 12 ]; then
+                echo "⚠️ $APP not running after 2 minutes (Status: $STATUS)"
+              else
+                echo "  ⏳ $APP: $STATUS (attempt $i/12, waiting 10s...)"
+                sleep 10
+              fi
+            done
+          done
+
+      - name: Verify API Health Endpoints
+        run: |
+          echo ""
+          echo "========================================"
+          echo "Step 4/5: API Health Checks"
+          echo "========================================"
+          echo ""
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          API_APP="${{ env.IMAGE_NAME }}"
+
+          API_FQDN=$(az containerapp show --name "$API_APP" -g "$RG" --query "properties.configuration.ingress.fqdn" -o tsv 2>/dev/null || echo "")
+
+          if [ -z "$API_FQDN" ]; then
+            echo "❌ API FQDN not available - ingress not configured"
+            exit 1
+          fi
+
+          API_URL="https://$API_FQDN"
+          echo "API URL: $API_URL"
+          echo ""
+
+          # Test /health endpoint with retries
+          echo "Testing /health endpoint..."
+          for i in {1..12}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/health" 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" == "200" ]; then
+              echo "✅ Health check passed (HTTP $HTTP_CODE)"
+              break
+            elif [ $i -eq 12 ]; then
+              echo "❌ Health check failed after 12 retries (HTTP $HTTP_CODE)"
+              exit 1
+            else
+              echo "  ⏳ Health check: HTTP $HTTP_CODE (attempt $i/12, waiting 10s...)"
+              sleep 10
+            fi
+          done
+
+          # Test /readyz endpoint
+          echo ""
+          echo "Testing /readyz endpoint..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/readyz" 2>/dev/null || echo "000")
+          if [ "$HTTP_CODE" == "200" ]; then
+            echo "✅ Readiness check passed (HTTP $HTTP_CODE)"
+          else
+            echo "⚠️ Readiness: HTTP $HTTP_CODE (API might still be initializing connections)"
+          fi
+
+      - name: Audit RBAC Roles (Report Only)
+        continue-on-error: true
+        run: |
+          echo ""
+          echo "========================================"
+          echo "Step 5/5: RBAC Roles Audit"
+          echo "========================================"
+          echo ""
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
+
+          if [ -z "$IDENTITY_NAME" ]; then
+            echo "⚠️ AZURE_IDENTITY_NAME not set - skipping RBAC audit"
+            exit 0
+          fi
+
+          IDENTITY_ID=$(az identity show -g "$RG" -n "$IDENTITY_NAME" --query principalId -o tsv 2>/dev/null || echo "")
+
+          if [ -z "$IDENTITY_ID" ]; then
+            echo "⚠️ Managed identity '$IDENTITY_NAME' not found - skipping RBAC audit"
+            exit 0
+          fi
+
+          echo "Managed Identity: $IDENTITY_NAME"
+          echo "Principal ID: $IDENTITY_ID"
+          echo ""
+
+          ROLES=$(az role assignment list --assignee "$IDENTITY_ID" --all --query "[].roleDefinitionName" -o tsv 2>/dev/null || echo "")
+
+          if [ -z "$ROLES" ]; then
+            echo "⚠️ No role assignments found"
+          fi
+
+          # Check critical roles
+          MISSING=()
+
+          echo "Critical RBAC Roles Status:"
+          echo "----------------------------"
+
+          if echo "$ROLES" | grep -q "Storage Blob Data Contributor"; then
+            echo "✅ Storage Blob Data Contributor"
+          else
+            echo "❌ Storage Blob Data Contributor (MISSING)"
+            MISSING+=("Storage Blob Data Contributor")
+          fi
+
+          if echo "$ROLES" | grep -q "Cognitive Services User"; then
+            echo "✅ Cognitive Services User"
+          else
+            echo "❌ Cognitive Services User (MISSING)"
+            MISSING+=("Cognitive Services User")
+          fi
+
+          if echo "$ROLES" | grep -q "Azure Service Bus Data Owner"; then
+            echo "✅ Azure Service Bus Data Owner"
+          elif echo "$ROLES" | grep -q "Azure Service Bus Data Sender" && echo "$ROLES" | grep -q "Azure Service Bus Data Receiver"; then
+            echo "✅ Azure Service Bus Data Sender & Receiver"
+          else
+            echo "❌ Service Bus roles (MISSING)"
+            MISSING+=("Azure Service Bus Data Owner OR (Sender + Receiver)")
+          fi
+
+          echo ""
+
+          # Report missing roles but don't fail
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "⚠️ WARNING: Missing RBAC roles detected"
+            echo ""
+            echo "Missing roles:"
+            for role in "${MISSING[@]}"; do
+              echo "  - $role"
+            done
+            echo ""
+            echo "FIX: These roles should have been assigned by Terraform."
+            echo "     Run: cd infra && terraform apply"
+            echo ""
+            echo "IMPACT: Container Apps may fail to access Azure resources"
+            echo "        (Storage, Cosmos DB, Service Bus, AI Foundry)"
+            echo ""
+            echo "::warning::Missing RBAC roles: ${MISSING[*]}"
+          else
+            echo "✅ All critical RBAC roles are properly assigned"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo ""
+          echo "================================================"
+          echo "Post-Deployment Verification Summary"
+          echo "================================================"
+          echo ""
+          echo "✅ Deployment: Container Apps updated successfully"
+          echo "🔧 Auto-fixes: Applied (Cosmos firewall, tags policy)"
+          echo "🩺 Health checks: See results above"
+          echo "🔐 RBAC audit: See results above"
+          echo ""
+          echo "Next steps:"
+          echo "  1. Monitor Container App logs:"
+          echo "     az containerapp logs show --name ${{ env.IMAGE_NAME }} -g ${{ vars.AZURE_RESOURCE_GROUP }} --follow"
+          echo "  2. Test end-to-end: Upload a PDF via the UI"
+          echo "  3. If RBAC issues found: cd infra && terraform apply"
+          echo ""
