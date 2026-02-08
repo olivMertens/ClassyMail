@@ -102,9 +102,10 @@ $aiApiVersion = '2024-08-01-preview'
 $aiScope = 'https://cognitiveservices.azure.com/.default'
 
 # Découverte Application Insights (pour telemetry)
-$appInsightsName = Get-FirstOrNull "az monitor app-insights component list -g '$rg' --query '[0].name' -o tsv"
+# Note: Utilisation de 'az resource' car 'az monitor' peut échouer si le module python est corrompu
+$appInsightsName = Get-FirstOrNull "az resource list -g '$rg' --resource-type 'Microsoft.Insights/components' --query '[0].name' -o tsv"
 $appInsightsConnStr = if ($appInsightsName) {
-  Get-FirstOrNull "az monitor app-insights component show -g '$rg' -a '$appInsightsName' --query connectionString -o tsv"
+  Get-FirstOrNull "az resource show -g '$rg' -n '$appInsightsName' --resource-type 'Microsoft.Insights/components' --query properties.ConnectionString -o tsv"
 } else { $null }
 
 # Découverte Log Analytics Workspace

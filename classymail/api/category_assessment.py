@@ -102,14 +102,24 @@ CRITICAL:
 
 Assess quality and provide rewrites."""
 
+            # Prepare content based on model capabilities
+            if is_reasoning_model(deployment):
+                # Reasoning models (e.g., GPT-5, o1) often restrict 'system' messages.
+                # Combine instructions into the user prompt for compatibility.
+                messages = [
+                    {"role": "user", "content": f"{system_prompt}\n\n---\n\n{user_content}"}
+                ]
+            else:
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content},
+                ]
+
             # Detect model family for correct API parameters
             # GPT-5 Nano (Reasoning) budget adjusted to 10k (safe but not excessive).
             payload = {
                 "model": deployment,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_content},
-                ],
+                "messages": messages,
                 **build_chat_params(deployment, temperature=0.3, max_output_tokens=10000),
             }
 
