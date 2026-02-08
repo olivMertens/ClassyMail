@@ -10,6 +10,7 @@ import httpx
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
 from classymail.core import config
+from classymail.core.llm_compat import build_chat_params
 from classymail.core.llm_limits import get_limiter
 from classymail.services.azure_clients import Clients
 # from classymail.services.circuit_breaker import with_chat_circuit_breaker
@@ -501,11 +502,12 @@ class ChatAgent:
 
     async def _call_llm(self, messages: list[dict], tools: list[dict] | None = None) -> dict:
         headers = self._auth_header_func()
-        # Reasoning models (e.g. gpt-5.x, o1, o3) do not support 'temperature' or 'top_p'.
-        # We rely on their internal reasoning for consistency.
+        # Use centralized compatibility layer for model-aware parameters.
+        # Reasoning models (gpt-5.x, o1, o3) → max_completion_tokens, no temperature.
+        # Classic models (gpt-4o, etc.) → max_tokens + temperature.
         payload = {
             "messages": messages,
-            "max_completion_tokens": 4000, # Increased limit to accommodate reasoning/CoT tokens
+            **build_chat_params(self.deployment, temperature=0.7, max_output_tokens=4000),
         }
         if tools:
             payload["tools"] = tools

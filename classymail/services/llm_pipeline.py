@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential, retry_if_exception, retry
 
 from classymail.core import config
+from classymail.core.llm_compat import build_chat_params
 from classymail.models import OCRFailed, BusinessEntities
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.settings_store import get_categories_prompt_text, load_settings
@@ -92,8 +93,7 @@ Example JSON Output:
             {"role": "system", "content": system_prompt_entities},
             {"role": "user", "content": user_content},
         ],
-        "temperature": 0.1,
-        "max_tokens": 1500, # Enough for a long list of entities
+        **build_chat_params(deployment, temperature=0.1, max_output_tokens=1500),
     }
 
     with tracer.start_as_current_span(f"extract_entities_{deployment}") as span:
@@ -546,8 +546,7 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
-        "temperature": 0.1,
-        "max_tokens": config.PHI_RESERVED_OUTPUT_TOKENS,
+        **build_chat_params(deployment, temperature=0.1, max_output_tokens=config.PHI_RESERVED_OUTPUT_TOKENS),
     }
 
     url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={config.AI_API_VERSION}"
@@ -642,8 +641,12 @@ async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False
     if preprocessing_config.get("detect_pii", False):
         try:
             pii_method = preprocessing_config.get("pii_detection_method", "llm")
-            logger.info(f"Running PII detection with method: {pii_method}")
-            pii_result = await detect_pii(text_markdown, method=pii_method, clients=clients)
+            pii_llm_model = preprocessing_config.get("pii_llm_model", "auto")
+            # Resolve "auto" to the classification model
+            if pii_llm_model in ("auto", None, ""):
+                pii_llm_model = settings.get("ai_model", "phi4")
+            logger.info(f"Running PII detection with method: {pii_method}, model: {pii_llm_model}")
+            pii_result = await detect_pii(text_markdown, method=pii_method, clients=clients, model=pii_llm_model)
             logger.info(f"PII detection: {pii_result.total_count} items ({', '.join(pii_result.pii_types)})")
         except Exception as e:
             logger.warning(f"PII detection failed: {e}")
@@ -911,8 +914,7 @@ Analyse cette correction.
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
-        "temperature": 0.3,
-        "max_tokens": 150,
+        **build_chat_params(config.PHI_DEPLOYMENT, temperature=0.3, max_output_tokens=150),
     }
 
     url = f"{config.PHI_ENDPOINT.rstrip('/')}/openai/deployments/{config.PHI_DEPLOYMENT}/chat/completions?api-version={config.AI_API_VERSION}"

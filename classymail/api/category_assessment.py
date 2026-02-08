@@ -14,6 +14,7 @@ from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel, Field
 
 from classymail.core import config
+from classymail.core.llm_compat import build_chat_params
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.llm_pipeline import resolve_model_config
 
@@ -139,25 +140,15 @@ CRITICAL: Each suggestion must be actionable (user can implement immediately) an
 Focus on: keyword density, boundary precision, prompt structure, and LLM comprehension patterns."""
 
             # Detect model family for correct API parameters
-            # GPT-5.x and GPT-4.1+ models use max_completion_tokens and don't support temperature
-            is_reasoning_model = any(x in deployment.lower() for x in ["gpt-5", "gpt-4.1", "o1", "o3"])
-
             payload = {
                 "model": deployment,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_content},
                 ],
-                "response_format": {"type": "json_object"}
+                "response_format": {"type": "json_object"},
+                **build_chat_params(deployment, temperature=0.3, max_output_tokens=1500),
             }
-
-            # Add appropriate token limit parameter based on model family
-            if is_reasoning_model:
-                payload["max_completion_tokens"] = 1500
-                # Note: Reasoning models (gpt-5.x, gpt-4.1+, o1, o3) do not support temperature/top_p
-            else:
-                payload["max_tokens"] = 1500
-                payload["temperature"] = 0.3  # Low temperature for consistent advice (GPT-4.x only)
 
             span.set_attribute("gen_ai.system", "azure_openai")
             span.set_attribute("gen_ai.request.model", deployment)

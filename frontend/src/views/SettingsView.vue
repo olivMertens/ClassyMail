@@ -47,7 +47,8 @@ const settings = ref({
     enabled: true,
     include_subject: true,
     extract_last_conversation: true,
-    detect_pii: false
+    detect_pii: false,
+    pii_llm_model: 'auto'
   }
 })
 const defaults = ref({
@@ -708,22 +709,19 @@ onMounted(() => {
       class="bg-white dark:bg-gray-800 shadow sm:rounded-lg"
     >
       <div class="px-4 py-5 sm:p-6">
-        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white flex items-center gap-2">
+        <h3 class="text-lg font-bold text-gray-900 dark:text-white">
           {{ t('settings.processing.title') }}
-          <button
-            class="text-gray-400 hover:text-primary-500 transition-colors"
-            title="How these strategies work"
-            @click="showStrategyHelp = true"
-          >
-            <QuestionMarkCircleIcon class="h-5 w-5" />
-          </button>
         </h3>
-        <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
-          <p>{{ t('settings.processing.desc') }}</p>
-        </div>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400 mb-6">
+          {{ t('settings.processing.desc') }}
+        </p>
 
-        <!-- Model Selection -->
-        <div class="mt-6 mb-6 pb-6 border-b border-gray-100 dark:border-gray-700">
+        <!-- Section: AI Model Selection -->
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 mb-6 bg-gray-50/50 dark:bg-gray-900/20">
+          <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+            <CpuChipIcon class="h-5 w-5 text-blue-500" />
+            {{ t('settings.processing.model_select') }}
+          </h4>
           <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{
             t('settings.processing.model_select') }}</label>
           <div class="mt-2">
@@ -921,76 +919,94 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="mt-4 space-y-4">
-          <div class="flex items-center">
-            <input
-              id="strategy-standard"
-              v-model="settings.processing_strategy"
-              name="processing_strategy"
-              type="radio"
-              value="standard"
-              class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+        <!-- Section: Processing Strategy -->
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 mb-6 bg-gray-50/50 dark:bg-gray-900/20">
+          <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+            <AdjustmentsHorizontalIcon class="h-5 w-5 text-purple-500" />
+            {{ t('settings.processing.title') }}
+            <button
+              class="text-gray-400 hover:text-primary-500 transition-colors"
+              title="How these strategies work"
+              @click="showStrategyHelp = true"
             >
-            <label
-              for="strategy-standard"
-              class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
-            >
-              {{ t('settings.processing.strategy.standard') }}
-            </label>
-          </div>
-          <div class="flex items-center">
-            <input
-              id="strategy-reasoning"
-              v-model="settings.processing_strategy"
-              name="processing_strategy"
-              type="radio"
-              value="reasoning"
-              class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
-            >
-            <label
-              for="strategy-reasoning"
-              class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
-            >
-              {{ t('settings.processing.strategy.reasoning') }}
-            </label>
-          </div>
-          <div class="flex items-center">
-            <input
-              id="strategy-vision"
-              v-model="settings.processing_strategy"
-              name="processing_strategy"
-              type="radio"
-              value="vision"
-              class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
-            >
-            <label
-              for="strategy-vision"
-              class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
-            >
-              {{ t('settings.processing.strategy.vision') }}
-            </label>
+              <QuestionMarkCircleIcon class="h-5 w-5" />
+            </button>
+          </h4>
+          <div class="space-y-4">
+            <div class="flex items-center">
+              <input
+                id="strategy-standard"
+                v-model="settings.processing_strategy"
+                name="processing_strategy"
+                type="radio"
+                value="standard"
+                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+              >
+              <label
+                for="strategy-standard"
+                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
+              >
+                {{ t('settings.processing.strategy.standard') }}
+              </label>
+            </div>
+            <div class="flex items-center">
+              <input
+                id="strategy-reasoning"
+                v-model="settings.processing_strategy"
+                name="processing_strategy"
+                type="radio"
+                value="reasoning"
+                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+              >
+              <label
+                for="strategy-reasoning"
+                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
+              >
+                {{ t('settings.processing.strategy.reasoning') }}
+              </label>
+            </div>
+            <div class="flex items-center">
+              <input
+                id="strategy-vision"
+                v-model="settings.processing_strategy"
+                name="processing_strategy"
+                type="radio"
+                value="vision"
+                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+              >
+              <label
+                for="strategy-vision"
+                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white"
+              >
+                {{ t('settings.processing.strategy.vision') }}
+              </label>
+            </div>
           </div>
         </div>
 
-        <div class="mt-6">
-          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{
-            t('settings.processing.ocr_retries') }}</label>
+        <!-- Section: OCR Configuration -->
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 mb-6 bg-gray-50/50 dark:bg-gray-900/20">
+          <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
+            <ArrowPathIcon class="h-5 w-5 text-amber-500" />
+            {{ t('settings.processing.ocr_retries') }}
+          </h4>
           <input
             v-model="settings.ocr_max_attempts"
             type="number"
             min="1"
             max="10"
-            class="mt-1 block w-full max-w-xs rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+            class="block w-full max-w-xs rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
             :placeholder="defaults.ocr_max_attempts ?? 3"
           >
-          <p class="mt-1 text-xs text-gray-500">
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
             {{ t('settings.processing.ocr_retries_help') }}
           </p>
         </div>
 
-        <!-- Email Preprocessing Section -->
-        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
-          <h4 class="text-base font-semibold leading-6 text-gray-900 dark:text-white mb-2">
+        <!-- Section: Email Preprocessing -->
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 bg-gray-50/50 dark:bg-gray-900/20">
+          <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-2">
+            <InformationCircleIcon class="h-5 w-5 text-green-500" />
             Email Preprocessing (Client G2S)
           </h4>
           <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
@@ -1120,23 +1136,44 @@ onMounted(() => {
                   {{ t('settings.processing.pii_method_description') }}
                 </p>
               </div>
-            </div>
-          </div>
 
-          <div
-            class="mt-4 rounded-md bg-amber-50 dark:bg-amber-900/20 p-3 border border-amber-200 dark:border-amber-800"
-          >
-            <div class="flex">
-              <div class="flex-shrink-0">
-                <InformationCircleIcon
-                  class="h-5 w-5 text-amber-400"
-                  aria-hidden="true"
-                />
-              </div>
-              <div class="ml-3 text-sm text-amber-700 dark:text-amber-300">
-                <p>
-                  <strong>Professional Mode:</strong> Prompts use structured DEFINITION/EXCLUSIONS format without
-                  emojis for business compatibility
+              <!-- PII LLM Model Dropdown (shown when PII enabled + LLM or both method) -->
+              <div
+                v-if="settings.email_preprocessing.detect_pii && (settings.email_preprocessing.pii_detection_method === 'llm' || settings.email_preprocessing.pii_detection_method === 'both')"
+                class="ml-11 mt-3"
+              >
+                <label
+                  for="pii-llm-model"
+                  class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                >
+                  {{ t('settings.processing.pii_llm_model') }}
+                </label>
+                <select
+                  id="pii-llm-model"
+                  v-model="settings.email_preprocessing.pii_llm_model"
+                  class="block w-full rounded-md border-gray-300 py-1.5 pl-3 pr-10 text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                >
+                  <option value="auto">
+                    {{ t('settings.processing.pii_llm_model_auto') }}
+                  </option>
+                  <option value="phi4">
+                    Phi-4
+                  </option>
+                  <option value="gpt-4o-mini">
+                    gpt-4o-mini
+                  </option>
+                  <option value="gpt-5-nano">
+                    gpt-5-nano
+                  </option>
+                  <option value="gpt-5-mini">
+                    gpt-5-mini
+                  </option>
+                  <option value="gpt-4.1-nano">
+                    gpt-4.1-nano
+                  </option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('settings.processing.pii_llm_model_description') }}
                 </p>
               </div>
             </div>

@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from typing import Optional
 import httpx
 
+from classymail.core.llm_compat import build_chat_params
+
 logger = logging.getLogger(__name__)
 
 # Realistic email templates (French)
@@ -177,8 +179,7 @@ def _aoai_enhance_body(body: str, category: str) -> Optional[str]:
     )
 
     body_payload = {
-        "temperature": 0.7,
-        "max_tokens": 800,
+        **build_chat_params(deployment, temperature=0.7, max_output_tokens=800),
         "messages": [
             {
                 "role": "system",
@@ -285,9 +286,8 @@ async def generate_synthetic_from_seeds(seed_examples: list[dict], count: int = 
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            "response_format": { "type": "json_object" }, # GPT-4o/5 supports this
-            "temperature": 0.8, # Higher temp for variety
-            "max_tokens": 1000
+            "response_format": { "type": "json_object" },
+            **build_chat_params(deployment, temperature=0.8, max_output_tokens=1000),
         }
 
         try:

@@ -42,10 +42,13 @@
             "ocr_retries": "Max OCR Attempts",
             "ocr_retries_help": "Number of OCR retry attempts (exponential backoff on network errors).",
             "pii_detection_method": "PII Detection Method",
-            "pii_method_llm": "LLM-based (GPT-4o-mini) - Contextual",
+            "pii_method_llm": "LLM-based - Contextual",
             "pii_method_azure": "Azure AI Language Service - Native API",
             "pii_method_both": "Hybrid (Both) - Maximum Accuracy",
-            "pii_method_description": "LLM: Contextual understanding (~€0.002/email). Azure: 40+ predefined categories (~€0.001/email). Hybrid: Combines both for comprehensive detection."
+            "pii_method_description": "LLM: Contextual understanding. Azure: 40+ predefined categories (~€0.001/email). Hybrid: Combines both for comprehensive detection.",
+            "pii_llm_model": "PII LLM Model",
+            "pii_llm_model_auto": "Auto (same as classification model)",
+            "pii_llm_model_description": "Choose which LLM to use for PII extraction. 'Auto' reuses the classification model to avoid extra deployments."
         },
         "finetuning": {
             "title": "Fine-tuning Configuration",
@@ -407,9 +410,20 @@
         },
         "privacy": {
             "title": "Privacy & Data Safety (PII)",
-            "desc": "Personal Identifiable Information (PII) handling:",
-            "li1": "Detection: The AI flags emails containing sensitive data (Social Security Numbers, Finance details, Health info).",
-            "li2": "Anonymization: When exporting data for fine-tuning, the system automatically scrubs names, emails, and dates using a dedicated anonymizer model."
+            "desc": "GDPR-compliant Personal Identifiable Information (PII) management with configurable detection and anonymization:",
+            "detection_title": "PII Detection",
+            "detection_desc": "The AI flags emails containing sensitive data. Enable in Settings > Processing > Email Preprocessing.",
+            "detection_li1": "LLM-based: Contextual understanding using your chosen model — extracts names, emails, phones, addresses, contract IDs, and dates.",
+            "detection_li2": "Azure AI Language: Native service with 40+ predefined PII categories (~€0.001/email).",
+            "detection_li3": "Hybrid: Runs both methods in parallel and merges results for maximum accuracy.",
+            "detection_li4": "Configurable Model: PII detection can reuse your classification model (Auto) or use a dedicated deployment (gpt-4o-mini, gpt-5-nano, etc.).",
+            "detection_categories": "Detected categories: names, emails, phones, addresses, contract/policy numbers, dates, and other identifiers (SSN, passport, IBAN).",
+            "anonymization_title": "Anonymization (Fine-Tuning Export)",
+            "anonymization_desc": "When exporting JSONL data for fine-tuning, the system automatically scrubs all PII using a dedicated anonymizer model:",
+            "anonymization_li1": "Names, emails, and dates are replaced with generic placeholders ([Name], [Email], [Date]).",
+            "anonymization_li2": "Financial figures, addresses, and reference numbers are masked.",
+            "anonymization_li3": "Markdown structure (headers, links, tables) is fully preserved.",
+            "settings_hint": "Configure PII detection method and model in Settings > Processing > Email Preprocessing."
         },
         "vision": {
             "title": "Smart Vision (Mistral Document AI)",

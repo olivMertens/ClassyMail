@@ -51,6 +51,7 @@ DEFAULT_SETTINGS = {
         "extract_last_conversation": True,
         "detect_pii": False,  # Enable PII detection
         "pii_detection_method": "llm",  # llm | azure_language | both
+        "pii_llm_model": "auto",  # auto (reuse ai_model) | gpt-4o-mini | gpt-5-nano | ...
     }
 }
 PROCESSING_STRATEGY_ENV = "PROCESSING_STRATEGY"
@@ -203,6 +204,7 @@ def save_settings(settings: dict):
             ep.setdefault("include_subject", True)
             ep.setdefault("extract_last_conversation", True)
             ep.setdefault("detect_pii", False)
+            ep.setdefault("pii_llm_model", "auto")
 
     DATA_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
 

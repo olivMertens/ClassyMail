@@ -20,6 +20,7 @@ from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 
 from classymail.core import config
+from classymail.core.llm_compat import build_chat_params
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.settings_store import load_settings
 
@@ -63,6 +64,7 @@ async def extract_last_conversation_with_llm(
     text_markdown: str,
     *,
     clients: Clients | None = None,
+    model: str | None = None,
 ) -> str:
     """
     Use LLM to extract the last meaningful conversation from an email thread.
@@ -83,9 +85,9 @@ async def extract_last_conversation_with_llm(
     if not text_markdown or len(text_markdown.strip()) < 10:
         return text_markdown
 
-    # Use GPT-4o-mini for preprocessing (fast and cheap)
-    deployment = "gpt-4o-mini"  # Hardcoded for preprocessing
-    endpoint = config.AI_ENDPOINT
+    # Resolve model dynamically from settings or config
+    deployment = model or config.PHI_DEPLOYMENT
+    endpoint = config.PHI_ENDPOINT
 
     if not endpoint or not deployment:
         logger.warning("No LLM endpoint available for preprocessing. Returning original content.")
@@ -126,8 +128,7 @@ Return only the cleaned content."""
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
-        "temperature": 0.0,  # Deterministic extraction
-        "max_tokens": 3000,
+        **build_chat_params(deployment, temperature=0.0, max_output_tokens=3000),
     }
 
     with tracer.start_as_current_span("extract_last_conversation") as span:

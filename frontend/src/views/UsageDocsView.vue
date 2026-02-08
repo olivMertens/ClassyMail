@@ -285,16 +285,68 @@ graph LR
         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
           {{ t('guide.privacy.desc') }}
         </p>
-        <ul class="mt-3 space-y-2 text-sm text-gray-600 dark:text-gray-300">
-          <li class="flex items-start">
-            <span class="font-bold mr-2">•</span>
-            <span>{{ t('guide.privacy.li1') }}</span>
-          </li>
-          <li class="flex items-start">
-            <span class="font-bold mr-2">•</span>
-            <span>{{ t('guide.privacy.li2') }}</span>
-          </li>
-        </ul>
+
+        <!-- Detection sub-section -->
+        <div class="mt-4 border border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50/50 dark:bg-green-900/10">
+          <h4 class="font-medium text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
+            <span class="inline-block w-2 h-2 rounded-full bg-green-500" />
+            {{ t('guide.privacy.detection_title') }}
+          </h4>
+          <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('guide.privacy.detection_desc') }}
+          </p>
+          <ul class="mt-2 space-y-1.5 text-sm text-gray-600 dark:text-gray-300">
+            <li class="flex items-start">
+              <span class="font-bold mr-2">•</span>
+              <span>{{ t('guide.privacy.detection_li1') }}</span>
+            </li>
+            <li class="flex items-start">
+              <span class="font-bold mr-2">•</span>
+              <span>{{ t('guide.privacy.detection_li2') }}</span>
+            </li>
+            <li class="flex items-start">
+              <span class="font-bold mr-2">•</span>
+              <span>{{ t('guide.privacy.detection_li3') }}</span>
+            </li>
+            <li class="flex items-start">
+              <span class="font-bold mr-2">•</span>
+              <span>{{ t('guide.privacy.detection_li4') }}</span>
+            </li>
+          </ul>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
+            {{ t('guide.privacy.detection_categories') }}
+          </p>
+        </div>
+
+        <!-- Anonymization sub-section -->
+        <div class="mt-3 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4 bg-indigo-50/50 dark:bg-indigo-900/10">
+          <h4 class="font-medium text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
+            <span class="inline-block w-2 h-2 rounded-full bg-indigo-500" />
+            {{ t('guide.privacy.anonymization_title') }}
+          </h4>
+          <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('guide.privacy.anonymization_desc') }}
+          </p>
+          <ul class="mt-2 space-y-1.5 text-sm text-gray-600 dark:text-gray-300">
+            <li class="flex items-start">
+              <span class="font-bold mr-2">•</span>
+              <span>{{ t('guide.privacy.anonymization_li1') }}</span>
+            </li>
+            <li class="flex items-start">
+              <span class="font-bold mr-2">•</span>
+              <span>{{ t('guide.privacy.anonymization_li2') }}</span>
+            </li>
+            <li class="flex items-start">
+              <span class="font-bold mr-2">•</span>
+              <span>{{ t('guide.privacy.anonymization_li3') }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Settings hint -->
+        <p class="mt-3 text-xs text-primary-600 dark:text-primary-400 font-medium">
+          {{ t('guide.privacy.settings_hint') }}
+        </p>
       </div>
     </div>
 

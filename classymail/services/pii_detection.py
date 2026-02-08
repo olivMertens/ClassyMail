@@ -26,6 +26,7 @@ from opentelemetry import trace
 from pydantic import BaseModel
 
 from classymail.core import config
+from classymail.core.llm_compat import build_chat_params
 from classymail.services.azure_clients import auth_headers, Clients
 
 logger = logging.getLogger(__name__)
@@ -84,25 +85,25 @@ async def detect_pii_with_llm(
     text_content: str,
     *,
     clients: Clients | None = None,
-) ->PIIDetectionResult:
+    model: str | None = None,
+) -> PIIDetectionResult:
     """
     Detect and extract PII from email content using LLM with JSON mode.
 
     Args:
         text_content: Email content to analyze
         clients: Azure clients for authentication
+        model: LLM deployment name (default: from settings or PHI_DEPLOYMENT)
 
     Returns:
         PIIDetectionResult containing all extracted PII
-
-    Cost: ~$0.002 per email (using GPT-4o-mini)
     """
     if not text_content or len(text_content.strip()) < 10:
         return PIIDetectionResult()
 
-    # Use GPT-4o-mini for PII detection (cost-effective)
-    deployment = "gpt-4o-mini"
-    endpoint = config.PHI_ENDPOINT  # Fixed: was config.AI_ENDPOINT (doesn't exist)
+    # Resolve model: explicit > config fallback
+    deployment = model or config.PHI_DEPLOYMENT
+    endpoint = config.PHI_ENDPOINT
 
     if not endpoint or not deployment:
         logger.warning("No LLM endpoint available for PII detection. Returning empty result.")
@@ -156,8 +157,7 @@ Return the PII in JSON format as specified."""
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
-        "temperature": 0.0,  # Deterministic extraction
-        "max_tokens": 2000,  # Sufficient for comprehensive PII list
+        **build_chat_params(deployment, temperature=0.0, max_output_tokens=2000),
     }
 
     with tracer.start_as_current_span("detect_pii") as span:
@@ -235,6 +235,7 @@ async def detect_pii(
     method: str = "llm",
     clients: Clients | None = None,
     language: str = "en",
+    model: str | None = None,
 ) -> PIIDetectionResult:
     """
     Detect PII using the specified method(s).
@@ -257,7 +258,7 @@ async def detect_pii(
     method = method.lower()
 
     if method == "llm":
-        return await detect_pii_with_llm(text_content, clients=clients)
+        return await detect_pii_with_llm(text_content, clients=clients, model=model)
 
     elif method == "azure_language":
         # Import here to avoid circular dependency and optional dependency
@@ -267,7 +268,7 @@ async def detect_pii(
         except ImportError as e:
             logger.error(f"Azure AI Language service not available: {e}. Install: pip install azure-ai-textanalytics")
             logger.warning("Falling back to LLM-based PII detection")
-            return await detect_pii_with_llm(text_content, clients=clients)
+            return await detect_pii_with_llm(text_content, clients=clients, model=model)
 
     elif method == "both":
         # Hybrid mode: run both methods and merge results
@@ -276,7 +277,7 @@ async def detect_pii(
 
             try:
                 # Run both methods in parallel
-                llm_task = detect_pii_with_llm(text_content, clients=clients)
+                llm_task = detect_pii_with_llm(text_content, clients=clients, model=model)
 
                 from classymail.services.pii_detection_azure import detect_pii_with_azure_language
                 azure_task = detect_pii_with_azure_language(text_content, clients=clients, language=language)
@@ -311,7 +312,7 @@ async def detect_pii(
             except ImportError as e:
                 logger.error(f"Azure AI Language service not available for hybrid mode: {e}")
                 logger.warning("Falling back to LLM-only PII detection")
-                return await detect_pii_with_llm(text_content, clients=clients)
+                return await detect_pii_with_llm(text_content, clients=clients, model=model)
 
     else:
         raise ValueError(f"Invalid PII detection method: {method}. Must be 'llm', 'azure_language', or 'both'")

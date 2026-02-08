@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from classymail.core import config
+from classymail.core.llm_compat import build_chat_params
 from classymail.core.monitoring import get_queue_metrics, get_system_health_score
 from classymail.services.azure_clients import Clients, get_clients, blob_id_from_url
 import logging
@@ -660,8 +661,7 @@ async def test_phi4_connection(clients: Clients = Depends(get_clients)):
 
         payload = {
             "messages": [{"role": "user", "content": "Say 'Connection OK'"}],
-            "max_tokens": 10,
-            "temperature": 0
+            **build_chat_params(config.PHI_DEPLOYMENT, temperature=0, max_output_tokens=10),
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -790,15 +790,11 @@ async def test_gpt_connection(model: str | None = None, clients: Clients = Depen
         headers = await auth_headers(clients, model_type="openai")
         endpoint = f"{gpt_endpoint.rstrip('/')}/openai/deployments/{gpt_deployment}/chat/completions?api-version={api_version}"
 
-        # Base payload
+        # Base payload – use build_chat_params for model-aware token/temperature handling
         payload = {
             "messages": [{"role": "user", "content": "Say 'GPT Connection OK'"}],
-            "max_tokens": 10,
+            **build_chat_params(gpt_deployment, temperature=0, max_output_tokens=10),
         }
-
-        # Some models don't support temperature parameter
-        if model not in ["gpt-5-nano", "gpt-4.1-nano"]:
-            payload["temperature"] = 0
 
         logger.info(f"[TEST-GPT] Testing {gpt_deployment} at {endpoint}")
 

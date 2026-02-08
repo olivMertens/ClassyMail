@@ -7,6 +7,7 @@ import httpx
 from opentelemetry import trace
 
 from classymail.core import config
+from classymail.core.llm_compat import build_chat_params
 from classymail.services.azure_clients import auth_headers, Clients
 
 
@@ -62,8 +63,7 @@ async def anonymize_markdown_for_finetune(markdown: str, clients: Clients | None
             {"role": "system", "content": ANONYMIZER_SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
-        "temperature": 0,
-        "max_tokens": config.ANONYMIZER_MAX_TOKENS,
+        **build_chat_params(config.ANONYMIZER_DEPLOYMENT, temperature=0, max_output_tokens=config.ANONYMIZER_MAX_TOKENS),
     }
 
     url = (

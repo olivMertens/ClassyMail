@@ -39,9 +39,9 @@ This repo uses a 2-step AI pipeline:
 
 ## API Parameter Differences: Standard vs Reasoning Models
 
-**CRITICAL:** GPT-5.x and GPT-4.1+ reasoning models use DIFFERENT API parameters than GPT-4.x models.
+**CRITICAL:** GPT-5.x and o-series reasoning models use DIFFERENT API parameters than GPT-4.x models.
 
-### Standard Models (GPT-4o, GPT-4o-mini, Phi-4)
+### Standard Models (GPT-4o, GPT-4o-mini, GPT-4.1, Phi-4)
 
 **Supported Parameters:**
 ```json
@@ -55,7 +55,7 @@ This repo uses a 2-step AI pipeline:
 }
 ```
 
-### Reasoning Models (GPT-5.x, GPT-4.1+, o1, o3)
+### Reasoning Models (GPT-5.x, o1, o3, o4)
 
 **Supported Parameters:**
 ```json
@@ -63,7 +63,7 @@ This repo uses a 2-step AI pipeline:
   "model": "gpt-5-nano",
   "messages": [...],
   "max_completion_tokens": 1500,  // ✅ Use max_completion_tokens (NOT max_tokens)
-  // ❌ NO temperature parameter
+  // ❌ NO temperature parameter (rejected with HTTP 400)
   // ❌ NO top_p parameter
   "response_format": {"type": "json_object"}
 }
@@ -75,22 +75,27 @@ This repo uses a 2-step AI pipeline:
 - `max_completion_tokens` limits only the VISIBLE output tokens
 - Temperature/top_p would interfere with the reasoning process
 
-**Code Detection Pattern:**
-```python
-# Detect reasoning model by deployment name
-is_reasoning_model = any(x in deployment.lower() for x in ["gpt-5", "gpt-4.1", "o1", "o3"])
+### Centralized Compatibility Layer (`classymail/core/llm_compat.py`)
 
-if is_reasoning_model:
-    payload["max_completion_tokens"] = 1500
-    # No temperature parameter
-else:
-    payload["max_tokens"] = 1500
-    payload["temperature"] = 0.3
+All LLM calls use `build_chat_params()` to produce the correct parameters automatically:
+
+```python
+from classymail.core.llm_compat import build_chat_params
+
+payload = {
+    "model": deployment,
+    "messages": [...],
+    **build_chat_params(deployment, temperature=0.0, max_output_tokens=2000),
+}
+# Classic model → {"temperature": 0.0, "max_tokens": 2000}
+# Reasoning model → {"max_completion_tokens": 2000}  (temperature omitted)
 ```
 
+**Detected reasoning families:** `o1`, `o3`, `o4`, `gpt-5`, `gpt5`
+
 **Implementation References:**
-- [chat_agent.py](../classymail/services/chat_agent.py#L508-L515): Correct implementation for chatbot
-- [category_assessment.py](../classymail/api/category_assessment.py#L140-L163): Correct implementation for category assessment
+- [llm_compat.py](../classymail/core/llm_compat.py): Centralized helper (`is_reasoning_model`, `build_chat_params`)
+- [test_llm_compat.py](../tests/test_llm_compat.py): 29 tests covering model detection and parameter construction
 
 ---
 
