@@ -220,16 +220,42 @@ Le dossier `scripts/` contient des outils pour le développement, le déploiemen
 
 ### 📋 Scripts de Vérification & Diagnostic
 
+#### `update_cosmos_firewall` (.ps1 / .sh) — **🆕 Mise à Jour Automatique Firewall Cosmos DB**
+**⚠️ CRITIQUE** : Les IPs sortantes des Container Apps changent à chaque redéploiement. Ce script automatise la mise à jour du firewall Cosmos DB.
+
+**Usage :**
+```bash
+# PowerShell - Ajouter les IPs des Container Apps
+.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "email-poc-rg"
+
+# PowerShell - Inclure aussi votre IP locale (pour scripts de debug)
+.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "email-poc-rg" -IncludeLocalIP
+
+# Bash
+./scripts/update_cosmos_firewall.sh -g email-poc-rg
+
+# Bash avec IP locale
+./scripts/update_cosmos_firewall.sh -g email-poc-rg --include-local-ip
+```
+
+**Ce que fait le script :**
+1. ✅ Récupère les IPs sortantes de `email-poc-api`
+2. ✅ Récupère les IPs sortantes de `email-poc-worker`
+3. ✅ Ajoute `0.0.0.0` (Azure Services)
+4. ✅ (Optionnel) Ajoute votre IP publique pour développement local
+5. ✅ Met à jour le firewall Cosmos DB avec la liste complète dédupliquée
+
+**💡 À lancer après :**
+- Chaque déploiement de Container App (`az containerapp update`)
+- Si vous voyez des erreurs **403 Forbidden** dans les logs Worker
+- Avant d'exécuter des scripts Python locaux qui accèdent à Cosmos DB
+
+**Note :** Si vous voyez "operation in progress", attendez 1-2 minutes et relancez le script.
+
+---
+
 #### `verify-mvp-setup` (.ps1 / .sh) — **Vérification Infrastructure Complète**
 Valide l'ensemble de l'infrastructure Azure déployée.
-
-**⚠️ Important : Configuration Firewall Cosmos DB**
-Pour que les scripts locaux (`verify_chat_vector.py`, `diagnose_pipeline.py`) puissent interroger Cosmos DB, votre IP publique doit être autorisée.
-Si vous rencontrez des erreurs **403 Forbidden**, ajoutez votre IP :
-```bash
-# Ajouter votre IP actuelle au firewall Cosmos DB
-az cosmosdb update --name email-poc-cosmos --resource-group email-poc-rg --ip-range-filter "$(curl -s ifconfig.me)"
-```
 
 **Usage :**
 ```bash
@@ -270,85 +296,6 @@ export RESOURCE_GROUP=email-poc-rg
 ```
 
 **💡 À lancer après :** Changements de rôles ou problèmes d'authentification
-
----
-
-#### `diagnose_pipeline.py` — **Diagnostics Pipeline OCR/Classification**
-Teste le pipeline complet avec un PDF local.
-
-**Usage :**
-```bash
-# Test avec un PDF local
-uv run python scripts/diagnose_pipeline.py --pdf dataset/pdf/test.pdf
-
-# Afficher les erreurs Cosmos DB (5 dernières)
-uv run python scripts/diagnose_pipeline.py --show-errors
-
-# Afficher 10 erreurs sans les logs détaillés
-uv run python scripts/diagnose_pipeline.py --show-errors --limit 10 --no-log
-```
-
-**Prérequis :** `secrets.env` configuré avec les endpoints AI
-
----
-
-#### `diagnose_failures.py` — **Analyse des Erreurs Cosmos DB**
-Analyse les items en status ERROR dans Cosmos DB et catégorise les erreurs.
-
-**Usage :**
-```bash
-uv run python scripts/diagnose_failures.py
-```
-
-**Détecte :**
-- ⏱️ Timeouts (LLM/Network)
-- 🔄 Worker restarts (deployment interruptions)
-- 503/502 Service Unavailable
-- 429 Rate limiting
-- 📄 PDF corrompus
-
-**Prérequis :** Connexion Cosmos DB configurée
-
----
-
-#### `verify_chat_vector.py` — **Validation Embeddings + RAG**
-Vérifie que le système d'embeddings et le chat RAG fonctionnent.
-
-**Usage :**
-```bash
-uv run python scripts/verify_chat_vector.py
-```
-
-**Teste :**
-- ✅ Génération d'embeddings (text-embedding-3-small)
-- ✅ Recherche vectorielle dans Cosmos DB
-- ✅ Agent de chat RAG avec requête test
-
-**Prérequis :** `EMBEDDING_ENDPOINT` et `COSMOS_ENDPOINT` configurés
-
----
-
-#### `verify_logs.py` — **Vérification Azure Monitor Logs**
-Interroge Log Analytics pour récupérer les traces d'exécution.
-
-**Usage :**
-```bash
-uv run python scripts/verify_logs.py
-```
-
-**Prérequis :** `LOG_ANALYTICS_WORKSPACE_ID` dans `secrets.env`
-
----
-
-#### `verify_telemetry.py` — **Validation Application Insights**
-Envoie un span de test vers Application Insights.
-
-**Usage :**
-```bash
-uv run python scripts/verify_telemetry.py
-```
-
-**Prérequis :** `APPLICATIONINSIGHTS_CONNECTION_STRING` dans `secrets.env`
 
 ---
 
@@ -454,52 +401,9 @@ Télécharge le runtime Vue.js pour le frontend (offline fallback).
 
 ---
 
-### 🧪 Scripts de Test & Génération de Données
+### 🧪 Scripts de Test
 
-#### `generate_dummy_pdfs.py` — **Génération PDFs de Test Bruités**
-Génère des PDFs d'emails réalistes avec typos, argot, multilangue, et données fictives.
 
-**Usage :**
-```bash
-# Génération standard (75 PDFs avec ~300 mots chacun)
-uv run python scripts/generate_dummy_pdfs.py --count 75 --out dataset/pdf_test
-
-# Génération avec Azure OpenAI (emails plus réalistes)
-uv run python scripts/generate_dummy_pdfs.py --count 50 --use-aoai --aoai-deployment gpt-4o-mini
-
-# Génération courte pour tests rapides
-uv run python scripts/generate_dummy_pdfs.py --count 10 --target-words 100
-```
-
-**Prérequis pour --use-aoai :**
-- `AZURE_OPENAI_ENDPOINT` dans `secrets.env`
-- `AZURE_OPENAI_API_KEY` ou authentification Entra ID
-
-**Catégories générées :**
-- habitation, scolaire, releve_compte, domm_elec, evt_naturel
-- Catégories mixtes (multi-intent)
-- hors_sujet, incompréhensible
-
----
-
-#### `generate_realistic_emails.py` — **Génération Emails Professionnels**
-Génère des PDFs d'emails professionnels français pour tests réalistes.
-
-**Usage :**
-```bash
-# Génération standard (10 PDFs variés)
-uv run python scripts/generate_realistic_emails.py --count 10 --out dataset/pdf
-
-# Génération ciblée sur certaines catégories
-uv run python scripts/generate_realistic_emails.py --count 20 \
-  --categories "Attestation habitation" "Résiliation" "Réclamation"
-```
-
-**Catégories disponibles :**
-- Attestation habitation, Résiliation, Dommages électriques
-- Sinistre dégât des eaux, Modification contrat, Demande de devis, Réclamation
-
----
 
 #### `test_e2e_flow.py` — **Test End-to-End Complet**
 Upload des PDFs générés vers l'API et vérifie le traitement.
@@ -516,48 +420,12 @@ uv run python scripts/test_e2e_flow.py --count 10 \
 ```
 
 **Workflow :**
-1. Génère des PDFs réalistes
+1. Génère des PDFs réalistes (via génération inline)
 2. Upload via `/api/upload`
 3. Attend traitement (configurable avec --wait)
 4. Affiche résumé avec IDs pour suivi
 
-**Prérequis :** API démarrée (`uvicorn main:app`)
-
----
-
-#### `test_e2e_local.py` — **Test End-to-End Local Automatisé**
-Lance l'API + Worker en arrière-plan, génère et upload un PDF, puis vérifie le traitement.
-
-**Usage :**
-```bash
-uv run python scripts/test_e2e_local.py
-```
-
-**Workflow automatique :**
-1. Génère 1 PDF de test
-2. Démarre API + Worker (port 8001)
-3. Upload le PDF
-4. Poll Cosmos DB jusqu'à status=PROCESSED ou ERROR
-5. Affiche le résultat final
-
-**Prérequis :** `secrets.env` complet (Cosmos, AI, Storage, Service Bus)
-
----
-
-#### `simulate_corrupted_pdf.py` — **Test de Fichier Corrompu**
-Upload un fichier corrompu (non-PDF) pour tester la gestion d'erreur.
-
-**Usage :**
-```bash
-# Test local
-uv run python scripts/simulate_corrupted_pdf.py
-
-# Test sur environnement déployé
-uv run python scripts/simulate_corrupted_pdf.py \
-  --base-url "https://email-poc-api.azurecontainerapps.io"
-```
-
-**Résultat attendu :** Status ERROR avec `error_stage=download`
+**Prérequis :** API démarrée (`uvicorn main:app`) ou URL déployée
 
 ---
 
@@ -614,25 +482,21 @@ ln -s ../../scripts/pre-push.sh .git/hooks/pre-push  # Linux/Mac
 # 1. Générer secrets.env avec les ressources Azure
 .\scripts\write_secrets_env.ps1 -ResourceGroup "email-poc-rg" -Force
 
-# 2. Vérifier l'infrastructure complète
-.\scripts\verify-mvp-setup.ps1 -ResourceGroup "email-poc-rg"
+# 2. Mettre à jour le firewall Cosmos DB avec les IPs des Container Apps
+.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "email-poc-rg" -IncludeLocalIP
 
-# 3. Tester les endpoints AI
-uv run python scripts/verify_chat_vector.py
-uv run python scripts/verify_telemetry.py
+# 3. Vérifier l'infrastructure complète
+.\scripts\verify-mvp-setup.ps1 -ResourceGroup "email-poc-rg"
 ```
 
 #### **🧪 Développement & Tests**
 ```bash
-# 1. Générer des données de test
-uv run python scripts/generate_realistic_emails.py --count 20
+# 1. Tester le pipeline complet avec l'API déployée
+uv run python scripts/test_e2e_flow.py --api-url https://email-poc-api.azurecontainerapps.io --count 5
 
-# 2. Tester le pipeline complet
-uv run python scripts/test_e2e_local.py
-
-# 3. Debug si problèmes
-uv run python scripts/diagnose_pipeline.py --pdf dataset/pdf/test.pdf
-uv run python scripts/diagnose_failures.py
+# 2. Tester en local
+uvicorn main:app --reload  # Terminal 1
+uv run python scripts/test_e2e_flow.py --count 3  # Terminal 2
 ```
 
 #### **🚀 Avant Deployment**
@@ -643,21 +507,23 @@ uv run python scripts/diagnose_failures.py
 # 2. Build & Push image Docker
 .\scripts\build_acr.ps1 -AcrName "emailpocacr" -Tag "v1.0.0" -PushMethod acr
 
-# 3. Vérification post-déploiement
+# 3. Mise à jour firewall Cosmos DB après déploiement
+.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "email-poc-rg"
+
+# 4. Vérification post-déploiement
 .\scripts\verify-mvp-setup.ps1 -ResourceGroup "email-poc-rg"
 ```
 
 #### **🔧 Troubleshooting**
 ```bash
-# Erreurs de traitement
-uv run python scripts/diagnose_failures.py
-uv run python scripts/diagnose_pipeline.py --show-errors --limit 10
+# 403 Forbidden depuis Container Apps vers Cosmos DB
+.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "email-poc-rg"
 
-# Logs Azure Monitor
-uv run python scripts/verify_logs.py
+# Vérifier la santé de l'infrastructure
+.\scripts\verify-mvp-setup.ps1 -ResourceGroup "email-poc-rg"
 
-# Test fichier corrompu
-uv run python scripts/simulate_corrupted_pdf.py
+# Tester l'API end-to-end
+uv run python scripts/test_e2e_flow.py --api-url https://your-api.azurecontainerapps.io --count 2
 ```
 
 ---
