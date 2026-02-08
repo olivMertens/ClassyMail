@@ -140,17 +140,19 @@ CRITICAL: Each suggestion must be actionable (user can implement immediately) an
 Focus on: keyword density, boundary precision, prompt structure, and LLM comprehension patterns."""
 
             # Detect model family for correct API parameters
+            # GPT-5 Nano (Reasoning) requires significant token budget for internal thought process.
+            # 1500 is often too low, causing finish_reason='length' and empty content.
+            # We increase this to 5000 to ensure completion.
             payload = {
                 "model": deployment,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_content},
                 ],
-                **build_chat_params(deployment, temperature=0.3, max_output_tokens=1500),
+                **build_chat_params(deployment, temperature=0.3, max_output_tokens=5000),
             }
 
             # Reasoning models (GPT-5, o1) often do not support 'response_format'={"type": "json_object"}
-            # They rely on strong prompt adherence instead.
             if not is_reasoning_model(deployment):
                 payload["response_format"] = {"type": "json_object"}
 
@@ -172,7 +174,10 @@ Focus on: keyword density, boundary precision, prompt structure, and LLM compreh
 
                 if not content:
                     logger.error(f"[assessment] Invalid AI response: Empty content. Finish reason: {choices[0].get('finish_reason')}. Data: {data}")
-                    raise HTTPException(status_code=502, detail=f"AI Model returned empty content (Finish Reason: {choices[0].get('finish_reason', 'unknown')}).")
+                    detail_msg = f"AI Model returned empty content (Finish Reason: {choices[0].get('finish_reason', 'unknown')})."
+                    if choices[0].get('finish_reason') == 'length':
+                        detail_msg += " The model exhausted its token limit while reasoning. Please retry or contact support to increase limits."
+                    raise HTTPException(status_code=502, detail=detail_msg)
 
                 # Parse JSON response – cleanup potential markdown or whitespace
                 cleaned = content.strip()
