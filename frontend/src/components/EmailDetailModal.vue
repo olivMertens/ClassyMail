@@ -573,6 +573,42 @@ const renderMarkdown = (text) => md.render(text || '')
                     </div>
                   </div>
 
+                  <!-- Vision Analysis -->
+                  <div v-if="email.vision_analysis && email.vision_analysis.length">
+                    <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 mt-4 flex items-center gap-2">
+                      👁 Vision Analysis
+                      <span class="text-xs font-normal text-gray-500">({{ email.vision_analysis.length }} images)</span>
+                    </h4>
+                    <div class="space-y-3 max-h-60 overflow-y-auto border border-gray-100 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900">
+                      <div
+                        v-for="item in email.vision_analysis"
+                        :key="item.id || item.summary"
+                        class="text-sm p-3 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                      >
+                        <div class="flex justify-between items-start mb-2">
+                          <span class="font-bold text-xs uppercase text-gray-500 tracking-wider">Page {{ (item.page_index || 0) + 1 }} • {{ item.image_type || 'Image' }}</span>
+                          <span
+                            v-if="item.is_relevant"
+                            class="text-[10px] bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 px-1.5 py-0.5 rounded border border-green-200 dark:border-green-800"
+                          >Relevant</span>
+                        </div>
+                        <div
+                          v-if="item.summary"
+                          class="mb-2 text-gray-900 dark:text-gray-100"
+                        >
+                          {{ item.summary }}
+                        </div>
+                        <div
+                          v-if="item.details"
+                          class="text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-900/50 p-2 rounded border border-gray-100 dark:border-gray-800"
+                        >
+                          <span class="font-semibold block mb-1">Details:</span>
+                          {{ item.details }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <!-- Category Selection -->
                   <div>
                     <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">
@@ -992,8 +1028,8 @@ const renderMarkdown = (text) => md.render(text || '')
             :key="s"
             class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all"
             :class="reprocessStrategy === s
-              ? 'border-primary-500 bg-primary-50 text-gray-900 dark:bg-primary-900/30 dark:border-primary-400 dark:text-white'
-              : 'border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-700/50 dark:text-white hover:border-gray-300 dark:hover:border-gray-600'"
+              ? 'border-primary-500 bg-primary-50 text-gray-900 dark:bg-primary-900/40 dark:border-primary-400 dark:text-white'
+              : 'border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-700 dark:text-white hover:border-gray-300 dark:hover:border-gray-600'"
           >
             <input
               v-model="reprocessStrategy"

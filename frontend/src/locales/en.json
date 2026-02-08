@@ -101,9 +101,10 @@
                 "title": "AI Assessment",
                 "quality": "Quality",
                 "suggestions": "Specific Suggestions:",
-                "success": "Assessment Complete!\n\nQuality: {score}\n\nReview the advice below the category.",
+                "success": "assessment Complete!\n\nQuality: {score}\n\nReview the advice below the category.",
                 "error": "Assessment Failed: {error}"
             },
+            "optimization_note": "Legacy Migration Tip: If mapping legacy categories to LLM intents, prefer descriptive definitions over exact keywords. The AI understands context better than strict rules.",
             "import": {
                 "button": "Import from Excel (.xlsx)",
                 "importing": "Importing...",

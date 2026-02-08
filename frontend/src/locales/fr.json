@@ -104,6 +104,7 @@
                 "success": "Évaluation Terminée !\n\nQualité : {score}\n\nConsultez les conseils ci-dessous.",
                 "error": "Échec de l'Évaluation : {error}"
             },
+            "optimization_note": "Conseil Migration Legacy : Si vous mappez d'anciennes catégories vers des intentions LLM, préférez des définitions descriptives aux mots-clés exacts. L'IA comprend mieux le contexte que les règles strictes.",
             "import": {
                 "button": "Importer depuis Excel (.xlsx)",
                 "importing": "Importation en cours...",

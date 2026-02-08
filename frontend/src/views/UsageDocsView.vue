@@ -348,33 +348,33 @@ graph LR
           {{ t('guide.privacy.settings_hint') }}
         </p>
       </div>
-    </div>
 
-    <!-- Features -->
-    <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg px-4 py-5 sm:p-6">
-      <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white flex items-center gap-2">
-        <EyeIcon class="h-5 w-5 text-amber-500" />
-        {{ t('guide.vision.title') }}
-      </h3>
-      <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-3xl">
-        {{ t('guide.vision.desc') }}
-      </p>
-      <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="border border-gray-200 dark:border-gray-700 rounded p-3">
-          <h5 class="font-medium text-sm text-gray-900 dark:text-white">
-            {{ t('guide.vision.standard_title') }}
-          </h5>
-          <p class="text-xs text-gray-500 mt-1">
-            {{ t('guide.vision.standard_desc') }}
-          </p>
-        </div>
-        <div class="border border-gray-200 dark:border-gray-700 rounded p-3 bg-amber-50 dark:bg-amber-900/10">
-          <h5 class="font-medium text-sm text-gray-900 dark:text-white">
-            {{ t('guide.vision.vision_title') }}
-          </h5>
-          <p class="text-xs text-gray-500 mt-1">
-            {{ t('guide.vision.vision_desc') }}
-          </p>
+      <!-- Smart Vision (right column, next to PII) -->
+      <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg px-4 py-5 sm:p-6">
+        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white flex items-center gap-2">
+          <EyeIcon class="h-5 w-5 text-amber-500" />
+          {{ t('guide.vision.title') }}
+        </h3>
+        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          {{ t('guide.vision.desc') }}
+        </p>
+        <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+            <h5 class="font-medium text-sm text-gray-900 dark:text-white">
+              {{ t('guide.vision.standard_title') }}
+            </h5>
+            <p class="text-xs text-gray-600 dark:text-gray-300 mt-1">
+              {{ t('guide.vision.standard_desc') }}
+            </p>
+          </div>
+          <div class="border border-amber-200 dark:border-amber-700 rounded-lg p-4 bg-amber-50 dark:bg-amber-900/20">
+            <h5 class="font-medium text-sm text-gray-900 dark:text-white">
+              {{ t('guide.vision.vision_title') }}
+            </h5>
+            <p class="text-xs text-gray-600 dark:text-gray-300 mt-1">
+              {{ t('guide.vision.vision_desc') }}
+            </p>
+          </div>
         </div>
       </div>
     </div>

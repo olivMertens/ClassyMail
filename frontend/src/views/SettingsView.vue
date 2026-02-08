@@ -1411,6 +1411,23 @@ onMounted(() => {
           </div>
         </div>
 
+        <!-- Optimization Note -->
+        <div class="rounded-md bg-blue-50 dark:bg-blue-900/20 p-4 mb-6 border-l-4 border-blue-400 dark:border-blue-500">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <InformationCircleIcon
+                class="h-5 w-5 text-blue-400 dark:text-blue-500"
+                aria-hidden="true"
+              />
+            </div>
+            <div class="ml-3">
+              <p class="text-sm text-blue-700 dark:text-blue-300">
+                {{ t('settings.categories.optimization_note') }}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div class="flex justify-between items-center mb-6">
           <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
             {{ t('settings.categories.managed_title') }}

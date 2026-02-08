@@ -6,7 +6,7 @@ defineProps({
   show: { type: Boolean, default: false },
   message: { type: Object, default: null }
 })
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'reprocess'])
 
 const formatTime = (t) => {
   if (!t) return '—'
@@ -104,9 +104,16 @@ const formatTime = (t) => {
         </div>
       </div>
 
-      <div class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex justify-end">
+      <div class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex justify-end gap-3">
         <button
-          class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-500"
+          v-if="message?.blob_id"
+          class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+          @click="$emit('reprocess', message)"
+        >
+          Reprocess
+        </button>
+        <button
+          class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           @click="emit('close')"
         >
           Close

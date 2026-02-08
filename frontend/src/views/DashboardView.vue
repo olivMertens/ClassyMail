@@ -104,6 +104,20 @@ const reprocessEmail = async (email) => {
   }
 }
 
+const reprocessDlqItem = async (msg) => {
+  if (!msg?.blob_id) return
+  if (await confirm('Relaunch this item? Note: The DLQ message will remain until purged or deleted manually. A new processing attempt will be queued.')) {
+    try {
+      const res = await fetch(`/api/emails/${msg.blob_id}/reprocess`, { method: 'POST' })
+      if (!res.ok) throw new Error('Failed to reprocess')
+      await showAlert('Item re-queued successfully')
+      dlqModalOpen.value = false
+    } catch (e) {
+      await showAlert(e.message)
+    }
+  }
+}
+
 const fetchEmails = async () => {
   loading.value = true
   error.value = null
@@ -804,10 +818,11 @@ const emit = defineEmits(['open-email'])
           </div>
           <div
             v-else
-            class="text-[10px] text-gray-400 italic max-w-[150px] truncate"
-            :title="email.classification?.classification_reason || 'No category detected'"
+            class="text-[10px] italic max-w-[150px] truncate"
+            :class="email.status === 'ERROR' ? 'text-red-500 font-medium' : 'text-gray-400'"
+            :title="email.status === 'ERROR' ? (email.error || 'Unknown Error') : (email.classification?.classification_reason || 'No category detected')"
           >
-            {{ email.classification?.classification_reason || 'No category' }}
+            {{ email.status === 'ERROR' ? (email.error || 'Error') : (email.classification?.classification_reason || 'No category') }}
           </div>
           <div class="flex items-center gap-1.5">
             <span
@@ -1442,6 +1457,7 @@ const emit = defineEmits(['open-email'])
     :show="dlqModalOpen"
     :message="selectedDlq"
     @close="dlqModalOpen = false"
+    @reprocess="reprocessDlqItem"
   />
 
   <!-- Reprocess Modal with Strategy Selector -->
@@ -1476,8 +1492,8 @@ const emit = defineEmits(['open-email'])
             :key="s"
             class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all"
             :class="reprocessStrategy === s
-              ? 'border-primary-500 bg-primary-50 text-gray-900 dark:bg-primary-900/30 dark:border-primary-400 dark:text-white'
-              : 'border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-700/50 dark:text-white hover:border-gray-300 dark:hover:border-gray-600'"
+              ? 'border-primary-500 bg-primary-50 text-gray-900 dark:bg-primary-900/40 dark:border-primary-400 dark:text-white'
+              : 'border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-700 dark:text-white hover:border-gray-300 dark:hover:border-gray-600'"
           >
             <input
               v-model="reprocessStrategy"
