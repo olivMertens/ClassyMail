@@ -125,8 +125,8 @@ cd ..
 ### 4. Start API Server
 
 ```bash
-# Run API only (no worker)
-uv run uvicorn main:app --port 8011 --reload
+# Run API only (no worker) - default port 8000
+uv run uvicorn main:app --reload
 
 # Run API + worker in same process (dev mode)
 $env:ENABLE_WORKER = "true"

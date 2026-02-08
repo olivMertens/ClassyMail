@@ -22,7 +22,7 @@ Both Container Apps use the **same User Assigned Managed Identity** (`email-poc-
 
 | Resource | Required Role for Identity | Purpose |
 | :--- | :--- | :--- |
-| **Service Bus** | `Azure Service Bus Data Owner` (or Sender/Receiver) | Read tasks, manage locks, send DLQ. |
+| **Service Bus** | `Azure Service Bus Data Sender` + `Data Receiver` | Send messages (API, DLQ retry) + consume tasks (Worker). |
 | **Storage Account** | `Storage Blob Data Contributor` | Read PDF content. |
 | **Cosmos DB** | `Cosmos DB Built-in Data Contributor` | Read/Write metadata & results. |
 | **AI Foundry** | `Cognitive Services User` | Invoke LLM models. |

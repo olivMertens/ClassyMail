@@ -31,7 +31,7 @@ flowchart LR
 
   subgraph EG[Azure Event Grid]
     T[System Topic - Storage Account]
-    S[Subscription: .pdf → Service Bus]
+    S[Subscription: .pdf to Service Bus]
   end
 
   subgraph SB[Azure Service Bus]
@@ -40,39 +40,47 @@ flowchart LR
 
   subgraph Foundry[Azure AI Foundry]
     OCR[Mistral OCR]
-    Phi["🔶 Phi-4 8K"]
-    GPT["🟢 gpt-4o-mini 120K"]
+    Phi["Phi-4 8K"]
+    GPT["gpt-4o-mini 120K"]
+    Nano["gpt-5-nano Assessment"]
   end
 
   subgraph DB[Azure Cosmos DB]
-    C[(Container: emails + comparison_results)]
+    C[(Container: emails)]
   end
 
-  U -->|1) Upload PDF (API) OR direct Blob| API
-  U -->|1bis) Upload direct| B
-  API -->|2) Write blob| B
-  B -->|3) BlobCreated| T
+  subgraph AppInsights[Azure Monitor]
+    AI[Application Insights + Live Metrics]
+  end
+
+  U -->|"1 Upload PDF via API"| API
+  U -->|"1bis Upload direct"| B
+  API -->|"2 Write blob"| B
+  B -->|"3 BlobCreated"| T
   T --> S
-  S -->|comparison=false| Q
-  Q -->|4) Dequeue message| W
-  W -->|5) Consume blob_url & tags| W
-  W -->|6) Download PDF| B
-  W -->|7) OCR| OCR
-  OCR -->|Markdown + usage| W
-  W -->|Token Budget Decision| W
-  W -->|8a) < 8K| Phi
-  W -->|8b) ≥ 8K| GPT
-  Phi -->|JSON intents| W
-  GPT -->|JSON intents| W
-  W -->|Optional: POST model=both| API
-  API -->|Parallel call| Phi
-  API -->|Parallel call| GPT
-  Phi -->|Result 1| API
-  GPT -->|Result 2| API
-  W -->|9) Upsert comparison_results| C
-  API -->|10) Read results| C
-  C -->|Dual results| API
-  API -->|11) UI Comparison Tab| U
+  S -->|"comparison=false"| Q
+  Q -->|"4 Dequeue message"| W
+  W -->|"5 Read blob_url + tags"| W
+  W -->|"6 Download PDF"| B
+  W -->|"7 OCR"| OCR
+  OCR -->|"Markdown + usage"| W
+  W -->|"Token Budget Decision"| W
+  W -->|"8a less than 8K"| Phi
+  W -->|"8b 8K or more"| GPT
+  Phi -->|"JSON intents"| W
+  GPT -->|"JSON intents"| W
+  W -->|"Optional: POST model=both"| API
+  API -->|"Parallel call"| Phi
+  API -->|"Parallel call"| GPT
+  Phi -->|"Result 1"| API
+  GPT -->|"Result 2"| API
+  W -->|"9 Upsert results"| C
+  API -->|"10 Read results"| C
+  C -->|"Results"| API
+  API -->|"11 UI Dashboard"| U
+  API -.->|"Telemetry"| AI
+  W -.->|"Telemetry"| AI
+  API -->|"Category Assessment"| Nano
 ```
 
 ### Étapes (lecture rapide)

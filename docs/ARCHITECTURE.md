@@ -30,14 +30,14 @@ flowchart TD
     SB --> W[Worker]
     W --> OCR[Mistral OCR]
     OCR --> Check{"Token Budget Decision"}
-    Check -->|< 8K| Phi["🔶 Phi-4 Primary"]
-    Check -->|≥ 8K| GPT["🟢 gpt-4o-mini Fallback"]
+    Check -->|"less than 8K"| Phi["Phi-4 Primary"]
+    Check -->|"8K or more"| GPT["gpt-4o-mini Fallback"]
     OCR --> PII{"PII Detection?"}
     PII -->|LLM| GPT_PII["GPT-4o-mini PII"]
-    PII -->|Azure| Lang["🔷 Azure AI Language"]
+    PII -->|Azure| Lang["Azure AI Language"]
     PII -->|Both| Hybrid["LLM + Azure Hybrid"]
     OCR --> Comp{"Comparison Enabled?"}
-    Comp -->|YES| Dual["🔶 Phi-4 ∥ 🟢 gpt4o-mini Parallel"]
+    Comp -->|YES| Dual["Phi-4 and gpt-4o-mini Parallel"]
     Comp -->|NO| Single[Single Model]
     Phi -->|JSON| API
     GPT -->|JSON| API
@@ -46,13 +46,18 @@ flowchart TD
     GPT_PII -->|PII Data| API
     Lang -->|PII Data| API
     Hybrid -->|Merged PII| API
-    API --> Cosmos[(Cosmos DB - comparison_results)]
+    API -->|"Category Assessment"| Nano["gpt-5-nano Reasoning"]
+    Nano -->|"Advice JSON"| API
+    API --> Cosmos[(Cosmos DB)]
     Cosmos --> API
-    API --> UI[Dashboard - Comparison Tab]
+    API --> UI[Dashboard]
+    API -.->|Telemetry| AppInsights[Application Insights + Live Metrics]
+    W -.->|Telemetry| AppInsights
 
     style Lang fill:#e1f5fe
     style GPT_PII fill:#e8f5e9
     style Hybrid fill:#fff3e0
+    style Nano fill:#fff9c4
 ```
 
 ## 2. Séquence de traitement
@@ -106,7 +111,7 @@ L'identité managée assignée aux Container Apps (`api` et `worker`) doit dispo
 | **Service Bus** | `Azure Service Bus Data Receiver` | `4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0` | Permet au `worker` de consommer les messages de la queue. |
 | **Service Bus** | `Azure Service Bus Data Sender` | `69a216fc-b8fb-44d8-bc22-1f3c2cd27a39` | Permet à l'API (et DLQ retry) d'envoyer des messages. |
 | **Cosmos DB (SQL)** | `Cosmos DB Built-in Data Contributor` | `00000000-0000-0000-0000-000000000002` | **Data Plane RBAC**. Lecture/Écriture des documents JSON. *Note: Ce n'est pas un rôle IAM Azure classique, mais un rôle SQL natif Cosmos.* |
-| **AI Foundry Project** | `Cognitive Services User` | `a97b65f3-2400-443d-9d23-a1288a8760ba` | **Modèles Déployés**: <br/>• **Phi-4 v7** (Classification primaire)<br/>• **Mistral Document AI 2505** (OCR + Vision)<br/>• **GPT-5.1 / GPT-5.2-chat** (Conversational AI)<br/>• **GPT-4o-mini** (Fallback + PII)<br/>• **text-embedding-3-small** (Embeddings) |
+| **AI Foundry Project** | `Cognitive Services User` | `a97b65f3-2400-443d-9d23-a1288a8760ba` | **Modèles Déployés**: Phi-4 (Classification primaire), Mistral Document AI 2505 (OCR + Vision), GPT-5-nano (Category Assessment, reasoning), GPT-5.2-chat (Conversational AI), GPT-4o-mini (Fallback + PII), text-embedding-3-small (Embeddings) |
 | **Azure AI Language** ⚙️ | `Cognitive Services Language Reader` | `36e80216-4058-40c5-bf25-3b30a0199a10` | **PII Detection Native API** (optionnel, `deploy_language_service=true`). Service TextAnalytics avec 43+ catégories PII prédéfinies. |
 | **Container Registry**| `AcrPull` | `7f951dda-4ed3-4680-a7ca-43fe172d538d` | Pull de l'image Docker par l'environnement Container Apps. |
 | **Application Insights** | `Monitoring Metrics Publisher` | `3913510d-42f4-4e42-8a64-420c390055eb` | Télémétrie OpenTelemetry (traces distribuées, métriques). |
@@ -164,8 +169,12 @@ ClassyMail uses the **Azure Monitor OpenTelemetry Distro** (`azure-monitor-opent
 
 | Tier | Package | Features |
 |:-----|:--------|:---------|
-| **Full distro** (production) | `azure-monitor-opentelemetry` | Application Map, Agents View, Live Metrics, GenAI tracing, auto-instrumentation |
+| **Full distro** (production) | `azure-monitor-opentelemetry` | Application Map, Agents View, **Live Metrics**, GenAI tracing, auto-instrumentation (FastAPI, HTTPX, requests) |
 | **Exporter-only** (local dev) | `azure-monitor-opentelemetry-exporter` | Trace-only, lighter footprint |
+
+> **Live Metrics** streams real-time telemetry (requests, failures, dependencies) with ~1s latency.
+> Requires `APPLICATIONINSIGHTS_CONNECTION_STRING` and `azure-monitor-opentelemetry` package.
+> The `LiveEndpoint` in the connection string points to the regional Live Metrics ingestion (e.g. `swedencentral.livediagnostics.monitor.azure.com`).
 
 ### Application Map
 
@@ -221,25 +230,27 @@ The LLM pipeline (`#classymail/services/llm_pipeline.py`) and anonymizer (`#clas
 - OpenTelemetry spans with `gen_ai.*` attributes: pages (Mistral), tokens (Phi-4)
 - Per-email cost calculation (UI & CSV export): pricing configurable via environment variables
 
-## 5. Fine-tuning LoRA (Phi‑4)
+## 6. Fine-tuning LoRA (Phi‑4)
 
 1. Collecte `needs_review=false` dans Cosmos.
 2. Export JSONL (Foundry Dataset).
 3. Fine-tune LoRA sur `phi-4` via Foundry (UI/CLI) avec 1000–2000 exemples.
 4. Déployer `phi-4-custom` et mettre `PHI_DEPLOYMENT`.
 
-## 6. Terraform (Foundry)
+## 7. Terraform (Foundry)
 
-- `azapi_resource` AIServices (Foundry) + Project + Deployments (Phi‑4, Mistral OCR)
+- `azapi_resource` AIServices (Foundry) + Project + Deployments (Phi‑4, Mistral OCR, GPT-5-nano)
 - RBAC `Cognitive Services User` pour l'identité ACA
+- Application Insights + Log Analytics Workspace (telemetry, Live Metrics)
+- KEDA scaler azure-servicebus pour le worker
 
-## 6. Déploiement & Docker local
+## 8. Déploiement & Docker local
 
-- Build : `docker build -t <acr>.azurecr.io/ClassyMail-agent:local .`
-- Push : `az acr login --name <acr>; docker push <acr>.azurecr.io/ClassyMail-agent:local`
-- ACA : `az containerapp update --name ClassyMail-agent --resource-group <rg> --image <acr>.azurecr.io/ClassyMail-agent:local`
+- Build : `docker build -t <acr>.azurecr.io/classymail:local .`
+- Push : `az acr login --name <acr>; docker push <acr>.azurecr.io/classymail:local`
+- ACA : `az containerapp update --name email-poc-api --resource-group email-poc-rg --image <acr>.azurecr.io/classymail:local`
 
-## 6. Pipeline Processing Details
+## 9. Pipeline Processing Details
 
 > 📊 **Interactive Diagrams**: Zoom and download controls available. See [README_DIAGRAMS.md](./README_DIAGRAMS.md).
 
@@ -275,7 +286,7 @@ This section explains the end-to-end processing pipeline (PDF → OCR → classi
 - **Metrics**: per-step latency (download/OCR/LLM), tokens/pages, error rates, DLQ depth.
 - **Data retention**: TTL policies in Cosmos for raw OCR markdown if not required long-term.
 
-## 7. Pourquoi cette architecture est efficiente ?
+## 10. Pourquoi cette architecture est efficiente ?
 
 - **OCR** spécialisé (Mistral) facturé **1 €/1K pages** vs multimodal tokens coûteux.
 - **SLM Phi‑4** : **0.000107 €/1K input**, **0.00043 €/1K output**, _context_ 128K, LoRA possible.
@@ -286,7 +297,7 @@ This section explains the end-to-end processing pipeline (PDF → OCR → classi
     - Infra (ACA/Storage) : faible
     - **Total ~21 €**
 
-## 8. Architecture “au fil de l’eau” (Post-POC)
+## 11. Architecture "au fil de l'eau" (Post-POC)
 
 **Objectif** : traitement en continu des mails entrants (<1 min) avec bursts matinaux.
 
@@ -304,32 +315,24 @@ This section explains the end-to-end processing pipeline (PDF → OCR → classi
 **Flux** : identique, avec scaling horizontal >1 instance ACA et KEDA sur SB queue.
 
 
-## 2. Nouveau vs Ancien
-
-**Nouveau (API + Worker séparés sur ACA) :**
+## 12. Déploiement ACA (API + Worker séparés)
 
 ```mermaid
 flowchart LR
-  Client -->|HTTP| API[API Container App]
+  Client -->|HTTP| API["API Container App: email-poc-api"]
   API --> SBQ[Service Bus Queue]
-  SBQ --> Worker[Worker Container App]
+  SBQ --> Worker["Worker Container App: email-poc-worker"]
   API --> Cosmos[(Cosmos DB)]
   Worker --> Cosmos
   API --> Storage[(Blob Storage)]
   Worker --> Storage
   API --> Foundry[Azure AI Foundry]
   Worker --> Foundry
+  API -.->|Telemetry| AI[Application Insights]
+  Worker -.->|Telemetry| AI
 ```
 
 - API expose `/healthz` + `/readyz` (alias `/health`, `/ready`).
-- Worker scale avec KEDA (scaler azure-servicebus, identité managée).
-- Même image pour les deux; worker: `python -m classymail.worker_main`.
-
-**Ancien (mono-process):** API + worker dans le même process, scaling couplé et clients globaux vieillissants.
-
-## 4. Nouveau découpage API + Worker (ACA)
-
-- API expose `/healthz` `/readyz` (alias `/health` `/ready`).
-- Worker scale via KEDA (azure-servicebus, managed identity).
-- Même image pour API/Worker; worker: `python -m classymail.worker_main`.
-- MI `app_id` a les rôles: Storage Blob Data Contributor, Azure Service Bus Data Receiver/Sender, Cosmos DB SQL Data Contributor, Cognitive Services User.
+- Worker scale avec KEDA (scaler azure-servicebus, min=1, max=10).
+- Même image Docker pour les deux; worker: `python -m classymail.worker_main`.
+- MI `app_id` a les rôles: Storage Blob Data Contributor, Azure Service Bus Data Receiver/Sender, Cosmos DB Built-in Data Contributor, Cognitive Services User, Monitoring Metrics Publisher.

@@ -1,11 +1,11 @@
 # Models & Fallback
 
-This repo uses a 2-step AI pipeline:
+This repo uses a multi-step AI pipeline:
 
-1) OCR: Mistral Document AI → Markdown
-2) Classification: LLM → strict JSON multi-intents
-3) Vector Search: Text Embedding for RAG (Chatbot)
-4) Category Assessment: GPT-5 Nano → AI-powered category quality analysis
+1) **OCR**: Mistral Document AI → Markdown
+2) **Classification**: LLM (Phi-4 / GPT-4o-mini fallback) → strict JSON multi-intents
+3) **Vector Search**: Text Embedding for RAG (Chatbot)
+4) **Category Assessment**: GPT-5-nano (reasoning model) → AI-powered category quality analysis
 
 ---
 
@@ -19,7 +19,7 @@ This repo uses a 2-step AI pipeline:
 | **Phi-4** | `Phi-4` or `phi-4` | Primary classification (8K context) | 8,000 | ✅ YES |
 | **GPT-4o-mini** | `gpt-4o-mini` | Fallback classification (120K context) | 120,000 | ✅ YES |
 | **text-embedding-3-small** | `text-embedding-3-small` | Vector embeddings for RAG chatbot | N/A (embeddings) | ✅ YES |
-| **GPT-5.2-chat** or **GPT-5-mini** | `gpt-5.2-chat` or `gpt-5-mini` | Chatbot + Category Assessment | 200,000 | ⚠️ RECOMMENDED |
+| **GPT-5.2-chat** or **GPT-5-mini** | `gpt-5.2-chat` or `gpt-5-mini` | Chatbot (RAG conversational AI) | 200,000 | ⚠️ RECOMMENDED |
 | **GPT-5-nano** | `gpt-5-nano` | Category assessment (reasoning model) | 200,000 | ⚠️ RECOMMENDED |
 
 **API Version Requirements:**
