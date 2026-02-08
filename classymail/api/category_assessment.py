@@ -14,7 +14,7 @@ from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel, Field
 
 from classymail.core import config
-from classymail.core.llm_compat import build_chat_params
+from classymail.core.llm_compat import build_chat_params, is_reasoning_model
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.llm_pipeline import resolve_model_config
 
@@ -146,9 +146,13 @@ Focus on: keyword density, boundary precision, prompt structure, and LLM compreh
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_content},
                 ],
-                "response_format": {"type": "json_object"},
                 **build_chat_params(deployment, temperature=0.3, max_output_tokens=1500),
             }
+
+            # Reasoning models (GPT-5, o1) often do not support 'response_format'={"type": "json_object"}
+            # They rely on strong prompt adherence instead.
+            if not is_reasoning_model(deployment):
+                payload["response_format"] = {"type": "json_object"}
 
             span.set_attribute("gen_ai.system", "azure_openai")
             span.set_attribute("gen_ai.request.model", deployment)
@@ -158,14 +162,40 @@ Focus on: keyword density, boundary precision, prompt structure, and LLM compreh
                 response.raise_for_status()
                 data = response.json()
 
-                content = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+                choices = data.get("choices", [])
+                if not choices:
+                    logger.error(f"[assessment] Invalid AI response: No choices returned. Data: {data}")
+                    raise HTTPException(status_code=502, detail="AI Model returned no Content Choices.")
 
-                # Parse JSON response – strip markdown code fences if present
+                message = choices[0].get("message", {})
+                content = message.get("content")
+
+                if not content:
+                    logger.error(f"[assessment] Invalid AI response: Empty content. Finish reason: {choices[0].get('finish_reason')}. Data: {data}")
+                    raise HTTPException(status_code=502, detail=f"AI Model returned empty content (Finish Reason: {choices[0].get('finish_reason', 'unknown')}).")
+
+                # Parse JSON response – cleanup potential markdown or whitespace
                 cleaned = content.strip()
+                # Check for code fence first as it's cleaner
                 fence_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", cleaned, re.DOTALL)
                 if fence_match:
                     cleaned = fence_match.group(1).strip()
-                result = json.loads(cleaned)
+                elif re.search(r"^\{.*\}$", cleaned, re.DOTALL):
+                     pass # Already looks like JSON
+                else:
+                     # Try finding outermost JSON object
+                     json_match = re.search(r"(\{.*\})", cleaned, re.DOTALL)
+                     if json_match:
+                         cleaned = json_match.group(1).strip()
+
+                try:
+                    result = json.loads(cleaned)
+                except json.JSONDecodeError:
+                    # Retry with raw content just in case extraction failed but it was valid
+                    try:
+                        result = json.loads(content)
+                    except json.JSONDecodeError:
+                         raise # Re-raise original error to be caught below
 
                 span.set_status(Status(StatusCode.OK))
                 logger.info(f"[assessment] Category '{request.name}' assessed with score: {result.get('quality_score', 'Unknown')}")
@@ -184,7 +214,7 @@ Focus on: keyword density, boundary precision, prompt structure, and LLM compreh
                 detail=f"LLM assessment failed: {e.response.text[:200]}"
             )
         except json.JSONDecodeError as e:
-            logger.error(f"[assessment] JSON parse error: {e} | raw content: {content[:500]}")
+            logger.error(f"[assessment] JSON parse error: {e} | Raw Content Snippet: {content[:500] if 'content' in locals() and content else 'None'}")
             span.set_status(Status(StatusCode.ERROR, str(e)))
             raise HTTPException(
                 status_code=500,
@@ -194,6 +224,8 @@ Focus on: keyword density, boundary precision, prompt structure, and LLM compreh
             logger.error(f"[assessment] Unexpected error: {e}")
             span.set_status(Status(StatusCode.ERROR, str(e)))
             span.record_exception(e)
+            if isinstance(e, HTTPException):
+                raise e
             raise HTTPException(
                 status_code=500,
                 detail=f"Assessment failed: {str(e)}"
