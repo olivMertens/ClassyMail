@@ -158,6 +158,7 @@ graph TD
           <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white mb-4">
             {{ t('developer_docs.architecture.title') }}
           </h3>
+          <!-- eslint-disable-next-line vue/no-v-html -->
           <p
             class="text-sm text-gray-500 dark:text-gray-400 mb-6"
             v-html="t('developer_docs.architecture.desc_html')"

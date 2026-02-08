@@ -301,10 +301,22 @@ jobs:
         run: |
           IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
           IDENTITY_ID=$(az identity show -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "$IDENTITY_NAME" --query id -o tsv)
-          az containerapp identity assign \
+
+          # Check if identity is already assigned (idempotent)
+          CURRENT_IDENTITIES=$(az containerapp identity show \
             --name "${{ env.IMAGE_NAME }}" \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --user-assigned "$IDENTITY_ID"
+            --query "userAssignedIdentities | keys(@)" -o tsv 2>/dev/null || echo "")
+
+          if echo "$CURRENT_IDENTITIES" | grep -qi "$IDENTITY_ID"; then
+            echo "Identity already assigned - skipping"
+          else
+            echo "Assigning identity..."
+            az containerapp identity assign \
+              --name "${{ env.IMAGE_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --user-assigned "$IDENTITY_ID"
+          fi
 
       - name: Configure ACR pull (API)
         run: |
@@ -431,10 +443,22 @@ jobs:
           APP="${{ env.WORKER_APP_NAME }}"
           IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
           IDENTITY_ID=$(az identity show -g "$RG" -n "$IDENTITY_NAME" --query id -o tsv)
-          az containerapp identity assign \
+
+          # Check if identity is already assigned (idempotent)
+          CURRENT_IDENTITIES=$(az containerapp identity show \
             --name "$APP" \
             --resource-group "$RG" \
-            --user-assigned "$IDENTITY_ID"
+            --query "userAssignedIdentities | keys(@)" -o tsv 2>/dev/null || echo "")
+
+          if echo "$CURRENT_IDENTITIES" | grep -qi "$IDENTITY_ID"; then
+            echo "Identity already assigned - skipping"
+          else
+            echo "Assigning identity..."
+            az containerapp identity assign \
+              --name "$APP" \
+              --resource-group "$RG" \
+              --user-assigned "$IDENTITY_ID"
+          fi
 
       - name: Configure ACR pull (Worker)
         run: |
@@ -511,6 +535,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq
 
+      - name: Wait for Deployments to Stabilize
+        run: |
+          echo "⏳ Waiting 30 seconds for Container App deployments to stabilize..."
+          sleep 30
+          echo "✅ Ready to proceed with verification"
+
       - name: Fix Cosmos DB Firewall (Critical)
         run: |
           echo "========================================"
@@ -533,11 +563,17 @@ jobs:
           echo "Step 2/5: Security & Cost Control Tags"
           echo "========================================"
           echo ""
+          echo "ℹ️ Skipping policy creation in CI/CD (requires subscription-level permissions)"
+          echo "   Policy should be applied manually or via Terraform"
+          echo "   Run locally: ./scripts/verify_security_cost_tags.sh ${{ vars.AZURE_RESOURCE_GROUP }} --apply --remediate"
+          echo ""
+
+          # Check compliance only (no policy creation)
           chmod +x scripts/verify_security_cost_tags.sh
-          if ./scripts/verify_security_cost_tags.sh "${{ vars.AZURE_RESOURCE_GROUP }}" --apply --remediate; then
-            echo "✅ Tags policy applied and remediation started"
+          if ./scripts/verify_security_cost_tags.sh "${{ vars.AZURE_RESOURCE_GROUP }}"; then
+            echo "✅ Tags compliance check completed"
           else
-            echo "⚠️ Tags policy failed (non-critical, governance only)"
+            echo "⚠️ Tags compliance check completed with warnings (non-critical)"
           fi
 
       - name: Wait for Container Apps Ready
