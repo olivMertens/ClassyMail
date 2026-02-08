@@ -5,10 +5,11 @@
 # This script validates the complete Azure infrastructure setup for the ClassyMail MVP.
 #
 # Usage:
-#   ./scripts/verify-mvp-setup.sh [resource-group-name]
+#   ./scripts/verify-mvp-setup.sh [resource-group-name] [--auto-fix-network]
 #
 # Example:
 #   ./scripts/verify-mvp-setup.sh email-mvp-rg
+#   ./scripts/verify-mvp-setup.sh email-mvp-rg --auto-fix-network
 #
 # Prerequisites:
 #   - Azure CLI installed and authenticated (az login)
@@ -16,6 +17,24 @@
 #
 
 set -euo pipefail
+
+# Parse arguments
+AUTO_FIX_NETWORK=false
+RG=""
+
+for arg in "$@"; do
+    case $arg in
+        --auto-fix-network)
+            AUTO_FIX_NETWORK=true
+            shift
+            ;;
+        *)
+            if [ -z "$RG" ]; then
+                RG="$arg"
+            fi
+            ;;
+    esac
+done
 
 # Colors for output
 RED='\033[0;31m'
@@ -35,7 +54,9 @@ FAILED=0
 WARNINGS=0
 
 # Resource Group (can be passed as argument or will be prompted)
-RG="${1:-}"
+if [ -z "$RG" ]; then
+    RG="${1:-}"
+fi
 
 # Function to print colored output
 print_status() {
@@ -154,7 +175,68 @@ if [ -n "$COSMOS_ACCOUNT" ]; then
     COSMOS_ENDPOINT=$(az cosmosdb show --name "$COSMOS_ACCOUNT" --resource-group "$RG" --query documentEndpoint -o tsv)
     print_status "success" "Cosmos DB '$COSMOS_ACCOUNT' found"
     echo "  Provisioning state: $COSMOS_STATE"
-    echo "  Endpoint: $COSMOS_ENDPOINT"
+    echo "  network access configuration
+    PUBLIC_ACCESS=$(az cosmosdb show --name "$COSMOS_ACCOUNT" --resource-group "$RG" --query publicNetworkAccess -o tsv 2>/dev/null || echo "Unknown")
+    IP_RULES=$(az cosmosdb show --name "$COSMOS_ACCOUNT" --resource-group "$RG" --query "ipRules[].ipAddressOrRange" -o tsv 2>/dev/null || echo "")
+
+    echo "  Public network access: $PUBLIC_ACCESS"
+
+    if [ "$PUBLIC_ACCESS" == "Disabled" ]; then
+        print_status "error" "Cosmos DB public network access is DISABLED"
+        echo -e "    ${YELLOW}⚠️  Container Apps cannot connect without VNet integration${NC}"
+        echo -e "    ${CYAN}📝 Fix: Run ./scripts/update_cosmos_firewall.sh \"$RG\"${NC}"
+
+        if [ "$AUTO_FIX_NETWORK" == "true" ]; then
+            echo ""
+            echo -e "  ${YELLOW}🔧 Auto-fix enabled - Running update_cosmos_firewall.sh...${NC}"
+            if bash "$(dirname "$0")/update_cosmos_firewall.sh" "$RG" --include-local-ip; then
+                print_status "success" "  Network firewall updated successfully"
+            else
+                print_status "error" "  Failed to update network firewall"
+            fi
+        fi
+    else
+        print_status "success" "Public network access: Enabled"
+
+        # Check if firewall has IP rules
+        if [ -n "$IP_RULES" ]; then
+            IP_LIST=$(echo "$IP_RULES" | tr '\n' ', ' | sed 's/,$//')
+            echo "  Firewall IP rules: $IP_LIST"
+
+            # Check if 0.0.0.0 (Azure Services) is included
+            if echo "$IP_RULES" | grep -q "0.0.0.0"; then
+                print_status "success" "Azure Services (0.0.0.0) allowed in firewall"
+            else
+                print_status "warning" "Azure Services (0.0.0.0) NOT in firewall - may cause connection issues"
+                echo -e "    ${CYAN}📝 Fix: Run ./scripts/update_cosmos_firewall.sh \"$RG\"${NC}"
+
+                if [ "$AUTO_FIX_NETWORK" == "true" ]; then
+                    echo ""
+                    echo -e "  ${YELLOW}🔧 Auto-fix enabled - Running update_cosmos_firewall.sh...${NC}"
+                    if bash "$(dirname "$0")/update_cosmos_firewall.sh" "$RG" --include-local-ip; then
+                        print_status "success" "  Network firewall updated successfully"
+                    else
+                        print_status "error" "  Failed to update network firewall"
+                    fi
+                fi
+            fi
+        else
+            print_status "warning" "No firewall IP rules configured - may cause connection issues"
+            echo -e "    ${CYAN}📝 Fix: Run ./scripts/update_cosmos_firewall.sh \"$RG\"${NC}"
+
+            if [ "$AUTO_FIX_NETWORK" == "true" ]; then
+                echo ""
+                echo -e "  ${YELLOW}🔧 Auto-fix enabled - Running update_cosmos_firewall.sh...${NC}"
+                if bash "$(dirname "$0")/update_cosmos_firewall.sh" "$RG" --include-local-ip; then
+                    print_status "success" "  Network firewall updated successfully"
+                else
+                    print_status "error" "  Failed to update network firewall"
+                fi
+            fi
+        fi
+    fi
+
+    # Check Endpoint: $COSMOS_ENDPOINT"
 
     # Check RBAC assignments
     if [ -n "$IDENTITY_ID" ]; then
@@ -379,14 +461,21 @@ if [ $FAILED -eq 0 ]; then
     echo "  2. Test end-to-end workflow by uploading a PDF via UI"
     echo "  3. Monitor Application Insights for telemetry"
     echo "  4. Review warnings above and address if needed"
+    echo ""
+    echo "Tip: Use --auto-fix-network to automatically fix Cosmos DB firewall issues"
+    echo "     ./scripts/verify-mvp-setup.sh \"$RG\" --auto-fix-network"
 else
     print_status "error" "Some checks failed. Please review errors above."
     echo ""
     echo "Common fixes:"
     echo "  - RBAC issues: cd infra && terraform apply"
+    echo "  - Network issues: ./scripts/update_cosmos_firewall.sh \"$RG\""
     echo "  - Container Apps not running: az containerapp restart --name <app-name> -g $RG"
     echo "  - Cosmos DB errors: Wait 5-10 min for RBAC propagation, then restart apps"
     echo "  - Missing deployments: See docs/AZURE_AI_FOUNDRY_SETUP.md"
+    echo ""
+    echo "Tip: Use --auto-fix-network to automatically fix network issues"
+    echo "     ./scripts/verify-mvp-setup.sh \"$RG\" --auto-fix-network"
 fi
 
 echo ""

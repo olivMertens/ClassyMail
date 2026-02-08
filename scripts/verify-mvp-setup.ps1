@@ -15,7 +15,10 @@
 
 param(
     [Parameter(Mandatory=$false)]
-    [string]$ResourceGroup
+    [string]$ResourceGroup,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$AutoFixNetwork = $false
 )
 
 # Counters
@@ -179,6 +182,76 @@ if ($cosmosAccounts -and $cosmosAccounts.Count -gt 0) {
     Write-Status -Status success -Message "Cosmos DB '$($cosmos.name)' found"
     Write-Host "  Provisioning state: $($cosmos.provisioningState)"
     Write-Host "  Endpoint: $($cosmos.documentEndpoint)"
+
+    # Check network access configuration
+    try {
+        $cosmosDetail = az cosmosdb show --name $cosmos.name --resource-group $ResourceGroup 2>$null | ConvertFrom-Json
+        $publicAccess = $cosmosDetail.publicNetworkAccess
+        $ipRules = $cosmosDetail.ipRules
+
+        Write-Host "  Public network access: $publicAccess"
+
+        if ($publicAccess -eq "Disabled") {
+            Write-Status -Status error -Message "Cosmos DB public network access is DISABLED"
+            Write-Host "    ⚠️  Container Apps cannot connect without VNet integration" -ForegroundColor Yellow
+            Write-Host "    📝 Fix: Run .\scripts\update_cosmos_firewall.ps1 -ResourceGroup `"$ResourceGroup`"" -ForegroundColor Cyan
+
+            if ($AutoFixNetwork) {
+                Write-Host ""
+                Write-Host "  🔧 Auto-fix enabled - Running update_cosmos_firewall.ps1..." -ForegroundColor Magenta
+                & "$PSScriptRoot\update_cosmos_firewall.ps1" -ResourceGroup $ResourceGroup -IncludeLocalIP
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Status -Status success -Message "  Network firewall updated successfully"
+                } else {
+                    Write-Status -Status error -Message "  Failed to update network firewall"
+                }
+            }
+        } else {
+            Write-Status -Status success -Message "Public network access: Enabled"
+
+            # Check if Container App IPs are in firewall
+            if ($ipRules -and $ipRules.Count -gt 0) {
+                $ipList = ($ipRules | ForEach-Object { $_.ipAddressOrRange }) -join ", "
+                Write-Host "  Firewall IP rules: $ipList"
+
+                # Check if 0.0.0.0 (Azure Services) is included
+                $hasAzureServices = $ipRules | Where-Object { $_.ipAddressOrRange -eq "0.0.0.0" }
+                if ($hasAzureServices) {
+                    Write-Status -Status success -Message "Azure Services (0.0.0.0) allowed in firewall"
+                } else {
+                    Write-Status -Status warning -Message "Azure Services (0.0.0.0) NOT in firewall - may cause connection issues"
+                    Write-Host "    📝 Fix: Run .\scripts\update_cosmos_firewall.ps1 -ResourceGroup `"$ResourceGroup`"" -ForegroundColor Cyan
+
+                    if ($AutoFixNetwork) {
+                        Write-Host ""
+                        Write-Host "  🔧 Auto-fix enabled - Running update_cosmos_firewall.ps1..." -ForegroundColor Magenta
+                        & "$PSScriptRoot\update_cosmos_firewall.ps1" -ResourceGroup $ResourceGroup -IncludeLocalIP
+                        if ($LASTEXITCODE -eq 0) {
+                            Write-Status -Status success -Message "  Network firewall updated successfully"
+                        } else {
+                            Write-Status -Status error -Message "  Failed to update network firewall"
+                        }
+                    }
+                }
+            } else {
+                Write-Status -Status warning -Message "No firewall IP rules configured - may cause connection issues"
+                Write-Host "    📝 Fix: Run .\scripts\update_cosmos_firewall.ps1 -ResourceGroup `"$ResourceGroup`"" -ForegroundColor Cyan
+
+                if ($AutoFixNetwork) {
+                    Write-Host ""
+                    Write-Host "  🔧 Auto-fix enabled - Running update_cosmos_firewall.ps1..." -ForegroundColor Magenta
+                    & "$PSScriptRoot\update_cosmos_firewall.ps1" -ResourceGroup $ResourceGroup -IncludeLocalIP
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Status -Status success -Message "  Network firewall updated successfully"
+                    } else {
+                        Write-Status -Status error -Message "  Failed to update network firewall"
+                    }
+                }
+            }
+        }
+    } catch {
+        Write-Status -Status warning -Message "Could not check Cosmos DB network configuration"
+    }
 
     # Check RBAC assignments
     if ($identityId) {
@@ -385,6 +458,9 @@ if ($apiApp) {
         $appDetail = az containerapp show --name $apiApp.name --resource-group $ResourceGroup 2>$null | ConvertFrom-Json
         $apiFqdn = $appDetail.properties.configuration.ingress.fqdn
 
+    Write-Host ""
+    Write-Host "Tip: Use -AutoFixNetwork to automatically fix Cosmos DB firewall issues"
+    Write-Host "     .\scripts\verify-mvp-setup.ps1 -ResourceGroup `"$ResourceGroup`" -AutoFixNetwork"
         if ($apiFqdn) {
             $apiUrl = "https://$apiFqdn"
             Write-Host "  API URL: $apiUrl"
@@ -457,9 +533,13 @@ if ($script:Failed -eq 0) {
     Write-Host "  4. Review warnings above and address if needed"
 } else {
     Write-Status -Status error -Message "Some checks failed. Please review errors above."
+    Write-Host ""Network issues: .\scripts\update_cosmos_firewall.ps1 -ResourceGroup `"$ResourceGroup`""
+    Write-Host "  - Container Apps not running: az containerapp restart --name <app-name> -g $ResourceGroup"
+    Write-Host "  - Cosmos DB errors: Wait 5-10 min for RBAC propagation, then restart apps"
+    Write-Host "  - Missing deployments: See docs/AZURE_AI_FOUNDRY_SETUP.md"
     Write-Host ""
-    Write-Host "Common fixes:"
-    Write-Host "  - RBAC issues: cd infra && terraform apply"
+    Write-Host "Tip: Use -AutoFixNetwork to automatically fix network issues"
+    Write-Host "     .\scripts\verify-mvp-setup.ps1 -ResourceGroup `"$ResourceGroup`" -AutoFixNetwork
     Write-Host "  - Container Apps not running: az containerapp restart --name <app-name> -g $ResourceGroup"
     Write-Host "  - Cosmos DB errors: Wait 5-10 min for RBAC propagation, then restart apps"
     Write-Host "  - Missing deployments: See docs/AZURE_AI_FOUNDRY_SETUP.md"
