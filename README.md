@@ -213,7 +213,28 @@ Interface multilingue complète :
 *   **Maintenance** : Script `check_i18n.py` pour vérifier la cohérence EN/FR
 
 ---
+## 💪 Résilience & Tolérance aux Pannes
 
+ClassyMail est conçu pour survivre aux échecs transitoires et aux pics de charge sans perte de données.
+
+### 1. Gestion des Quotas (TPM/RPM)
+Les modèles Azure OpenAI/Mistral ont des limites strictes (Tokens/Requests Per Minute).
+*   **Token Leaky Bucket** : Le système estime les tokens AVANT l'appel. Si le quota est atteint, le worker se met en pause ("sleep") intelligemment.
+*   **Retry Exponential** : En cas d'erreur 429 (Too Many Requests), la librairie `tenacity` réessaie avec un délai progressif (2s, 4s, 8s...).
+
+### 2. Garantie "At-Least-Once" (Service Bus)
+Le pipeline utilise le pattern **Peek-Lock** de Service Bus :
+*   Le worker "emprunte" le message sans le supprimer.
+*   Le message n'est supprimé (`complete_message`) **QUE** si le traitement (OCR + Classif + Save) réussit.
+*   **Crash Recovery** : Si le worker crashe (OOM, restart) pendant le traitement, le "Lock" expire (par défaut 5min). Le message redevient visible et sera repris par un autre worker.
+
+### 3. Dead Letter Queue (DLQ)
+Si un email échoue systématiquement (ex: PDF corrompu faisant crasher le parser) après 10 tentatives (configurable) :
+*   Il est déplacé vers la **Dead Letter Queue**.
+*   Il ne bloque plus la file principale.
+*   **Dashboard** : L'onglet "Failures" permet de voir ces messages, analyser l'erreur, et les rejouer (`/reprocess`) ou les purger.
+
+---
 ## �️ Scripts & Outils de Développement
 
 Le dossier `scripts/` contient des outils pour le développement, le déploiement et le débogage. Les scripts sont disponibles en versions **PowerShell (.ps1)** et **Bash (.sh)** pour la compatibilité cross-platform.

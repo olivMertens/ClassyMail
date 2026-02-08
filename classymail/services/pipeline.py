@@ -3,6 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
+
 from classymail.models import EmailRecord, ClassificationResult
 from classymail.services.azure_clients import download_blob_as_base64, blob_id_from_url, Clients
 from classymail.services.llm_pipeline import ocr_with_mistral, classify_with_phi4, process_agent_response, generate_embedding, extract_business_entities, classify_comparison
@@ -11,6 +14,7 @@ from classymail.core import config
 import logging
 
 logger = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
 
 
 def chunk_markdown(markdown: str, chunk_size: int = 2000, overlap: int = 200) -> list[dict]:
@@ -55,47 +59,54 @@ async def run_reclassification_pipeline(
     if models is None:
         models = [config.PHI_DEPLOYMENT, config.PHI_FALLBACK_DEPLOYMENT]
 
-    logger.info(f"[pipeline] -> Starting reclassification for item: {item_id} with models={models}")
+    with tracer.start_as_current_span("pipeline.reclassification") as span:
+        span.set_attribute("app.item_id", item_id)
+        span.set_attribute("app.models", ",".join(models))
 
-    await clients.ensure_cosmos_container()
-    try:
-        item_data = await clients.cosmos_container.read_item(item=item_id, partition_key=item_id)
-        email_accord = EmailRecord(**item_data)
-    except Exception as e:
-        logger.error(f"Failed to fetch item {item_id}: {e}")
-        raise
+        logger.info(f"[pipeline] -> Starting reclassification for item: {item_id} with models={models}")
 
-    if not email_accord.markdown:
-        raise ValueError(f"Item {item_id} has no markdown content, cannot reclassify.")
+        await clients.ensure_cosmos_container()
+        try:
+            item_data = await clients.cosmos_container.read_item(item=item_id, partition_key=item_id)
+            email_accord = EmailRecord(**item_data)
+        except Exception as e:
+            logger.error(f"Failed to fetch item {item_id}: {e}")
+            span.set_status(Status(StatusCode.ERROR, str(e)))
+            raise
 
-    # Run Comparison
-    comparison_result = await classify_comparison(email_accord.markdown, models=models, clients=clients)
+        if not email_accord.markdown:
+            raise ValueError(f"Item {item_id} has no markdown content, cannot reclassify.")
 
-    # Store result
-    meta = comparison_result.get("comparison_meta", {})
-    comparison_record = {
-        "meta": {
-            "executed_at": meta.get("executed_at", datetime.now(timezone.utc).isoformat()),
-            "agreement": meta.get("agreement", False),
-            "confidence_delta": meta.get("confidence_delta", 0.0),
-            "elapsed_ms": meta.get("elapsed_ms", 0),
-        },
-        "model_results": comparison_result.get("model_results", {}),
-        "mode": "async", # This ran via worker
-        # Legacy fields
-        "phi4": comparison_result.get("phi4"),
-        "gpt4o_mini": comparison_result.get("gpt4o_mini")
-    }
+        # Run Comparison
+        comparison_result = await classify_comparison(email_accord.markdown, models=models, clients=clients)
 
-    # Append to existing results
-    if not email_accord.comparison_results:
-        email_accord.comparison_results = []
+        # Store result
+        meta = comparison_result.get("comparison_meta", {})
+        comparison_record = {
+            "meta": {
+                "executed_at": meta.get("executed_at", datetime.now(timezone.utc).isoformat()),
+                "agreement": meta.get("agreement", False),
+                "confidence_delta": meta.get("confidence_delta", 0.0),
+                "elapsed_ms": meta.get("elapsed_ms", 0),
+            },
+            "model_results": comparison_result.get("model_results", {}),
+            "mode": "async", # This ran via worker
+            # Legacy fields
+            "phi4": comparison_result.get("phi4"),
+            "gpt4o_mini": comparison_result.get("gpt4o_mini")
+        }
 
-    email_accord.comparison_results.append(comparison_record)
-    email_accord.updated_at = datetime.now(timezone.utc)
+        # Append to existing results
+        if not email_accord.comparison_results:
+            email_accord.comparison_results = []
 
-    # We return the updated record. The worker will save it.
-    return email_accord
+        email_accord.comparison_results.append(comparison_record)
+        email_accord.updated_at = datetime.now(timezone.utc)
+        span.set_attribute("app.agreement", meta.get("agreement", False))
+        span.set_status(Status(StatusCode.OK))
+
+        # We return the updated record. The worker will save it.
+        return email_accord
 
 
 async def run_classification_pipeline(
@@ -117,6 +128,10 @@ async def run_classification_pipeline(
         final_overrides = cost_overrides or {}
         strategy = "standard"
 
+    span = tracer.start_span("pipeline.classification")
+    span.set_attribute("app.blob_url", blob_url)
+    span.set_attribute("app.strategy", strategy)
+
     def log(stage: str, event: str, detail: Optional[str] = None) -> None:
         entry = {
             "ts": datetime.now(timezone.utc).isoformat(),
@@ -137,6 +152,8 @@ async def run_classification_pipeline(
         log("download", "error", f"{type(ex).__name__}: {ex}")
         err = OCRFailed(f"stage=download: {type(ex).__name__}: {ex}")
         setattr(err, "processing_log", processing_log)
+        span.set_status(Status(StatusCode.ERROR, str(ex)))
+        span.end()
         raise err from ex
 
     try:
@@ -158,6 +175,8 @@ async def run_classification_pipeline(
         log("ocr", "error", f"{type(ex).__name__}: {ex}")
         err = OCRFailed(f"stage=ocr: {type(ex).__name__}: {ex}")
         setattr(err, "processing_log", processing_log)
+        span.set_status(Status(StatusCode.ERROR, str(ex)))
+        span.end()
         raise err from ex
 
     markdown = ocr_result.get("markdown") or ""
@@ -188,6 +207,8 @@ async def run_classification_pipeline(
         log("classify", "error", f"{type(ex).__name__}: {ex}")
         err = OCRFailed(f"stage=classify: {type(ex).__name__}: {ex}")
         setattr(err, "processing_log", processing_log)
+        span.set_status(Status(StatusCode.ERROR, str(ex)))
+        span.end()
         raise err from ex
     processed = process_agent_response(classification_raw)
 
@@ -273,6 +294,7 @@ async def run_classification_pipeline(
             }
         ),
         entities=BusinessEntities(**entities_data) if entities_data else None,
+        vision_analysis=mistral_images if mistral_images else None,
         status=status,
         usage=usage,
         updated_at=datetime.now(timezone.utc),
@@ -280,4 +302,8 @@ async def run_classification_pipeline(
     )
     if chunk_docs:
         setattr(record, "chunks", chunk_docs)
+    span.set_attribute("app.result_status", status)
+    span.set_attribute("app.result_id", record.id)
+    span.set_status(Status(StatusCode.OK))
+    span.end()
     return record

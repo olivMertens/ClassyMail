@@ -175,6 +175,20 @@ az servicebus queue show \
   --resource-group rg-email-poc
 ```
 
+### Error: Event Grid not triggering Service Bus
+
+**Cause**: Service Bus Local Authentication disabled (`disableLocalAuth: true`).
+**Impact**: Event Grid cannot deliver messages to the queue. The Terraform configuration explicitly enables local auth to support this integration.
+
+**Solution**:
+```bash
+# Enable Local Authentication
+az servicebus namespace update \
+  --resource-group rg-email-poc \
+  --name sbemailpoc \
+  --disable-local-auth false
+```
+
 ### Error: `CredentialUnavailableError` in local development
 
 **Cause**: `DefaultAzureCredential` can't find credentials locally

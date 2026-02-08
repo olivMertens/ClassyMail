@@ -8,6 +8,8 @@ import re
 import asyncio
 import httpx
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 
 from classymail.core import config
 from classymail.core.llm_compat import build_chat_params
@@ -33,6 +35,7 @@ from classymail.services.repository import (
 from classymail.services.llm_pipeline import generate_embedding
 
 logger = logging.getLogger("ClassyMail.chatbot")
+tracer = trace.get_tracer(__name__)
 
 
 def _enrich_with_links(item: dict | None) -> dict | None:
@@ -126,6 +129,14 @@ class ChatAgent:
             return {"role": "assistant", "content": "Chatbot is not configured (missing CHAT_ENDPOINT)."}
 
         self._ensure_auth()
+
+        # Record root span for the entire chat agent run so sub-spans
+        # (_call_llm, tool executions) are correlated in Application Map.
+        span = tracer.start_span("chat_agent.run")
+        span.set_attribute("gen_ai.system", "azure_openai")
+        span.set_attribute("gen_ai.request.model", self.deployment or "")
+        if session_id:
+            span.set_attribute("app.session_id", session_id)
 
         # Define tools in OpenAI format
         tools = [
@@ -405,6 +416,8 @@ class ChatAgent:
                             await set_cache_entry(last_user.get("content", ""), query_vector, content, sources=sources, clients=clients)
                         except Exception as ex:
                             logger.warning(f"Cache set failed: {ex}")
+                    span.set_status(Status(StatusCode.OK))
+                    span.end()
                     return {"role": "assistant", "content": content, "sources": sources}
 
                 # Handle Tool Calls
@@ -491,45 +504,66 @@ class ChatAgent:
 
                 # Loop continues to next turn to let Model see tool results and decide next step...
 
+            span.set_attribute("app.max_turns_exceeded", True)
+            span.set_status(Status(StatusCode.ERROR, "max turns exceeded"))
+            span.end()
             return {"role": "assistant", "content": "Error: Chatbot exceeded maximum turns."}
 
         except Exception as e:
             logger.error(f"Chatbot error: {e}", exc_info=True)
+            span.set_status(Status(StatusCode.ERROR, str(e)))
+            span.end()
             return {
                 "role": "assistant",
                 "content": f"I encountered an error processing your request: {str(e)}",
             }
 
     async def _call_llm(self, messages: list[dict], tools: list[dict] | None = None) -> dict:
-        headers = self._auth_header_func()
-        # Use centralized compatibility layer for model-aware parameters.
-        # Reasoning models (gpt-5.x, o1, o3) → max_completion_tokens, no temperature.
-        # Classic models (gpt-4o, etc.) → max_tokens + temperature.
-        payload = {
-            "messages": messages,
-            **build_chat_params(self.deployment, temperature=0.7, max_output_tokens=4000),
-        }
-        if tools:
-            payload["tools"] = tools
-            payload["tool_choice"] = "auto"
-            # Explicitly DISABLE parallel tool calls (NOT supported by reasoning models like o1)
-            payload["parallel_tool_calls"] = False
+        with tracer.start_as_current_span("chat.completions") as span:
+            span.set_attribute("gen_ai.system", "azure_openai")
+            span.set_attribute("gen_ai.operation", "chat.completions")
+            span.set_attribute("gen_ai.request.model", self.deployment or "")
+            span.set_attribute("gen_ai.request.has_tools", bool(tools))
 
-        logger.info(f"Calling Chat LLM: {self.endpoint_url}")
-        limiter = get_limiter("chat")
-        async with httpx.AsyncClient(timeout=60) as client:
-            tokens_est = 4000
-            while not await limiter.consume_if_allowed(tokens_est):
-                await asyncio.sleep(1)
+            headers = self._auth_header_func()
+            # Use centralized compatibility layer for model-aware parameters.
+            # Reasoning models (gpt-5.x, o1, o3) → max_completion_tokens, no temperature.
+            # Classic models (gpt-4o, etc.) → max_tokens + temperature.
+            payload = {
+                "messages": messages,
+                **build_chat_params(self.deployment, temperature=0.7, max_output_tokens=4000),
+            }
+            if tools:
+                payload["tools"] = tools
+                payload["tool_choice"] = "auto"
+                # Explicitly DISABLE parallel tool calls (NOT supported by reasoning models like o1)
+                payload["parallel_tool_calls"] = False
 
-            async with limiter:
-                resp = await client.post(self.endpoint_url, json=payload, headers=headers)
-            try:
-                resp.raise_for_status()
-            except httpx.HTTPStatusError as ex:
-                logger.error(f"Chat LLM Failed: {ex.response.status_code} - {ex.response.text}")
-                raise
-            return resp.json()
+            logger.info(f"Calling Chat LLM: {self.endpoint_url}")
+            limiter = get_limiter("chat")
+            async with httpx.AsyncClient(timeout=60) as client:
+                tokens_est = 4000
+                while not await limiter.consume_if_allowed(tokens_est):
+                    await asyncio.sleep(1)
+
+                async with limiter:
+                    resp = await client.post(self.endpoint_url, json=payload, headers=headers)
+                try:
+                    resp.raise_for_status()
+                except httpx.HTTPStatusError as ex:
+                    span.set_status(Status(StatusCode.ERROR, str(ex)))
+                    span.set_attribute("gen_ai.response.status_code", ex.response.status_code)
+                    logger.error(f"Chat LLM Failed: {ex.response.status_code} - {ex.response.text}")
+                    raise
+
+                result = resp.json()
+                usage = result.get("usage", {})
+                if usage:
+                    span.set_attribute("gen_ai.usage.input_tokens", usage.get("prompt_tokens", 0))
+                    span.set_attribute("gen_ai.usage.output_tokens", usage.get("completion_tokens", 0))
+                    span.set_attribute("gen_ai.usage.total_tokens", usage.get("total_tokens", 0))
+                span.set_status(Status(StatusCode.OK))
+                return result
 
     def _extract_final_answer(self, content: str) -> str:
         """

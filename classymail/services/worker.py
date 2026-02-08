@@ -10,6 +10,9 @@ import inspect
 
 from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ResourceNotFoundError
 from azure.servicebus.aio import AutoLockRenewer
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
+
 from classymail.core import config
 from classymail.services.azure_clients import Clients
 from classymail.services.pipeline import run_classification_pipeline
@@ -19,6 +22,7 @@ from classymail.services.azure_clients import blob_id_from_url
 from classymail.services.messages import extract_blob_url
 
 logger = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
 
 
 async def worker_loop_forever(*, queue_name: str, get_settings, clients: Clients):
@@ -130,74 +134,81 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
         return
 
     target_ref = item_id or blob_url
-    logger.info("[msg:%s] → Processing ref: %s (Mode: %s)", message_id, target_ref, reclassify_mode or "Ingestion")
+    mode = reclassify_mode or "ingestion"
+    logger.info("[msg:%s] → Processing ref: %s (Mode: %s)", message_id, target_ref, mode)
 
     try:
         result = None
-        with ProcessingTimer() as timer:
-            if reclassify_mode:
-                # Reclassification Branch
-                models = payload.get("models")
-                # Legacy support
-                if not models:
-                    m = payload.get("model")
-                    if m == "both":
-                        models = [config.PHI_DEPLOYMENT, config.PHI_FALLBACK_DEPLOYMENT]
-                    elif m:
-                        models = [m]
+        with tracer.start_as_current_span("worker.process_message") as span:
+            span.set_attribute("messaging.system", "azure_servicebus")
+            span.set_attribute("messaging.operation", mode)
+            span.set_attribute("messaging.message.id", str(message_id or ""))
+            span.set_attribute("messaging.message.delivery_count", delivery_count or 0)
+            if blob_url:
+                span.set_attribute("app.blob_url", blob_url)
+            if item_id:
+                span.set_attribute("app.item_id", item_id)
 
-                from classymail.services.pipeline import run_reclassification_pipeline
-                result = await run_reclassification_pipeline(item_id or blob_id_from_url(blob_url), models=models, clients=clients)
+            with ProcessingTimer() as timer:
+                if reclassify_mode:
+                    # Reclassification Branch
+                    models = payload.get("models")
+                    # Legacy support
+                    if not models:
+                        m = payload.get("model")
+                        if m == "both":
+                            models = [config.PHI_DEPLOYMENT, config.PHI_FALLBACK_DEPLOYMENT]
+                        elif m:
+                            models = [m]
 
-            else:
-                # Standard Ingestion Branch
-                if not blob_url:
-                     raise ValueError("Ingestion mode requires blob_url")
+                    from classymail.services.pipeline import run_reclassification_pipeline
+                    result = await run_reclassification_pipeline(item_id or blob_id_from_url(blob_url), models=models, clients=clients)
 
-                # Update status to PROCESSING so it shows up in dashboard immediately
-                try:
-                    logger.info("[msg:%s] Setting status to PROCESSING for %s", message_id, blob_url)
-                    processing_record = EmailRecord(
-                        id=blob_id_from_url(blob_url),
-                        file_url=blob_url,
-                        status="PROCESSING",
-                        updated_at=datetime.now(timezone.utc),
-                        created_at=getattr(msg, "enqueued_time_utc", datetime.now(timezone.utc))
-                    )
-                    await save_to_cosmos(processing_record, clients=clients)
-                except Exception as e:
-                     logger.warning("[msg:%s] Could not set PROCESSING status: %s", message_id, e)
+                else:
+                    # Standard Ingestion Branch
+                    if not blob_url:
+                        raise ValueError("Ingestion mode requires blob_url")
 
-                settings = get_settings()
-                if inspect.iscoroutine(settings):
-                    settings = await settings
-                # Allow per-message strategy override (e.g. reprocess with different mode)
-                msg_strategy = payload.get("processing_strategy")
-                if msg_strategy in ("standard", "reasoning", "vision"):
-                    settings = {**settings, "processing_strategy": msg_strategy}
-                    logger.info("[msg:%s] Strategy override: %s", message_id, msg_strategy)
-                logger.info("[msg:%s] Starting classification pipeline", message_id)
-                result = await run_classification_pipeline(blob_url, settings=settings, clients=clients)
+                    # Update status to PROCESSING so it shows up in dashboard immediately
+                    try:
+                        logger.info("[msg:%s] Setting status to PROCESSING for %s", message_id, blob_url)
+                        processing_record = EmailRecord(
+                            id=blob_id_from_url(blob_url),
+                            file_url=blob_url,
+                            status="PROCESSING",
+                            updated_at=datetime.now(timezone.utc),
+                            created_at=getattr(msg, "enqueued_time_utc", datetime.now(timezone.utc))
+                        )
+                        await save_to_cosmos(processing_record, clients=clients)
+                    except Exception as e:
+                        logger.warning("[msg:%s] Could not set PROCESSING status: %s", message_id, e)
 
+                    settings = get_settings()
+                    if inspect.iscoroutine(settings):
+                        settings = await settings
+                    # Allow per-message strategy override (e.g. reprocess with different mode)
+                    msg_strategy = payload.get("processing_strategy")
+                    if msg_strategy in ("standard", "reasoning", "vision"):
+                        settings = {**settings, "processing_strategy": msg_strategy}
+                        logger.info("[msg:%s] Strategy override: %s", message_id, msg_strategy)
+                    logger.info("[msg:%s] Starting classification pipeline", message_id)
+                    result = await run_classification_pipeline(blob_url, settings=settings, clients=clients)
+
+            span.set_attribute("app.processing_time_ms", timer.duration_ms)
             logger.info("[msg:%s] Pipeline/Task completed in %.0fms", message_id, timer.duration_ms)
 
-        # Update metadata
-        # Only overwrite created_at if it's ingestion (fresh processing)
-        if not reclassify_mode:
-            arrival_time = getattr(msg, "enqueued_time_utc", datetime.now(timezone.utc))
-            result.created_at = arrival_time
+            # Update metadata
+            if not reclassify_mode:
+                arrival_time = getattr(msg, "enqueued_time_utc", datetime.now(timezone.utc))
+                result.created_at = arrival_time
+                result.processing_time_ms = timer.duration_ms
 
-        # Always track processing time of this operation (though purely additive for history??)
-        # Using a transient field or updating the record?
-        # EmailRecord logic usually strictly defines schema.
-        # For reclassification, we appended to comparison_results. We shouldn't necessarily overwrite the root processing_time_ms
-        # unless it represents the *latest* operation.
-        # But let's keep it simple: we update what we have.
-        if not reclassify_mode:
-             result.processing_time_ms = timer.duration_ms
+            logger.info("[msg:%s] Saving result to Cosmos DB (ID: %s)", message_id, result.id)
+            await save_to_cosmos(result)
+            span.set_attribute("app.result_id", result.id)
+            span.set_attribute("app.result_status", getattr(result, "status", ""))
+            span.set_status(Status(StatusCode.OK))
 
-        logger.info("[msg:%s] Saving result to Cosmos DB (ID: %s)", message_id, result.id)
-        await save_to_cosmos(result)
         logger.info("[msg:%s] ✓ Processing complete for %s", message_id, result.id)
         await receiver.complete_message(msg)
     except OCRFailed as ex:

@@ -322,11 +322,19 @@ async def check_connectivity(clients: Clients = Depends(get_clients)):
     except Exception as e:
         results["cosmos_write"] = str(e)
 
-    # 3. Test Service Bus Sender Creation
+    # 3. Test Service Bus Sender & Receiver
     try:
+        # Check Sender (Auth + Connection)
         sender = clients.sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
         async with sender:
-            pass # Just opening the link verifies connectivity/auth
+            pass # Verifies Service Bus Data Sender role
+
+        # Check Receiver (Peek permission - verifies Service Bus Data Receiver role)
+        receiver = clients.sb_client.get_queue_receiver(queue_name=config.SERVICE_BUS_QUEUE)
+        async with receiver:
+             # Try to peek 1 message (safe read-only operation)
+            await receiver.peek_messages(max_message_count=1)
+
         results["servicebus_connect"] = "ok"
     except Exception as e:
         results["servicebus_connect"] = str(e)

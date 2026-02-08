@@ -54,6 +54,16 @@ class BusinessEntities(BaseModel):
     reference_numbers: List[str] = Field(default_factory=list, description="IDs, Policy #, Invoice #, etc.")
 
 
+class VisionAnalysisItem(BaseModel):
+    id: Optional[str] = None
+    page_index: int = 0
+    image_type: Optional[str] = None
+    summary: Optional[str] = None
+    bbox: Optional[Dict[str, float]] = None
+    details: Optional[str] = None
+    is_relevant: Optional[bool] = None
+
+
 class EmailRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     file_url: str
@@ -69,6 +79,7 @@ class EmailRecord(BaseModel):
     chunks: Optional[List[dict]] = None
     classification: Optional[ClassificationResult] = None
     entities: Optional[BusinessEntities] = None  # Auto-extracted entities
+    vision_analysis: Optional[List[VisionAnalysisItem]] = None  # Structured vision extraction
     pii_detected: Optional[bool] = False  # Whether PII was found
     pii_data: Optional[dict] = None  # Structured PII extraction (for GDPR audits)
     preprocessing_metadata: Optional[dict] = None  # Preprocessing info (subject, conversation extraction)
