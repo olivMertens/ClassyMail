@@ -64,92 +64,53 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
             headers = await auth_headers(clients=clients)
             url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={config.AI_API_VERSION}"
 
-            # System prompt with best practices
-            system_prompt = """You are a classification taxonomy expert specialized in insurance and customer service categories, with deep expertise in LLM prompt engineering.
+            # System prompt with best practices - Optimized for GPT-5 Nano efficiency
+            system_prompt = """You are an expert in insurance email classification taxonomies.
+Assess the category definition below and provide actionable PROMPT-READY improvements.
 
-Your task is to assess category definitions for email classification systems and provide professional, actionable advice formatted for direct integration into LLM prompts.
+ASSESSMENT CRITERIA:
+1. Definition: Must use specific keywords (e.g., "bail, quittance" instead of "documents logement").
+2. Exclusions: Must be explicit (e.g., "Ne concerne pas X").
+3. Structure: Use "DEFINITION" and "EXCLUSIONS" headers.
+4. Validation Strategies: Mention standard keywords and visual cues (e.g., "photo", "signature").
 
-ASSESSMENT CRITERIA (LLM-Optimized Best Practices):
-
-1. **Definition (What it IS) - LLM Comprehension:**
-   - ✅ GOOD: "Documents certifiant la résidence ou l'assurance habitation : bail, attestation locataire, quittance loyer, police d'assurance logement, justificatif de domicile"
-   - ❌ AVOID: "Documents d'habitation" (too vague, LLM needs concrete examples)
-   - WHY: LLMs match patterns. Concrete keywords = better classification accuracy
-   - FORMAT: Use semicolons for separation, list 5-8 specific terms
-
-2. **Exclusions (What it ISN'T) - Boundary Precision:**
-   - ✅ GOOD: "Ne concerne pas les attestations professionnelles ou véhicules"
-   - ❌ AVOID: "Autres documents exclus" (too generic)
-   - WHY: Explicit negatives prevent false positives in ambiguous cases
-   - FORMAT: "Ne concerne pas X, Y, Z. Ne pas inclure A quand B."
-
-3. **Prompt-Ready Structure:**
-   - Use DEFINITION/EXCLUSIONS format (system understands this structure)
-   - Start definitions with action verbs or document types
-   - Keep sentences declarative, not interrogative
-   - Avoid emojis, markdown formatting (breaks prompt parsing)
-
-4. **LLM Processing Efficiency:**
-   - 50-200 words optimal for DEFINITION (too short = ambiguous, too long = diluted signal)
-   - 20-100 words for EXCLUSIONS (focus on top 3 confusion points)
-   - Front-load most distinctive keywords in first 2 sentences
-
-5. **Multi-Strategy Validation:**
-   - Standard (text): needs keyword density
-   - Reasoning (CoT): needs logical structure ("when X, then classify as Y")
-   - Vision: needs visual cue mentions ("photo de", "signature", "tampon")
-
-YOUR ADVICE MUST INCLUDE:
-- Concrete rewriting examples: "Replace [current text] with [improved text]"
-- Explain WHY each change helps LLM comprehension
-- Provide ready-to-use text snippets the user can copy-paste
-- Flag missing elements (keywords, edge cases, visual cues)
-
-RESPONSE FORMAT (JSON):
+RESPONSE FORMAT (JSON ONLY):
 {
   "quality_score": "Good|Needs Improvement|Poor",
-  "advice": "Professional assessment explaining WHAT to change and WHY it improves LLM performance. Include 1-2 concrete rewriting examples with before/after comparisons.",
+  "advice": "Concise explanation of what to fix and why.",
   "specific_suggestions": [
-    "REWRITE Definition: Replace 'X' with 'Y: [concrete example]' because [LLM reason]",
-    "ADD Exclusions: Include 'Ne concerne pas [specific case]' to prevent confusion with [overlapping category]",
-    "ENHANCE Keywords: Add visual cues like 'photo', 'signature' for Vision strategy",
-    "OPTIMIZE Length: Current definition is [too short/too long], target 50-200 words"
+     "REWRITE Definition: [New text]",
+     "ADD Exclusions: [New text]",
+     "ADD Keywords: [List]"
   ]
 }
 
-CRITICAL: Each suggestion must be actionable (user can implement immediately) and pedagogical (user understands WHY it works for LLMs)."""
+CRITICAL:
+- Output JSON ONLY.
+- Be CONCISE.
+- Do not explain your reasoning process in the output, just the results.
+"""
 
-            user_content = f"""Assess this category definition for an insurance email classification system optimized for LLM prompt comprehension:
+            user_content = f"""**Category Name:** {request.name}
+**Slug:** {request.slug}
 
-**Category Name:** {request.name}
-**Technical Slug:** {request.slug}
+**Current DEFINITION:**
+{request.description or "(empty)"}
 
-**Current DEFINITION (What it IS):**
-{request.description or "(empty - CRITICAL ISSUE)"}
+**Current EXCLUSIONS:**
+{request.exclusions or "(empty)"}
 
-**Current EXCLUSIONS (What it ISN'T):**
-{request.exclusions or "(empty - missing boundary specification)"}
-
-**Your Task:**
-1. Rate quality: Good / Needs Improvement / Poor
-2. Provide actionable advice with concrete rewriting examples
-3. Explain WHY each suggestion improves LLM classification accuracy
-4. Format all text snippets as copy-paste ready for direct use in prompts
-5. Consider Standard (text), Reasoning (CoT), and Vision (image) strategies
-
-Focus on: keyword density, boundary precision, prompt structure, and LLM comprehension patterns."""
+Assess quality and provide rewrites."""
 
             # Detect model family for correct API parameters
-            # GPT-5 Nano (Reasoning) requires significant token budget for internal thought process.
-            # 1500 is often too low, causing finish_reason='length' and empty content.
-            # We increase this to 5000 to ensure completion.
+            # GPT-5 Nano (Reasoning) budget adjusted to 10k (safe but not excessive).
             payload = {
                 "model": deployment,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_content},
                 ],
-                **build_chat_params(deployment, temperature=0.3, max_output_tokens=5000),
+                **build_chat_params(deployment, temperature=0.3, max_output_tokens=10000),
             }
 
             # Reasoning models (GPT-5, o1) often do not support 'response_format'={"type": "json_object"}
@@ -176,7 +137,7 @@ Focus on: keyword density, boundary precision, prompt structure, and LLM compreh
                     logger.error(f"[assessment] Invalid AI response: Empty content. Finish reason: {choices[0].get('finish_reason')}. Data: {data}")
                     detail_msg = f"AI Model returned empty content (Finish Reason: {choices[0].get('finish_reason', 'unknown')})."
                     if choices[0].get('finish_reason') == 'length':
-                        detail_msg += " The model exhausted its token limit while reasoning. Please retry or contact support to increase limits."
+                        detail_msg += " The model exhausted its token limit (10k) while reasoning. The prompt has been optimized to reduce overhead."
                     raise HTTPException(status_code=502, detail=detail_msg)
 
                 # Parse JSON response – cleanup potential markdown or whitespace
