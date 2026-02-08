@@ -254,6 +254,67 @@ Le dossier `scripts/` contient des outils pour le développement, le déploiemen
 
 ---
 
+#### `verify_security_cost_tags.sh` — **🆕 Vérification & Application Politique de Tags**
+**🏷️ GOUVERNANCE** : Vérifie et applique automatiquement les tags `SecurityControl` et `CostControl` requis sur toutes les ressources Azure.
+
+**Usage :**
+```bash
+# Vérification uniquement (compliance check)
+./scripts/verify_security_cost_tags.sh email-poc-rg
+
+# Créer/Mettre à jour la définition et l'assignation de la politique
+./scripts/verify_security_cost_tags.sh email-poc-rg --apply
+
+# Créer la tâche de remédiation pour corriger les ressources non-conformes
+./scripts/verify_security_cost_tags.sh email-poc-rg --remediate
+
+# Workflow complet : appliquer la politique ET corriger les ressources
+./scripts/verify_security_cost_tags.sh email-poc-rg --apply --remediate
+```
+
+**Ce que fait le script :**
+1. ✅ **Scan** : Liste toutes les ressources du Resource Group
+2. ✅ **Vérification** : Vérifie la présence des tags `SecurityControl` et `CostControl`
+3. ✅ **Rapport** : Affiche le statut de conformité (Compliant/Non-Compliant/Excluded)
+4. ✅ **Application (--apply)** : Crée la définition de politique Azure et l'assigne au RG
+5. ✅ **Remédiation (--remediate)** : Lance une tâche de remédiation asynchrone pour ajouter les tags manquants
+
+**Politique appliquée :**
+- **Effet** : `modify` (ajout/remplacement automatique)
+- **Tags ajoutés** : `SecurityControl=ignore`, `CostControl=ignore`
+- **Ressources exclues** : Subscriptions, Resource Groups, Deployments, Management Groups
+- **Rôle requis** : Contributor (automatiquement assigné via Managed Identity)
+
+**💡 À lancer après :**
+- Déploiement Terraform initial (`terraform apply`)
+- Ajout de nouvelles ressources Azure
+- Audits de conformité trimestriels
+
+**Exemple de sortie :**
+```
+Resource Compliance Report:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ email-poc-cosmos (Microsoft.DocumentDB/databaseAccounts)
+  Status: COMPLIANT
+  Tags: SecurityControl=ignore, CostControl=ignore
+
+✗ email-poc-storage (Microsoft.Storage/storageAccounts)
+  Status: NON-COMPLIANT
+  Missing: SecurityControl tag
+  Missing: CostControl tag
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Summary:
+  Compliant:     5
+  Non-Compliant: 3
+  Excluded:      1
+  Total:         9
+```
+
+**Note :** La remédiation est asynchrone. Attendez 5-10 minutes puis relancez sans `--remediate` pour vérifier.
+
+---
+
 #### `verify-mvp-setup` (.ps1 / .sh) — **Vérification Infrastructure Complète**
 Valide l'ensemble de l'infrastructure Azure déployée.
 
@@ -485,7 +546,10 @@ ln -s ../../scripts/pre-push.sh .git/hooks/pre-push  # Linux/Mac
 # 2. Mettre à jour le firewall Cosmos DB avec les IPs des Container Apps
 .\scripts\update_cosmos_firewall.ps1 -ResourceGroup "email-poc-rg" -IncludeLocalIP
 
-# 3. Vérifier l'infrastructure complète
+# 3. Vérifier et appliquer la politique de tags (gouvernance)
+./scripts/verify_security_cost_tags.sh email-poc-rg --apply --remediate
+
+# 4. Vérifier l'infrastructure complète
 .\scripts\verify-mvp-setup.ps1 -ResourceGroup "email-poc-rg"
 ```
 
@@ -521,6 +585,9 @@ uv run python scripts/test_e2e_flow.py --count 3  # Terminal 2
 
 # Vérifier la santé de l'infrastructure
 .\scripts\verify-mvp-setup.ps1 -ResourceGroup "email-poc-rg"
+
+# Vérifier la conformité des tags (audit gouvernance)
+./scripts/verify_security_cost_tags.sh email-poc-rg
 
 # Tester l'API end-to-end
 uv run python scripts/test_e2e_flow.py --api-url https://your-api.azurecontainerapps.io --count 2
