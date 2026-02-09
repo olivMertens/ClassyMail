@@ -155,6 +155,9 @@ def pydantic_to_mistral_schema(model: type[BaseModel]) -> dict:
 def retryable_httpx(exc: Exception) -> bool:
     if isinstance(exc, OCRFailed):
         return bool(getattr(exc, "retryable", False))
+    # Retry on network-level timeouts (ReadTimeout, ConnectTimeout, etc.)
+    if isinstance(exc, httpx.TimeoutException):
+        return True
     return (
         isinstance(exc, httpx.HTTPStatusError)
         and exc.response is not None
@@ -395,7 +398,7 @@ async def ocr_with_mistral(
                             attempt_no = attempt.retry_state.attempt_number
                             logger.info(f"[metrics] OCR Request attempt {attempt_no}/{attempts}: {url}")
 
-                            async with httpx.AsyncClient(timeout=90) as client:
+                            async with httpx.AsyncClient(timeout=120) as client:
                                 async with get_limiter("mistral"):
                                     resp = await client.post(url, json=current_payload, headers=headers)
                                 try:
