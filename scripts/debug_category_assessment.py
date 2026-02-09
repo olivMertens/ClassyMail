@@ -1,147 +1,151 @@
+"""
+Debug script: test the category assessment flow directly from CLI.
 
+Usage:
+    uv run python scripts/debug_category_assessment.py
+    uv run python scripts/debug_category_assessment.py --name "Relevé de compte" --slug "ddedoc_relevecompte"
+    uv run python scripts/debug_category_assessment.py --name "New" --slug "new" --description "" --exclusions ""
+"""
+
+import argparse
 import asyncio
-import os
-import json
-import httpx
+
+# Load env vars before importing app modules
 from dotenv import load_dotenv
+load_dotenv("secrets.env")
 
-# Load environment variables
-load_dotenv('secrets.env')
+from classymail.core.llm_compat import is_reasoning_model  # noqa: E402
+from classymail.services.azure_clients import auth_headers, Clients  # noqa: E402
+from classymail.services.llm_pipeline import resolve_model_config  # noqa: E402
+from classymail.api.category_assessment import assess_category, CategoryAssessmentRequest  # noqa: E402
 
-# Mock config and helpers locally to avoid importing the whole app stack
-class Config:
-    AI_API_VERSION = os.getenv("AI_API_VERSION", "2024-08-01-preview")
-    # Using the exact configuration from secrets.env for gpt-5-nano if available, else hardcode
-    PHI_ENDPOINT = os.getenv("PHI_ENDPOINT")
-    PHI_DEPLOYMENT = "gpt-5-nano"
 
-config = Config()
+def separator(title: str = ""):
+    print(f"\n{'=' * 60}")
+    if title:
+        print(f"  {title}")
+        print('=' * 60)
 
-def build_chat_params(deployment, temperature=0.3, max_output_tokens=1500):
-    # Simplified reasoning model logic
-    is_reasoning = "gpt-5" in deployment.lower() or "o1" in deployment.lower()
-    params = {}
-    if is_reasoning:
-        params["max_completion_tokens"] = max_output_tokens
-    else:
-        params["max_tokens"] = max_output_tokens
-        params["temperature"] = temperature
-    return params
 
-async def get_token():
-    # Attempt to get a token using az cli if possible, or use key if available
-    # For now, let's assume Managed Identity or local AZ CLI login context
-    # This is a bit complex to simulate fully without the app's auth helper,
-    # but we can try using `az account get-access-token`
-    proc = await asyncio.create_subprocess_shell(
-        "az account get-access-token --resource https://cognitiveservices.azure.com/.default --query accessToken -o tsv",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
+async def test_assessment(
+    name: str = "Attestation habitation",
+    slug: str = "ddedoc_habitation",
+    description: str = "Demande d'attestation habitation pour son logement résidentiel.\nDemande d'attestation habitation pour son logement résidentiel locatif.",
+    exclusions: str = "Demande d'attestation habitation avec pour motif le télétravail.\nDemande d'attestation habitation pour une location de salle de fête.",
+    language: str = "fr",
+):
+    separator("Category Assessment Debug")
+
+    # --- Step 1: Show resolved model config ---
+    print("\n[1] Resolving model config for 'gpt-5-nano'...")
+    try:
+        endpoint, deployment = resolve_model_config("gpt-5-nano")
+        print(f"    Endpoint:   {endpoint}")
+        print(f"    Deployment: {deployment}")
+        print(f"    Reasoning:  {is_reasoning_model(deployment)}")
+    except Exception as e:
+        print(f"    FAILED: {type(e).__name__}: {e}")
+        return
+
+    if not endpoint or not deployment:
+        print("    ERROR: Model not configured. Set PHI_ENDPOINT in secrets.env.")
+        return
+
+    # --- Step 2: Test authentication ---
+    print("\n[2] Testing authentication...")
+    try:
+        clients = Clients()
+        headers = await auth_headers(clients=clients)
+        # Mask the token for display
+        auth_val = headers.get("Authorization", headers.get("api-key", ""))
+        masked = auth_val[:20] + "..." if len(auth_val) > 20 else auth_val
+        print(f"    Auth header: {masked}")
+        print(f"    Method: {'API Key' if 'api-key' in headers else 'Bearer Token'}")
+    except Exception as e:
+        print(f"    AUTH FAILED: {type(e).__name__}: {e}")
+        print("    -> Ensure 'az login' is done, or set AZURE_AI_KEY in secrets.env")
+        return
+
+    # --- Step 3: Show request details ---
+    separator("Request Details")
+    print(f"  Name:        {name}")
+    print(f"  Slug:        {slug}")
+    print(f"  Description: {description[:80]}{'...' if len(description) > 80 else ''}")
+    print(f"  Exclusions:  {exclusions[:80]}{'...' if len(exclusions) > 80 else ''}")
+    print(f"  Language:    {language}")
+
+    # --- Step 4: Call the actual endpoint handler ---
+    separator("Calling assess_category()")
+    request = CategoryAssessmentRequest(
+        name=name,
+        slug=slug,
+        description=description,
+        exclusions=exclusions,
+        language=language,
     )
-    stdout, stderr = await proc.communicate()
-    if stdout:
-        return stdout.decode().strip()
-    print(f"Error getting token: {stderr.decode()}")
-    return None
 
-async def test_assessment():
-    print("--- Starting Category Assessment Test ---")
+    try:
+        result = await assess_category(request)
+        separator("SUCCESS - Assessment Result")
+        print(f"  Quality Score: {result.quality_score}")
+        print(f"  Advice:        {result.advice}")
+        if result.specific_suggestions:
+            print(f"  Suggestions ({len(result.specific_suggestions)}):")
+            for i, s in enumerate(result.specific_suggestions, 1):
+                print(f"    {i}. {s[:120]}{'...' if len(s) > 120 else ''}")
+        else:
+            print("  Suggestions:   (none)")
+        print()
+    except Exception as e:
+        separator("FAILED")
+        print(f"  Error Type: {type(e).__name__}")
+        print(f"  Detail:     {e}")
+        # If HTTPException, show status
+        if hasattr(e, "status_code"):
+            print(f"  HTTP Status: {e.status_code}")
+        if hasattr(e, "detail"):
+            print(f"  HTTP Detail: {e.detail}")
+        import traceback
+        print("\n  Full traceback:")
+        traceback.print_exc()
 
-    token = await get_token()
-    if not token:
-        print("Failed to acquire auth token. Ensure you're logged in with 'az login'.")
-        return
 
-    endpoint = config.PHI_ENDPOINT
-    deployment = config.PHI_DEPLOYMENT
+def main():
+    parser = argparse.ArgumentParser(description="Debug category assessment flow")
+    parser.add_argument("--name", default="Attestation habitation", help="Category name")
+    parser.add_argument("--slug", default="ddedoc_habitation", help="Category slug")
+    parser.add_argument("--description", default=None, help="Category description (empty string for empty)")
+    parser.add_argument("--exclusions", default=None, help="Category exclusions (empty string for empty)")
+    parser.add_argument("--language", default="fr", choices=["fr", "en"], help="Response language")
+    parser.add_argument("--empty", action="store_true", help="Test with empty description and exclusions")
+    args = parser.parse_args()
 
-    if not endpoint:
-        print("Error: PHI_ENDPOINT not set in secrets.env")
-        return
+    # Default descriptions if not overridden
+    desc = args.description
+    excl = args.exclusions
 
-    url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={config.AI_API_VERSION}"
-    print(f"Target URL: {url}")
-    print(f"Model: {deployment}")
+    if args.empty:
+        desc = ""
+        excl = ""
+    elif desc is None:
+        desc = (
+            "Demande d'attestation habitation pour son logement résidentiel.\n"
+            "Demande d'attestation habitation pour son logement résidentiel locatif."
+        )
+    if excl is None:
+        excl = (
+            "Demande d'attestation habitation avec pour motif le télétravail.\n"
+            "Demande d'attestation habitation pour une location de salle de fête."
+        )
 
-    system_prompt = """You are a classification taxonomy expert specialized in insurance and customer service categories, with deep expertise in LLM prompt engineering.
-    (Truncated for brevity, but assume full prompt logic here...)
-    RESPONSE FORMAT (JSON):
-    {
-      "quality_score": "Good|Needs Improvement|Poor",
-      "advice": "...",
-      "specific_suggestions": []
-    }
-    """
+    asyncio.run(test_assessment(
+        name=args.name,
+        slug=args.slug,
+        description=desc,
+        exclusions=excl,
+        language=args.language,
+    ))
 
-    user_content = """Assess this category definition:
-    **Category Name:** Attestation habitation
-    **Technical Slug:** ddedoc_habitation
-    **Current DEFINITION:** Demande d'attestation habitation pour son logement résidentiel.
-    **Current EXCLUSIONS:** Demande d'attestation habitation avec pour motif le télétravail.
-    """
-
-    # We use a larger max_token to test if that's the fix
-    # Trying with 2000 first (current code uses 1500)
-    MAX_TOKENS = 1500
-
-    payload = {
-        "model": deployment,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_content},
-        ],
-        **build_chat_params(deployment, temperature=0.3, max_output_tokens=MAX_TOKENS),
-    }
-
-    # For reasoning models, we strip response_format
-    if "gpt-5" not in deployment:
-         payload["response_format"] = {"type": "json_object"}
-
-    print(f"Payload keys: {list(payload.keys())}")
-    if "max_completion_tokens" in payload:
-        print(f"Using max_completion_tokens: {payload['max_completion_tokens']}")
-    if "max_tokens" in payload:
-        print(f"Using max_tokens: {payload['max_tokens']}")
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-
-    async with httpx.AsyncClient(timeout=60) as client:
-        try:
-            print("Sending request...")
-            resp = await client.post(url, json=payload, headers=headers)
-            print(f"Response Status: {resp.status_code}")
-
-            try:
-                data = resp.json()
-                # print(json.dumps(data, indent=2))
-
-                choices = data.get("choices", [])
-                if choices:
-                    choice = choices[0]
-                    finish_reason = choice.get("finish_reason")
-                    content = choice.get("message", {}).get("content")
-
-                    print(f"Finish Reason: {finish_reason}")
-                    print(f"Content Length: {len(content) if content else 0}")
-
-                    if content:
-                        print("--- Content Preview ---")
-                        print(content[:200] + "...")
-                        print("-----------------------")
-                    else:
-                        print("!!! CONTENT IS EMPTY !!!")
-                else:
-                    print("No choices returned.")
-
-            except json.JSONDecodeError:
-                print("Failed to decode JSON response.")
-                print(resp.text)
-
-        except Exception as e:
-            print(f"Request failed: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(test_assessment())
+    main()
