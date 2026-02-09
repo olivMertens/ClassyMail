@@ -26,6 +26,9 @@ MODEL_PRICING = {
     "gpt-5-mini": (0.0004, 0.0016),
     "gpt-5": (0.002, 0.008),
 
+    # Kimi (Moonshot AI via Foundry)
+    "kimi-k2.5": (0.0006, 0.003),
+
     # Legacy/fallback
     "gpt-35-turbo": (0.0005, 0.0015),
 }

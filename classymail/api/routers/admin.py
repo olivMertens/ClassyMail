@@ -774,7 +774,7 @@ async def test_mistral_ocr_connection(clients: Clients = Depends(get_clients)):
 async def test_gpt_connection(model: str | None = None, clients: Clients = Depends(get_clients)):
     """
     Test GPT connection (defaults to configured fallback, or specific model).
-    Enhanced to test gpt-5-nano, gpt-5-mini, gpt-4.1-nano and other models.
+    Enhanced to test gpt-5-nano, gpt-5-mini, gpt-4.1-nano, Kimi-K2.5 and other models.
     """
     try:
         import httpx

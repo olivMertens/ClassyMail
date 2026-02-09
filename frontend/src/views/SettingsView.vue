@@ -744,6 +744,9 @@ onMounted(() => {
               <option value="gpt-4.1-nano">
                 gpt-4.1-nano
               </option>
+              <option value="Kimi-K2.5">
+                Kimi-K2.5 (Moonshot AI)
+              </option>
             </select>
           </div>
           <div
@@ -784,6 +787,9 @@ onMounted(() => {
                 </option>
                 <option value="gpt-4.1-nano">
                   gpt-4.1-nano
+                </option>
+                <option value="Kimi-K2.5">
+                  Kimi-K2.5 (Moonshot AI)
                 </option>
               </select>
             </div>
@@ -916,13 +922,28 @@ onMounted(() => {
                       </span>
                     </div>
                   </div>
+                  <div class="flex items-center justify-between gap-2">
+                    <span><strong>Kimi-K2.5:</strong> Quality 0.88 ⭐, Cost ~$1-4/10K emails (multimodal)</span>
+                    <div class="flex gap-2 shrink-0">
+                      <span
+                        v-if="settings.ai_model === 'Kimi-K2.5'"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                      >
+                        ✓ Primary
+                      </span>
+                      <span
+                        v-if="settings.adversarial_model === 'Kimi-K2.5'"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
+                      >
+                        🔄 Adversarial
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-
-        <!-- Section: Processing Strategy -->
+        </div>        <!-- Section: Processing Strategy -->
         <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 mb-6 bg-gray-50/50 dark:bg-gray-900/20">
           <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
             <AdjustmentsHorizontalIcon class="h-5 w-5 text-purple-500" />
@@ -1173,6 +1194,9 @@ onMounted(() => {
                   </option>
                   <option value="gpt-4.1-nano">
                     gpt-4.1-nano
+                  </option>
+                  <option value="Kimi-K2.5">
+                    Kimi-K2.5 (Moonshot AI)
                   </option>
                 </select>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">

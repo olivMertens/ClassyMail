@@ -726,6 +726,10 @@ def resolve_model_config(model_key: str) -> tuple[str, str]:
     if k in ("gpt-4o-mini", "gpt4o-mini", "gpt4o_mini", "fallback", "audit"):
         return config.PHI_FALLBACK_ENDPOINT, config.PHI_FALLBACK_DEPLOYMENT
 
+    # Kimi K2.5 (Moonshot AI via Foundry) – deployed on the primary endpoint
+    if k in ("kimi-k2.5", "kimi_k2.5", "kimik2.5"):
+        return config.PHI_ENDPOINT, "Kimi-K2.5"
+
     # Fallback/Generic: Assume the key is the deployment name on the primary endpoint
     # This supports 'gpt5-nano', 'gpt4.1-nano' etc. if they are deployed on the same resource
     return config.PHI_ENDPOINT, model_key

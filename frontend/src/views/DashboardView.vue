@@ -799,14 +799,18 @@ const emit = defineEmits(['open-email'])
           ? 'ring-2 ring-primary-500 border-primary-400 dark:border-primary-500'
           : email.test_mode
             ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700'
-            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+            : email.processing_strategy === 'vision'
+              ? 'bg-teal-50/40 dark:bg-teal-950/20 border-teal-300 dark:border-teal-700/60'
+              : email.processing_strategy === 'reasoning'
+                ? 'bg-purple-50/40 dark:bg-purple-950/20 border-purple-300 dark:border-purple-700/60'
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
       ]"
       @click="emit('open-email', email)"
     >
-      <div class="p-3 flex-1 flex flex-col gap-2">
+      <div class="p-3 flex-1 flex flex-col gap-1.5">
         <!-- Header: Checkbox + Status + Actions -->
         <div class="flex justify-between items-start">
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1.5">
             <input
               type="checkbox"
               :checked="selectedIds.has(email.id)"
@@ -853,36 +857,36 @@ const emit = defineEmits(['open-email'])
           </div>
 
           <!-- Minimal Actions -->
-          <div class="flex gap-2 opacity-100 transition-opacity">
+          <div class="flex gap-1 items-center">
             <span
               v-if="email.pii_detected"
               class="text-amber-500"
               :title="t('dashboard.pii.detected')"
             >
-              <ShieldExclamationIcon class="h-5 w-5" />
+              <ShieldExclamationIcon class="h-4 w-4" />
             </span>
             <button
               :title="t('dashboard.actions.view')"
-              class="text-gray-400 hover:text-primary-600"
+              class="text-gray-400 hover:text-primary-600 p-0.5"
               @click.stop="emit('open-email', email)"
             >
-              <EyeIcon class="h-5 w-5" />
+              <EyeIcon class="h-4 w-4" />
             </button>
             <button
               :title="t('dashboard.actions.reprocess')"
               :disabled="reprocessingId === email.id"
-              class="text-gray-400 hover:text-green-600"
+              class="text-gray-400 hover:text-green-600 p-0.5"
               @click.stop="reprocessEmail(email)"
             >
               <ArrowPathIcon
-                class="h-5 w-5"
+                class="h-4 w-4"
                 :class="{ 'animate-spin': reprocessingId === email.id }"
               />
             </button>
           </div>
         </div>
 
-        <!-- Content -->
+        <!-- Content: Title + Sender (left-aligned, full width) -->
         <div class="min-w-0">
           <h3
             class="font-medium text-gray-900 dark:text-white truncate text-sm leading-tight"
@@ -896,30 +900,26 @@ const emit = defineEmits(['open-email'])
           </p>
         </div>
 
-        <!-- Footer: ID & Category & Duration -->
-        <div
-          class="mt-auto pt-2 flex items-center justify-between gap-2 border-t border-gray-100 dark:border-gray-700/50"
-        >
-          <div class="text-[10px] text-gray-400 font-mono truncate max-w-[40%]">
-            #{{ email.id.slice(0, 6) }}
-          </div>
+        <!-- Footer: full-width, stacked layout for better space usage -->
+        <div class="mt-auto pt-1.5 border-t border-gray-100 dark:border-gray-700/50 space-y-1.5">
+          <!-- Categories row: spans full width -->
           <div
             v-if="getSortedIntents(email).length"
-            class="flex-shrink-0 flex flex-wrap items-center gap-1 justify-end max-w-[60%]"
+            class="flex flex-wrap items-center gap-1"
           >
             <span
               v-for="(intent, idx) in getSortedIntents(email).slice(0, 2)"
               :key="intent.intent"
-              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] border"
+              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] border max-w-full"
               :class="idx === 0 ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-blue-100 dark:border-blue-800 font-medium' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700'"
               :title="`${intent.intent}: ${Math.round((intent.confidence || 0) * 100)}%${intent.justification ? '\n' + intent.justification : ''}`"
             >
-              <span class="truncate max-w-[80px]">{{ intent.intent }}</span>
-              <span class="ml-0.5 font-semibold">{{ Math.round((intent.confidence || 0) * 100) }}%</span>
+              <span class="truncate">{{ intent.intent }}</span>
+              <span class="ml-0.5 font-semibold flex-shrink-0">{{ Math.round((intent.confidence || 0) * 100) }}%</span>
             </span>
             <span
               v-if="getSortedIntents(email).length > 2"
-              class="inline-flex items-center px-1 py-0.5 rounded-full text-[9px] bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 cursor-help font-medium"
+              class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 cursor-help font-semibold flex-shrink-0"
               :title="'Additional intents:\n' + getSortedIntents(email).slice(2).map(i => `- ${i.intent}: ${Math.round((i.confidence || 0) * 100)}%`).join('\n')"
             >
               +{{ getSortedIntents(email).length - 2 }}
@@ -927,28 +927,35 @@ const emit = defineEmits(['open-email'])
           </div>
           <div
             v-else
-            class="text-[10px] italic max-w-[150px] truncate"
+            class="text-[10px] italic truncate"
             :class="email.status === 'ERROR' ? 'text-red-500 font-medium' : 'text-gray-400'"
             :title="email.status === 'ERROR' ? (email.error || 'Unknown Error') : (email.classification?.classification_reason || 'No category detected')"
           >
             {{ email.status === 'ERROR' ? (email.error || 'Error') : (email.classification?.classification_reason || 'No category') }}
           </div>
-          <div class="flex items-center gap-1.5">
-            <span
-              v-if="strategyBadge(email.processing_strategy)"
-              class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium border"
-              :class="strategyBadge(email.processing_strategy).color"
-              :title="t('dashboard.strategy.' + (email.processing_strategy || 'standard'))"
-            >
-              {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' +
-                strategyBadge(email.processing_strategy).key) }}
-            </span>
-            <div
-              v-if="formatDuration(email)"
-              class="text-[10px] text-gray-500 dark:text-gray-400 inline-flex items-center gap-0.5"
-              title="Processing time"
-            >
-              ⏱ {{ formatDuration(email) }}
+
+          <!-- Meta row: ID + Strategy + Duration -->
+          <div class="flex items-center justify-between gap-1">
+            <div class="text-[10px] text-gray-400 font-mono">
+              #{{ email.id.slice(0, 6) }}
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span
+                v-if="strategyBadge(email.processing_strategy)"
+                class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium border"
+                :class="strategyBadge(email.processing_strategy).color"
+                :title="t('dashboard.strategy.' + (email.processing_strategy || 'standard'))"
+              >
+                {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' +
+                  strategyBadge(email.processing_strategy).key) }}
+              </span>
+              <div
+                v-if="formatDuration(email)"
+                class="text-[10px] text-gray-500 dark:text-gray-400 inline-flex items-center gap-0.5"
+                title="Processing time"
+              >
+                ⏱ {{ formatDuration(email) }}
+              </div>
             </div>
           </div>
         </div>

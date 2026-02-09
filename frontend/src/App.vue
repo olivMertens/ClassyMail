@@ -1,16 +1,18 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import DashboardLayout from './components/DashboardLayout.vue'
 import DashboardView from './views/DashboardView.vue'
-import UploadView from './views/UploadView.vue'
-import CostsView from './views/CostsView.vue'
-import SettingsView from './views/SettingsView.vue'
-import DeveloperDocsView from './views/DeveloperDocsView.vue'
-import UsageDocsView from './views/UsageDocsView.vue'
-import ExportsView from './views/ExportsView.vue'
 import EmailDetailModal from './components/EmailDetailModal.vue'
 import GlobalConfirmDialog from './components/GlobalConfirmDialog.vue'
+
+// Lazy-loaded views – only fetched when navigated to
+const UploadView = defineAsyncComponent(() => import('./views/UploadView.vue'))
+const CostsView = defineAsyncComponent(() => import('./views/CostsView.vue'))
+const SettingsView = defineAsyncComponent(() => import('./views/SettingsView.vue'))
+const DeveloperDocsView = defineAsyncComponent(() => import('./views/DeveloperDocsView.vue'))
+const UsageDocsView = defineAsyncComponent(() => import('./views/UsageDocsView.vue'))
+const ExportsView = defineAsyncComponent(() => import('./views/ExportsView.vue'))
 
 const { locale } = useI18n()
 
