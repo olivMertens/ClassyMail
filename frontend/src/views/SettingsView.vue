@@ -181,15 +181,17 @@ const assessCategory = async (index) => {
       })
       // Results now shown inline - no alert dialog
     } else {
-      const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
+      const err = await res.json().catch(() => null)
+      const detail = err?.detail || `HTTP ${res.status} – ${res.statusText || 'Unknown error'}`
+      console.error('[assess-category] Server error:', res.status, detail)
       categoryAssessments.value.delete(index)
-      await showAlert(`Assessment Failed: ${err.detail || 'Unknown error'}`)
+      await showAlert(`Assessment Failed (${res.status}): ${detail}`)
     }
   } catch (e) {
-    console.error(e)
+    console.error('[assess-category] Network/client error:', e)
     trackException(e)
     categoryAssessments.value.delete(index)
-    await showAlert(`Assessment Error: ${e.message}`)
+    await showAlert(`Assessment Error: ${e.message || 'Network error – check console for details'}`)
   } finally {
     assessingCategory.value = null
   }

@@ -60,6 +60,7 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
         try:
             # Use GPT-5 Nano for assessment
             endpoint, deployment = resolve_model_config("gpt-5-nano")
+            logger.info("[assessment] Resolved model: endpoint=%s deployment=%s", endpoint, deployment)
 
             if not endpoint or not deployment:
                 raise HTTPException(
@@ -68,8 +69,18 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
                 )
 
             clients = Clients()
-            headers = await auth_headers(clients=clients)
+            try:
+                headers = await auth_headers(clients=clients)
+            except Exception as auth_err:
+                err_type = type(auth_err).__name__
+                err_msg = str(auth_err) or "(no details)"
+                logger.error("[assessment] Authentication failed: %s: %s", err_type, err_msg)
+                raise HTTPException(
+                    status_code=401,
+                    detail=f"Azure authentication failed ({err_type}): {err_msg[:200]}"
+                )
             url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={config.AI_API_VERSION}"
+            logger.debug("[assessment] Request URL: %s", url)
 
             # Bilingual prompt with WHERE/HOW guidance - Language-aware
             is_french = request.language == "fr"
@@ -178,7 +189,10 @@ Assess quality and provide rewrites."""
             span.set_attribute("gen_ai.system", "azure_openai")
             span.set_attribute("gen_ai.request.model", deployment)
 
-            async with httpx.AsyncClient(timeout=30) as client:
+            logger.info("[assessment] Calling LLM for category '%s' (model=%s, reasoning=%s)",
+                        name, deployment, is_reasoning_model(deployment))
+
+            async with httpx.AsyncClient(timeout=60) as client:
                 response = await client.post(url, headers=headers, json=payload)
                 response.raise_for_status()
                 data = response.json()
@@ -231,26 +245,30 @@ Assess quality and provide rewrites."""
                 )
 
         except httpx.HTTPStatusError as e:
-            logger.error(f"[assessment] HTTP error: {e.response.status_code} - {e.response.text[:500]}")
+            err_body = e.response.text[:500] if e.response.text else "(empty body)"
+            logger.error("[assessment] HTTP %s from LLM: %s", e.response.status_code, err_body)
             span.set_status(Status(StatusCode.ERROR, str(e)))
             raise HTTPException(
                 status_code=e.response.status_code,
-                detail=f"LLM assessment failed: {e.response.text[:200]}"
+                detail=f"LLM assessment failed (HTTP {e.response.status_code}): {err_body[:200]}"
             )
         except json.JSONDecodeError as e:
-            logger.error(f"[assessment] JSON parse error: {e} | Raw Content Snippet: {content[:500] if 'content' in locals() and content else 'None'}")
+            raw_snippet = content[:500] if 'content' in locals() and content else 'None'
+            logger.error("[assessment] JSON parse error: %s | Raw: %s", e, raw_snippet)
             span.set_status(Status(StatusCode.ERROR, str(e)))
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to parse LLM response: {str(e)[:100]}"
+                detail=f"Failed to parse LLM response as JSON: {str(e)[:100]}"
             )
+        except HTTPException:
+            raise  # Already formatted, propagate as-is
         except Exception as e:
-            logger.error(f"[assessment] Unexpected error: {e}")
-            span.set_status(Status(StatusCode.ERROR, str(e)))
+            err_type = type(e).__name__
+            err_msg = str(e) or "(no details)"
+            logger.error("[assessment] %s: %s", err_type, err_msg, exc_info=True)
+            span.set_status(Status(StatusCode.ERROR, f"{err_type}: {err_msg}"))
             span.record_exception(e)
-            if isinstance(e, HTTPException):
-                raise e
             raise HTTPException(
                 status_code=500,
-                detail=f"Assessment failed: {str(e)}"
+                detail=f"Assessment failed ({err_type}): {err_msg[:200]}"
             )
