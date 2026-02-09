@@ -195,12 +195,18 @@
         },
         "reprocess": {
             "title": "Retraiter l'Email",
+            "title_batch": "Retraiter en lot ({count} emails)",
             "select_strategy": "Sélectionner le mode de traitement",
             "current": "Traité actuellement avec :",
             "confirm": "Retraiter",
             "cancel": "Annuler",
             "success": "Email remis en file pour retraitement",
-            "warning_vision": "Le mode Vision utilise l'analyse d'images et peut prendre plus de temps"
+            "success_batch": "{count} email(s) remis en file pour retraitement",
+            "warning_vision": "Le mode Vision utilise l'analyse d'images et peut prendre plus de temps",
+            "select_all": "Tout sélectionner",
+            "deselect_all": "Tout désélectionner",
+            "selected": "{count} sélectionné(s)",
+            "batch_reprocess": "Retraiter la sélection"
         },
         "strategy": {
             "standard": "Standard",

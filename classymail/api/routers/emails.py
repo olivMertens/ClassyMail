@@ -549,6 +549,56 @@ async def reprocess_email(
         raise HTTPException(status_code=400, detail=str(ex))
 
 
+@router.post("/emails/batch-reprocess")
+async def batch_reprocess_emails(
+    payload: dict,
+    cosmos_container=Depends(get_cosmos_container),
+    sb_client=Depends(get_sb_client),
+):
+    """
+    Re-enqueue multiple emails for full pipeline reprocessing.
+
+    Payload:
+    {
+        "ids": ["id1", "id2", ...],
+        "processing_strategy": "standard" | "reasoning" | "vision"  (optional)
+    }
+    """
+    ids = payload.get("ids", [])
+    if not ids:
+        raise HTTPException(status_code=400, detail="No email ids provided")
+
+    strategy = payload.get("processing_strategy")
+    enqueued = []
+    errors = []
+
+    sender = sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
+    async with sender:
+        for item_id in ids:
+            try:
+                item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
+                blob_url = item.get("file_url")
+                if not blob_url:
+                    errors.append({"id": item_id, "error": "file_url missing"})
+                    continue
+
+                message_data: dict = {"blob_url": blob_url}
+                if strategy in ("standard", "reasoning", "vision"):
+                    message_data["processing_strategy"] = strategy
+
+                await sender.send_messages(ServiceBusMessage(json.dumps(message_data)))
+                enqueued.append(item_id)
+            except Exception as ex:
+                errors.append({"id": item_id, "error": str(ex)})
+
+    return {
+        "enqueued": len(enqueued),
+        "failed": len(errors),
+        "errors": errors,
+        "processing_strategy": strategy,
+    }
+
+
 @router.post("/emails/{item_id}/reclassify")
 async def reclassify_email(
     item_id: str,

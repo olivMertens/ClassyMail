@@ -391,7 +391,7 @@ const renderMarkdown = (text) => md.render(text || '')
               </button>
               <button
                 :disabled="reprocessing"
-                class="text-amber-600 hover:text-amber-500 dark:text-amber-400 font-medium text-sm flex items-center gap-1"
+                class="text-green-600 hover:text-green-500 dark:text-green-400 font-medium text-sm flex items-center gap-1"
                 @click="reprocess"
               >
                 <ArrowPathIcon
@@ -575,18 +575,23 @@ const renderMarkdown = (text) => md.render(text || '')
 
                   <!-- Vision Analysis -->
                   <div v-if="email.vision_analysis && email.vision_analysis.length">
-                    <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 mt-4 flex items-center gap-2">
+                    <h4
+                      class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 mt-4 flex items-center gap-2"
+                    >
                       👁 Vision Analysis
                       <span class="text-xs font-normal text-gray-500">({{ email.vision_analysis.length }} images)</span>
                     </h4>
-                    <div class="space-y-3 max-h-60 overflow-y-auto border border-gray-100 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900">
+                    <div
+                      class="space-y-3 max-h-60 overflow-y-auto border border-gray-100 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900"
+                    >
                       <div
                         v-for="item in email.vision_analysis"
                         :key="item.id || item.summary"
                         class="text-sm p-3 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
                       >
                         <div class="flex justify-between items-start mb-2">
-                          <span class="font-bold text-xs uppercase text-gray-500 tracking-wider">Page {{ (item.page_index || 0) + 1 }} • {{ item.image_type || 'Image' }}</span>
+                          <span class="font-bold text-xs uppercase text-gray-500 tracking-wider">Page {{
+                            (item.page_index || 0) + 1 }} • {{ item.image_type || 'Image' }}</span>
                           <span
                             v-if="item.is_relevant"
                             class="text-[10px] bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 px-1.5 py-0.5 rounded border border-green-200 dark:border-green-800"
@@ -1028,8 +1033,8 @@ const renderMarkdown = (text) => md.render(text || '')
             :key="s"
             class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all"
             :class="reprocessStrategy === s
-              ? 'border-primary-500 bg-primary-50 text-gray-900 dark:bg-primary-900/40 dark:border-primary-400 dark:text-white'
-              : 'border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-700 dark:text-white hover:border-gray-300 dark:hover:border-gray-600'"
+              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/40 dark:border-primary-400'
+              : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600'"
           >
             <input
               v-model="reprocessStrategy"
@@ -1039,7 +1044,12 @@ const renderMarkdown = (text) => md.render(text || '')
             >
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <span class="text-sm font-medium">
+                <span
+                  class="text-sm font-medium"
+                  :class="reprocessStrategy === s
+                    ? 'text-primary-900 dark:text-primary-100'
+                    : 'text-gray-900 dark:text-white'"
+                >
                   {{ t('dashboard.strategy.' + s) }}
                 </span>
                 <span
@@ -1070,7 +1080,7 @@ const renderMarkdown = (text) => md.render(text || '')
             {{ t('dashboard.reprocess.cancel') }}
           </button>
           <button
-            class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
+            class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
             @click="confirmReprocess"
           >
             <ArrowPathIcon class="h-4 w-4" />

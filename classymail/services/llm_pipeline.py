@@ -226,27 +226,30 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
             if image_notes:
                 markdown_parts.append("\n\n---\n**Visual Elements Detected:**\n" + "\n".join(image_notes) + "\n---\n")
 
-        for img in page_images:
-            # Normalize bounding box from various Mistral formats to standard {x_min, y_min, x_max, y_max}
-            bbox = img.get("bbox")
-            if not bbox and "top_left_x" in img:
-                # Handle flattened coordinates often returned by Mistral
-                bbox = {
-                    "x_min": img.get("top_left_x", 0),
-                    "y_min": img.get("top_left_y", 0),
-                    "x_max": img.get("bottom_right_x", 0),
-                    "y_max": img.get("bottom_right_y", 0)
-                }
+        # Only collect annotated images when vision enrichment is enabled
+        # to avoid showing image metadata in standard/reasoning modes
+        if enable_vision_enrichment:
+            for img in page_images:
+                # Normalize bounding box from various Mistral formats to standard {x_min, y_min, x_max, y_max}
+                bbox = img.get("bbox")
+                if not bbox and "top_left_x" in img:
+                    # Handle flattened coordinates often returned by Mistral
+                    bbox = {
+                        "x_min": img.get("top_left_x", 0),
+                        "y_min": img.get("top_left_y", 0),
+                        "x_max": img.get("bottom_right_x", 0),
+                        "y_max": img.get("bottom_right_y", 0)
+                    }
 
-            annotated_images.append({
-                "id": img.get("id"),
-                "page_index": page_idx,
-                "image_type": img.get("type") or img.get("image_type"),
-                "summary": img.get("summary") or img.get("description"),
-                "bbox": bbox,
-                "details": img.get("details"),
-                "is_relevant": img.get("is_relevant"),
-            })
+                annotated_images.append({
+                    "id": img.get("id"),
+                    "page_index": page_idx,
+                    "image_type": img.get("type") or img.get("image_type"),
+                    "summary": img.get("summary") or img.get("description"),
+                    "bbox": bbox,
+                    "details": img.get("details"),
+                    "is_relevant": img.get("is_relevant"),
+                })
 
     content = "\n\n".join(markdown_parts)
     logger.info(f"[metrics] OCR Final combined content: {len(content)} chars (from {total_content_chars} chars across {len(ocr_pages)} pages)")

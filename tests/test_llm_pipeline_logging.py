@@ -19,6 +19,20 @@ def test_combine_logs_metrics(caplog):
     assert "pages" in caplog.text
 
     assert content.strip() == "Hello\n\nWorld"
+    # With enable_vision_enrichment=False, no images should be collected
+    assert len(annotated) == 0
+
+
+def test_combine_collects_images_with_vision_enrichment(caplog):
+    """Images should only be collected when enable_vision_enrichment=True."""
+    ocr_pages = [
+        {"markdown": "Hello", "images": [{"id": "img1", "type": "photo"}]},
+        {"markdown": "World", "images": []},
+    ]
+    with caplog.at_level(logging.INFO):
+        content, annotated = _combine_ocr_pages(ocr_pages, enable_vision_enrichment=True, data={"pages": ocr_pages})
+
+    assert content.strip() == "Hello\n\nWorld"
     assert len(annotated) == 1
     assert annotated[0]["page_index"] == 0
     assert annotated[0]["id"] == "img1"

@@ -195,12 +195,18 @@
         },
         "reprocess": {
             "title": "Reprocess Email",
+            "title_batch": "Batch Reprocess ({count} emails)",
             "select_strategy": "Select processing mode",
             "current": "Currently processed with:",
             "confirm": "Reprocess",
             "cancel": "Cancel",
             "success": "Email re-queued for reprocessing",
-            "warning_vision": "Vision mode uses image analysis and may take longer"
+            "success_batch": "{count} email(s) re-queued for reprocessing",
+            "warning_vision": "Vision mode uses image analysis and may take longer",
+            "select_all": "Select all",
+            "deselect_all": "Deselect all",
+            "selected": "{count} selected",
+            "batch_reprocess": "Reprocess selected"
         },
         "strategy": {
             "standard": "Standard",

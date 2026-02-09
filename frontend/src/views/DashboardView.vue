@@ -75,6 +75,11 @@ const viewMode = ref('cards') // 'cards' or 'table'
 const purging = ref(false)
 const sortBy = ref('timestamp')
 const sortOrder = ref('desc')
+const selectedIds = ref(new Set())
+const reprocessModalOpen = ref(false)
+const reprocessTarget = ref(null)
+const reprocessStrategy = ref('standard')
+const batchReprocessing = ref(false)
 
 const pageSizeOptions = [20, 50, 100]
 
@@ -87,20 +92,80 @@ const filters = computed(() => [
   { id: 'ERROR', label: t('dashboard.filters.errors'), color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
 ])
 
-const reprocessEmail = async (email) => {
-  if (await confirm('Are you sure you want to reprocess this email? It will be re-queued.')) {
-    try {
-      reprocessingId.value = email.id
-      const res = await fetch(`/api/emails/${email.id}/reprocess`, { method: 'POST' })
-      if (!res.ok) throw new Error('Failed to reprocess')
-      // Optimistic update
-      email.status = 'PENDING'
-      await showAlert('Email re-queued successfully')
-    } catch (e) {
-      await showAlert(e.message)
-    } finally {
-      reprocessingId.value = null
-    }
+const reprocessEmail = (email) => {
+  reprocessTarget.value = email
+  reprocessStrategy.value = email.processing_strategy || 'standard'
+  reprocessModalOpen.value = true
+}
+
+const confirmReprocess = async () => {
+  const target = reprocessTarget.value
+  reprocessModalOpen.value = false
+  if (!target) return
+  try {
+    reprocessingId.value = target.id
+    const res = await fetch(`/api/emails/${target.id}/reprocess`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ processing_strategy: reprocessStrategy.value }),
+    })
+    if (!res.ok) throw new Error('Failed to reprocess')
+    target.status = 'PENDING'
+    await showAlert(t('dashboard.reprocess.success'))
+  } catch (e) {
+    await showAlert(e.message)
+  } finally {
+    reprocessingId.value = null
+    reprocessTarget.value = null
+  }
+}
+
+const openBatchReprocess = () => {
+  reprocessTarget.value = null
+  reprocessStrategy.value = 'standard'
+  reprocessModalOpen.value = true
+}
+
+const confirmBatchReprocess = async () => {
+  reprocessModalOpen.value = false
+  batchReprocessing.value = true
+  const ids = [...selectedIds.value]
+  try {
+    const res = await fetch('/api/emails/batch-reprocess', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, processing_strategy: reprocessStrategy.value }),
+    })
+    if (!res.ok) throw new Error('Failed to batch reprocess')
+    const data = await res.json()
+    // Optimistic update
+    emails.value.forEach(e => {
+      if (ids.includes(e.id)) e.status = 'PENDING'
+    })
+    selectedIds.value.clear()
+    await showAlert(t('dashboard.reprocess.success_batch', { count: data.enqueued }))
+  } catch (e) {
+    await showAlert(e.message)
+  } finally {
+    batchReprocessing.value = false
+  }
+}
+
+const toggleSelect = (id) => {
+  if (selectedIds.value.has(id)) {
+    selectedIds.value.delete(id)
+  } else {
+    selectedIds.value.add(id)
+  }
+  // Force reactivity
+  selectedIds.value = new Set(selectedIds.value)
+}
+
+const toggleSelectAll = () => {
+  if (selectedIds.value.size === emails.value.length) {
+    selectedIds.value = new Set()
+  } else {
+    selectedIds.value = new Set(emails.value.map(e => e.id))
   }
 }
 
@@ -684,26 +749,70 @@ const emit = defineEmits(['open-email'])
     </p>
   </div>
 
+  <!-- Batch Action Bar -->
+  <div
+    v-if="emails.length > 0"
+    class="flex items-center gap-3 py-2"
+  >
+    <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-600 dark:text-gray-300">
+      <input
+        type="checkbox"
+        :checked="selectedIds.size === emails.length && emails.length > 0"
+        :indeterminate="selectedIds.size > 0 && selectedIds.size < emails.length"
+        class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700"
+        @change="toggleSelectAll"
+      >
+      {{ selectedIds.size === emails.length ? t('dashboard.reprocess.deselect_all') :
+        t('dashboard.reprocess.select_all') }}
+    </label>
+    <span
+      v-if="selectedIds.size > 0"
+      class="text-xs text-gray-500 dark:text-gray-400"
+    >
+      {{ t('dashboard.reprocess.selected', { count: selectedIds.size }) }}
+    </span>
+    <button
+      v-if="selectedIds.size > 0"
+      class="ml-auto inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+      :disabled="batchReprocessing"
+      @click="openBatchReprocess"
+    >
+      <ArrowPathIcon
+        class="h-4 w-4"
+        :class="{ 'animate-spin': batchReprocessing }"
+      />
+      {{ t('dashboard.reprocess.batch_reprocess') }} ({{ selectedIds.size }})
+    </button>
+  </div>
+
   <!-- Cards View -->
   <div
-    v-else-if="viewMode === 'cards'"
-    class="grid gap-4 mt-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4"
+    v-if="viewMode === 'cards' && emails.length"
+    class="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4"
   >
     <div
       v-for="email in emails"
       :key="email.id"
       :class="[
-        'rounded-lg shadow-sm border hover:shadow-md transition-shadow flex flex-col h-full text-sm group cursor-pointer',
-        email.test_mode
-          ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700'
-          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+        'rounded-lg shadow-sm border hover:shadow-md transition-shadow flex flex-col h-full text-sm group cursor-pointer relative',
+        selectedIds.has(email.id)
+          ? 'ring-2 ring-primary-500 border-primary-400 dark:border-primary-500'
+          : email.test_mode
+            ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700'
+            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
       ]"
       @click="emit('open-email', email)"
     >
       <div class="p-3 flex-1 flex flex-col gap-2">
-        <!-- Header: Status + Actions -->
+        <!-- Header: Checkbox + Status + Actions -->
         <div class="flex justify-between items-start">
           <div class="flex items-center gap-2">
+            <input
+              type="checkbox"
+              :checked="selectedIds.has(email.id)"
+              class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 cursor-pointer"
+              @click.stop="toggleSelect(email.id)"
+            >
             <span
               v-if="email.status === 'ERROR'"
               class="text-red-500"
@@ -1004,12 +1113,21 @@ const emit = defineEmits(['open-email'])
 
   <!-- Table View -->
   <div
-    v-else-if="viewMode === 'table'"
+    v-if="viewMode === 'table' && emails.length"
     class="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
   >
     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
       <thead class="bg-gray-50 dark:bg-gray-900">
         <tr>
+          <th class="px-3 py-3 w-10">
+            <input
+              type="checkbox"
+              :checked="selectedIds.size === emails.length && emails.length > 0"
+              :indeterminate="selectedIds.size > 0 && selectedIds.size < emails.length"
+              class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700"
+              @change="toggleSelectAll"
+            >
+          </th>
           <th
             class="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
           >
@@ -1092,9 +1210,18 @@ const emit = defineEmits(['open-email'])
           :key="email.id"
           :class="[
             'hover:bg-gray-50 dark:hover:bg-gray-700',
+            selectedIds.has(email.id) ? 'bg-primary-50/50 dark:bg-primary-900/20' : '',
             email.test_mode ? 'bg-amber-50 dark:bg-amber-950/20' : ''
           ]"
         >
+          <td class="px-3 py-4 w-10">
+            <input
+              type="checkbox"
+              :checked="selectedIds.has(email.id)"
+              class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 cursor-pointer"
+              @change="toggleSelect(email.id)"
+            >
+          </td>
           <td class="px-3 sm:px-6 py-4">
             <div class="flex items-center gap-2">
               <div
@@ -1460,7 +1587,7 @@ const emit = defineEmits(['open-email'])
     @reprocess="reprocessDlqItem"
   />
 
-  <!-- Reprocess Modal with Strategy Selector -->
+  <!-- Reprocess Modal with Strategy Selector (single + batch) -->
   <Teleport to="body">
     <div
       v-if="reprocessModalOpen"
@@ -1471,8 +1598,11 @@ const emit = defineEmits(['open-email'])
         <!-- Header -->
         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-            <ArrowPathIcon class="h-5 w-5 text-primary-600" />
-            {{ t('dashboard.reprocess.title') }}
+            <ArrowPathIcon class="h-5 w-5 text-green-600" />
+            {{ reprocessTarget
+              ? t('dashboard.reprocess.title')
+              : t('dashboard.reprocess.title_batch', { count: selectedIds.size })
+            }}
           </h3>
           <p
             v-if="reprocessTarget?.processing_strategy"
@@ -1492,8 +1622,8 @@ const emit = defineEmits(['open-email'])
             :key="s"
             class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all"
             :class="reprocessStrategy === s
-              ? 'border-primary-500 bg-primary-50 text-gray-900 dark:bg-primary-900/40 dark:border-primary-400 dark:text-white'
-              : 'border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-700 dark:text-white hover:border-gray-300 dark:hover:border-gray-600'"
+              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/40 dark:border-primary-400'
+              : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600'"
           >
             <input
               v-model="reprocessStrategy"
@@ -1503,7 +1633,12 @@ const emit = defineEmits(['open-email'])
             >
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <span class="text-sm font-medium">
+                <span
+                  class="text-sm font-medium"
+                  :class="reprocessStrategy === s
+                    ? 'text-primary-900 dark:text-primary-100'
+                    : 'text-gray-900 dark:text-white'"
+                >
                   {{ t('dashboard.strategy.' + s) }}
                 </span>
                 <span
@@ -1538,8 +1673,8 @@ const emit = defineEmits(['open-email'])
             {{ t('dashboard.reprocess.cancel') }}
           </button>
           <button
-            class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
-            @click="confirmReprocess"
+            class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+            @click="reprocessTarget ? confirmReprocess() : confirmBatchReprocess()"
           >
             <ArrowPathIcon class="h-4 w-4" />
             {{ t('dashboard.reprocess.confirm') }}
