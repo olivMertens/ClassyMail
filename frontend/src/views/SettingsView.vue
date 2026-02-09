@@ -166,7 +166,8 @@ const assessCategory = async (index) => {
         name: category.name,
         slug: category.slug,
         description: category.description || '',
-        exclusions: category.exclusions || ''
+        exclusions: category.exclusions || '',
+        language: locale.value || 'en'
       })
     })
 
@@ -178,7 +179,7 @@ const assessCategory = async (index) => {
         quality_score: data.quality_score,
         specific_suggestions: data.specific_suggestions || []
       })
-      await showAlert(`Assessment Complete!\n\nQuality: ${data.quality_score}\n\nReview the advice below the category.`)
+      // Results now shown inline - no alert dialog
     } else {
       const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
       categoryAssessments.value.delete(index)

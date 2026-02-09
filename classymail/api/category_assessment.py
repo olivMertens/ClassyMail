@@ -29,6 +29,7 @@ class CategoryAssessmentRequest(BaseModel):
     slug: str = Field(..., description="Category technical slug")
     description: str = Field(default="", description="Category definition (what it IS)")
     exclusions: str = Field(default="", description="Category exclusions (what it ISN'T)")
+    language: str = Field(default="en", description="Response language: 'en' or 'fr'")
 
 
 class CategoryAssessmentResponse(BaseModel):
@@ -64,31 +65,72 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
             headers = await auth_headers(clients=clients)
             url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={config.AI_API_VERSION}"
 
-            # System prompt with best practices - Optimized for GPT-5 Nano efficiency
-            system_prompt = """You are an expert in insurance email classification taxonomies.
+            # Bilingual prompt with WHERE/HOW guidance - Language-aware
+            is_french = request.language == "fr"
+
+            if is_french:
+                system_prompt = """Vous êtes un expert en taxonomies de classification d'emails d'assurance.
+Évaluez la définition de catégorie ci-dessous et fournissez des améliorations ACTIONNABLES.
+
+CRITÈRES D'ÉVALUATION:
+1. Définition: Doit utiliser des mots-clés spécifiques (ex: "bail, quittance" au lieu de "documents logement").
+2. Exclusions: Doivent être explicites (ex: "Ne concerne pas X").
+3. Structure: Utiliser les en-têtes "DEFINITION" et "EXCLUSIONS".
+4. Indices de Validation: Mentionner les mots-clés standards et indices visuels (ex: "photo", "signature").
+
+FORMAT DE RÉPONSE (JSON UNIQUEMENT):
+{
+  "quality_score": "Good|Needs Improvement|Poor",
+  "advice": "Explication concise de ce qu'il faut corriger et pourquoi.",
+  "specific_suggestions": [
+     "RÉÉCRIRE le champ 'Définition' (remplacer tout le contenu actuel par): DEFINITION [nouveau texte complet]",
+     "RÉÉCRIRE le champ 'Exclusions' (remplacer tout le contenu actuel par): EXCLUSIONS - Ne concerne pas...",
+     "AJOUTER à la FIN du champ 'Définition' (après le dernier mot-clé existant): [mots-clés séparés par virgules]"
+  ]
+}
+
+EXEMPLES DE SUGGESTIONS ULTRA-PRÉCISES:
+- "RÉÉCRIRE le champ 'Définition' (remplacer tout le contenu actuel par): DEFINITION Attestation d'habitation: document officiel permettant de confirmer l'adresse. Sont couverts: logement principal, logement étudiant. Mots-clés: bail, quittance, loyer, attestation habitation"
+- "AJOUTER à la FIN du champ 'Définition' (après le dernier mot existant): , signature, photo, date de naissance"
+- "RÉÉCRIRE le champ 'Exclusions' (remplacer tout le contenu actuel par): EXCLUSIONS - Ne concerne pas les résidences secondaires. - Ne couvre pas les biens non couverts par l'assurance habitation."
+
+IMPORTANT:
+- Spécifiez TOUJOURS si c'est dans le champ "Définition" ou "Exclusions"
+- Précisez si c'est "RÉÉCRIRE tout le contenu" ou "AJOUTER à la fin"
+- Pour "AJOUTER", formatez comme: , mot1, mot2, mot3 (avec virgule initiale)
+- Sortie JSON UNIQUEMENT.
+"""
+            else:
+                system_prompt = """You are an expert in insurance email classification taxonomies.
 Assess the category definition below and provide actionable PROMPT-READY improvements.
 
 ASSESSMENT CRITERIA:
 1. Definition: Must use specific keywords (e.g., "bail, quittance" instead of "documents logement").
-2. Exclusions: Must be explicit (e.g., "Ne concerne pas X").
+2. Exclusions: Must be explicit (e.g., "Does not concern X").
 3. Structure: Use "DEFINITION" and "EXCLUSIONS" headers.
-4. Validation Strategies: Mention standard keywords and visual cues (e.g., "photo", "signature").
+4. Validation Cues: Mention standard keywords and visual cues (e.g., "photo", "signature").
 
 RESPONSE FORMAT (JSON ONLY):
 {
   "quality_score": "Good|Needs Improvement|Poor",
   "advice": "Concise explanation of what to fix and why.",
   "specific_suggestions": [
-     "REWRITE Definition: [New text]",
-     "ADD Exclusions: [New text]",
-     "ADD Keywords: [List]"
+     "REWRITE the 'Definition' field (replace entire current content with): DEFINITION [complete new text]",
+     "REWRITE the 'Exclusions' field (replace entire current content with): EXCLUSIONS - Does not concern...",
+     "ADD to the END of 'Definition' field (after last existing keyword): [keywords separated by commas]"
   ]
 }
 
-CRITICAL:
+EXAMPLES OF ULTRA-PRECISE SUGGESTIONS:
+- "REWRITE the 'Definition' field (replace entire current content with): DEFINITION Housing certificate: official document confirming address and housing status. Covers: main residence, student housing. Keywords: lease, receipt, rent, housing certificate"
+- "ADD to the END of 'Definition' field (after last existing word): , signature, photo, date of birth"
+- "REWRITE the 'Exclusions' field (replace entire current content with): EXCLUSIONS - Does not concern secondary residences. - Does not cover properties not covered by home insurance."
+
+IMPORTANT:
+- ALWAYS specify if it's in "Definition" or "Exclusions" field
+- Clarify if it's "REWRITE entire content" or "ADD to the end"
+- For "ADD", format as: , word1, word2, word3 (with initial comma)
 - Output JSON ONLY.
-- Be CONCISE.
-- Do not explain your reasoning process in the output, just the results.
 """
 
             user_content = f"""**Category Name:** {request.name}
