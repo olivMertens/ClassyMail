@@ -27,8 +27,8 @@ class CategoryAssessmentRequest(BaseModel):
     """Category assessment request."""
     name: str = Field(..., description="Category display name")
     slug: str = Field(..., description="Category technical slug")
-    description: str = Field(default="", description="Category definition (what it IS)")
-    exclusions: str = Field(default="", description="Category exclusions (what it ISN'T)")
+    description: str | None = Field(default="", description="Category definition (what it IS)")
+    exclusions: str | None = Field(default="", description="Category exclusions (what it ISN'T)")
     language: str = Field(default="en", description="Response language: 'en' or 'fr'")
 
 
@@ -48,8 +48,14 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
     and provides actionable advice for improvement.
     """
     with tracer.start_as_current_span("assess_category") as span:
-        span.set_attribute("category.name", request.name)
-        span.set_attribute("category.slug", request.slug)
+        # Normalize None → empty string for safety
+        description = (request.description or "").strip()
+        exclusions = (request.exclusions or "").strip()
+        name = request.name.strip()
+        slug = request.slug.strip()
+
+        span.set_attribute("category.name", name)
+        span.set_attribute("category.slug", slug)
 
         try:
             # Use GPT-5 Nano for assessment
@@ -133,14 +139,14 @@ IMPORTANT:
 - Output JSON ONLY.
 """
 
-            user_content = f"""**Category Name:** {request.name}
-**Slug:** {request.slug}
+            user_content = f"""**Category Name:** {name}
+**Slug:** {slug}
 
 **Current DEFINITION:**
-{request.description or "(empty)"}
+{description or "(empty)"}
 
 **Current EXCLUSIONS:**
-{request.exclusions or "(empty)"}
+{exclusions or "(empty)"}
 
 Assess quality and provide rewrites."""
 

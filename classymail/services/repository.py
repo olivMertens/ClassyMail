@@ -9,7 +9,7 @@ from typing import Optional
 from classymail.models import EmailRecord
 from classymail.services.azure_clients import Clients, get_default_clients
 from classymail.services.anonymizer import anonymize_markdown_for_finetune, basic_pii_scrub
-from classymail.services.settings_store import get_categories_prompt_text
+from classymail.services.settings_store import get_categories_prompt_text_async
 from classymail.services.llm_pipeline import generate_embedding
 from classymail.core import config
 
@@ -156,7 +156,7 @@ async def export_finetune_jsonl_iter(
     it = clients.cosmos_container.query_items(query)
 
     # Get production-grade system prompt with categories (matches inference exactly)
-    categories_text = await get_categories_prompt_text(clients=clients)
+    categories_text = await get_categories_prompt_text_async(clients=clients)
 
     system_prompt = os.getenv(
         "FINETUNE_SYSTEM_PROMPT",

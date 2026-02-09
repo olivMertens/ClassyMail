@@ -11,6 +11,64 @@ from unittest.mock import AsyncMock, patch, MagicMock
 import httpx
 
 from classymail.api.category_assessment import assess_category, CategoryAssessmentRequest
+from classymail.services.settings_store import _build_categories_prompt
+
+
+# ---- _build_categories_prompt unit tests ----
+
+def test_build_categories_prompt_empty_list():
+    """Empty list returns a fallback message."""
+    result = _build_categories_prompt([])
+    assert "aucune" in result.lower() or "no categories" in result.lower()
+
+
+def test_build_categories_prompt_none_exclusions():
+    """Categories with None exclusions produce '(aucune)' placeholder."""
+    cats = [{"name": "Test", "slug": "test", "description": "Desc", "exclusions": None}]
+    result = _build_categories_prompt(cats)
+    assert "DÉFINITION: Desc" in result
+    assert "EXCLUSIONS: (aucune)" in result
+
+
+def test_build_categories_prompt_empty_exclusions():
+    """Categories with empty-string exclusions produce '(aucune)' placeholder."""
+    cats = [{"name": "Test", "slug": "test", "description": "Desc", "exclusions": ""}]
+    result = _build_categories_prompt(cats)
+    assert "EXCLUSIONS: (aucune)" in result
+
+
+def test_build_categories_prompt_empty_description():
+    """Categories with empty description produce '(non définie)' placeholder."""
+    cats = [{"name": "Foo", "slug": "foo", "description": "", "exclusions": "Bar"}]
+    result = _build_categories_prompt(cats)
+    assert "DÉFINITION: (non définie)" in result
+    assert "EXCLUSIONS: Bar" in result
+
+
+def test_build_categories_prompt_full():
+    """Categories with both desc and exclusions render correctly."""
+    cats = [
+        {"name": "A", "slug": "a", "description": "Desc A", "exclusions": "Excl A"},
+        {"name": "B", "slug": "b", "description": "Desc B", "exclusions": ""},
+    ]
+    result = _build_categories_prompt(cats)
+    assert "1. A" in result
+    assert "DÉFINITION: Desc A" in result
+    assert "EXCLUSIONS: Excl A" in result
+    assert "2. B" in result
+    assert "EXCLUSIONS: (aucune)" in result
+
+
+def test_build_categories_prompt_skips_nameless():
+    """Categories without a name are skipped."""
+    cats = [
+        {"name": "", "slug": "a", "description": "D", "exclusions": "E"},
+        {"name": "Valid", "slug": "b", "description": "D", "exclusions": "E"},
+    ]
+    result = _build_categories_prompt(cats)
+    # Only the valid category should appear (numbered 1)
+    assert "1. Valid" in result
+    assert result.count("DÉFINITION:") == 1
 
 
 @pytest.mark.asyncio
@@ -107,6 +165,91 @@ async def test_assess_category_good_quality():
 
             assert result.quality_score == "Good"
             assert len(result.specific_suggestions) == 0
+
+
+@pytest.mark.asyncio
+async def test_assess_category_none_exclusions():
+    """Test assessment when exclusions is None (e.g. from JS null)."""
+    request = CategoryAssessmentRequest(
+        name="Test Category",
+        slug="test_category",
+        description="Some description",
+        exclusions=None
+    )
+
+    with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve, \
+         patch("classymail.api.category_assessment.Clients"), \
+         patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
+
+        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano")
+        mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps({
+                            "quality_score": "Needs Improvement",
+                            "advice": "Add exclusions.",
+                            "specific_suggestions": ["ADD Exclusions"]
+                        })
+                    },
+                    "finish_reason": "stop"
+                }
+            ]
+        }
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(return_value=mock_response)
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+
+            result = await assess_category(request)
+            assert result.quality_score == "Needs Improvement"
+
+
+@pytest.mark.asyncio
+async def test_assess_category_none_description_and_exclusions():
+    """Test assessment when both description and exclusions are None."""
+    request = CategoryAssessmentRequest(
+        name="Empty Cat",
+        slug="empty_cat",
+        description=None,
+        exclusions=None
+    )
+
+    with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve, \
+         patch("classymail.api.category_assessment.Clients"), \
+         patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
+
+        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano")
+        mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps({
+                            "quality_score": "Poor",
+                            "advice": "Both empty.",
+                            "specific_suggestions": ["ADD Definition", "ADD Exclusions"]
+                        })
+                    },
+                    "finish_reason": "stop"
+                }
+            ]
+        }
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(return_value=mock_response)
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+
+            result = await assess_category(request)
+            assert result.quality_score == "Poor"
+            assert len(result.specific_suggestions) == 2
 
 
 @pytest.mark.asyncio

@@ -217,23 +217,41 @@ async def save_settings_async(settings: dict, clients=None):
     except Exception:
         pass
 
+def _build_categories_prompt(cats: list) -> str:
+    """Build prompt text from a list of category dicts.
+
+    Handles empty list, missing fields, and empty exclusions gracefully.
+    """
+    if not cats:
+        return "(Aucune catégorie configurée / No categories configured)"
+
+    lines: list[str] = []
+    idx = 0
+    for c in cats:
+        name = (c.get('name') or '').strip()
+        if not name:
+            continue
+        idx += 1
+        desc = (c.get('description') or '').strip()
+        excl = (c.get('exclusions') or '').strip()
+
+        # Always use structured format so the LLM sees consistent blocks
+        lines.append(f"{idx}. {name}")
+        lines.append(f"   DÉFINITION: {desc if desc else '(non définie)'}")
+        lines.append(f"   EXCLUSIONS: {excl if excl else '(aucune)'}")
+
+    return "\n".join(lines) if lines else "(Aucune catégorie configurée / No categories configured)"
+
+
 def get_categories_prompt_text() -> str:
     """Generate professional prompt text for categories with definitions and exclusions."""
     settings = load_settings()
-    cats = settings.get("categories", DEFAULT_CATEGORIES)
-    lines = []
-    for idx, c in enumerate(cats, 1):
-        name = c.get('name', '')
-        desc = c.get('description', '')
-        excl = c.get('exclusions', '')
+    cats = settings.get("categories") or []
+    return _build_categories_prompt(cats)
 
-        # Professional format without emojis
-        if desc and excl:
-            lines.append(f"{idx}. {name}")
-            lines.append(f"   DÉFINITION: {desc}")
-            lines.append(f"   EXCLUSIONS: {excl}")
-        elif desc:
-            lines.append(f"{idx}. {name}: {desc}")
-        else:
-            lines.append(f"{idx}. {name}")
-    return "\n".join(lines)
+
+async def get_categories_prompt_text_async(clients=None) -> str:
+    """Async variant – reads from Cosmos if available, then builds prompt text."""
+    settings = await load_settings_async(clients=clients)
+    cats = settings.get("categories") or []
+    return _build_categories_prompt(cats)

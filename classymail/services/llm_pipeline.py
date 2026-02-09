@@ -487,6 +487,9 @@ async def _classify_with_single_model(
     headers = await auth_headers(clients=clients)
     categories_text = get_categories_prompt_text()
 
+    if "(aucune catégorie" in categories_text.lower() or "(no categories" in categories_text.lower():
+        logger.warning("[classify] No categories configured – classification will return empty intents")
+
     extra_instructions = ""
     if strategy == "reasoning":
         extra_instructions = "\nIMPORTANT : Adopte une approche 'Step-by-step'. Analyse d'abord le contexte, puis déduis les intentions. Sois très précis sur la justification."
