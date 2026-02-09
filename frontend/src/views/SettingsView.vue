@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   CheckCircleIcon,
   MoonIcon,
@@ -83,7 +83,29 @@ const acaValidationResults = ref(null)
 const simulatingFlow = ref(false)
 const useAoaiEnhancement = ref(false)
 
+// ── Token & pricing hypothesis (mirrors MODEL_PRICING in costing.py) ──
+// Prices are per 1 K tokens (input, output) — Azure OpenAI / Foundry, 2025
+const MODEL_PRICING = {
+  'phi4':        { label: 'Phi-4',        input: 0.000107, output: 0.00043, quality: 0.82  },
+  'gpt-4o':      { label: 'GPT-4o',       input: 0.0025,   output: 0.010,   quality: 0.92  },
+  'gpt-4o-mini': { label: 'GPT-4o Mini',  input: 0.00015,  output: 0.0006,  quality: 0.84  },
+  'gpt-4.1-nano':{ label: 'GPT-4.1 Nano', input: 0.0001,   output: 0.0004,  quality: 0.72  },
+  'gpt-5-nano':  { label: 'GPT-5 Nano',   input: 0.00005,  output: 0.0004,  quality: 0.79  },
+  'gpt-5-mini':  { label: 'GPT-5 Mini',   input: 0.0004,   output: 0.0016,  quality: 0.89  },
+  'Kimi-K2.5':   { label: 'Kimi-K2.5',    input: 0.0006,   output: 0.003,   quality: 0.88  },
+}
 
+// Hypothesis: tokens per email (classification only — single LLM call)
+const TOKEN_HYPOTHESIS = { inputLow: 800, inputHigh: 1500, outputLow: 200, outputHigh: 500 }
+
+const modelCostEstimates = computed(() => {
+  const n = 10_000
+  return Object.entries(MODEL_PRICING).map(([key, m]) => {
+    const costLow  = n * ((m.input * TOKEN_HYPOTHESIS.inputLow  / 1000) + (m.output * TOKEN_HYPOTHESIS.outputLow  / 1000))
+    const costHigh = n * ((m.input * TOKEN_HYPOTHESIS.inputHigh / 1000) + (m.output * TOKEN_HYPOTHESIS.outputHigh / 1000))
+    return { key, ...m, costLow: Math.round(costLow * 100) / 100, costHigh: Math.round(costHigh * 100) / 100 }
+  })
+})
 
 // --- Category Management & Sanitization ---
 
@@ -750,11 +772,18 @@ onMounted(() => {
             </select>
           </div>
           <div
-            v-if="settings.ai_model !== 'phi4'"
+            v-if="!['gpt-4o', 'gpt-4o-mini', 'gpt-4.1-nano'].includes(settings.ai_model)"
             class="mt-2 flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm"
           >
             <ExclamationTriangleIcon class="h-4 w-4" />
             <span>{{ t('settings.processing.finetuning_not_supported') }}</span>
+          </div>
+          <div
+            v-else
+            class="mt-2 flex items-center gap-2 text-green-600 dark:text-green-400 text-sm"
+          >
+            <CheckCircleIcon class="h-4 w-4" />
+            <span>{{ t('settings.processing.finetuning_available') }}</span>
           </div>
 
           <!-- Adversarial Model Selection -->
@@ -799,7 +828,7 @@ onMounted(() => {
             </p>
           </div>
 
-          <!-- Cost/Quality Trade-off Info -->
+          <!-- Cost/Quality Trade-off Info (computed from MODEL_PRICING) -->
           <div class="mt-3 rounded-md bg-blue-50 dark:bg-blue-900/20 p-3 border border-blue-200 dark:border-blue-800">
             <div class="flex">
               <div class="flex-shrink-0">
@@ -812,133 +841,73 @@ onMounted(() => {
                 <p class="font-medium text-blue-800 dark:text-blue-300 mb-1">
                   Model Comparison — Estimated Quality & Cost
                 </p>
-                <p class="text-xs italic text-blue-600 dark:text-blue-300 mb-2">
-                  💡 Prices vary by region, volume, and caching. Verify with the <a
-                    href="https://azure.microsoft.com/en-us/pricing/calculator/"
-                    target="_blank"
-                    class="underline font-semibold"
-                  >Azure Pricing Calculator</a>.
-                </p>
+                <!-- Token hypothesis -->
+                <div class="text-[11px] text-blue-600 dark:text-blue-300 mb-2 bg-blue-100/50 dark:bg-blue-800/30 rounded p-2 space-y-1">
+                  <p class="font-semibold">
+                    📊 Hypothesis (classification only — single LLM call/email):
+                  </p>
+                  <p>
+                    Input: ~{{ TOKEN_HYPOTHESIS.inputLow }}–{{ TOKEN_HYPOTHESIS.inputHigh }} tokens/email
+                    (system prompt + categories + email content)
+                  </p>
+                  <p>
+                    Output: ~{{ TOKEN_HYPOTHESIS.outputLow }}–{{ TOKEN_HYPOTHESIS.outputHigh }} tokens/email
+                    (JSON response)
+                  </p>
+                  <p class="italic mt-1">
+                    💡 Prices vary by region, volume, and caching. Verify with the
+                    <a
+                      href="https://azure.microsoft.com/en-us/pricing/calculator/"
+                      target="_blank"
+                      class="underline font-semibold"
+                    >Azure Pricing Calculator</a>.
+                  </p>
+                </div>
+                <!-- Dynamic model list -->
                 <div class="text-blue-700 dark:text-blue-200 space-y-1">
-                  <div class="flex items-center justify-between gap-2">
-                    <span><strong>gpt-4o:</strong> Quality 0.92 ⭐⭐, Cost ~$30-60/10K emails</span>
+                  <div
+                    v-for="m in modelCostEstimates"
+                    :key="m.key"
+                    class="flex items-center justify-between gap-2"
+                  >
+                    <span>
+                      <strong>{{ m.label }}:</strong>
+                      Quality {{ m.quality.toFixed(2) }}
+                      <template v-if="m.quality >= 0.90"> ⭐⭐</template>
+                      <template v-else-if="m.quality >= 0.85"> ⭐</template>,
+                      Cost ~${{ m.costLow.toFixed(0) }}–{{ m.costHigh.toFixed(0) }}/10K emails
+                    </span>
                     <div class="flex gap-2 shrink-0">
                       <span
-                        v-if="settings.ai_model === 'gpt-4o'"
+                        v-if="settings.ai_model === m.key"
                         class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
                       >
                         ✓ Primary
                       </span>
                       <span
-                        v-if="settings.adversarial_model === 'gpt-4o'"
+                        v-if="settings.adversarial_model === m.key"
                         class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
                       >
                         🔄 Adversarial
                       </span>
                     </div>
                   </div>
-                  <div class="flex items-center justify-between gap-2">
-                    <span><strong>gpt-5-mini:</strong> Quality 0.89 ⭐, Cost ~$8-12/10K emails</span>
-                    <div class="flex gap-2 shrink-0">
-                      <span
-                        v-if="settings.ai_model === 'gpt-5-mini'"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                      >
-                        ✓ Primary
-                      </span>
-                      <span
-                        v-if="settings.adversarial_model === 'gpt-5-mini'"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
-                      >
-                        🔄 Adversarial
-                      </span>
-                    </div>
-                  </div>
-                  <div class="flex items-center justify-between gap-2">
-                    <span><strong>gpt-5-nano:</strong> Quality 0.79 ⭐, Cost ~$1-2/10K emails</span>
-                    <div class="flex gap-2 shrink-0">
-                      <span
-                        v-if="settings.ai_model === 'gpt-5-nano'"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                      >
-                        ✓ Primary
-                      </span>
-                      <span
-                        v-if="settings.adversarial_model === 'gpt-5-nano'"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
-                      >
-                        🔄 Adversarial
-                      </span>
-                    </div>
-                  </div>
-                  <div class="flex items-center justify-between gap-2">
-                    <span><strong>Phi-4 (base):</strong> Quality 0.82, Cost ~$2-5/10K emails</span>
-                    <div class="flex gap-2 shrink-0">
-                      <span
-                        v-if="settings.ai_model === 'phi4'"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                      >
-                        ✓ Primary
-                      </span>
-                      <span
-                        v-if="settings.adversarial_model === 'phi4'"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
-                      >
-                        🔄 Adversarial
-                      </span>
-                    </div>
-                  </div>
-                  <div class="flex items-center justify-between gap-2">
-                    <span><strong>gpt-4o-mini:</strong> Quality 0.84, Cost ~$2-4/10K emails</span>
-                    <div class="flex gap-2 shrink-0">
-                      <span
-                        v-if="settings.ai_model === 'gpt-4o-mini'"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                      >
-                        ✓ Primary
-                      </span>
-                      <span
-                        v-if="settings.adversarial_model === 'gpt-4o-mini'"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
-                      >
-                        🔄 Adversarial
-                      </span>
-                    </div>
-                  </div>
-                  <div class="flex items-center justify-between gap-2">
-                    <span><strong>gpt-4.1-nano:</strong> Quality 0.72, Cost ~$1-2/10K emails</span>
-                    <div class="flex gap-2 shrink-0">
-                      <span
-                        v-if="settings.ai_model === 'gpt-4.1-nano'"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                      >
-                        ✓ Primary
-                      </span>
-                      <span
-                        v-if="settings.adversarial_model === 'gpt-4.1-nano'"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
-                      >
-                        🔄 Adversarial
-                      </span>
-                    </div>
-                  </div>
-                  <div class="flex items-center justify-between gap-2">
-                    <span><strong>Kimi-K2.5:</strong> Quality 0.88 ⭐, Cost ~$1-4/10K emails (multimodal)</span>
-                    <div class="flex gap-2 shrink-0">
-                      <span
-                        v-if="settings.ai_model === 'Kimi-K2.5'"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                      >
-                        ✓ Primary
-                      </span>
-                      <span
-                        v-if="settings.adversarial_model === 'Kimi-K2.5'"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
-                      >
-                        🔄 Adversarial
-                      </span>
-                    </div>
-                  </div>
+                </div>
+                <!-- Cost multiplier warnings -->
+                <div class="mt-3 text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50/60 dark:bg-amber-900/20 rounded p-2 space-y-1 border border-amber-200/50 dark:border-amber-800/30">
+                  <p class="font-semibold">
+                    ⚠️ These estimates cover classification only. Actual costs increase with:
+                  </p>
+                  <ul class="list-disc pl-4 space-y-0.5">
+                    <li><strong>Entity extraction:</strong> +1 LLM call/email (~×1.3 cost)</li>
+                    <li><strong>PII detection (LLM mode):</strong> +1 LLM call/email (~×1.5 cost)</li>
+                    <li><strong>Email preprocessing:</strong> +1 LLM call/email (~×1.3 cost)</li>
+                    <li><strong>Adversarial comparison:</strong> doubles classification calls (~×2 cost)</li>
+                    <li><strong>Reprocessing:</strong> multiplies ALL above by number of passes</li>
+                  </ul>
+                  <p class="italic mt-1">
+                    With all features enabled + adversarial: expect ~×3–4 the base estimate.
+                  </p>
                 </div>
               </div>
             </div>

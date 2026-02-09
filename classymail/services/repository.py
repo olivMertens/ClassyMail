@@ -115,6 +115,23 @@ async def sum_phi4_cost_usd(*, clients: Clients | None = None) -> float:
     return float(v or 0.0)
 
 
+async def sum_llm_tokens(*, clients: Clients | None = None) -> dict:
+    """Aggregate prompt/completion tokens across all processed emails."""
+    v = await _scalar_query(
+        "SELECT VALUE {"
+        "  prompt: SUM(c.usage.phi4.prompt_tokens),"
+        "  completion: SUM(c.usage.phi4.completion_tokens)"
+        "} FROM c WHERE IS_DEFINED(c.usage) AND IS_DEFINED(c.usage.phi4)",
+        clients=clients,
+    )
+    if v and isinstance(v, dict):
+        return {
+            "prompt_tokens": int(v.get("prompt") or 0),
+            "completion_tokens": int(v.get("completion") or 0),
+        }
+    return {"prompt_tokens": 0, "completion_tokens": 0}
+
+
 async def sum_mistral_cost_usd(*, clients: Clients | None = None) -> float:
     v = await _scalar_query(
         "SELECT VALUE SUM(c.usage.mistral.cost_usd) FROM c WHERE IS_DEFINED(c.usage) AND IS_DEFINED(c.usage.mistral) AND IS_DEFINED(c.usage.mistral.cost_usd)",

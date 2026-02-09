@@ -14,7 +14,7 @@ from __future__ import annotations
 # Model families that use reasoning and have restricted API parameters.
 # These models reject ``temperature`` / ``top_p`` and require
 # ``max_completion_tokens`` instead of the legacy ``max_tokens``.
-_REASONING_FAMILIES: tuple[str, ...] = ("o1", "o3", "o4", "gpt-5", "gpt5")
+_REASONING_FAMILIES: tuple[str, ...] = ("o1", "o3", "o4", "gpt-5", "gpt5", "kimi")
 
 
 def is_reasoning_model(deployment: str) -> bool:
@@ -70,3 +70,13 @@ def build_chat_params(
         params["temperature"] = temperature
 
     return params
+
+
+def extract_message_content(message: dict) -> str | None:
+    """Extract text content from a chat completion message.
+
+    Some reasoning models (Kimi-K2.5, certain o-series) return their
+    output in ``reasoning_content`` instead of ``content``.  This helper
+    checks both fields and returns whichever is non-empty.
+    """
+    return message.get("content") or message.get("reasoning_content")

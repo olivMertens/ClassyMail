@@ -7,7 +7,7 @@ import httpx
 from opentelemetry import trace
 
 from classymail.core import config
-from classymail.core.llm_compat import build_chat_params
+from classymail.core.llm_compat import build_chat_params, extract_message_content
 from classymail.services.azure_clients import auth_headers, Clients
 
 
@@ -82,7 +82,7 @@ async def anonymize_markdown_for_finetune(markdown: str, clients: Clients | None
             resp.raise_for_status()
             data = resp.json()
 
-        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        content = extract_message_content(data.get("choices", [{}])[0].get("message", {})) or ""
         usage = data.get("usage")
         if usage:
             span.set_attribute("gen_ai.usage.input_tokens", usage.get("prompt_tokens", 0))

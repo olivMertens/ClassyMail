@@ -20,7 +20,7 @@ from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 
 from classymail.core import config
-from classymail.core.llm_compat import build_chat_params
+from classymail.core.llm_compat import build_chat_params, extract_message_content
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.settings_store import load_settings
 
@@ -143,7 +143,7 @@ Return only the cleaned content."""
                 data = response.json()
 
                 # Extract response
-                extracted = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                extracted = (extract_message_content(data.get("choices", [{}])[0].get("message", {})) or "").strip()
 
                 # Check if LLM detected no real content
                 if extracted.upper() == "NO_CONTENT":

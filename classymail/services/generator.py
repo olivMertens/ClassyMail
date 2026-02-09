@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Optional
 import httpx
 
-from classymail.core.llm_compat import build_chat_params
+from classymail.core.llm_compat import build_chat_params, extract_message_content
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +199,7 @@ def _aoai_enhance_body(body: str, category: str) -> Optional[str]:
         if response.status_code >= 400:
             return None
         data = response.json()
-        enhanced = (data.get("choices") or [{}])[0].get("message", {}).get("content")
+        enhanced = extract_message_content((data.get("choices") or [{}])[0].get("message", {}))
         return enhanced if enhanced else None
     except Exception:
         return None
@@ -297,7 +297,7 @@ async def generate_synthetic_from_seeds(seed_examples: list[dict], count: int = 
                     logger.error(f"Generation failed: {resp.text}")
                     continue
 
-                content = resp.json()["choices"][0]["message"]["content"]
+                content = extract_message_content(resp.json()["choices"][0].get("message", {}))
                 new_data = json.loads(content)
 
                 # Check structure

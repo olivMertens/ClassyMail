@@ -86,7 +86,7 @@ async def test_assess_category_success():
          patch("classymail.api.category_assessment.Clients"), \
          patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
 
-        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano")
+        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
         mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
         # Mock httpx response
@@ -137,7 +137,7 @@ async def test_assess_category_good_quality():
          patch("classymail.api.category_assessment.Clients"), \
          patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
 
-        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano")
+        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
         mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
         mock_response = MagicMock()
@@ -181,7 +181,7 @@ async def test_assess_category_none_exclusions():
          patch("classymail.api.category_assessment.Clients"), \
          patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
 
-        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano")
+        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
         mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
         mock_response = MagicMock()
@@ -223,7 +223,7 @@ async def test_assess_category_none_description_and_exclusions():
          patch("classymail.api.category_assessment.Clients"), \
          patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
 
-        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano")
+        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
         mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
         mock_response = MagicMock()
@@ -266,7 +266,7 @@ async def test_assess_category_empty_fields():
          patch("classymail.api.category_assessment.Clients"), \
          patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
 
-        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano")
+        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
         mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
         mock_response = MagicMock()
@@ -313,7 +313,7 @@ async def test_assess_category_model_not_configured():
     )
 
     with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve:
-        mock_resolve.return_value = (None, None)
+        mock_resolve.return_value = (None, None, "2024-08-01-preview")
 
         with pytest.raises(HTTPException) as exc_info:
             await assess_category(request)
@@ -338,7 +338,7 @@ async def test_assess_category_http_error():
          patch("classymail.api.category_assessment.Clients"), \
          patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
 
-        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano")
+        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
         mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
         with patch("httpx.AsyncClient") as mock_client_class:
@@ -375,7 +375,7 @@ async def test_assess_category_json_parse_error():
          patch("classymail.api.category_assessment.Clients"), \
          patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
 
-        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano")
+        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
         mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
         mock_response = MagicMock()
@@ -418,7 +418,7 @@ async def test_assess_category_no_choices():
          patch("classymail.api.category_assessment.Clients"), \
          patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
 
-        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano")
+        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
         mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
         mock_response = MagicMock()
@@ -453,7 +453,7 @@ async def test_assess_category_empty_content():
          patch("classymail.api.category_assessment.Clients"), \
          patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
 
-        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano")
+        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
         mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
         mock_response = MagicMock()
@@ -492,7 +492,7 @@ async def test_assess_category_json_with_code_fence():
          patch("classymail.api.category_assessment.Clients"), \
          patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
 
-        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano")
+        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
         mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
         # JSON wrapped in code fence
@@ -539,7 +539,7 @@ async def test_assess_category_reasoning_model():
          patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers, \
          patch("classymail.api.category_assessment.is_reasoning_model") as mock_is_reasoning:
 
-        mock_resolve.return_value = ("https://test.openai.azure.com", "o1-preview")
+        mock_resolve.return_value = ("https://test.openai.azure.com", "o1-preview", "2024-08-01-preview")
         mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
         mock_is_reasoning.return_value = True
 
@@ -589,7 +589,7 @@ async def test_assess_category_standard_model():
          patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers, \
          patch("classymail.api.category_assessment.is_reasoning_model") as mock_is_reasoning:
 
-        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-4o")
+        mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-4o", "2024-08-01-preview")
         mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
         mock_is_reasoning.return_value = False
 

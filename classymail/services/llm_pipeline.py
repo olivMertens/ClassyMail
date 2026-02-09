@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential, retry_if_exception, retry
 
 from classymail.core import config
-from classymail.core.llm_compat import build_chat_params
+from classymail.core.llm_compat import build_chat_params, extract_message_content
 from classymail.models import OCRFailed, BusinessEntities
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.settings_store import get_categories_prompt_text, load_settings
@@ -33,7 +33,8 @@ async def extract_business_entities(
     *,
     clients: Clients | None = None,
     config_deployment: str | None = None, # Allow override for specific model
-    config_endpoint: str | None = None
+    config_endpoint: str | None = None,
+    api_version: str | None = None,
 ) -> dict:
     """
     Extracts structured business entities (people, orgs, dates, amounts, etc.) from text.
@@ -84,7 +85,7 @@ Example JSON Output:
 
     headers = await auth_headers(clients=clients)
 
-    url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={config.AI_API_VERSION}"
+    url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={api_version or config.AI_API_VERSION}"
 
     payload = {
         "model": deployment,
@@ -105,7 +106,7 @@ Example JSON Output:
                 resp = await client.post(url, json=payload, headers=headers)
                 resp.raise_for_status()
                 data = resp.json()
-                content = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+                content = extract_message_content(data.get("choices", [{}])[0].get("message", {})) or "{}"
                 usage = data.get("usage", {})
 
                 logger.info(f"[metrics] Entity Extraction Success: {usage.get('total_tokens', 0)} tokens")
@@ -475,6 +476,7 @@ async def _classify_with_single_model(
     endpoint: str,
     deployment: str,
     strategy: str = "standard",
+    api_version: str | None = None,
     clients: Clients | None = None,
 ) -> dict:
     """
@@ -555,7 +557,7 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
         **build_chat_params(deployment, temperature=0.1, max_output_tokens=config.PHI_RESERVED_OUTPUT_TOKENS),
     }
 
-    url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={config.AI_API_VERSION}"
+    url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={api_version or config.AI_API_VERSION}"
 
     logger.info(f"[metrics] Classify Request: {deployment} strategy={strategy}")
     logger.info(f"[metrics] Token Estimate: system={system_tokens} user={user_tokens_est} truncated={truncated}")
@@ -586,7 +588,7 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
                 raise
 
             data = resp.json()
-            content = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+            content = extract_message_content(data.get("choices", [{}])[0].get("message", {})) or "{}"
             usage = data.get("usage", {})
 
             logger.info(f"[metrics] Classify Success ({deployment}): {usage.get('total_tokens', 0)} tokens used")
@@ -708,31 +710,43 @@ async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False
         raise
 
 
-def resolve_model_config(model_key: str) -> tuple[str, str]:
+def resolve_model_config(model_key: str) -> tuple[str, str, str]:
     """
-    Resolves a model key/name to an (endpoint, deployment) tuple.
+    Resolves a model key/name to an (endpoint, deployment, api_version) tuple.
+
+    Most models use the default ``config.AI_API_VERSION``.
+    Kimi-K2.5 requires ``2024-05-01-preview``.
     """
     k = model_key.lower().strip()
+    default_api_version: str = config.AI_API_VERSION
+
+    # Models that need a non-default api-version
+    _MODEL_API_VERSIONS: dict[str, str] = {
+        "kimi-k2.5": "2024-05-01-preview",
+    }
+
+    def _api_version_for(deployment: str) -> str:
+        return _MODEL_API_VERSIONS.get(deployment.lower(), default_api_version)
 
     # Direct match with configured deployments (preferred)
     if config.PHI_DEPLOYMENT and k == config.PHI_DEPLOYMENT.lower():
-         return config.PHI_ENDPOINT, config.PHI_DEPLOYMENT
+         return config.PHI_ENDPOINT, config.PHI_DEPLOYMENT, _api_version_for(config.PHI_DEPLOYMENT)
     if config.PHI_FALLBACK_DEPLOYMENT and k == config.PHI_FALLBACK_DEPLOYMENT.lower():
-         return config.PHI_FALLBACK_ENDPOINT, config.PHI_FALLBACK_DEPLOYMENT
+         return config.PHI_FALLBACK_ENDPOINT, config.PHI_FALLBACK_DEPLOYMENT, _api_version_for(config.PHI_FALLBACK_DEPLOYMENT)
 
     # Aliases
     if k in ("phi-4", "phi4", "standard", "primary"):
-        return config.PHI_ENDPOINT, config.PHI_DEPLOYMENT
+        return config.PHI_ENDPOINT, config.PHI_DEPLOYMENT, default_api_version
     if k in ("gpt-4o-mini", "gpt4o-mini", "gpt4o_mini", "fallback", "audit"):
-        return config.PHI_FALLBACK_ENDPOINT, config.PHI_FALLBACK_DEPLOYMENT
+        return config.PHI_FALLBACK_ENDPOINT, config.PHI_FALLBACK_DEPLOYMENT, default_api_version
 
     # Kimi K2.5 (Moonshot AI via Foundry) – deployed on the primary endpoint
     if k in ("kimi-k2.5", "kimi_k2.5", "kimik2.5"):
-        return config.PHI_ENDPOINT, "Kimi-K2.5"
+        return config.PHI_ENDPOINT, "Kimi-K2.5", "2024-05-01-preview"
 
     # Fallback/Generic: Assume the key is the deployment name on the primary endpoint
     # This supports 'gpt5-nano', 'gpt4.1-nano' etc. if they are deployed on the same resource
-    return config.PHI_ENDPOINT, model_key
+    return config.PHI_ENDPOINT, model_key, _api_version_for(model_key)
 
 
 async def classify_comparison(
@@ -757,7 +771,7 @@ async def classify_comparison(
     resolved_names = []
 
     for m in models:
-        endpoint, deployment = resolve_model_config(m)
+        endpoint, deployment, _api_ver = resolve_model_config(m)
         if not endpoint:
              logger.warning(f"No endpoint found for model '{m}', skipping")
              continue
@@ -768,6 +782,7 @@ async def classify_comparison(
             endpoint=endpoint,
             deployment=deployment,
             strategy=strategy,
+            api_version=_api_ver,
             clients=clients
         ))
 
@@ -934,7 +949,7 @@ Analyse cette correction.
             resp = await client.post(url, json=payload, headers=headers)
             if resp.status_code == 200:
                 data = resp.json()
-                return data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                return (extract_message_content(data.get("choices", [{}])[0].get("message", {})) or "").strip()
     except Exception:
         pass
 

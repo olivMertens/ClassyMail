@@ -7,10 +7,12 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 
 from classymail.services.azure_clients import Clients, get_clients
 from classymail.services.azure_retail_prices import get_retail_unit_prices
+from classymail.services.costing import MODEL_PRICING
 from classymail.services.repository import (
     count_by_status,
     sum_mistral_cost_usd,
     sum_phi4_cost_usd,
+    sum_llm_tokens,
     count_items_with_any_usage_cost,
 )
 
@@ -42,6 +44,7 @@ async def costs_summary(
 
         phi4_usd = await sum_phi4_cost_usd(clients=clients)
         mistral_usd = await sum_mistral_cost_usd(clients=clients)
+        llm_tokens = await sum_llm_tokens(clients=clients)
 
         emails_with_usage = await count_items_with_any_usage_cost(clients=clients)
     except Exception as e:
@@ -133,6 +136,43 @@ async def costs_summary(
             retail = None
             retail_estimates = None
 
+    # Build model cost comparison based on actual token usage
+    prompt_tokens = llm_tokens.get("prompt_tokens", 0)
+    completion_tokens = llm_tokens.get("completion_tokens", 0)
+
+    # Per-email averages (for hypothesis display)
+    avg_prompt = round(prompt_tokens / emails_with_usage) if emails_with_usage else 0
+    avg_completion = round(completion_tokens / emails_with_usage) if emails_with_usage else 0
+
+    # De-duplicate MODEL_PRICING (some keys are aliases)
+    _DISPLAY_MODELS = {
+        "phi-4": "Phi-4",
+        "gpt-4o": "GPT-4o",
+        "gpt-4o-mini": "GPT-4o Mini",
+        "gpt-4.1-nano": "GPT-4.1 Nano",
+        "gpt-5-nano": "GPT-5 Nano",
+        "gpt-5-mini": "GPT-5 Mini",
+        "kimi-k2.5": "Kimi-K2.5",
+    }
+    model_comparison = []
+    for model_key, display_name in _DISPLAY_MODELS.items():
+        pricing = MODEL_PRICING.get(model_key)
+        if not pricing:
+            continue
+        input_per_1k, output_per_1k = pricing
+        projected = (prompt_tokens / 1000.0 * input_per_1k) + (completion_tokens / 1000.0 * output_per_1k)
+        # Extrapolate to 10K emails based on per-email averages
+        projected_10k = (
+            (avg_prompt * 10_000 / 1000.0 * input_per_1k)
+            + (avg_completion * 10_000 / 1000.0 * output_per_1k)
+        ) if emails_with_usage else 0.0
+        model_comparison.append({
+            "model": display_name,
+            "key": model_key,
+            "projected_usd": round(projected, 6),
+            "projected_10k_usd": round(projected_10k, 2),
+        })
+
     return {
         "counts": {
             "processed": processed_count,
@@ -142,10 +182,31 @@ async def costs_summary(
             "emails_with_usage": emails_with_usage,
         },
         "actual_usd": {
+            "llm": float(phi4_usd or 0.0),
             "phi4": float(phi4_usd or 0.0),
             "mistral_ocr": float(mistral_usd or 0.0),
             "ai_total": float(ai_total_usd),
         },
+        "llm_tokens": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "avg_prompt_per_email": avg_prompt,
+            "avg_completion_per_email": avg_completion,
+        },
+        "token_hypothesis": {
+            "description": "Classification only — single LLM call per email. Does NOT include entity extraction, PII detection, email preprocessing, or adversarial comparison.",
+            "avg_input_tokens_per_email": avg_prompt,
+            "avg_output_tokens_per_email": avg_completion,
+            "emails_sampled": emails_with_usage,
+            "cost_multipliers": {
+                "entity_extraction": "~×1.3 (adds 1 LLM call/email)",
+                "pii_detection_llm": "~×1.5 (adds 1 LLM call/email)",
+                "email_preprocessing": "~×1.3 (adds 1 LLM call/email)",
+                "adversarial_comparison": "~×2.0 (doubles classification calls)",
+                "all_features_plus_adversarial": "~×3–4 total",
+            },
+        },
+        "model_cost_comparison": model_comparison,
         "avg_usd_per_email": {
             "ai_total": float(avg_ai_usd_per_email),
         },

@@ -13,8 +13,7 @@ from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel, Field
 
-from classymail.core import config
-from classymail.core.llm_compat import build_chat_params, is_reasoning_model
+from classymail.core.llm_compat import build_chat_params, extract_message_content, is_reasoning_model
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.llm_pipeline import resolve_model_config
 
@@ -59,8 +58,8 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
 
         try:
             # Use GPT-5 Nano for assessment
-            endpoint, deployment = resolve_model_config("gpt-5-nano")
-            logger.info("[assessment] Resolved model: endpoint=%s deployment=%s", endpoint, deployment)
+            endpoint, deployment, api_version = resolve_model_config("gpt-5-nano")
+            logger.info("[assessment] Resolved model: endpoint=%s deployment=%s api_version=%s", endpoint, deployment, api_version)
 
             if not endpoint or not deployment:
                 raise HTTPException(
@@ -79,7 +78,7 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
                     status_code=401,
                     detail=f"Azure authentication failed ({err_type}): {err_msg[:200]}"
                 )
-            url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={config.AI_API_VERSION}"
+            url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
             logger.debug("[assessment] Request URL: %s", url)
 
             # Bilingual prompt with WHERE/HOW guidance - Language-aware
@@ -203,7 +202,7 @@ Assess quality and provide rewrites."""
                     raise HTTPException(status_code=502, detail="AI Model returned no Content Choices.")
 
                 message = choices[0].get("message", {})
-                content = message.get("content")
+                content = extract_message_content(message)
 
                 if not content:
                     logger.error(f"[assessment] Invalid AI response: Empty content. Finish reason: {choices[0].get('finish_reason')}. Data: {data}")

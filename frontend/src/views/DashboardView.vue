@@ -1218,7 +1218,9 @@ const emit = defineEmits(['open-email'])
           :class="[
             'hover:bg-gray-50 dark:hover:bg-gray-700',
             selectedIds.has(email.id) ? 'bg-primary-50/50 dark:bg-primary-900/20' : '',
-            email.test_mode ? 'bg-amber-50 dark:bg-amber-950/20' : ''
+            email.test_mode ? 'bg-amber-50 dark:bg-amber-950/20' : '',
+            !selectedIds.has(email.id) && !email.test_mode && strategyBadge(email.processing_strategy)?.key === 'vision_short' ? 'bg-teal-50/30 dark:bg-teal-900/10' : '',
+            !selectedIds.has(email.id) && !email.test_mode && strategyBadge(email.processing_strategy)?.key === 'reasoning_short' ? 'bg-purple-50/30 dark:bg-purple-900/10' : ''
           ]"
         >
           <td class="px-3 py-4 w-10">

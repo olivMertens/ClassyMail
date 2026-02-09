@@ -190,10 +190,10 @@ onMounted(() => {
           <dl class="divide-y divide-gray-200 dark:divide-gray-700">
             <div class="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
               <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
-                Phi-4
+                LLM (Classification)
               </dt>
               <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:col-span-2 sm:mt-0">
-                ${{ (costs.actual_usd?.phi4 ?? 0).toFixed(4) }}
+                ${{ (costs.actual_usd?.llm ?? costs.actual_usd?.phi4 ?? 0).toFixed(4) }}
               </dd>
             </div>
             <div class="px-0 py-3 sm:grid sm:grid-cols-3 sm:gap-4">
@@ -215,6 +215,88 @@ onMounted(() => {
               </dd>
             </div>
           </dl>
+        </div>
+
+        <!-- Model Cost Comparison -->
+        <div
+          v-if="costs.model_cost_comparison && costs.model_cost_comparison.length"
+          class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 lg:col-span-2"
+        >
+          <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white mb-2">
+            {{ t('costs.model_comparison_title') || 'Model Cost Comparison' }}
+          </h3>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            {{ t('costs.model_comparison_desc') || 'Projected LLM cost if all emails were reprocessed with each model, based on actual token usage.' }}
+          </p>
+
+          <!-- Token hypothesis from actual data -->
+          <div
+            v-if="costs.token_hypothesis"
+            class="text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50/60 dark:bg-blue-900/20 rounded p-2 mb-3 space-y-1 border border-blue-200/50 dark:border-blue-800/30"
+          >
+            <p class="font-semibold">
+              📊 Token hypothesis (from {{ costs.token_hypothesis.emails_sampled }} processed emails):
+            </p>
+            <p>
+              Avg input: <strong>{{ costs.token_hypothesis.avg_input_tokens_per_email?.toLocaleString() }}</strong> tokens/email
+              · Avg output: <strong>{{ costs.token_hypothesis.avg_output_tokens_per_email?.toLocaleString() }}</strong> tokens/email
+            </p>
+            <p class="italic">
+              {{ costs.token_hypothesis.description }}
+            </p>
+          </div>
+
+          <!-- 10K projection grid -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+            <div
+              v-for="mc in costs.model_cost_comparison"
+              :key="mc.key"
+              class="relative rounded-lg border p-3 text-center"
+              :class="mc.projected_10k_usd === Math.min(...costs.model_cost_comparison.map(m => m.projected_10k_usd))
+                ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20'
+                : 'border-gray-200 dark:border-gray-700'"
+            >
+              <div class="text-xs font-medium text-gray-600 dark:text-gray-300 truncate">
+                {{ mc.model }}
+              </div>
+              <div class="mt-1 text-lg font-bold text-gray-900 dark:text-white">
+                ${{ mc.projected_10k_usd?.toFixed(0) ?? mc.projected_usd?.toFixed(4) }}
+              </div>
+              <div class="text-[10px] text-gray-400">
+                /10K emails
+              </div>
+              <div
+                v-if="mc.projected_10k_usd === Math.min(...costs.model_cost_comparison.map(m => m.projected_10k_usd))"
+                class="mt-1 text-[10px] font-semibold text-green-700 dark:text-green-400"
+              >
+                {{ t('costs.cheapest') || 'Cheapest' }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Actual spend for current batch -->
+          <p
+            v-if="costs.llm_tokens"
+            class="text-[11px] text-gray-400 dark:text-gray-500 mt-3"
+          >
+            Actual total tokens ({{ costs.counts?.emails_with_usage ?? 0 }} emails):
+            {{ (costs.llm_tokens.prompt_tokens ?? 0).toLocaleString() }} input +
+            {{ (costs.llm_tokens.completion_tokens ?? 0).toLocaleString() }} output
+          </p>
+
+          <!-- Cost multiplier warning -->
+          <div class="mt-3 text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50/60 dark:bg-amber-900/20 rounded p-2 space-y-1 border border-amber-200/50 dark:border-amber-800/30">
+            <p class="font-semibold">
+              ⚠️ Classification-only estimate. Costs increase with:
+            </p>
+            <ul class="list-disc pl-4 space-y-0.5">
+              <li><strong>Entity extraction:</strong> ~×1.3</li>
+              <li><strong>PII detection (LLM):</strong> ~×1.5</li>
+              <li><strong>Adversarial comparison:</strong> ~×2.0</li>
+              <li><strong>All features + adversarial:</strong> ~×3–4 total</li>
+              <li><strong>Reprocessing:</strong> multiplies by number of passes</li>
+            </ul>
+          </div>
         </div>
 
         <!-- Projected Spend -->

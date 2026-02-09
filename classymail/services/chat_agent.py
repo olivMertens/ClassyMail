@@ -12,7 +12,7 @@ from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 
 from classymail.core import config
-from classymail.core.llm_compat import build_chat_params
+from classymail.core.llm_compat import build_chat_params, extract_message_content
 from classymail.core.llm_limits import get_limiter
 from classymail.services.azure_clients import Clients
 # from classymail.services.circuit_breaker import with_chat_circuit_breaker
@@ -379,7 +379,7 @@ class ChatAgent:
 
                 message = response_json["choices"][0]["message"]
                 tool_calls = message.get("tool_calls")
-                content = message.get("content")
+                content = extract_message_content(message)
 
                 # HEURISTIC FIX: Recover from hallucinated JSON in content
                 if not tool_calls and content:

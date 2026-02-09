@@ -34,6 +34,7 @@
             "desc": "Sélectionnez le pipeline et le modèle IA pour le traitement des emails.",
             "model_select": "Modèle IA",
             "finetuning_not_supported": "Le Fine-tuning n'est pas disponible pour ce modèle.",
+            "finetuning_available": "Fine-tuning disponible (Azure OpenAI)",
             "strategy": {
                 "standard": "Standard (Optimisé Texte/OCR - Défaut)",
                 "reasoning": "Raisonnement (CoT / Analyse Profonde)",
@@ -314,6 +315,9 @@
         "avg_cost": "Coût IA Moyen / Email",
         "actual_spend": "Dépense IA Réelle (Historique)",
         "total_ai": "Total IA",
+        "model_comparison_title": "Comparaison des coûts par modèle — Projection 10K emails",
+        "model_comparison_desc": "Coût LLM de classification projeté pour 10K emails basé sur la consommation moyenne réelle de tokens. N'inclut pas l'extraction d'entités, la détection PII ou les appels adversariaux.",
+        "cheapest": "Le moins cher",
         "monthly_projection": "Projection Mensuelle",
         "projection_emails": "Emails projetés/mois : {n}",
         "projection_ai_formula": "IA variable = (coût IA moyen/email d’après l’historique : ${avg}) × {n}",

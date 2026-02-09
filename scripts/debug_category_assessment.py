@@ -39,9 +39,10 @@ async def test_assessment(
     # --- Step 1: Show resolved model config ---
     print("\n[1] Resolving model config for 'gpt-5-nano'...")
     try:
-        endpoint, deployment = resolve_model_config("gpt-5-nano")
+        endpoint, deployment, api_version = resolve_model_config("gpt-5-nano")
         print(f"    Endpoint:   {endpoint}")
         print(f"    Deployment: {deployment}")
+        print(f"    API Version:{api_version}")
         print(f"    Reasoning:  {is_reasoning_model(deployment)}")
     except Exception as e:
         print(f"    FAILED: {type(e).__name__}: {e}")
