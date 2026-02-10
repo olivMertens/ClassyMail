@@ -71,6 +71,7 @@ These variables **must** be configured for the application to function correctly
 - **`MISTRAL_DEPLOYMENT`** - The deployment name for Mistral OCR model
   - Example: `mistral-document-ai-2505`
   - Used for: OCR and document understanding
+  - ⚠️ **CRITICAL:** Must be EXACTLY `mistral-document-ai-2505` — typos (e.g., `mistral-ocr-2505`) cause HTTP 500 errors during OCR processing. Verify in Azure AI Foundry → Deployments.
 
 - **`MISTRAL_MODE`** - The deployment mode for Mistral (serverless MaaS)
   - Example: `maas`

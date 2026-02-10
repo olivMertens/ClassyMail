@@ -69,7 +69,7 @@ AZURE_COSMOS_CONTAINER=emails
 # Azure AI Foundry
 AZURE_AI_ENDPOINT=https://<aifoundry>.cognitiveservices.azure.com/
 MISTRAL_ENDPOINT=${AZURE_AI_ENDPOINT}
-MISTRAL_DEPLOYMENT=mistral-document-ai-2505
+MISTRAL_DEPLOYMENT=mistral-document-ai-2505  # ⚠️ CRITICAL: Must be EXACTLY this name — typos cause HTTP 500 errors
 MISTRAL_MODE=maas
 PHI_ENDPOINT=${AZURE_AI_ENDPOINT}
 PHI_DEPLOYMENT=Phi-4

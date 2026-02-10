@@ -263,7 +263,12 @@ Some AzureRM provider versions don't auto-detect subscription from Azure CLI. Th
 
 **💡 Worker Configuration:** The Worker container does NOT need UI configuration variables (`UI_SHOW_INFO_MODAL`, `UI_SHOW_DEVELOPER_TAB`, `MAX_UPLOAD_SIZE`, `ORGANIZATION_NAME`) since it doesn't serve the web interface.
 
-> **Note:** Keep `MISTRAL_DEPLOYMENT` consistent across Terraform, config defaults, and AI Foundry deployment (`mistral-document-ai-2505`).
+> **🔴 CRITICAL - MISTRAL_DEPLOYMENT Name:** Use **EXACTLY** `mistral-document-ai-2505` for `MISTRAL_DEPLOYMENT`. Typos (e.g., `mistral-ocr-2505`) will cause **HTTP 500 errors** during OCR processing. Verify consistency across:
+> - Environment variables: `MISTRAL_DEPLOYMENT=mistral-document-ai-2505`
+> - Terraform: `name = "mistral-document-ai-2505"` in `infra/main.tf`
+> - `secrets.env` and `secrets.env.example`
+> - `write_secrets_env.ps1` PowerShell script
+> - All deployment documentation
 
 ### Chatbot Variables (Injected into Container Apps)
 

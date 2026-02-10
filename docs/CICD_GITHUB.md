@@ -181,7 +181,7 @@ Terraform outputs → variables à renseigner :
 - `AZURE_COSMOS_DB` (output: `AZURE_COSMOS_DB`)
 - `AZURE_COSMOS_CONTAINER` (output: `AZURE_COSMOS_CONTAINER`)
 - `AZURE_AI_ENDPOINT` (output: `AI_ENDPOINT`)
-- `MISTRAL_DEPLOYMENT` (ex: `mistral-document-ai-2505`)
+- `MISTRAL_DEPLOYMENT` (ex: `mistral-document-ai-2505`) — ⚠️ **CRITICAL**: Must be exactly `mistral-document-ai-2505` or OCR will fail with HTTP 500 errors
 - `MISTRAL_MODE` (ex: `maas`)
 - `PHI_DEPLOYMENT` (ex: `phi-4`)
 

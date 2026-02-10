@@ -153,7 +153,7 @@ $lines = @(
   '',
   '# Mistral OCR Model',
   "MISTRAL_ENDPOINT=$aiEndpoint",
-  'MISTRAL_DEPLOYMENT=mistral-ocr-2505',
+  'MISTRAL_DEPLOYMENT=mistral-document-ai-2505',
   'MISTRAL_MODE=maas',
   'MISTRAL_API_VERSION=2024-05-01-preview',
   '',

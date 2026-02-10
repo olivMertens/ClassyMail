@@ -209,12 +209,12 @@ resource "azapi_resource" "deployment_phi4" {
 resource "azapi_resource" "deployment_mistral_ocr" {
   count     = var.enable_model_deployments ? 1 : 0
   type      = "Microsoft.CognitiveServices/accounts/deployments@2023-05-01"
-  name      = "mistral-ocr-2505"
+  name      = "mistral-document-ai-2505"
   parent_id = azapi_resource.ai_foundry.id
   body = jsonencode({
     sku = { name = "GlobalStandard", capacity = 1 }
     properties = {
-      model = { format = "Mistral", name = "mistral-ocr-2505", version = "25.05" }
+      model = { format = "Mistral", name = "mistral-document-ai-2505", version = "25.05" }
     }
   })
 }

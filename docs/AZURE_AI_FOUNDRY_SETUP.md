@@ -56,10 +56,11 @@ The ClassyMail MVP requires the following model deployments in Azure AI Foundry:
 
 ### 3. **Mistral Large (OCR & Document Understanding)**
 - **Model**: `Mistral-Large-2505` (serverless MaaS)
-- **Deployment Name** (recommended): `mistral-document-ai-2505`
+- **Deployment Name** (required): `mistral-document-ai-2505`
 - **Purpose**: OCR extraction from PDFs and document structure analysis
 - **Mode**: Serverless (Models as a Service)
 - **Environment Variable**: `MISTRAL_DEPLOYMENT`
+- ⚠️ **CRITICAL**: Deployment name MUST be `mistral-document-ai-2505` exactly. Typos (e.g., `mistral-ocr-2505`) will cause **HTTP 500 errors** during OCR processing.
 
 ### 4. **GPT Model (Advanced Classification)**
 - **Model**: `gpt-5.2-chat` or `gpt-4o`

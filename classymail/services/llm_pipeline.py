@@ -519,6 +519,13 @@ RÈGLES DE CLASSIFICATION :
 - Assigne un score de confiance (0.0 à 1.0) pour CHAQUE intention détectée.
 - La justification DOIT citer un extrait du texte et/ou la définition de la catégorie correspondante.
 
+EXTRACTION DU SENDER (Expéditeur) - PRIORITAIRE :
+Pour le sender, cherche en priorité :
+1. Email address (pattern: xxx@xxx.xxx) - récupère le PREMIER email trouvé
+2. "From:", "De:", "Sender:" suivi d'un nom ou email
+3. Signature à la fin (ex: "Cordialement, Jean Dupont")
+4. Si trouvé: retourne le sender. Sinon: retourne null (pas "Non identifiable")
+
 FORMAT DE RÉPONSE ATTENDU (JSON UNIQUEMENT) :
 {{
     "detected_intents": [
@@ -530,8 +537,8 @@ FORMAT DE RÉPONSE ATTENDU (JSON UNIQUEMENT) :
     ],
     "global_complexity": "Simple|Complexe",
     "classification_reason": "Explication courte si detected_intents est vide (ex: 'Aucune intention ne correspond car le contenu est hors périmètre assurance')",
-    "subject": "Sujet ou Objet de l'email extrait du texte",
-    "sender": "Nom ou Email de l'expéditeur extrait"
+    "subject": "Sujet ou Objet de l'email extrait du texte (ou null si absent)",
+    "sender": "Email address or name extracted (ex: 'john@example.com' or 'John Dupont'). Use null if not found."
 }}
 
 IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason avec une explication claire.

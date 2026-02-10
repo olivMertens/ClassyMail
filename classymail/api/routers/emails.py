@@ -213,10 +213,10 @@ async def list_emails(
         total = processed_count + review_count
 
         settings = load_settings()
-        finetune_min_required = settings.get("finetune_min_examples", 50)
-        # Fallback to env if not set in settings (though load_settings defaults to 50)
+        finetune_min_required = settings.get("finetune_min_examples", 5)
+        # Fallback to env if not set in settings (though load_settings defaults to 5)
         if not finetune_min_required:
-             finetune_min_required = int(os.getenv("FINETUNE_MIN_EXAMPLES", "50"))
+             finetune_min_required = int(os.getenv("FINETUNE_MIN_EXAMPLES", "5"))
 
         finetune_reviewed_ready = await count_reviewed_ready_items(clients=clients)
         avg_conf = await get_average_confidence(clients=clients)
@@ -266,7 +266,7 @@ async def get_stats(clients: Clients = Depends(get_clients)):
     pending_total = db_pending + db_processing
 
     settings = load_settings()
-    finetune_min_examples = settings.get("finetune_min_examples", 50)
+    finetune_min_examples = settings.get("finetune_min_examples", 5)
     # The frontend expects finetune_min_required
     finetune_min_required = finetune_min_examples
 
@@ -398,7 +398,7 @@ async def export_emails_finetune_jsonl(
     clients: Clients = Depends(get_clients),
 ):
     settings = load_settings()
-    finetune_min_required = min_required or settings.get("finetune_min_examples", 50)
+    finetune_min_required = min_required or settings.get("finetune_min_examples", 5)
 
     finetune_reviewed_ready = await count_reviewed_ready_items(clients=clients)
     if not include_unreviewed and finetune_reviewed_ready < finetune_min_required:
@@ -854,13 +854,13 @@ async def export_emails_csv(
     logger.info(f"CSV Export request: status={status}, format={format}")
 
     try:
-        # Build query
+        # Build query - Use list format for parameters (Cosmos SDK requirement)
         filters = ["IS_DEFINED(c.file_url)", "IS_DEFINED(c.status)"]
-        params = {}
+        params = []
 
         if status != "all":
             filters.append("c.status = @status")
-            params["@status"] = status
+            params.append({"name": "@status", "value": status})
 
         where_clause = " AND ".join(filters)
         query_sql = f"SELECT * FROM c WHERE {where_clause} ORDER BY c.created_at DESC"

@@ -43,13 +43,13 @@ DEFAULT_SETTINGS = {
     "processing_strategy": "standard",  # standard | reasoning | vision
     "ai_model": "phi4",
     "adversarial_model": None, # Default comparison model
-    "finetune_min_examples": 50,
+    "finetune_min_examples": 5,
     "ocr_max_attempts": 3,
     "email_preprocessing": {
         "enabled": True,
         "include_subject": True,
         "extract_last_conversation": True,
-        "detect_pii": False,  # Enable PII detection
+        "detect_pii": True,  # Enable PII detection by default (name, email, phone, address extraction)
         "pii_detection_method": "llm",  # llm | azure_language | both
         "pii_llm_model": "auto",  # auto (reuse ai_model) | gpt-4o-mini | gpt-5-nano | ...
     }
@@ -115,7 +115,7 @@ def load_settings() -> dict:
         if "adversarial_model" not in data:
             data["adversarial_model"] = None
         if "finetune_min_examples" not in data:
-            data["finetune_min_examples"] = 50
+            data["finetune_min_examples"] = 5
         if "ocr_max_attempts" not in data:
             data["ocr_max_attempts"] = 3
         else:
@@ -186,7 +186,7 @@ def save_settings(settings: dict):
                 val = 5
             settings["finetune_min_examples"] = val
         except (ValueError, TypeError):
-            settings["finetune_min_examples"] = 50
+            settings["finetune_min_examples"] = 5
 
     if "ocr_max_attempts" in settings:
         settings["ocr_max_attempts"] = _sanitize_ocr_attempts(settings["ocr_max_attempts"])
@@ -203,7 +203,7 @@ def save_settings(settings: dict):
             ep.setdefault("enabled", True)
             ep.setdefault("include_subject", True)
             ep.setdefault("extract_last_conversation", True)
-            ep.setdefault("detect_pii", False)
+            ep.setdefault("detect_pii", True)  # PII detection enabled by default
             ep.setdefault("pii_llm_model", "auto")
 
     DATA_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")

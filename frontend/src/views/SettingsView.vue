@@ -602,13 +602,6 @@ onMounted(() => {
           {{ t('settings.categories.tab_name') }}
         </button>
         <button
-          :class="[activeTab === 'design' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
-          @click="activeTab = 'design'"
-        >
-          <SwatchIcon class="h-4 w-4" />
-          {{ t('settings.appearance') }}
-        </button>
-        <button
           :class="[activeTab === 'processing' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
           @click="activeTab = 'processing'"
         >
@@ -616,11 +609,11 @@ onMounted(() => {
           {{ t('settings.tabs.processing') }}
         </button>
         <button
-          :class="[activeTab === 'finetuning' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
-          @click="activeTab = 'finetuning'"
+          :class="[activeTab === 'design' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          @click="activeTab = 'design'"
         >
-          <AdjustmentsHorizontalIcon class="h-4 w-4" />
-          {{ t('settings.tabs.finetuning') }}
+          <SwatchIcon class="h-4 w-4" />
+          {{ t('settings.appearance') }}
         </button>
         <button
           :class="[activeTab === 'general' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
@@ -628,6 +621,13 @@ onMounted(() => {
         >
           <BanknotesIcon class="h-4 w-4" />
           {{ t('settings.tabs.general') }}
+        </button>
+        <button
+          :class="[activeTab === 'finetuning' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          @click="activeTab = 'finetuning'"
+        >
+          <AdjustmentsHorizontalIcon class="h-4 w-4" />
+          {{ t('settings.tabs.finetuning') }}
         </button>
 
         <button
