@@ -2088,9 +2088,7 @@ onMounted(() => {
                   <span
                     :class="acaValidationResults.all_required_present ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
                   >
-                    {{ acaValidationResults.all_required_present ? '✓ All Required Variables Present' : '✗ Missing
-                    Required
-                    Variables' }}
+                    {{ acaValidationResults.all_required_present ? '✓ All Required Variables Present' : '✗ Missing Required Variables' }}
                   </span>
                 </p>
                 <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">

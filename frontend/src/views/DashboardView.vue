@@ -426,7 +426,7 @@ const visionTooltip = (email) => {
   const items = email.vision_analysis
   if (!items || !items.length) return t('dashboard.strategy.vision')
   const lines = [`👁 Vision Analysis (${items.length} image${items.length > 1 ? 's' : ''}):`]
-  items.forEach((item, i) => {
+  items.forEach((item) => {
     const page = (item.page_index || 0) + 1
     const type = item.image_type || 'Image'
     const summary = item.summary || item.alt_text || item.description || ''
@@ -968,8 +968,7 @@ const emit = defineEmits(['open-email'])
             :class="email.status === 'ERROR' ? 'text-red-500 font-medium' : 'text-gray-400'"
             :title="email.status === 'ERROR' ? (email.error || 'Unknown Error') : (email.classification?.classification_reason || 'No category detected')"
           >
-            {{ email.status === 'ERROR' ? (email.error || 'Error') : (email.classification?.classification_reason || 'No
-            category') }}
+            {{ email.status === 'ERROR' ? (email.error || 'Error') : (email.classification?.classification_reason || 'No category') }}
           </div>
 
           <!-- Vision Analysis Summary: Show if present and strategy is vision -->
@@ -987,7 +986,10 @@ const emit = defineEmits(['open-email'])
               :title="`${img.summary || img.image_type || 'Image'}`"
             >
               <span class="line-clamp-1">{{ (img.summary || img.image_type || 'Image').substring(0, 40) }}</span>
-              <span v-if="(img.summary || img.image_type || 'Image').length > 40" class="text-[8px]">…</span>
+              <span
+                v-if="(img.summary || img.image_type || 'Image').length > 40"
+                class="text-[8px]"
+              >…</span>
             </span>
             <span
               v-if="email.vision_analysis.length > 2"

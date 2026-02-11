@@ -622,7 +622,10 @@ const renderMarkdown = (text) => md.render(text || '')
                             <span class="font-semibold text-xs text-green-700 dark:text-green-300">
                               Page {{ (item.page_index || 0) + 1 }}
                             </span>
-                            <span v-if="item.image_type" class="text-xs text-gray-600 dark:text-gray-400 capitalize">
+                            <span
+                              v-if="item.image_type"
+                              class="text-xs text-gray-600 dark:text-gray-400 capitalize"
+                            >
                               • {{ item.image_type }}
                             </span>
                           </div>
@@ -931,8 +934,7 @@ const renderMarkdown = (text) => md.render(text || '')
                       No comparison data
                     </h3>
                     <p class="mt-1 text-sm text-gray-500">
-                      Run an adversarial check to compare {{ primaryModel }} with {{ adversarialModel || 'configured
-                      model' }}.
+                      Run an adversarial check to compare {{ primaryModel }} with {{ adversarialModel || 'configured model' }}.
                     </p>
                     <div class="mt-6 flex flex-col items-center gap-2">
                       <button
