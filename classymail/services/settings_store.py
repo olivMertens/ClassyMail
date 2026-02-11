@@ -129,9 +129,9 @@ def load_settings() -> dict:
             data["ocr_max_attempts"] = 3
         else:
             data["ocr_max_attempts"] = _sanitize_ocr_attempts(data["ocr_max_attempts"])
-        if "email_preprocessing" not in data:
+        if "email_preprocessing" not in data or not isinstance(data["email_preprocessing"], dict):
             data["email_preprocessing"] = DEFAULT_SETTINGS["email_preprocessing"].copy()
-        if "g2s_export" not in data:
+        if "g2s_export" not in data or not isinstance(data["g2s_export"], dict):
             data["g2s_export"] = DEFAULT_SETTINGS["g2s_export"].copy()
         return _apply_env_overrides(data)
     except Exception:

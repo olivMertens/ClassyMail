@@ -34,7 +34,7 @@ def _bound_limit(limit: int) -> int:
 
 def _query(container, query: str, parameters: list[dict] | None = None, max_items: int | None = None):
     # Cosmos SDK supports max_item_count to limit page size, reducing RU burn when ORDER BY + no partition key.
-    return container.query_items(query, parameters=parameters, max_item_count=max_items)
+    return container.query_items(query, parameters=parameters if parameters is not None else [], max_item_count=max_items)
 
 
 async def save_to_cosmos(record: EmailRecord, clients: Clients | None = None) -> None:
@@ -100,7 +100,7 @@ async def _scalar_query(query: str, *, clients: Clients | None = None, parameter
     await clients.ensure_cosmos_container()
     it = clients.cosmos_container.query_items(
         query,
-        parameters=parameters,
+        parameters=parameters if parameters is not None else [],
     )
     async for v in it:
         return v
@@ -119,8 +119,8 @@ async def sum_llm_tokens(*, clients: Clients | None = None) -> dict:
     """Aggregate prompt/completion tokens across all processed emails."""
     v = await _scalar_query(
         "SELECT VALUE {"
-        "  prompt: SUM(c.usage.phi4.prompt_tokens),"
-        "  completion: SUM(c.usage.phi4.completion_tokens)"
+        "  \"prompt\": SUM(c.usage.phi4.prompt_tokens),"
+        "  \"completion\": SUM(c.usage.phi4.completion_tokens)"
         "} FROM c WHERE IS_DEFINED(c.usage) AND IS_DEFINED(c.usage.phi4)",
         clients=clients,
     )

@@ -885,11 +885,11 @@ async def export_emails_csv(
 
         # Load settings for slug mapping
         settings = load_settings()
-        categories = settings.get("categories", [])
+        categories = settings.get("categories") or []
         slug_map = {cat.get("name", ""): cat.get("slug", cat.get("name", "")) for cat in categories}
 
         # G2S export settings
-        g2s_export = settings.get("g2s_export", {})
+        g2s_export = settings.get("g2s_export") or {}
         unclassified_label = g2s_export.get("unclassified_label", "autre")
 
         # Generate CSV in memory
