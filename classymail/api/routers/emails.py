@@ -812,14 +812,25 @@ def extract_filename(blob_url: str) -> str:
 
 
 def extract_visual_proofs(item: dict) -> str:
-    """Extract visual proofs (image descriptions) from chunks when vision mode used."""
-    chunks = item.get("chunks", [])
+    """Extract visual proofs (image descriptions) from vision_analysis."""
+    vision_items = item.get("vision_analysis") or []
     visual_proofs = []
 
+    for vi in vision_items:
+        summary = vi.get("summary") or vi.get("description") or ""
+        img_type = vi.get("image_type") or "Image"
+        page = (vi.get("page_index") or 0) + 1
+        if summary:
+            visual_proofs.append(f"[Page {page} - {img_type}: {summary}]")
+
+    if visual_proofs:
+        return " | ".join(visual_proofs)
+
+    # Fallback: legacy chunks format
+    chunks = item.get("chunks", [])
     for chunk in chunks:
         alt_text = chunk.get("alt_text")
         description = chunk.get("description")
-
         if alt_text:
             visual_proofs.append(f"[Image: {alt_text}]")
         elif description:
@@ -877,6 +888,10 @@ async def export_emails_csv(
         categories = settings.get("categories", [])
         slug_map = {cat.get("name", ""): cat.get("slug", cat.get("name", "")) for cat in categories}
 
+        # G2S export settings
+        g2s_export = settings.get("g2s_export", {})
+        unclassified_label = g2s_export.get("unclassified_label", "autre")
+
         # Generate CSV in memory
         output = io.StringIO()
 
@@ -903,7 +918,7 @@ async def export_emails_csv(
                     intent_slugs.append(slug)
                     confidences.append(confidence)
 
-                intentions_str = ",".join(intent_slugs) if intent_slugs else "unclassified"
+                intentions_str = ",".join(intent_slugs) if intent_slugs else unclassified_label
 
                 # Calculate average confidence
                 avg_confidence = round(sum(confidences) / len(confidences), 2) if confidences else 0.0
@@ -912,22 +927,24 @@ async def export_emails_csv(
                 writer.writerow([pdf_filename, intentions_str, confidence_pct])
 
         else:  # enriched format
-            # Full audit format with 12 columns
+            # Full audit format with dynamic columns based on g2s_export settings
             writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
-            writer.writerow([
-                'ID',
-                'INTENTIONS',
-                'CONFIDENCE_MOYENNE',
-                'DETAILS_CONFIDENCES',
-                'MODE_DETECTION',
-                'QUALITE',
-                'MODELE',
-                'JUSTIFICATION',
-                'PREUVES_VISUELLES',
-                'TEMPS_MS',
-                'PII_DETECTE',
-                'PII_TYPES'
-            ])
+
+            # Build dynamic header based on settings
+            header = ['ID', 'INTENTIONS', 'CONFIDENCE_MOYENNE', 'DETAILS_CONFIDENCES', 'MODE_DETECTION']
+            if g2s_export.get("show_quality", True):
+                header.append('QUALITE')
+            if g2s_export.get("show_model", True):
+                header.append('MODELE')
+            if g2s_export.get("show_justification", True):
+                header.append('JUSTIFICATION')
+            if g2s_export.get("show_visual_proofs", True):
+                header.append('PREUVES_VISUELLES')
+            if g2s_export.get("show_time", True):
+                header.append('TEMPS_S')
+            if g2s_export.get("show_pii", True):
+                header.extend(['PII_DETECTE', 'PII_TYPES'])
+            writer.writerow(header)
 
             for item in items:
                 # Extract PDF filename from blob URL
@@ -940,7 +957,7 @@ async def export_emails_csv(
 
                 # Extract model info and detection mode
                 usage = item.get("usage", {})
-                model_name = usage.get("model", "unknown")
+                model_name = usage.get("phi4_model") or usage.get("model") or "unknown"
                 detection_mode = usage.get("strategy", "standard")
 
                 # Intentions and confidences
@@ -959,7 +976,7 @@ async def export_emails_csv(
                     confidence_details.append(f"{intent_name}: {confidence}%")
                     justifications.append(intent_obj.get("justification", ""))
 
-                intentions_str = ",".join(intent_slugs) if intent_slugs else "unclassified"
+                intentions_str = ",".join(intent_slugs) if intent_slugs else unclassified_label
 
                 # Calculate average confidence
                 avg_confidence = round(sum(confidences) / len(confidences), 2) if confidences else 0.0
@@ -978,6 +995,14 @@ async def export_emails_csv(
 
                 justification_str = " | ".join(justifications) if justifications else ""
 
+                # Convert processing time from ms to seconds with 2 decimal places
+                processing_time_s = ""
+                if processing_time:
+                    try:
+                        processing_time_s = round(float(processing_time) / 1000.0, 2)
+                    except (ValueError, TypeError):
+                        processing_time_s = processing_time
+
                 # Extract visual proofs from chunks (only when vision mode)
                 visual_proofs = extract_visual_proofs(item) if detection_mode == "vision" else ""
 
@@ -994,20 +1019,21 @@ async def export_emails_csv(
 
                 pii_types_str = ",".join(pii_types) if pii_types else ""
 
-                writer.writerow([
-                    pdf_filename,
-                    intentions_str,
-                    confidence_pct,
-                    details_str,
-                    detection_mode,
-                    quality,
-                    model_name,
-                    justification_str,
-                    visual_proofs,
-                    processing_time,
-                    pii_detected,
-                    pii_types_str
-                ])
+                # Build dynamic row based on settings
+                row = [pdf_filename, intentions_str, confidence_pct, details_str, detection_mode]
+                if g2s_export.get("show_quality", True):
+                    row.append(quality)
+                if g2s_export.get("show_model", True):
+                    row.append(model_name)
+                if g2s_export.get("show_justification", True):
+                    row.append(justification_str)
+                if g2s_export.get("show_visual_proofs", True):
+                    row.append(visual_proofs)
+                if g2s_export.get("show_time", True):
+                    row.append(processing_time_s)
+                if g2s_export.get("show_pii", True):
+                    row.extend([pii_detected, pii_types_str])
+                writer.writerow(row)
 
         # Get CSV content with UTF-8 BOM
         csv_content = output.getvalue()

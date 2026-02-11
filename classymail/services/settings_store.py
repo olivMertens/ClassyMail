@@ -52,6 +52,15 @@ DEFAULT_SETTINGS = {
         "detect_pii": True,  # Enable PII detection by default (name, email, phone, address extraction)
         "pii_detection_method": "llm",  # llm | azure_language | both
         "pii_llm_model": "auto",  # auto (reuse ai_model) | gpt-4o-mini | gpt-5-nano | ...
+    },
+    "g2s_export": {
+        "unclassified_label": "autre",  # Label shown in CSV when no category matches
+        "show_model": True,              # Include MODELE column in enriched CSV
+        "show_pii": True,                # Include PII_DETECTE and PII_TYPES columns
+        "show_justification": True,      # Include JUSTIFICATION column
+        "show_visual_proofs": True,       # Include PREUVES_VISUELLES column
+        "show_quality": True,             # Include QUALITE column
+        "show_time": True,               # Include TEMPS_S column
     }
 }
 PROCESSING_STRATEGY_ENV = "PROCESSING_STRATEGY"
@@ -122,6 +131,8 @@ def load_settings() -> dict:
             data["ocr_max_attempts"] = _sanitize_ocr_attempts(data["ocr_max_attempts"])
         if "email_preprocessing" not in data:
             data["email_preprocessing"] = DEFAULT_SETTINGS["email_preprocessing"].copy()
+        if "g2s_export" not in data:
+            data["g2s_export"] = DEFAULT_SETTINGS["g2s_export"].copy()
         return _apply_env_overrides(data)
     except Exception:
         return _apply_env_overrides(DEFAULT_SETTINGS.copy())
@@ -205,6 +216,22 @@ def save_settings(settings: dict):
             ep.setdefault("extract_last_conversation", True)
             ep.setdefault("detect_pii", True)  # PII detection enabled by default
             ep.setdefault("pii_llm_model", "auto")
+
+    # Sanitize g2s_export
+    if "g2s_export" not in settings:
+        settings["g2s_export"] = DEFAULT_SETTINGS["g2s_export"].copy()
+    else:
+        ge = settings["g2s_export"]
+        if not isinstance(ge, dict):
+            settings["g2s_export"] = DEFAULT_SETTINGS["g2s_export"].copy()
+        else:
+            ge.setdefault("unclassified_label", "autre")
+            ge.setdefault("show_model", True)
+            ge.setdefault("show_pii", True)
+            ge.setdefault("show_justification", True)
+            ge.setdefault("show_visual_proofs", True)
+            ge.setdefault("show_quality", True)
+            ge.setdefault("show_time", True)
 
     DATA_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
 

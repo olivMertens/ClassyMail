@@ -49,6 +49,15 @@ const settings = ref({
     extract_last_conversation: true,
     detect_pii: false,
     pii_llm_model: 'auto'
+  },
+  g2s_export: {
+    unclassified_label: 'autre',
+    show_model: true,
+    show_pii: true,
+    show_justification: true,
+    show_visual_proofs: true,
+    show_quality: true,
+    show_time: true
   }
 })
 const defaults = ref({
@@ -86,13 +95,13 @@ const useAoaiEnhancement = ref(false)
 // ── Token & pricing hypothesis (mirrors MODEL_PRICING in costing.py) ──
 // Prices are per 1 K tokens (input, output) — Azure OpenAI / Foundry, 2025
 const MODEL_PRICING = {
-  'phi4':        { label: 'Phi-4',        input: 0.000107, output: 0.00043, quality: 0.82  },
-  'gpt-4o':      { label: 'GPT-4o',       input: 0.0025,   output: 0.010,   quality: 0.92  },
-  'gpt-4o-mini': { label: 'GPT-4o Mini',  input: 0.00015,  output: 0.0006,  quality: 0.84  },
-  'gpt-4.1-nano':{ label: 'GPT-4.1 Nano', input: 0.0001,   output: 0.0004,  quality: 0.72  },
-  'gpt-5-nano':  { label: 'GPT-5 Nano',   input: 0.00005,  output: 0.0004,  quality: 0.79  },
-  'gpt-5-mini':  { label: 'GPT-5 Mini',   input: 0.0004,   output: 0.0016,  quality: 0.89  },
-  'Kimi-K2.5':   { label: 'Kimi-K2.5',    input: 0.0006,   output: 0.003,   quality: 0.88  },
+  'phi4': { label: 'Phi-4', input: 0.000107, output: 0.00043, quality: 0.82 },
+  'gpt-4o': { label: 'GPT-4o', input: 0.0025, output: 0.010, quality: 0.92 },
+  'gpt-4o-mini': { label: 'GPT-4o Mini', input: 0.00015, output: 0.0006, quality: 0.84 },
+  'gpt-4.1-nano': { label: 'GPT-4.1 Nano', input: 0.0001, output: 0.0004, quality: 0.72 },
+  'gpt-5-nano': { label: 'GPT-5 Nano', input: 0.00005, output: 0.0004, quality: 0.79 },
+  'gpt-5-mini': { label: 'GPT-5 Mini', input: 0.0004, output: 0.0016, quality: 0.89 },
+  'Kimi-K2.5': { label: 'Kimi-K2.5', input: 0.0006, output: 0.003, quality: 0.88 },
 }
 
 // Hypothesis: tokens per email (classification only — single LLM call)
@@ -101,7 +110,7 @@ const TOKEN_HYPOTHESIS = { inputLow: 800, inputHigh: 1500, outputLow: 200, outpu
 const modelCostEstimates = computed(() => {
   const n = 10_000
   return Object.entries(MODEL_PRICING).map(([key, m]) => {
-    const costLow  = n * ((m.input * TOKEN_HYPOTHESIS.inputLow  / 1000) + (m.output * TOKEN_HYPOTHESIS.outputLow  / 1000))
+    const costLow = n * ((m.input * TOKEN_HYPOTHESIS.inputLow / 1000) + (m.output * TOKEN_HYPOTHESIS.outputLow / 1000))
     const costHigh = n * ((m.input * TOKEN_HYPOTHESIS.inputHigh / 1000) + (m.output * TOKEN_HYPOTHESIS.outputHigh / 1000))
     return { key, ...m, costLow: Math.round(costLow * 100) / 100, costHigh: Math.round(costHigh * 100) / 100 }
   })
@@ -303,6 +312,18 @@ const loadSettings = async () => {
       if (!settings.value.ai_model) {
         settings.value.ai_model = 'phi4'
       }
+      // Ensure g2s_export defaults
+      if (!settings.value.g2s_export) {
+        settings.value.g2s_export = {
+          unclassified_label: 'autre',
+          show_model: true,
+          show_pii: true,
+          show_justification: true,
+          show_visual_proofs: true,
+          show_quality: true,
+          show_time: true
+        }
+      }
     }
   } catch (e) {
     console.error(e)
@@ -327,7 +348,8 @@ const saveSettings = async () => {
       ocr_max_attempts: settings.value.ocr_max_attempts ? Number(settings.value.ocr_max_attempts) : 3,
       review_confidence_threshold: settings.value.review_confidence_threshold ? Number(settings.value.review_confidence_threshold) : 0.85,
       categories: settings.value.categories,
-      email_preprocessing: settings.value.email_preprocessing  // FIX: Include email_preprocessing settings
+      email_preprocessing: settings.value.email_preprocessing,  // FIX: Include email_preprocessing settings
+      g2s_export: settings.value.g2s_export  // G2S export customization
     }
 
     const res = await fetch('/api/settings', {
@@ -537,7 +559,9 @@ const themes = [
   { id: 'blue', name: 'Blue', class: 'bg-blue-600' },
   { id: 'green', name: 'Green', class: 'bg-emerald-600' },
   { id: 'indigo', name: 'Indigo', class: 'bg-indigo-600' },
-  { id: 'orange', name: 'Orange', class: 'bg-orange-600' }
+  { id: 'slate', name: 'Slate', class: 'bg-slate-600' },
+  { id: 'orange', name: 'Orange', class: 'bg-orange-600' },
+  { id: 'red', name: 'Red', class: 'bg-red-600' }
 ]
 
 const toggleDarkMode = () => {
@@ -842,7 +866,9 @@ onMounted(() => {
                   Model Comparison — Estimated Quality & Cost
                 </p>
                 <!-- Token hypothesis -->
-                <div class="text-[11px] text-blue-600 dark:text-blue-300 mb-2 bg-blue-100/50 dark:bg-blue-800/30 rounded p-2 space-y-1">
+                <div
+                  class="text-[11px] text-blue-600 dark:text-blue-300 mb-2 bg-blue-100/50 dark:bg-blue-800/30 rounded p-2 space-y-1"
+                >
                   <p class="font-semibold">
                     📊 Hypothesis (classification only — single LLM call/email):
                   </p>
@@ -894,7 +920,9 @@ onMounted(() => {
                   </div>
                 </div>
                 <!-- Cost multiplier warnings -->
-                <div class="mt-3 text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50/60 dark:bg-amber-900/20 rounded p-2 space-y-1 border border-amber-200/50 dark:border-amber-800/30">
+                <div
+                  class="mt-3 text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50/60 dark:bg-amber-900/20 rounded p-2 space-y-1 border border-amber-200/50 dark:border-amber-800/30"
+                >
                   <p class="font-semibold">
                     ⚠️ These estimates cover classification only. Actual costs increase with:
                   </p>
@@ -912,7 +940,7 @@ onMounted(() => {
               </div>
             </div>
           </div>
-        </div>        <!-- Section: Processing Strategy -->
+        </div> <!-- Section: Processing Strategy -->
         <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 mb-6 bg-gray-50/50 dark:bg-gray-900/20">
           <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
             <AdjustmentsHorizontalIcon class="h-5 w-5 text-purple-500" />
@@ -1171,6 +1199,121 @@ onMounted(() => {
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {{ t('settings.processing.pii_llm_model_description') }}
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: G2S Export Settings -->
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 bg-gray-50/50 dark:bg-gray-900/20 mt-6">
+          <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-2">
+            <InformationCircleIcon class="h-5 w-5 text-blue-500" />
+            Export CSV (Client G2S)
+          </h4>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Configurer le contenu de l'export CSV et le traitement des emails non classifiés
+          </p>
+
+          <div class="space-y-4">
+            <!-- Unclassified label -->
+            <div>
+              <label
+                for="unclassified-label"
+                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                Libellé pour les emails non classifiés
+              </label>
+              <input
+                id="unclassified-label"
+                v-model="settings.g2s_export.unclassified_label"
+                type="text"
+                class="block w-full max-w-xs rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+                placeholder="autre"
+              >
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Valeur affichée dans la colonne INTENTIONS quand aucune catégorie ne correspond (défaut: "autre")
+              </p>
+            </div>
+
+            <!-- CSV columns toggles -->
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Colonnes incluses dans l'export enrichi
+              </p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="flex items-center">
+                  <input
+                    id="export-quality"
+                    v-model="settings.g2s_export.show_quality"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+                  >
+                  <label
+                    for="export-quality"
+                    class="ml-2 text-sm text-gray-700 dark:text-gray-300"
+                  >QUALITE</label>
+                </div>
+                <div class="flex items-center">
+                  <input
+                    id="export-model"
+                    v-model="settings.g2s_export.show_model"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+                  >
+                  <label
+                    for="export-model"
+                    class="ml-2 text-sm text-gray-700 dark:text-gray-300"
+                  >MODELE</label>
+                </div>
+                <div class="flex items-center">
+                  <input
+                    id="export-justification"
+                    v-model="settings.g2s_export.show_justification"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+                  >
+                  <label
+                    for="export-justification"
+                    class="ml-2 text-sm text-gray-700 dark:text-gray-300"
+                  >JUSTIFICATION</label>
+                </div>
+                <div class="flex items-center">
+                  <input
+                    id="export-visual-proofs"
+                    v-model="settings.g2s_export.show_visual_proofs"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+                  >
+                  <label
+                    for="export-visual-proofs"
+                    class="ml-2 text-sm text-gray-700 dark:text-gray-300"
+                  >PREUVES_VISUELLES</label>
+                </div>
+                <div class="flex items-center">
+                  <input
+                    id="export-time"
+                    v-model="settings.g2s_export.show_time"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+                  >
+                  <label
+                    for="export-time"
+                    class="ml-2 text-sm text-gray-700 dark:text-gray-300"
+                  >TEMPS_S</label>
+                </div>
+                <div class="flex items-center">
+                  <input
+                    id="export-pii"
+                    v-model="settings.g2s_export.show_pii"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+                  >
+                  <label
+                    for="export-pii"
+                    class="ml-2 text-sm text-gray-700 dark:text-gray-300"
+                  >PII_DETECTE +
+                    PII_TYPES</label>
+                </div>
               </div>
             </div>
           </div>
@@ -1945,7 +2088,9 @@ onMounted(() => {
                   <span
                     :class="acaValidationResults.all_required_present ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
                   >
-                    {{ acaValidationResults.all_required_present ? '✓ All Required Variables Present' : '✗ Missing Required Variables' }}
+                    {{ acaValidationResults.all_required_present ? '✓ All Required Variables Present' : '✗ Missing
+                    Required
+                    Variables' }}
                   </span>
                 </p>
                 <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">

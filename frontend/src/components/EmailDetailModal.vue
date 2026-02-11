@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, ExclamationCircleIcon } from '@heroicons/vue/24/outline'
+import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, ExclamationCircleIcon, ShieldExclamationIcon } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
 import { useDialog } from '../composables/useDialog'
 import { useI18n } from 'vue-i18n'
@@ -518,6 +518,33 @@ const renderMarkdown = (text) => md.render(text || '')
                     </div>
                   </div>
 
+                  <!-- PII Detection Summary -->
+                  <div
+                    v-if="email.pii_detected && email.pii_data"
+                    class="rounded-md bg-amber-50 dark:bg-amber-900/20 p-3 border border-amber-200 dark:border-amber-800"
+                  >
+                    <div class="flex items-center gap-2 mb-2">
+                      <ShieldExclamationIcon class="h-5 w-5 text-amber-500" />
+                      <span class="text-sm font-semibold text-amber-800 dark:text-amber-200">PII Détecté</span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                      <div
+                        v-for="(items, key) in email.pii_data"
+                        :key="key"
+                      >
+                        <template v-if="items && items.length">
+                          <span class="font-semibold text-amber-700 dark:text-amber-300 capitalize">{{ {
+                            names: 'Noms',
+                            emails: 'Emails', phones: 'Téléphones', addresses: 'Adresses', contract_ids: 'N° contrat',
+                            dates: 'Dates', other: 'Autre'
+                          }[key] || key }}:</span>
+                          <span class="text-amber-600 dark:text-amber-400 ml-1">{{ items.slice(0, 3).join(', ') }}{{
+                            items.length > 3 ? ` (+${items.length - 3})` : '' }}</span>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+
                   <!-- Debug URLs -->
                   <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
                     <div v-if="email.file_url">
@@ -576,39 +603,61 @@ const renderMarkdown = (text) => md.render(text || '')
                   <!-- Vision Analysis -->
                   <div v-if="email.vision_analysis && email.vision_analysis.length">
                     <h4
-                      class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 mt-4 flex items-center gap-2"
+                      class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 mt-4 flex items-center gap-2"
                     >
                       👁 Vision Analysis
-                      <span class="text-xs font-normal text-gray-500">({{ email.vision_analysis.length }} images)</span>
+                      <span class="text-xs font-normal text-gray-500">({{ email.vision_analysis.length }} image{{ email.vision_analysis.length !== 1 ? 's' : '' }})</span>
                     </h4>
                     <div
-                      class="space-y-3 max-h-60 overflow-y-auto border border-gray-100 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900"
+                      class="space-y-2 border border-green-100 dark:border-green-900/30 rounded-lg p-3 bg-green-50/50 dark:bg-green-900/10"
                     >
                       <div
-                        v-for="item in email.vision_analysis"
-                        :key="item.id || item.summary"
-                        class="text-sm p-3 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                        v-for="(item, idx) in email.vision_analysis"
+                        :key="item.id || `vis-${idx}`"
+                        class="text-sm p-2.5 rounded bg-white dark:bg-gray-800 border border-green-200 dark:border-green-800/50"
                       >
-                        <div class="flex justify-between items-start mb-2">
-                          <span class="font-bold text-xs uppercase text-gray-500 tracking-wider">Page {{
-                            (item.page_index || 0) + 1 }} • {{ item.image_type || 'Image' }}</span>
+                        <!-- Header: Page + Type + Relevance Badge -->
+                        <div class="flex justify-between items-start mb-2 gap-2">
+                          <div class="flex items-center gap-1">
+                            <span class="font-semibold text-xs text-green-700 dark:text-green-300">
+                              Page {{ (item.page_index || 0) + 1 }}
+                            </span>
+                            <span v-if="item.image_type" class="text-xs text-gray-600 dark:text-gray-400 capitalize">
+                              • {{ item.image_type }}
+                            </span>
+                          </div>
                           <span
                             v-if="item.is_relevant"
-                            class="text-[10px] bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 px-1.5 py-0.5 rounded border border-green-200 dark:border-green-800"
-                          >Relevant</span>
+                            class="flex-shrink-0 text-[10px] bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 px-1.5 py-0.5 rounded-full border border-green-200 dark:border-green-800 font-medium"
+                          >
+                            ✓ Relevant
+                          </span>
                         </div>
+
+                        <!-- Summary: Main description -->
                         <div
                           v-if="item.summary"
-                          class="mb-2 text-gray-900 dark:text-gray-100"
+                          class="mb-2 text-gray-900 dark:text-gray-100 text-sm leading-relaxed"
                         >
+                          <strong class="block text-xs text-gray-700 dark:text-gray-300 mb-1">Summary:</strong>
                           {{ item.summary }}
                         </div>
+
+                        <!-- Details: Additional context -->
                         <div
                           v-if="item.details"
-                          class="text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-900/50 p-2 rounded border border-gray-100 dark:border-gray-800"
+                          class="text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900/30 p-2.5 rounded border border-green-100 dark:border-green-800/30"
                         >
-                          <span class="font-semibold block mb-1">Details:</span>
+                          <span class="font-semibold block mb-1 text-green-700 dark:text-green-400">Details:</span>
                           {{ item.details }}
+                        </div>
+
+                        <!-- Fallback: Show image_type if no summary -->
+                        <div
+                          v-if="!item.summary && !item.details && item.image_type"
+                          class="text-xs italic text-gray-500 dark:text-gray-400"
+                        >
+                          Image type detected: <strong>{{ item.image_type }}</strong>
                         </div>
                       </div>
                     </div>
@@ -882,7 +931,8 @@ const renderMarkdown = (text) => md.render(text || '')
                       No comparison data
                     </h3>
                     <p class="mt-1 text-sm text-gray-500">
-                      Run an adversarial check to compare {{ primaryModel }} with {{ adversarialModel || 'configured model' }}.
+                      Run an adversarial check to compare {{ primaryModel }} with {{ adversarialModel || 'configured
+                      model' }}.
                     </p>
                     <div class="mt-6 flex flex-col items-center gap-2">
                       <button

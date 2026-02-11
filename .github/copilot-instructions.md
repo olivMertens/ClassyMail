@@ -3,6 +3,7 @@
 - Always respect the DI pattern with `Clients` (no import-by-value of `sb_client`, `cosmos_container`, `blob_service_client`).
 - Use `uv run ruff check .` and `uv run pytest` before suggesting completion is done.
 - For infrastructure, prefer Terraform; keep `container_image` required, two ACAs (api/worker) with KEDA servicebus scaler.
+- **MANDATORY for all Terraform modifications**: Before creating or modifying any Terraform resource, fetch the Azure Verified Modules (AVM) registry at `https://azure.github.io/Azure-Verified-Modules/` using `fetch_webpage` to check for an official AVM module or latest best practices. Prefer AVM modules over raw `azurerm`/`azapi` resources when available.
 - Health/ready endpoints: `/healthz` `/readyz` (aliases `/health` `/ready`).
 - Avoid modifying `main.py` except to delegate to `classymail.app:app`.
 - Default to Python 3.12.

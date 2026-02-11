@@ -25,5 +25,21 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+# 4. Terraform Validation (if infra/ files changed)
+$tfChanged = git diff --cached --name-only -- 'infra/*.tf' 2>$null
+if (-not $tfChanged) {
+    $tfChanged = git diff origin/main --name-only -- 'infra/*.tf' 2>$null
+}
+if ($tfChanged) {
+    Write-Host "Terraform files changed — running validation..."
+    pwsh scripts/validate_terraform.ps1 -SkipInit:$false
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Terraform validation failed."
+        exit 1
+    }
+} else {
+    Write-Host "No Terraform changes detected, skipping validation." -ForegroundColor DarkGray
+}
+
 Write-Host "All checks passed!" -ForegroundColor Green
 exit 0

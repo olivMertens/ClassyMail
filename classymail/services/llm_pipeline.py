@@ -183,6 +183,8 @@ def clamp_text_to_token_budget(text: str, max_tokens: int) -> tuple[str, bool]:
 def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = False, data: dict | None = None) -> tuple[str, list[dict]]:
     """
     Combine OCR pages into markdown and log per-page metrics.
+    Also extracts image descriptions from Mistral's markdown output.
+    
     Logs:
     - total pages received
     - per-page markdown length and image count
@@ -190,11 +192,31 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
     - final combined content stats
     - raw response preview on empty content error
     """
+    import re
+    
     logger.info(f"[metrics] OCR Response: {len(ocr_pages)} pages received from Mistral Document AI")
 
     markdown_parts: list[str] = []
     total_content_chars = 0
     annotated_images: list[dict] = []
+    
+    # Pre-process all markdown to extract image descriptions early
+    all_markdown = ""
+    image_markdown_refs = {}  # Map img-id to description from markdown
+
+    for page_idx, page in enumerate(ocr_pages):
+        page_md = page.get("markdown", "") or ""
+        all_markdown += page_md + "\n"
+        
+        # Extract image descriptions from markdown syntax: ![description](url)
+        image_pattern = r'!\[([^\]]*)\]\(([^)]*)\)'
+        for match in re.finditer(image_pattern, page_md):
+            desc_text, img_url = match.groups()
+            if desc_text and img_url:
+                # Store by img_url (e.g., 'img-0.jpeg')
+                img_key = img_url.split('/')[-1] if '/' in img_url else img_url
+                image_markdown_refs[img_key] = desc_text
+                image_markdown_refs[f"page_{page_idx}_{img_key}"] = desc_text
 
     for page_idx, page in enumerate(ocr_pages):
         page_md = page.get("markdown", "") or ""
@@ -213,7 +235,7 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
             # We enrich with detailed annotations to help Phi-4 understand visual context
             image_notes = []
             for img in page_images:
-                summary = img.get("summary") or ""
+                summary = img.get("summary") or img.get("description") or ""
                 details = img.get("details") or ""
                 img_type = img.get("image_type") or img.get("type") or "image"
                 img_id = img.get("id") or f"img-{len(image_notes)}"
@@ -233,7 +255,27 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
         # Only collect annotated images when vision enrichment is enabled
         # to avoid showing image metadata in standard/reasoning modes
         if enable_vision_enrichment:
-            for img in page_images:
+            for img_idx, img in enumerate(page_images):
+                # Debug: Log raw image data to understand Mistral response structure
+                logger.debug(f"[metrics] Raw image from Mistral: {json.dumps(img, default=str)[:500]}")
+                
+                # Try multiple sources for image description
+                summary = img.get("summary") or img.get("description") or ""
+                
+                # If no API description, try to get from markdown
+                if not summary:
+                    img_id_candidates = [
+                        img.get("id"),
+                        f"img-{img_idx}.jpeg",
+                        f"img-{img_idx}",
+                        f"page_{page_idx}_img-{img_idx}.jpeg"
+                    ]
+                    for candidate in img_id_candidates:
+                        if candidate and candidate in image_markdown_refs:
+                            summary = image_markdown_refs[candidate]
+                            logger.info(f"[metrics] Found markdown description for image {candidate}: '{summary[:100]}'")
+                            break
+                
                 # Normalize bounding box from various Mistral formats to standard {x_min, y_min, x_max, y_max}
                 bbox = img.get("bbox")
                 if not bbox and "top_left_x" in img:
@@ -245,18 +287,20 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
                         "y_max": img.get("bottom_right_y", 0)
                     }
 
-                annotated_images.append({
+                vision_item = {
                     "id": img.get("id"),
                     "page_index": page_idx,
                     "image_type": img.get("type") or img.get("image_type"),
-                    "summary": img.get("summary") or img.get("description"),
+                    "summary": summary,
                     "bbox": bbox,
                     "details": img.get("details"),
                     "is_relevant": img.get("is_relevant"),
-                })
+                }
+                logger.info(f"[metrics] Extracted vision item for page {page_idx}: type={vision_item.get('image_type')}, has_summary={bool(vision_item.get('summary'))}, summary='{(vision_item.get('summary') or '')[:80]}'")
+                annotated_images.append(vision_item)
 
     content = "\n\n".join(markdown_parts)
-    logger.info(f"[metrics] OCR Final combined content: {len(content)} chars (from {total_content_chars} chars across {len(ocr_pages)} pages)")
+    logger.info(f"[metrics] OCR Final combined content: {len(content)} chars (from {total_content_chars} chars across {len(ocr_pages)} pages), total_images={len(annotated_images)}")
 
     if not content.strip():
         logger.error(f"[metrics] OCR Failed: Empty content after combining {len(ocr_pages)} pages. Raw response preview: {str(data)[:500] if data else ''}")
@@ -293,11 +337,13 @@ async def ocr_with_mistral(
     # Prepare payloads (per page if image conversion works, else single PDF)
     # NOTE: Vision strategy uses OCR-rendered page images only (no attachments/external images).
     payloads = []
+    image_conversion_total_ms = 0  # Track vision-specific overhead
     try:
         import fitz
         from PIL import Image
         import io
         import base64
+        import time
 
         def _split_pdf_base64(pdf_data: bytes, max_pages: int = 30) -> list[str]:
             """Split PDF into base64-encoded chunks of max_pages each.
@@ -332,13 +378,16 @@ async def ocr_with_mistral(
                     p["bbox_annotation_format"] = pydantic_to_mistral_schema(ImageDescription)
                 payloads.append(p)
         else:
-            # Per-page image conversion
+            # Per-page image conversion (OPTIMIZED for vision strategy)
+            # Note: Reduced resolution (1x instead of 2x) and quality (75 instead of 85)
+            # to improve performance. Mistral Document AI performs rescaling internally.
+            image_conversion_start = time.perf_counter()
             for page_idx in range(page_count):
                 page = doc.load_page(page_idx)
-                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                pix = page.get_pixmap(matrix=fitz.Matrix(1, 1))  # 1x resolution (50% faster) vs 2x
                 img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
                 buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=85)
+                img.save(buf, format="JPEG", quality=75)  # Reduced from 85 to 75 for faster encoding
                 img_b64 = base64.b64encode(buf.getvalue()).decode()
 
                 p = {
@@ -352,6 +401,7 @@ async def ocr_with_mistral(
                 if enable_vision_enrichment:
                     p["bbox_annotation_format"] = pydantic_to_mistral_schema(ImageDescription)
                 payloads.append(p)
+            image_conversion_total_ms = (time.perf_counter() - image_conversion_start) * 1000
         doc.close()
     except Exception as e:
         logger.warning(f"Failed to convert PDF to images, falling back to raw PDF base64: {e}")
@@ -418,6 +468,12 @@ async def ocr_with_mistral(
                                     data = resp.json()
                                     local_ocr_pages = data.get("pages", [])
                                     local_usage = data.get("usage", {})
+                                    
+                                    # Log response structure for first page to understand image field names
+                                    if local_ocr_pages and attempt_no == 1:
+                                        first_page_images = local_ocr_pages[0].get("images", [])
+                                        if first_page_images:
+                                            logger.info(f"[metrics] Mistral response - First image keys: {list(first_page_images[0].keys())}, Full sample: {json.dumps(first_page_images[0], default=str)[:1000]}")
                                 except json.JSONDecodeError as ex:
                                     response_text = resp.text[:1000]
                                     log_entry = {
@@ -465,10 +521,14 @@ async def ocr_with_mistral(
         pages_count = len(ocr_pages)
 
         logger.info(f"[metrics] OCR Success: {pages_count} pages processed")
+        if image_conversion_total_ms > 0:
+            logger.info(f"[metrics] Image conversion (vision strategy): {image_conversion_total_ms:.1f}ms ({image_conversion_total_ms/pages_count:.1f}ms/page)")
 
         span.set_attribute("gen_ai.usage.pages_processed", pages_count)
         span.set_attribute("gen_ai.usage.input_tokens", usage_info.get("prompt_tokens", 0))
         span.set_attribute("gen_ai.usage.output_tokens", usage_info.get("completion_tokens", 0))
+        if image_conversion_total_ms > 0:
+            span.set_attribute("app.image_conversion_ms", image_conversion_total_ms)
 
     return {"markdown": content, "usage": usage_info, "images": annotated_images}
 

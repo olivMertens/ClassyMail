@@ -27,5 +27,20 @@ if ! python scripts/check_i18n.py; then
     exit 1
 fi
 
+# 4. Terraform Validation (if infra/ files changed)
+TF_CHANGED=$(git diff --cached --name-only -- 'infra/*.tf' 2>/dev/null)
+if [[ -z "$TF_CHANGED" ]]; then
+    TF_CHANGED=$(git diff origin/main --name-only -- 'infra/*.tf' 2>/dev/null)
+fi
+if [[ -n "$TF_CHANGED" ]]; then
+    echo "Terraform files changed — running validation..."
+    if ! bash scripts/validate_terraform.sh; then
+        echo "Terraform validation failed."
+        exit 1
+    fi
+else
+    echo "No Terraform changes detected, skipping validation."
+fi
+
 echo "All checks passed!"
 exit 0

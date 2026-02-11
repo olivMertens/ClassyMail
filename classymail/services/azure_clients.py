@@ -98,33 +98,39 @@ class Clients:
 
             db = await self.cosmos_client.create_database_if_not_exists(id=config.COSMOS_DB)
 
-            # Vector Search Configuration
-            # Using text-embedding-3-small (1536 dimensions)
-            vector_embedding_policy = {
-                "vectorEmbeddings": [
-                    {
-                        "path": "/vector",
-                        "dataType": "float32",
-                        "distanceFunction": "cosine",
-                        "dimensions": 1536
-                    }
-                ]
-            }
-
-            indexing_policy = {
-                "indexingMode": "consistent",
-                "automatic": True,
-                "includedPaths": [{"path": "/*"}],
-                "excludedPaths": [{"path": "/_etag/?"}, {"path": "/vector/*"}],
-                "vectorIndexes": [{"path": "/vector", "type": "quantizedFlat"}]
-            }
-
-            self.cosmos_container = await db.create_container_if_not_exists(
-                id=config.COSMOS_CONTAINER,
-                partition_key=PartitionKey(path="/id"),
-                vector_embedding_policy=vector_embedding_policy,
-                indexing_policy=indexing_policy
-            )
+            # Prefer fetching the existing container (Terraform-managed) to avoid
+            # BadRequest when create_container_if_not_exists sends a vector-
+            # embedding policy that conflicts with the already-created container.
+            try:
+                self.cosmos_container = db.get_container_client(config.COSMOS_CONTAINER)
+                await self.cosmos_container.read()  # verify it exists
+                logger.info("Cosmos container '%s' found (existing).", config.COSMOS_CONTAINER)
+            except Exception:
+                # Container doesn't exist yet – create with full vector config
+                logger.info("Cosmos container '%s' not found, creating with vector policy.", config.COSMOS_CONTAINER)
+                vector_embedding_policy = {
+                    "vectorEmbeddings": [
+                        {
+                            "path": "/vector",
+                            "dataType": "float32",
+                            "distanceFunction": "cosine",
+                            "dimensions": 1536
+                        }
+                    ]
+                }
+                indexing_policy = {
+                    "indexingMode": "consistent",
+                    "automatic": True,
+                    "includedPaths": [{"path": "/*"}],
+                    "excludedPaths": [{"path": "/_etag/?"}, {"path": "/vector/*"}],
+                    "vectorIndexes": [{"path": "/vector", "type": "quantizedFlat"}]
+                }
+                self.cosmos_container = await db.create_container_if_not_exists(
+                    id=config.COSMOS_CONTAINER,
+                    partition_key=PartitionKey(path="/id"),
+                    vector_embedding_policy=vector_embedding_policy,
+                    indexing_policy=indexing_policy
+                )
 
     async def ensure_rag_containers(self):
         """

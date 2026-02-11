@@ -1,3 +1,27 @@
+# ──────────────────────────────────────────────────────────────────────
+# API-version audit (last checked: 2025-07-16)
+#
+# Resource                                          API version   Source
+# ─────────────────────────────────────────────────  ────────────  ─────────────
+# Microsoft.CognitiveServices/accounts               2025-06-01   AVM Bicep / Learn docs
+# Microsoft.CognitiveServices/accounts/projects      2025-06-01   AVM Bicep / Learn docs
+# Microsoft.CognitiveServices/accounts/deployments   2025-06-01   AVM Bicep (GA)
+# Microsoft.DocumentDB/.../containers                2025-04-15   AVM Bicep / Learn docs
+#
+# AVM modules available (future migration path):
+#   - Azure/avm-res-cognitiveservices-account/azurerm v0.11.0  (requires azapi ~> 2.5)
+#   - Azure/avm-res-documentdb-databaseaccount/azurerm
+#   - Azure/avm-ptn-aiml-ai-foundry/azurerm  (pattern module)
+#
+# azapi provider note: AVM v0.11.0 requires azapi ~> 2.5 (body uses native HCL
+# instead of jsonencode). Current config uses azapi ~> 1.13 with jsonencode().
+# Upgrade to azapi v2.x is a breaking syntax change; plan and test thoroughly.
+#
+# Agent Service / Capability Hosts:
+#   capabilityHosts requires preview API (2025-07-01-preview) via AzAPI only.
+#   Not needed unless deploying Agent Service standard setup with BYO storage.
+# ──────────────────────────────────────────────────────────────────────
+
 terraform {
   required_providers {
     azurerm = { source = "hashicorp/azurerm", version = "~> 4.0" }
@@ -195,7 +219,7 @@ resource "azapi_resource" "ai_project" {
 # Deployments (MaaS models)
 resource "azapi_resource" "deployment_phi4" {
   count     = var.enable_model_deployments ? 1 : 0
-  type      = "Microsoft.CognitiveServices/accounts/deployments@2023-05-01"
+  type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
   name      = "phi-4"
   parent_id = azapi_resource.ai_foundry.id
   body = jsonencode({
@@ -208,7 +232,7 @@ resource "azapi_resource" "deployment_phi4" {
 
 resource "azapi_resource" "deployment_mistral_ocr" {
   count     = var.enable_model_deployments ? 1 : 0
-  type      = "Microsoft.CognitiveServices/accounts/deployments@2023-05-01"
+  type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
   name      = "mistral-document-ai-2505"
   parent_id = azapi_resource.ai_foundry.id
   body = jsonencode({
@@ -351,39 +375,54 @@ resource "azurerm_cosmosdb_sql_database" "sql" {
   account_name        = azurerm_cosmosdb_account.db.name
 }
 
-resource "azurerm_cosmosdb_sql_container" "container" {
-  # Aligner avec les valeurs par défaut de l'app (main.py)
-  name                = "emails"
-  resource_group_name = azurerm_resource_group.rg.name
-  account_name        = azurerm_cosmosdb_account.db.name
-  database_name       = azurerm_cosmosdb_sql_database.sql.name
-  partition_key_paths = ["/id"]
+# Use AzApi for the emails container to support vectorEmbeddingPolicy + vectorIndexes
+# (azurerm_cosmosdb_sql_container does not expose these properties)
+resource "azapi_resource" "emails_container" {
+  schema_validation_enabled = false
 
-  # Politique d'indexation: garder l'index sur les champs utiles aux requêtes (status, reviewed, classification.needs_review, _ts)
-  # et désindexer les gros champs rarement filtrés pour réduire les RU (markdown, raw_response, logs, usage).
-  indexing_policy {
-    indexing_mode = "consistent"
+  type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-04-15"
+  name      = "emails"
+  parent_id = azurerm_cosmosdb_sql_database.sql.id
 
-    included_path {
-      path = "/*"
+  body = jsonencode({
+    properties = {
+      resource = {
+        id = "emails"
+        partitionKey = {
+          paths = ["/id"]
+          kind  = "Hash"
+        }
+        vectorEmbeddingPolicy = {
+          vectorEmbeddings = [
+            {
+              path             = "/vector"
+              dataType         = "float32"
+              distanceFunction = "cosine"
+              dimensions       = 1536
+            }
+          ]
+        }
+        indexingPolicy = {
+          indexingMode = "consistent"
+          automatic    = true
+          includedPaths = [
+            { path = "/*" }
+          ]
+          excludedPaths = [
+            { path = "/_etag/?" },
+            { path = "/vector/*" },
+            { path = "/markdown/?" },
+            { path = "/processing_log/?" },
+            { path = "/usage/?" },
+            { path = "/classification/raw_response/?" }
+          ]
+          vectorIndexes = [
+            { path = "/vector", type = "quantizedFlat" }
+          ]
+        }
+      }
     }
-
-    excluded_path {
-      path = "/markdown/?"
-    }
-
-    excluded_path {
-      path = "/processing_log/?"
-    }
-
-    excluded_path {
-      path = "/usage/?"
-    }
-
-    excluded_path {
-      path = "/classification/raw_response/?"
-    }
-  }
+  })
 }
 
 # --- RAG Containers (Chatbot & Cache) ---
@@ -410,7 +449,7 @@ resource "azapi_resource" "vector_cache" {
   # Schema validation disabled: vectorIndexes / vectorEmbeddingPolicy not fully GA yet
   schema_validation_enabled = false
 
-  type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15"
+  type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-04-15"
   name      = "vector_cache"
   parent_id = azurerm_cosmosdb_sql_database.sql.id
 
@@ -487,7 +526,7 @@ output "AZURE_STORAGE_CONTAINER" { value = azurerm_storage_container.pdf_inputs.
 
 output "AZURE_COSMOS_ENDPOINT" { value = azurerm_cosmosdb_account.db.endpoint }
 output "AZURE_COSMOS_DB" { value = azurerm_cosmosdb_sql_database.sql.name }
-output "AZURE_COSMOS_CONTAINER" { value = azurerm_cosmosdb_sql_container.container.name }
+output "AZURE_COSMOS_CONTAINER" { value = azapi_resource.emails_container.name }
 
 output "AZURE_COSMOS_KEY" {
   value     = var.cosmos_use_rbac ? null : azurerm_cosmosdb_account.db.primary_key
@@ -620,7 +659,7 @@ resource "azurerm_container_app" "api" {
       }
       env {
         name  = "AZURE_COSMOS_CONTAINER"
-        value = azurerm_cosmosdb_sql_container.container.name
+        value = azapi_resource.emails_container.name
       }
 
       # AI endpoints (Phi uses AZURE_AI_ENDPOINT fallback if PHI_ENDPOINT isn't set)
@@ -839,7 +878,7 @@ resource "azurerm_container_app" "worker" {
       }
       env {
         name  = "AZURE_COSMOS_CONTAINER"
-        value = azurerm_cosmosdb_sql_container.container.name
+        value = azapi_resource.emails_container.name
       }
 
       env {

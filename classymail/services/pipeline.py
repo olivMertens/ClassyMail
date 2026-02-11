@@ -116,7 +116,10 @@ async def run_classification_pipeline(
     cost_overrides: Optional[dict] = None, # Legacy support
     clients: Clients | None = None,
 ) -> EmailRecord:
+    import time
+    
     processing_log: list[dict] = []
+    stage_timings = {}  # Track timing for each stage
 
     logger.info(f"[pipeline] -> Starting pipeline for: {blob_url}")
 
@@ -144,8 +147,10 @@ async def run_classification_pipeline(
 
     try:
         log("download", "start")
+        stage_start = time.perf_counter()
         pdf_b64, pdf_bytes = await download_blob_as_base64(blob_url, return_bytes=True, clients=clients)
-        log("download", "ok", f"{len(pdf_bytes)} bytes")
+        stage_timings["download"] = (time.perf_counter() - stage_start) * 1000
+        log("download", "ok", f"{len(pdf_bytes)} bytes ({stage_timings['download']:.0f}ms)")
     except Exception as ex:
         from classymail.models import OCRFailed
 
@@ -158,6 +163,7 @@ async def run_classification_pipeline(
 
     try:
         log("ocr", "start")
+        stage_start = time.perf_counter()
         # Enable image extraction only if strategy is 'vision' to save costs/latency
         include_img = (strategy == "vision")
         # Vision uses OCR-rendered page images only (no attachments). Enrichment annotates those page images.
@@ -168,6 +174,7 @@ async def run_classification_pipeline(
             include_images=include_img,
             enable_vision_enrichment=include_img
         )
+        stage_timings["ocr"] = (time.perf_counter() - stage_start) * 1000
         log("ocr", "ok")
     except Exception as ex:
         from classymail.models import OCRFailed
@@ -187,20 +194,24 @@ async def run_classification_pipeline(
     entities_usage = None
     try:
         log("extraction", "start")
+        stage_start = time.perf_counter()
         # Run in parallel with classification potentially? For now sequential to keep logs clean
         # and maybe allow injection later.
         extraction_result = await extract_business_entities(markdown, clients=clients)
         entities_data = extraction_result.get("entities")
         entities_usage = extraction_result.get("usage")
-        log("extraction", "ok", f"Found {len(entities_data.get('dates', []))} dates, {len(entities_data.get('reference_numbers', []))} refs")
+        stage_timings["extraction"] = (time.perf_counter() - stage_start) * 1000
+        log("extraction", "ok", f"Found {len(entities_data.get('dates', []))} dates, {len(entities_data.get('reference_numbers', []))} refs ({stage_timings['extraction']:.0f}ms)")
     except Exception as ex:
         log("extraction", "error", f"Entity extraction failed (non-critical): {ex}")
         # Non-critical, continue
 
     try:
         log("classify", "start")
+        stage_start = time.perf_counter()
         classification_raw = await classify_with_phi4(markdown, strategy=strategy, clients=clients)
-        log("classify", "ok")
+        stage_timings["classify"] = (time.perf_counter() - stage_start) * 1000
+        log("classify", "ok", f"({stage_timings['classify']:.0f}ms)")
     except Exception as ex:
         from classymail.models import OCRFailed
 
@@ -217,6 +228,7 @@ async def run_classification_pipeline(
     chunk_docs: list[dict] = []
     try:
         log("embedding", "start")
+        stage_start = time.perf_counter()
         if markdown:
             vector = await generate_embedding(markdown, clients=clients)
             # Chunking & chunk embeddings for RAG
@@ -232,7 +244,8 @@ async def run_classification_pipeline(
                     "content": ch["content"],
                     "vector": ch_vec,
                 })
-        log("embedding", "ok", f"dim={len(vector)} chunks={len(chunk_docs)}")
+        stage_timings["embedding"] = (time.perf_counter() - stage_start) * 1000
+        log("embedding", "ok", f"dim={len(vector)} chunks={len(chunk_docs)} ({stage_timings['embedding']:.0f}ms)")
     except Exception as ex:
         log("embedding", "error", f"Failed to generate embedding: {ex}")
         # We generally don't want to fail the whole pipeline if embedding fails,
@@ -274,6 +287,16 @@ async def run_classification_pipeline(
 
     from classymail.models import BusinessEntities
 
+    # Extract PII results from classification if present
+    pii_detected_val = classification_raw.get("pii_detected", False) if isinstance(classification_raw, dict) else False
+    pii_data_val = classification_raw.get("detected_pii") if isinstance(classification_raw, dict) else None
+    preprocessing_meta = classification_raw.get("preprocessing_metadata") if isinstance(classification_raw, dict) else None
+
+    # Extract PII results from classification if present
+    pii_detected_val = classification_raw.get("pii_detected", False) if isinstance(classification_raw, dict) else False
+    pii_data_val = classification_raw.get("detected_pii") if isinstance(classification_raw, dict) else None
+    preprocessing_meta = classification_raw.get("preprocessing_metadata") if isinstance(classification_raw, dict) else None
+
     record = EmailRecord(
         id=blob_id_from_url(blob_url),
         file_url=blob_url,
@@ -295,6 +318,9 @@ async def run_classification_pipeline(
         ),
         entities=BusinessEntities(**entities_data) if entities_data else None,
         vision_analysis=mistral_images if mistral_images else None,
+        pii_detected=pii_detected_val,
+        pii_data=pii_data_val,
+        preprocessing_metadata=preprocessing_meta,
         status=status,
         usage=usage,
         updated_at=datetime.now(timezone.utc),
@@ -302,8 +328,15 @@ async def run_classification_pipeline(
     )
     if chunk_docs:
         setattr(record, "chunks", chunk_docs)
+    
+    # Log stage timing summary for performance diagnostics
+    total_ms = sum(stage_timings.values())
+    timing_summary = " | ".join([f"{stage}={ms:.0f}ms" for stage, ms in sorted(stage_timings.items())])
+    logger.info(f"[pipeline] STAGE_TIMINGS: {timing_summary} | TOTAL={total_ms:.0f}ms")
+    
     span.set_attribute("app.result_status", status)
     span.set_attribute("app.result_id", record.id)
+    span.set_attribute("app.stage_timings", {k: f"{v:.0f}ms" for k, v in stage_timings.items()})
     span.set_status(Status(StatusCode.OK))
     span.end()
     return record

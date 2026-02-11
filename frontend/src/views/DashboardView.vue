@@ -421,6 +421,43 @@ const getSortedIntents = (email) => {
   return [...intents].sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
 }
 
+// Build rich tooltip for vision analysis images
+const visionTooltip = (email) => {
+  const items = email.vision_analysis
+  if (!items || !items.length) return t('dashboard.strategy.vision')
+  const lines = [`👁 Vision Analysis (${items.length} image${items.length > 1 ? 's' : ''}):`]
+  items.forEach((item, i) => {
+    const page = (item.page_index || 0) + 1
+    const type = item.image_type || 'Image'
+    const summary = item.summary || item.alt_text || item.description || ''
+    lines.push(`  Page ${page} (${type})${summary ? ': ' + summary.substring(0, 120) : ''}`)
+  })
+  return lines.join('\n')
+}
+
+// Build rich tooltip for PII detection showing types and counts
+const piiTooltip = (email) => {
+  const data = email.pii_data
+  if (!data) return t('dashboard.pii.detected')
+  const PII_LABELS = {
+    names: 'Noms',
+    emails: 'Emails',
+    phones: 'Téléphones',
+    addresses: 'Adresses',
+    contract_ids: 'N° contrat',
+    dates: 'Dates',
+    other: 'Autre'
+  }
+  const lines = ['🛡 PII détecté:']
+  for (const [key, label] of Object.entries(PII_LABELS)) {
+    const items = data[key]
+    if (items && items.length) {
+      lines.push(`  ${label} (${items.length}): ${items.slice(0, 3).join(', ')}${items.length > 3 ? '...' : ''}`)
+    }
+  }
+  return lines.length > 1 ? lines.join('\n') : t('dashboard.pii.detected')
+}
+
 const emit = defineEmits(['open-email'])
 </script>
 
@@ -860,8 +897,8 @@ const emit = defineEmits(['open-email'])
           <div class="flex gap-1 items-center">
             <span
               v-if="email.pii_detected"
-              class="text-amber-500"
-              :title="t('dashboard.pii.detected')"
+              class="text-amber-500 cursor-help"
+              :title="piiTooltip(email)"
             >
               <ShieldExclamationIcon class="h-4 w-4" />
             </span>
@@ -931,7 +968,33 @@ const emit = defineEmits(['open-email'])
             :class="email.status === 'ERROR' ? 'text-red-500 font-medium' : 'text-gray-400'"
             :title="email.status === 'ERROR' ? (email.error || 'Unknown Error') : (email.classification?.classification_reason || 'No category detected')"
           >
-            {{ email.status === 'ERROR' ? (email.error || 'Error') : (email.classification?.classification_reason || 'No category') }}
+            {{ email.status === 'ERROR' ? (email.error || 'Error') : (email.classification?.classification_reason || 'No
+            category') }}
+          </div>
+
+          <!-- Vision Analysis Summary: Show if present and strategy is vision -->
+          <div
+            v-if="email.processing_strategy === 'vision' && email.vision_analysis && email.vision_analysis.length"
+            class="flex flex-wrap items-center gap-1 pt-0.5"
+          >
+            <span class="text-[9px] font-semibold text-green-700 dark:text-green-400 flex items-center gap-0.5">
+              👁 {{ email.vision_analysis.length }} image{{ email.vision_analysis.length !== 1 ? 's' : '' }}
+            </span>
+            <span
+              v-for="(img, idx) in email.vision_analysis.slice(0, 2)"
+              :key="idx"
+              class="text-[9px] text-gray-600 dark:text-gray-400 bg-green-50 dark:bg-green-900/20 rounded px-1 py-0.5 border border-green-100 dark:border-green-800/50"
+              :title="`${img.summary || img.image_type || 'Image'}`"
+            >
+              <span class="line-clamp-1">{{ (img.summary || img.image_type || 'Image').substring(0, 40) }}</span>
+              <span v-if="(img.summary || img.image_type || 'Image').length > 40" class="text-[8px]">…</span>
+            </span>
+            <span
+              v-if="email.vision_analysis.length > 2"
+              class="text-[8px] text-gray-500 dark:text-gray-400 font-semibold"
+            >
+              +{{ email.vision_analysis.length - 2 }}
+            </span>
           </div>
 
           <!-- Meta row: ID + Strategy + Duration -->
@@ -942,9 +1005,9 @@ const emit = defineEmits(['open-email'])
             <div class="flex items-center gap-1.5">
               <span
                 v-if="strategyBadge(email.processing_strategy)"
-                class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium border"
+                class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium border cursor-help"
                 :class="strategyBadge(email.processing_strategy).color"
-                :title="t('dashboard.strategy.' + (email.processing_strategy || 'standard'))"
+                :title="email.processing_strategy === 'vision' ? visionTooltip(email) : t('dashboard.strategy.' + (email.processing_strategy || 'standard'))"
               >
                 {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' +
                   strategyBadge(email.processing_strategy).key) }}
@@ -1235,8 +1298,8 @@ const emit = defineEmits(['open-email'])
             <div class="flex items-center gap-2">
               <div
                 v-if="email.pii_detected"
-                class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 rounded-full"
-                :title="t('dashboard.pii.tooltip')"
+                class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 rounded-full cursor-help"
+                :title="piiTooltip(email)"
               >
                 <ShieldExclamationIcon class="h-3.5 w-3.5 mr-1" />
                 {{ t('dashboard.pii.badge') }}
@@ -1320,9 +1383,9 @@ const emit = defineEmits(['open-email'])
               <span>{{ formatDuration(email) || '—' }}</span>
               <span
                 v-if="strategyBadge(email.processing_strategy)"
-                class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium border"
+                class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium border cursor-help"
                 :class="strategyBadge(email.processing_strategy).color"
-                :title="t('dashboard.strategy.' + (email.processing_strategy || 'standard'))"
+                :title="email.processing_strategy === 'vision' ? visionTooltip(email) : t('dashboard.strategy.' + (email.processing_strategy || 'standard'))"
               >
                 {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' +
                   strategyBadge(email.processing_strategy).key) }}

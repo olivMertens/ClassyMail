@@ -192,7 +192,11 @@ async def handle_queue_message(receiver, msg, *, get_settings, clients: Clients)
                         settings = {**settings, "processing_strategy": msg_strategy}
                         logger.info("[msg:%s] Strategy override: %s", message_id, msg_strategy)
                     logger.info("[msg:%s] Starting classification pipeline", message_id)
+                    import time as time_module
+                    pipeline_start = time_module.perf_counter()
                     result = await run_classification_pipeline(blob_url, settings=settings, clients=clients)
+                    pipeline_ms = (time_module.perf_counter() - pipeline_start) * 1000
+                    logger.info("[msg:%s] Pipeline processing took %.0fms", message_id, pipeline_ms)
 
             span.set_attribute("app.processing_time_ms", timer.duration_ms)
             logger.info("[msg:%s] Pipeline/Task completed in %.0fms", message_id, timer.duration_ms)
