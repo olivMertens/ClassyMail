@@ -184,7 +184,7 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
     """
     Combine OCR pages into markdown and log per-page metrics.
     Also extracts image descriptions from Mistral's markdown output.
-    
+
     Logs:
     - total pages received
     - per-page markdown length and image count
@@ -193,13 +193,13 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
     - raw response preview on empty content error
     """
     import re
-    
+
     logger.info(f"[metrics] OCR Response: {len(ocr_pages)} pages received from Mistral Document AI")
 
     markdown_parts: list[str] = []
     total_content_chars = 0
     annotated_images: list[dict] = []
-    
+
     # Pre-process all markdown to extract image descriptions early
     all_markdown = ""
     image_markdown_refs = {}  # Map img-id to description from markdown
@@ -207,7 +207,7 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
     for page_idx, page in enumerate(ocr_pages):
         page_md = page.get("markdown", "") or ""
         all_markdown += page_md + "\n"
-        
+
         # Extract image descriptions from markdown syntax: ![description](url)
         image_pattern = r'!\[([^\]]*)\]\(([^)]*)\)'
         for match in re.finditer(image_pattern, page_md):
@@ -258,10 +258,10 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
             for img_idx, img in enumerate(page_images):
                 # Debug: Log raw image data to understand Mistral response structure
                 logger.debug(f"[metrics] Raw image from Mistral: {json.dumps(img, default=str)[:500]}")
-                
+
                 # Try multiple sources for image description
                 summary = img.get("summary") or img.get("description") or ""
-                
+
                 # If no API description, try to get from markdown
                 if not summary:
                     img_id_candidates = [
@@ -275,7 +275,7 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
                             summary = image_markdown_refs[candidate]
                             logger.info(f"[metrics] Found markdown description for image {candidate}: '{summary[:100]}'")
                             break
-                
+
                 # Normalize bounding box from various Mistral formats to standard {x_min, y_min, x_max, y_max}
                 bbox = img.get("bbox")
                 if not bbox and "top_left_x" in img:
@@ -468,7 +468,7 @@ async def ocr_with_mistral(
                                     data = resp.json()
                                     local_ocr_pages = data.get("pages", [])
                                     local_usage = data.get("usage", {})
-                                    
+
                                     # Log response structure for first page to understand image field names
                                     if local_ocr_pages and attempt_no == 1:
                                         first_page_images = local_ocr_pages[0].get("images", [])

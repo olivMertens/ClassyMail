@@ -117,7 +117,7 @@ async def run_classification_pipeline(
     clients: Clients | None = None,
 ) -> EmailRecord:
     import time
-    
+
     processing_log: list[dict] = []
     stage_timings = {}  # Track timing for each stage
 
@@ -328,12 +328,12 @@ async def run_classification_pipeline(
     )
     if chunk_docs:
         setattr(record, "chunks", chunk_docs)
-    
+
     # Log stage timing summary for performance diagnostics
     total_ms = sum(stage_timings.values())
     timing_summary = " | ".join([f"{stage}={ms:.0f}ms" for stage, ms in sorted(stage_timings.items())])
     logger.info(f"[pipeline] STAGE_TIMINGS: {timing_summary} | TOTAL={total_ms:.0f}ms")
-    
+
     span.set_attribute("app.result_status", status)
     span.set_attribute("app.result_id", record.id)
     span.set_attribute("app.stage_timings", {k: f"{v:.0f}ms" for k, v in stage_timings.items()})
