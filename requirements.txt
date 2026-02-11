@@ -267,7 +267,7 @@ packaging==26.0
     #   pytest
 pdf2image==1.17.0
     # via classymail
-pillow==12.1.0
+pillow==12.1.1
     # via
     #   classymail
     #   fpdf2
