@@ -61,7 +61,8 @@ DEFAULT_SETTINGS = {
         "show_visual_proofs": True,       # Include PREUVES_VISUELLES column
         "show_quality": True,             # Include QUALITE column
         "show_time": True,               # Include TEMPS_S column
-    }
+    },
+    "ai_assessment_model": "gpt-4.1-nano",  # Model for category assessment (fast non-reasoning preferred)
 }
 PROCESSING_STRATEGY_ENV = "PROCESSING_STRATEGY"
 
@@ -133,6 +134,8 @@ def load_settings() -> dict:
             data["email_preprocessing"] = DEFAULT_SETTINGS["email_preprocessing"].copy()
         if "g2s_export" not in data or not isinstance(data["g2s_export"], dict):
             data["g2s_export"] = DEFAULT_SETTINGS["g2s_export"].copy()
+        if "ai_assessment_model" not in data:
+            data["ai_assessment_model"] = "gpt-4.1-nano"
         return _apply_env_overrides(data)
     except Exception:
         return _apply_env_overrides(DEFAULT_SETTINGS.copy())

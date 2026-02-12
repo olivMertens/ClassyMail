@@ -97,8 +97,9 @@
                 "remove_confirm": "Êtes-vous sûr de vouloir supprimer cette catégorie ?"
             },
             "assessment": {
-                "button": "Obtenir des Conseils IA (GPT-5 Nano)",
+                "button": "Obtenir des Conseils IA ({model})",
                 "analyzing": "Analyse en cours...",
+                "progress": "L'IA analyse votre catégorie...",
                 "title": "Évaluation IA",
                 "quality": "Qualité",
                 "suggestions": "Suggestions Spécifiques :",

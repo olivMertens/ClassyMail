@@ -58,7 +58,8 @@ const settings = ref({
     show_visual_proofs: true,
     show_quality: true,
     show_time: true
-  }
+  },
+  ai_assessment_model: 'gpt-4.1-nano'
 })
 const defaults = ref({
   phi4_input_per_1k: null,
@@ -121,8 +122,17 @@ const modelCostEstimates = computed(() => {
 const expandedCategories = ref(new Set())
 const newCategory = ref({ name: '', slug: '', description: '', exclusions: '' })
 const newCategoryExpanded = ref(false)
-const categoryAssessments = ref(new Map()) // Map<categoryIndex, { advice, quality_score, specific_suggestions, loading }>
+const categoryAssessments = ref(new Map()) // Map<categoryIndex, { advice, quality_score, specific_suggestions, loading, progress }>
 const assessingCategory = ref(null) // Current category being assessed
+const assessProgress = ref(0) // 0-100 progress simulation
+let assessProgressTimer = null
+
+// Display name for the assessment model
+const assessmentModelLabel = computed(() => {
+  const key = settings.value.ai_assessment_model || 'gpt-4.1-nano'
+  const pricing = MODEL_PRICING[key]
+  return pricing ? pricing.label : key
+})
 
 const sanitizeInput = (str, type) => {
   if (!str) return ''
@@ -187,7 +197,21 @@ const assessCategory = async (index) => {
   if (!category) return
 
   assessingCategory.value = index
-  categoryAssessments.value.set(index, { loading: true })
+  assessProgress.value = 0
+  categoryAssessments.value.set(index, { loading: true, progress: 0 })
+
+  // Start progress simulation (fast start, slows down toward 90%)
+  if (assessProgressTimer) clearInterval(assessProgressTimer)
+  assessProgressTimer = setInterval(() => {
+    if (assessProgress.value < 90) {
+      // Fast at start, decelerating curve
+      const remaining = 90 - assessProgress.value
+      const step = Math.max(0.5, remaining * 0.08)
+      assessProgress.value = Math.min(90, assessProgress.value + step)
+      const current = categoryAssessments.value.get(index)
+      if (current) current.progress = assessProgress.value
+    }
+  }, 200)
 
   try {
     const res = await fetch('/api/admin/assess-category', {
@@ -204,8 +228,11 @@ const assessCategory = async (index) => {
 
     if (res.ok) {
       const data = await res.json()
+      // Complete the progress bar
+      assessProgress.value = 100
       categoryAssessments.value.set(index, {
         loading: false,
+        progress: 100,
         advice: data.advice,
         quality_score: data.quality_score,
         specific_suggestions: data.specific_suggestions || []
@@ -224,6 +251,10 @@ const assessCategory = async (index) => {
     categoryAssessments.value.delete(index)
     await showAlert(`Assessment Error: ${e.message || 'Network error – check console for details'}`)
   } finally {
+    if (assessProgressTimer) {
+      clearInterval(assessProgressTimer)
+      assessProgressTimer = null
+    }
     assessingCategory.value = null
   }
 }
@@ -1724,31 +1755,53 @@ onMounted(() => {
                         />
                       </div>
 
-                      <!-- AI Assessment Button -->
-                      <div class="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-600">
-                        <button
-                          type="button"
-                          :disabled="assessingCategory === idx"
-                          class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                          @click="assessCategory(idx)"
+                      <!-- AI Assessment Button + Progress -->
+                      <div class="flex flex-col gap-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                        <div class="flex justify-between items-center">
+                          <button
+                            type="button"
+                            :disabled="assessingCategory === idx"
+                            class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            @click="assessCategory(idx)"
+                          >
+                            <CpuChipIcon
+                              v-if="assessingCategory !== idx"
+                              class="-ml-0.5 mr-1.5 h-4 w-4"
+                              aria-hidden="true"
+                            />
+                            <ArrowPathIcon
+                              v-else
+                              class="-ml-0.5 mr-1.5 h-4 w-4 animate-spin"
+                              aria-hidden="true"
+                            />
+                            {{ assessingCategory === idx ? t('settings.categories.assessment.analyzing') :
+                              t('settings.categories.assessment.button', { model: assessmentModelLabel }) }}
+                          </button>
+                          <span class="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 italic">
+                            <ExclamationTriangleIcon class="h-3 w-3" />
+                            {{ t('settings.categories.form.local_changes_warning') }}
+                          </span>
+                        </div>
+                        <!-- Progress bar (visible during assessment) -->
+                        <div
+                          v-if="assessingCategory === idx"
+                          class="w-full"
                         >
-                          <CpuChipIcon
-                            v-if="assessingCategory !== idx"
-                            class="-ml-0.5 mr-1.5 h-4 w-4"
-                            aria-hidden="true"
-                          />
-                          <ArrowPathIcon
-                            v-else
-                            class="-ml-0.5 mr-1.5 h-4 w-4 animate-spin"
-                            aria-hidden="true"
-                          />
-                          {{ assessingCategory === idx ? t('settings.categories.assessment.analyzing') :
-                            t('settings.categories.assessment.button') }}
-                        </button>
-                        <span class="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 italic">
-                          <ExclamationTriangleIcon class="h-3 w-3" />
-                          {{ t('settings.categories.form.local_changes_warning') }}
-                        </span>
+                          <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                              {{ t('settings.categories.assessment.progress') }}
+                            </span>
+                            <span class="text-xs font-mono text-red-500 dark:text-red-400">
+                              {{ Math.round(categoryAssessments.get(idx)?.progress || 0) }}%
+                            </span>
+                          </div>
+                          <div class="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700 overflow-hidden">
+                            <div
+                              class="bg-red-500 h-2 rounded-full transition-all duration-300 ease-out"
+                              :style="{ width: (categoryAssessments.get(idx)?.progress || 0) + '%' }"
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
 

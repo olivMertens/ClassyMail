@@ -1,4 +1,4 @@
-"""Category Assessment API - AI-powered category definition advice using GPT-5 Nano."""
+"""Category Assessment API - AI-powered category definition advice."""
 
 from __future__ import annotations
 
@@ -16,6 +16,12 @@ from pydantic import BaseModel, Field
 from classymail.core.llm_compat import build_chat_params, extract_message_content, is_reasoning_model
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.llm_pipeline import resolve_model_config
+from classymail.services.settings_store import load_settings
+
+# Default assessment model: gpt-4.1-nano is 10-20x faster than gpt-5-nano
+# for structured evaluation tasks (no reasoning overhead needed).
+# Override via Settings > ai_assessment_model or env ASSESSMENT_MODEL.
+DEFAULT_ASSESSMENT_MODEL = "gpt-4.1-nano"
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -41,10 +47,10 @@ class CategoryAssessmentResponse(BaseModel):
 @router.post("/api/admin/assess-category", response_model=CategoryAssessmentResponse)
 async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
     """
-    AI-powered category definition assessment using GPT-5 Nano.
+    AI-powered category definition assessment.
 
-    Analyzes category name, description, and exclusions against best practices
-    and provides actionable advice for improvement.
+    Uses a fast non-reasoning model by default (gpt-4.1-nano) for quick
+    structured evaluation. Configurable via settings.ai_assessment_model.
     """
     with tracer.start_as_current_span("assess_category") as span:
         # Normalize None → empty string for safety
@@ -57,14 +63,21 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
         span.set_attribute("category.slug", slug)
 
         try:
-            # Use GPT-5 Nano for assessment
-            endpoint, deployment, api_version = resolve_model_config("gpt-5-nano")
+            # Resolve assessment model: settings > env > default (gpt-4.1-nano)
+            import os
+            settings = load_settings()
+            assessment_model = (
+                settings.get("ai_assessment_model")
+                or os.getenv("ASSESSMENT_MODEL")
+                or DEFAULT_ASSESSMENT_MODEL
+            )
+            endpoint, deployment, api_version = resolve_model_config(assessment_model)
             logger.info("[assessment] Resolved model: endpoint=%s deployment=%s api_version=%s", endpoint, deployment, api_version)
 
             if not endpoint or not deployment:
                 raise HTTPException(
                     status_code=503,
-                    detail="GPT-5 Nano model not configured. Please configure in Settings."
+                    detail=f"Assessment model '{assessment_model}' not configured. Set ai_assessment_model in Settings or deploy the model in Azure AI Foundry."
                 )
 
             clients = Clients()
@@ -174,11 +187,13 @@ Assess quality and provide rewrites."""
                 ]
 
             # Detect model family for correct API parameters
-            # GPT-5 Nano (Reasoning) budget adjusted to 10k (safe but not excessive).
+            # Classic models: 2000 tokens is plenty for structured JSON advice.
+            # Reasoning models: keep 10k budget for thinking overhead.
+            token_budget = 10000 if is_reasoning_model(deployment) else 2000
             payload = {
                 "model": deployment,
                 "messages": messages,
-                **build_chat_params(deployment, temperature=0.3, max_output_tokens=10000),
+                **build_chat_params(deployment, temperature=0.3, max_output_tokens=token_budget),
             }
 
             # Reasoning models (GPT-5, o1) often do not support 'response_format'={"type": "json_object"}
@@ -191,7 +206,9 @@ Assess quality and provide rewrites."""
             logger.info("[assessment] Calling LLM for category '%s' (model=%s, reasoning=%s)",
                         name, deployment, is_reasoning_model(deployment))
 
-            async with httpx.AsyncClient(timeout=60) as client:
+            # Reasoning models need longer timeout; classic models respond in 2-5s
+            timeout_s = 90 if is_reasoning_model(deployment) else 30
+            async with httpx.AsyncClient(timeout=timeout_s) as client:
                 response = await client.post(url, headers=headers, json=payload)
                 response.raise_for_status()
                 data = response.json()

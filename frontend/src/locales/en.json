@@ -97,8 +97,9 @@
                 "remove_confirm": "Are you sure you want to remove this category?"
             },
             "assessment": {
-                "button": "Get AI Advice (GPT-5 Nano)",
+                "button": "Get AI Advice ({model})",
                 "analyzing": "Analyzing...",
+                "progress": "AI is analyzing your category...",
                 "title": "AI Assessment",
                 "quality": "Quality",
                 "suggestions": "Specific Suggestions:",
