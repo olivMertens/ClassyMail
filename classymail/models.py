@@ -14,7 +14,7 @@ class ClassificationIntent(BaseModel):
 
 
 class ClassificationResult(BaseModel):
-    detected_intents: List[ClassificationIntent]
+    detected_intents: List[ClassificationIntent] = Field(default_factory=list)
     global_complexity: Optional[str] = None
     needs_review: bool = False
     classification_reason: Optional[str] = None  # Explanation when no category found
