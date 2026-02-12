@@ -2372,6 +2372,8 @@ onMounted(() => {
                 <p class="text-gray-500 dark:text-gray-400 mt-1">
                   Integrates visual context (photos, diagrams, signatures) into the decision process using Mistral's
                   advanced BBox capabilities.<br>
+                  <strong>⚠️ Limit:</strong> Image annotations are limited to <strong>8 pages</strong> per document.
+                  For images beyond this limit, GPT-4o-mini provides fallback descriptions.<br>
                   <strong>Mechanism (3-Layer Analysis):</strong>
                 </p>
                 <div

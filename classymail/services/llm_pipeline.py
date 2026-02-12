@@ -144,11 +144,24 @@ Example JSON Output:
 def pydantic_to_mistral_schema(model: type[BaseModel]) -> dict:
     """
     Converts a Pydantic model to the JSON schema format expected by Mistral API.
+
+    The official Mistral SDK (response_format_from_pydantic_model) wraps the schema
+    in {"name": ..., "schema": ..., "strict": true} inside json_schema.
+    Azure AI Foundry's Mistral endpoint requires this exact format — omitting the
+    wrapper causes HTTP 422.
     """
     schema = model.model_json_schema()
+    # Remove $defs/title that Pydantic adds but Mistral doesn't need at top level
+    schema.pop("$defs", None)
+    # Ensure additionalProperties: false (required by strict mode)
+    schema.setdefault("additionalProperties", False)
     return {
         "type": "json_schema",
-        "json_schema": schema
+        "json_schema": {
+            "name": model.__name__,
+            "schema": schema,
+            "strict": True,
+        },
     }
 
 
@@ -178,6 +191,57 @@ def clamp_text_to_token_budget(text: str, max_tokens: int) -> tuple[str, bool]:
     if len(text) <= max_chars:
         return text, False
     return text[:max_chars], True
+
+
+def _is_filename_like(summary: str) -> bool:
+    """Check if a summary is just a filename (e.g. 'img-0.jpeg') rather than real content."""
+    import re
+    if not summary or not summary.strip():
+        return True
+    s = summary.strip()
+    # Matches patterns like img-0.jpeg, image_1.png, etc.
+    return bool(re.fullmatch(r'img[-_]?\d+\.?(jpe?g|png|gif|bmp|webp|svg)?', s, re.IGNORECASE))
+
+
+async def _describe_image_with_vision(
+    image_base64: str,
+    clients: Clients | None = None,
+) -> str:
+    """Call GPT-4o-mini to generate a description for an image that has no Mistral annotation."""
+    headers = await auth_headers(clients=clients)
+    url = (
+        f"{config.VISION_ENDPOINT.rstrip('/')}/openai/deployments/"
+        f"{config.VISION_DEPLOYMENT}/chat/completions"
+        f"?api-version={config.VISION_API_VERSION}"
+    )
+    payload = {
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Décris brièvement cette image en une ou deux phrases. "
+                            "Indique le type d'image (photo, graphique, logo, tableau, etc.) "
+                            "et son contenu principal."
+                        ),
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"},
+                    },
+                ],
+            }
+        ],
+        "max_tokens": 150,
+    }
+    async with httpx.AsyncClient(timeout=30) as client:
+        async with get_limiter("vision"):
+            resp = await client.post(url, json=payload, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+        return extract_message_content(data)
 
 
 def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = False, data: dict | None = None) -> tuple[str, list[dict]]:
@@ -296,6 +360,10 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
                     "details": img.get("details"),
                     "is_relevant": img.get("is_relevant"),
                 }
+                # Preserve base64 temporarily for GPT-4o-mini fallback (stripped later)
+                raw_b64 = img.get("image_base64") or img.get("base64") or ""
+                if raw_b64:
+                    vision_item["_image_base64"] = raw_b64
                 logger.info(f"[metrics] Extracted vision item for page {page_idx}: type={vision_item.get('image_type')}, has_summary={bool(vision_item.get('summary'))}, summary='{(vision_item.get('summary') or '')[:80]}'")
                 annotated_images.append(vision_item)
 
@@ -518,6 +586,47 @@ async def ocr_with_mistral(
 
         content, annotated_images = _combine_ocr_pages(ocr_pages, enable_vision_enrichment=enable_vision_enrichment, data=None)
 
+        # --- GPT-4o-mini fallback for images without useful descriptions ---
+        if enable_vision_enrichment and annotated_images:
+            needs_description = [
+                img for img in annotated_images
+                if _is_filename_like(img.get("summary", "")) and img.get("_image_base64")
+            ]
+            if needs_description:
+                logger.info(f"[metrics] Vision fallback: {len(needs_description)} images need GPT-4o-mini description")
+
+                async def _fill_description(img: dict) -> None:
+                    try:
+                        desc = await _describe_image_with_vision(img["_image_base64"], clients=clients)
+                        if desc:
+                            img["summary"] = desc
+                            img["image_type"] = img.get("image_type") or "image"
+                            logger.info(f"[metrics] Vision fallback OK for {img.get('id')}: '{desc[:80]}'")
+                    except Exception as e:
+                        logger.warning(f"[metrics] Vision fallback failed for {img.get('id')}: {e}")
+
+                await asyncio.gather(*[_fill_description(img) for img in needs_description])
+
+                # Inject GPT-4o-mini descriptions into the markdown so Phi-4
+                # can use them as classification context
+                enriched_notes = []
+                for img in needs_description:
+                    s = img.get("summary", "")
+                    if s and not _is_filename_like(s):
+                        img_id = img.get("id") or "image"
+                        img_type = img.get("image_type") or "image"
+                        enriched_notes.append(f"📎 **Image Context ({img_id})**: {img_type} - {s}")
+                if enriched_notes:
+                    content += (
+                        "\n\n---\n**Visual Elements (enriched):**\n"
+                        + "\n".join(enriched_notes)
+                        + "\n---\n"
+                    )
+
+            # Strip temporary base64 data from all images (not needed downstream)
+            for img in annotated_images:
+                img.pop("_image_base64", None)
+
         pages_count = len(ocr_pages)
 
         logger.info(f"[metrics] OCR Success: {pages_count} pages processed")
@@ -715,8 +824,8 @@ async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False
             logger.warning(f"Preprocessing failed, using original content: {e}")
             preprocessing_metadata = {"error": str(e)}
 
-    # PII Detection if enabled
-    if preprocessing_config.get("detect_pii", False):
+    # PII Detection if enabled (default True — matches DEFAULT_SETTINGS)
+    if preprocessing_config.get("detect_pii", True):
         try:
             pii_method = preprocessing_config.get("pii_detection_method", "llm")
             pii_llm_model = preprocessing_config.get("pii_llm_model", "auto")

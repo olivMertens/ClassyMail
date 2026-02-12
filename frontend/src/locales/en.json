@@ -74,7 +74,7 @@
         },
         "strategy_standard_help": "Fast & Efficient. Best for standard typed text documents and clear emails.",
         "strategy_reasoning_help": "Deep Analysis. Uses Chain-of-Thought to justify decisions before classifying. Useful for ambiguous cases.",
-        "strategy_vision_help": "Multimodal. Analyzes visual elements (images, layouts) in addition to text. Best for documents with photos or complex structures.",
+        "strategy_vision_help": "Multimodal. Analyzes visual elements (images, layouts) in addition to text. Best for documents with photos or complex structures. Note: image annotations limited to 8 pages.",
         "categories": {
             "tab_name": "Categories",
             "warning_title": "⚠️ System Behavior Warning",
@@ -203,7 +203,7 @@
             "cancel": "Cancel",
             "success": "Email re-queued for reprocessing",
             "success_batch": "{count} email(s) re-queued for reprocessing",
-            "warning_vision": "Vision mode uses image analysis and may take longer",
+            "warning_vision": "Vision mode uses image analysis and may take longer. Image annotations are limited to 8 pages per document.",
             "select_all": "Select all",
             "deselect_all": "Deselect all",
             "selected": "{count} selected",
@@ -443,7 +443,7 @@
             "standard_title": "Hybrid Processing",
             "standard_desc": "The pipeline is 'Content Aware': Text documents are OCR'd normally. However, if visual elements (photos, diagrams) are detected *inside* the document, they are automatically captioned by the Vision model.",
             "vision_title": "Full Page Scans vs. Images",
-            "vision_desc": "The system intelligently distinguishes between a 'scanned page' (treated as text source) and 'meaningful images' (e.g. car crash photos). Redundant descriptions of the page itself are suppressed."
+            "vision_desc": "The system intelligently distinguishes between a 'scanned page' (treated as text source) and 'meaningful images' (e.g. car crash photos). Redundant descriptions of the page itself are suppressed. Note: Mistral annotations are limited to 8 pages; beyond that, GPT-4o-mini provides fallback descriptions."
         },
         "flow_title": "Processing Flow"
     },

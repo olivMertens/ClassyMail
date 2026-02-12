@@ -74,7 +74,7 @@
         },
         "strategy_standard_help": "Rapide & Efficace. Idéal pour les textes dactylographiés standard et emails clairs.",
         "strategy_reasoning_help": "Analyse Profonde. Utilise le 'Chain-of-Thought' pour justifier avant de classifier. Utile pour les cas ambigus.",
-        "strategy_vision_help": "Multimodal. Analyse les éléments visuels (images, mise en page). Idéal pour les documents avec photos ou structures complexes.",
+        "strategy_vision_help": "Multimodal. Analyse les éléments visuels (images, mise en page). Idéal pour les documents avec photos ou structures complexes. Note : annotations d'images limitées à 8 pages.",
         "categories": {
             "tab_name": "Catégories",
             "warning_title": "⚠️ Avertissement Comportement Système",
@@ -203,7 +203,7 @@
             "cancel": "Annuler",
             "success": "Email remis en file pour retraitement",
             "success_batch": "{count} email(s) remis en file pour retraitement",
-            "warning_vision": "Le mode Vision utilise l'analyse d'images et peut prendre plus de temps",
+            "warning_vision": "Le mode Vision utilise l'analyse d'images et peut prendre plus de temps. Les annotations d'images sont limitées à 8 pages par document.",
             "select_all": "Tout sélectionner",
             "deselect_all": "Tout désélectionner",
             "selected": "{count} sélectionné(s)",
@@ -443,7 +443,7 @@
             "standard_title": "Traitement Hybride",
             "standard_desc": "Le pipeline est 'conscient du contenu' : les documents texte subissent un OCR classique. Cependant, si des éléments visuels (photos, schémas) sont détectés *dans* le document, ils sont automatiquement légendés par le modèle Vision.",
             "vision_title": "Scans vs Images Utiles",
-            "vision_desc": "Le système distingue intelligemment une 'page scannée' (traitée comme source de texte) des 'images porteuses de sens' (ex: photo d'accident). Les descriptions redondantes de la page elle-même sont supprimées."
+            "vision_desc": "Le système distingue intelligemment une 'page scannée' (traitée comme source de texte) des 'images porteuses de sens' (ex: photo d'accident). Les descriptions redondantes de la page elle-même sont supprimées. Note : les annotations Mistral sont limitées à 8 pages ; au-delà, GPT-4o-mini fournit des descriptions de repli."
         },
         "flow_title": "Flux de Traitement"
     },
