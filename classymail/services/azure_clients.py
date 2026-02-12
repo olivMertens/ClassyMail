@@ -40,6 +40,7 @@ class Clients:
         self.cosmos_container = None
         self.blob_service_client: BlobServiceClient | None = None
         self._cosmos_init_lock = asyncio.Lock()
+        self._cosmos_last_health_check: float = 0.0  # monotonic timestamp
 
         # RAG Containers
         self.cosmos_chat_container = None
@@ -69,26 +70,44 @@ class Clients:
         if self.blob_service_client:
             await self.blob_service_client.close()
 
+    # Rate-limit health checks to avoid burning RUs on every call.
+    # ensure_cosmos_container is called 5+ times per /api/emails request
+    # (get_cosmos_container, count_by_status x2, count_reviewed_ready, get_average_confidence).
+    _HEALTH_CHECK_INTERVAL_S = float(os.getenv("COSMOS_HEALTH_CHECK_INTERVAL_S", "300"))
+
     async def ensure_cosmos_container(self):
-        # Health check: If container exists, verify connection is still valid
-        if self.cosmos_container is not None:
-            try:
-                # Lightweight ping query to verify connection health
-                await self.cosmos_container.read()
-            except Exception as health_error:
-                logger.warning("Cosmos connection health check failed, recreating client: %s", health_error)
-                # Force reconnection by clearing cached client
-                self.cosmos_container = None
-                self.cosmos_client = None
+        import time as _time
 
+        # Fast path: container already initialised and health check not due yet
         if self.cosmos_container is not None:
-            return
-        if not config.COSMOS_ENDPOINT:
-            raise RuntimeError("AZURE_COSMOS_ENDPOINT is not set")
+            now = _time.monotonic()
+            if (now - self._cosmos_last_health_check) < self._HEALTH_CHECK_INTERVAL_S:
+                return  # skip redundant health check
 
+        # Acquire lock to prevent concurrent reconnections (race-condition fix)
         async with self._cosmos_init_lock:
+            # Re-check inside lock (another coroutine may have already fixed it)
             if self.cosmos_container is not None:
-                return
+                now = _time.monotonic()
+                if (now - self._cosmos_last_health_check) < self._HEALTH_CHECK_INTERVAL_S:
+                    return
+
+                # Health check is due – run inside the lock
+                try:
+                    await self.cosmos_container.read()
+                    self._cosmos_last_health_check = _time.monotonic()
+                    return  # still healthy
+                except Exception as health_error:
+                    logger.warning(
+                        "Cosmos health check failed, will reconnect container (keeping client): %s",
+                        health_error,
+                    )
+                    # Only clear the container reference; keep cosmos_client alive
+                    # to avoid expensive full-client recreation on transient errors.
+                    self.cosmos_container = None
+
+            if not config.COSMOS_ENDPOINT:
+                raise RuntimeError("AZURE_COSMOS_ENDPOINT is not set")
 
             if self.cosmos_client is None:
                 self.cosmos_client = CosmosClient(
@@ -104,6 +123,7 @@ class Clients:
             try:
                 self.cosmos_container = db.get_container_client(config.COSMOS_CONTAINER)
                 await self.cosmos_container.read()  # verify it exists
+                self._cosmos_last_health_check = _time.monotonic()
                 logger.info("Cosmos container '%s' found (existing).", config.COSMOS_CONTAINER)
             except Exception:
                 # Container doesn't exist yet – create with full vector config
@@ -131,6 +151,7 @@ class Clients:
                     vector_embedding_policy=vector_embedding_policy,
                     indexing_policy=indexing_policy
                 )
+                self._cosmos_last_health_check = _time.monotonic()
 
     async def ensure_rag_containers(self):
         """

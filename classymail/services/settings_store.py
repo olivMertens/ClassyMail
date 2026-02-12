@@ -241,8 +241,9 @@ async def save_settings_async(settings: dict, clients=None):
         if clients and getattr(clients, "cosmos_container", None):
             doc = {"id": "settings", **settings}
             await clients.cosmos_container.upsert_item(doc)
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to persist settings to Cosmos: %s", e)
 
 def _build_categories_prompt(cats: list) -> str:
     """Build prompt text from a list of category dicts.

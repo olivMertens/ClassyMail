@@ -234,7 +234,10 @@ async def list_emails(
         )
     except Exception as e:
         logger.error(f"Error listing emails: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        # Surface the actual error detail so the frontend/admin can diagnose
+        # (e.g., Cosmos throttling 429, auth failure, vector policy conflict)
+        detail = str(e) if str(e) else "Internal Server Error"
+        raise HTTPException(status_code=500, detail=detail)
 
 
 @router.get("/stats")
