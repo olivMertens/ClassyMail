@@ -710,7 +710,7 @@ onMounted(() => {
           <div>
             <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('settings.language')
             }}</label>
-            <div class="mt-2 flex items-center space-x-4">
+            <div class="mt-2 flex flex-wrap items-center gap-2">
               <button
                 class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
                 :class="currentLocale === 'en' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
@@ -724,6 +724,27 @@ onMounted(() => {
                 @click="setLocale('fr')"
               >
                 Français
+              </button>
+              <button
+                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+                :class="currentLocale === 'es' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
+                @click="setLocale('es')"
+              >
+                Español
+              </button>
+              <button
+                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+                :class="currentLocale === 'de' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
+                @click="setLocale('de')"
+              >
+                Deutsch
+              </button>
+              <button
+                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+                :class="currentLocale === 'it' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
+                @click="setLocale('it')"
+              >
+                Italiano
               </button>
             </div>
           </div>

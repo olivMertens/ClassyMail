@@ -587,7 +587,31 @@ async def ocr_with_mistral(
         content, annotated_images = _combine_ocr_pages(ocr_pages, enable_vision_enrichment=enable_vision_enrichment, data=None)
 
         # --- GPT-4o-mini fallback for images without useful descriptions ---
+        vision_fallback_ok = 0
+        vision_fallback_failed = 0
         if enable_vision_enrichment and annotated_images:
+            # Log detailed vision analysis inventory
+            filename_only = [img for img in annotated_images if _is_filename_like(img.get("summary", ""))]
+            has_desc = [img for img in annotated_images if not _is_filename_like(img.get("summary", ""))]
+            has_b64 = [img for img in filename_only if img.get("_image_base64")]
+            no_b64 = [img for img in filename_only if not img.get("_image_base64")]
+
+            logger.info(
+                f"[metrics] Vision analysis inventory: "
+                f"total_images={len(annotated_images)}, "
+                f"with_description={len(has_desc)}, "
+                f"filename_only={len(filename_only)}, "
+                f"fallback_eligible(has_b64)={len(has_b64)}, "
+                f"no_fallback(no_b64)={len(no_b64)}"
+            )
+            span.add_event("vision.analysis_inventory", {
+                "total_images": len(annotated_images),
+                "with_description": len(has_desc),
+                "filename_only": len(filename_only),
+                "fallback_eligible": len(has_b64),
+                "no_fallback": len(no_b64),
+            })
+
             needs_description = [
                 img for img in annotated_images
                 if _is_filename_like(img.get("summary", "")) and img.get("_image_base64")
@@ -596,16 +620,28 @@ async def ocr_with_mistral(
                 logger.info(f"[metrics] Vision fallback: {len(needs_description)} images need GPT-4o-mini description")
 
                 async def _fill_description(img: dict) -> None:
+                    nonlocal vision_fallback_ok, vision_fallback_failed
                     try:
                         desc = await _describe_image_with_vision(img["_image_base64"], clients=clients)
                         if desc:
                             img["summary"] = desc
                             img["image_type"] = img.get("image_type") or "image"
+                            vision_fallback_ok += 1
                             logger.info(f"[metrics] Vision fallback OK for {img.get('id')}: '{desc[:80]}'")
+                        else:
+                            vision_fallback_failed += 1
+                            logger.warning(f"[metrics] Vision fallback returned empty for {img.get('id')}")
                     except Exception as e:
+                        vision_fallback_failed += 1
                         logger.warning(f"[metrics] Vision fallback failed for {img.get('id')}: {e}")
 
                 await asyncio.gather(*[_fill_description(img) for img in needs_description])
+
+                span.add_event("vision.fallback_complete", {
+                    "requested": len(needs_description),
+                    "succeeded": vision_fallback_ok,
+                    "failed": vision_fallback_failed,
+                })
 
                 # Inject GPT-4o-mini descriptions into the markdown so Phi-4
                 # can use them as classification context
@@ -622,6 +658,17 @@ async def ocr_with_mistral(
                         + "\n".join(enriched_notes)
                         + "\n---\n"
                     )
+            elif filename_only:
+                # Images need description but have no base64 for fallback
+                logger.warning(
+                    f"[metrics] Vision: {len(filename_only)} images have filename-only summaries "
+                    f"but no base64 data for GPT-4o-mini fallback. "
+                    f"Check that include_image_base64=True is set in OCR request."
+                )
+                span.add_event("vision.no_fallback_data", {
+                    "count": len(filename_only),
+                    "image_ids": [img.get("id", "unknown") for img in filename_only[:5]],
+                })
 
             # Strip temporary base64 data from all images (not needed downstream)
             for img in annotated_images:
@@ -638,6 +685,14 @@ async def ocr_with_mistral(
         span.set_attribute("gen_ai.usage.output_tokens", usage_info.get("completion_tokens", 0))
         if image_conversion_total_ms > 0:
             span.set_attribute("app.image_conversion_ms", image_conversion_total_ms)
+        # Vision-specific telemetry attributes
+        if enable_vision_enrichment:
+            span.set_attribute("app.vision.total_images", len(annotated_images))
+            span.set_attribute("app.vision.fallback_ok", vision_fallback_ok)
+            span.set_attribute("app.vision.fallback_failed", vision_fallback_failed)
+            described = sum(1 for img in annotated_images if not _is_filename_like(img.get("summary", "")))
+            span.set_attribute("app.vision.images_with_description", described)
+            span.set_attribute("app.vision.images_filename_only", len(annotated_images) - described)
 
     return {"markdown": content, "usage": usage_info, "images": annotated_images}
 

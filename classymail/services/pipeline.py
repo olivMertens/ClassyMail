@@ -334,6 +334,19 @@ async def run_classification_pipeline(
     timing_summary = " | ".join([f"{stage}={ms:.0f}ms" for stage, ms in sorted(stage_timings.items())])
     logger.info(f"[pipeline] STAGE_TIMINGS: {timing_summary} | TOTAL={total_ms:.0f}ms")
 
+    # Vision analysis telemetry
+    if strategy == "vision" and mistral_images:
+        described = sum(1 for img in mistral_images if img.get("summary") and not img["summary"].strip().endswith((".jpeg", ".png", ".jpg", ".gif")))
+        span.set_attribute("app.vision.images_total", len(mistral_images))
+        span.set_attribute("app.vision.images_described", described)
+        span.add_event("vision.pipeline_complete", {
+            "strategy": strategy,
+            "images_total": len(mistral_images),
+            "images_described": described,
+            "images_filename_only": len(mistral_images) - described,
+        })
+        logger.info(f"[pipeline] Vision analysis: {len(mistral_images)} images, {described} with descriptions, {len(mistral_images) - described} filename-only")
+
     span.set_attribute("app.result_status", status)
     span.set_attribute("app.result_id", record.id)
     span.set_attribute("app.stage_timings", {k: f"{v:.0f}ms" for k, v in stage_timings.items()})

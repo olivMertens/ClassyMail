@@ -1,0 +1,570 @@
+{
+    "common": {
+        "refresh": "Aktualisieren",
+        "loading": "Laden...",
+        "retry": "Verbindung erneut versuchen"
+    },
+    "nav": {
+        "dashboard": "Dashboard",
+        "upload": "Hochladen",
+        "costs": "Kosten",
+        "settings": "Einstellungen"
+    },
+    "settings": {
+        "title": "Anwendungseinstellungen",
+        "saved": "Gespeichert!",
+        "save": "Speichern",
+        "saving": "Speichern...",
+        "appearance": "Darstellung",
+        "theme": "Farbthema",
+        "dark_mode": "Dunkelmodus",
+        "language": "Sprache",
+        "costs_title": "Kostenüberschreibung",
+        "costs_desc": "Standardtarife für die Kostenberechnung überschreiben. Leer lassen für Standardwerte.",
+        "telemetry_title": "Application Insights Telemetrie",
+        "tabs": {
+            "processing": "Verarbeitung",
+            "finetuning": "Fine-tuning",
+            "general": "Allgemein & Kosten",
+            "logs": "Logs",
+            "danger": "Gefahrenzone"
+        },
+        "processing": {
+            "title": "Verarbeitungsstrategie",
+            "desc": "Wählen Sie die Pipeline und das KI-Modell für die E-Mail-Verarbeitung.",
+            "model_select": "KI-Modell",
+            "finetuning_not_supported": "Fine-tuning ist für dieses Modell nicht verfügbar.",
+            "finetuning_available": "Fine-tuning verfügbar (Azure OpenAI)",
+            "strategy": {
+                "standard": "Standard (Text/OCR-optimiert - Standard)",
+                "reasoning": "Reasoning (CoT / Tiefenanalyse)",
+                "vision": "Vision (Visuelle Analyse - Experimentell)"
+            },
+            "ocr_retries": "Max. OCR-Versuche",
+            "ocr_retries_help": "Anzahl der OCR-Wiederholungsversuche (exponentielles Backoff bei Netzwerkfehlern).",
+            "pii_detection_method": "PII-Erkennungsmethode",
+            "pii_method_llm": "LLM-basiert - Kontextual",
+            "pii_method_azure": "Azure AI Language Service - Native API",
+            "pii_method_both": "Hybrid (Beide) - Maximale Genauigkeit",
+            "pii_method_description": "LLM: Kontextuelles Verständnis. Azure: 40+ vordefinierte Kategorien (~€0.001/E-Mail). Hybrid: Kombiniert beide für vollständige Erkennung.",
+            "pii_llm_model": "LLM-Modell für PII",
+            "pii_llm_model_auto": "Auto (gleiches Modell wie Klassifizierung)",
+            "pii_llm_model_description": "LLM für die PII-Extraktion wählen. 'Auto' verwendet das Klassifizierungsmodell, um zusätzliche Bereitstellungen zu vermeiden."
+        },
+        "finetuning": {
+            "title": "Fine-tuning-Konfiguration",
+            "desc": "Parameter für die Erstellung von Trainingsdatensätzen.",
+            "min_samples": "Mindestanzahl Beispiele erforderlich",
+            "min_samples_help": "Mindestanzahl manueller Validierungen für den JSONL-Export.",
+            "info_title": "Warum JSONL?",
+            "info_desc": "Das JSONL-Format (JSON Lines) ist der erforderliche Standard für das Fine-tuning von OpenAI-Modellen auf Azure. Jede Zeile stellt ein separates Trainingsbeispiel dar, bestehend aus einer Systemnachricht, Benutzereingabe und der erwarteten Assistentenantwort.",
+            "learn_more": "Mehr über Fine-tuning in Azure AI Foundry erfahren"
+        },
+        "danger": {
+            "title": "Gefahrenzone",
+            "desc": "Irreversible, destruktive Operationen. Gehen Sie mit Vorsicht vor.",
+            "dlq_title": "Dead Letter Queue (DLQ) Verwaltung",
+            "dlq_help": "Der Service Bus verschiebt Fehler hierher nach maximalen Wiederholungen.",
+            "dlq_desc": "Fehlgeschlagene Nachrichten landen hier. Analysieren Sie die Ursache und purgen Sie dann.",
+            "view_dlq": "DLQ-Nachrichten anzeigen",
+            "purge_dlq": "DLQ bereinigen",
+            "reset_title": "Atomares Zurücksetzen",
+            "reset_desc": "Löscht ALLE Daten dieser Umgebung.",
+            "reset_warning_title": "Diese Aktion wird:"
+        },
+        "strategy_standard_help": "Schnell & Effizient. Ideal für Standard-getippte Texte und klare E-Mails.",
+        "strategy_reasoning_help": "Tiefenanalyse. Verwendet 'Chain-of-Thought' zur Begründung vor der Klassifizierung. Nützlich bei mehrdeutigen Fällen.",
+        "strategy_vision_help": "Multimodal. Analysiert visuelle Elemente (Bilder, Layout). Ideal für Dokumente mit Fotos oder komplexen Strukturen. Hinweis: Bildannotationen auf 8 Seiten begrenzt.",
+        "categories": {
+            "tab_name": "Kategorien",
+            "warning_title": "⚠️ Systemverhalten-Warnung",
+            "warning_text": "Das Ändern von Kategorien verändert die KI-Klassifizierung aller zukünftigen E-Mails. Bestehende E-Mails behalten ihre ursprüngliche Klassifizierung. Änderungen werden nach dem Speichern sofort angewendet.",
+            "managed_title": "Verwaltete Klassifizierungskategorien",
+            "current_categories": "Definieren Sie die Absichtskategorien, die die KI für die Klassifizierung verwenden wird.",
+            "save_button": "Im System speichern",
+            "form": {
+                "name_label": "Name (Anzeige)",
+                "slug_label": "Slug (Technische ID für CSV)",
+                "slug_help": "Automatisch generiert, wenn leer gelassen",
+                "definition_label": "Definition (Was es IST)",
+                "definition_placeholder": "Beschreiben Sie, was diese Kategorie einschließt...",
+                "exclusions_label": "Ausschlüsse (Was es NICHT IST)",
+                "exclusions_placeholder": "Beschreiben Sie, was diese Kategorie NICHT einschließt...",
+                "local_changes_warning": "Änderungen werden lokal angewendet. Klicken Sie oben auf \"Im System speichern\" zum Bestätigen.",
+                "add_button": "Kategorie hinzufügen",
+                "add_new_category": "Neue Kategorie hinzufügen",
+                "cancel_adding": "Kategorie-Hinzufügung abbrechen",
+                "remove_confirm": "Sind Sie sicher, dass Sie diese Kategorie entfernen möchten?"
+            },
+            "assessment": {
+                "button": "KI-Beratung erhalten ({model})",
+                "analyzing": "Analysiere...",
+                "progress": "Die KI analysiert Ihre Kategorie...",
+                "title": "KI-Bewertung",
+                "quality": "Qualität",
+                "suggestions": "Spezifische Vorschläge:",
+                "success": "Bewertung abgeschlossen!\n\nQualität: {score}\n\nÜberprüfen Sie die Empfehlungen unten.",
+                "error": "Bewertung fehlgeschlagen: {error}"
+            },
+            "optimization_note": "Legacy-Migrations-Tipp: Wenn Sie alte Kategorien auf LLM-Absichten abbilden, bevorzugen Sie beschreibende Definitionen gegenüber exakten Schlüsselwörtern. Die KI versteht Kontext besser als strenge Regeln.",
+            "import": {
+                "button": "Aus Excel importieren (.xlsx)",
+                "importing": "Importiere...",
+                "help": "Laden Sie eine Excel-Datei mit Spalten hoch: Name, Slug, Definition, Ausschlüsse. Übereinstimmende Slugs werden aktualisiert, neue Kategorien hinzugefügt.",
+                "success": "✓ Import erfolgreich!\n\nHinzugefügt: {added}\nAktualisiert: {updated}\nÜbersprungen: {skipped}\nKategorien gesamt: {total}",
+                "error": "Import fehlgeschlagen: {error}"
+            },
+            "save_success": "✓ Kategorien erfolgreich gespeichert!\n\nÄnderungen sind jetzt aktiv und werden für alle zukünftigen E-Mail-Klassifizierungen verwendet."
+        }
+    },
+    "upload": {
+        "title": "Dokumente hochladen",
+        "subtitle": "Laden Sie PDF-Dokumente hoch (max. 10 Dateien), um die Klassifizierung zu starten.",
+        "drop_text": "oder Drag & Drop",
+        "select": "Datei auswählen",
+        "limits": "PDF bis zu 10MB",
+        "start": "Upload starten",
+        "uploading": "Hochladen..."
+    },
+    "dashboard": {
+        "search_placeholder": "E-Mails suchen...",
+        "stats": {
+            "total": "E-Mails gesamt",
+            "to_review": "Zu prüfen",
+            "processed": "Verarbeitet",
+            "quality": "Durchschn. Qualität",
+            "quality_tooltip": "Durchschnittlicher Konfidenzwert aller verarbeiteten E-Mails"
+        },
+        "progress": {
+            "title": "Verarbeitungsfortschritt",
+            "pending": "{processing} in Bearbeitung · {queued} in Warteschlange"
+        },
+        "filters": {
+            "all": "Alle",
+            "review": "Zu prüfen",
+            "processed": "Verarbeitet",
+            "errors": "Fehler"
+        },
+        "tabs": {
+            "dashboard": "Dashboard",
+            "failures": "Fehler",
+            "developer": "Entwickler"
+        },
+        "confidence": {
+            "any": "Jedes Niveau",
+            "very_low": "Sehr Niedrig (0-20%)",
+            "low": "Niedrig (20-40%)",
+            "medium": "Mittel (40-60%)",
+            "high": "Hoch (60-80%)",
+            "very_high": "Sehr Hoch (80-95%)",
+            "perfect": "Perfekt (95-100%)",
+            "no_category": "Keine Kategorie erkannt",
+            "low_header": "Niedriges Konfidenzniveau (<60%)",
+            "high_header": "Hohes Konfidenzniveau (>60%)",
+            "lt_30": "< 30%",
+            "lt_50": "< 50%",
+            "lt_60": "< 60%",
+            "review_required": "Überprüfung erforderlich (<50%)",
+            "none": "Keine"
+        },
+        "pii": {
+            "badge": "PII",
+            "detected": "Personenbezogene Daten erkannt",
+            "tooltip": "Diese E-Mail enthält personenbezogene Daten (PII)"
+        },
+        "view_mode": {
+            "cards": "Karten",
+            "table": "Tabelle"
+        },
+        "waiting": {
+            "title": "Warte auf Daten",
+            "subtitle": "Falls E-Mails vorhanden sind, aber nicht angezeigt werden, ist ggf. eine Neuverbindung erforderlich."
+        },
+        "no_emails": {
+            "title": "Keine E-Mails gefunden",
+            "subtitle": "Versuchen Sie, die Filter zu ändern, um mehr Ergebnisse anzuzeigen"
+        },
+        "status": {
+            "error": "Fehler",
+            "processing": "Verarbeitung...",
+            "processed": "Verarbeitet",
+            "review_required": "Überprüfung erforderlich",
+            "review": "Überprüfung erforderlich"
+        },
+        "actions": {
+            "view": "Details anzeigen",
+            "reprocess": "Erneut verarbeiten"
+        },
+        "reprocess": {
+            "title": "E-Mail erneut verarbeiten",
+            "title_batch": "Stapelverarbeitung ({count} E-Mails)",
+            "select_strategy": "Verarbeitungsmodus wählen",
+            "current": "Aktuell verarbeitet mit:",
+            "confirm": "Erneut verarbeiten",
+            "cancel": "Abbrechen",
+            "success": "E-Mail zur erneuten Verarbeitung eingereiht",
+            "success_batch": "{count} E-Mail(s) zur erneuten Verarbeitung eingereiht",
+            "warning_vision": "Der Vision-Modus verwendet Bildanalyse und kann länger dauern. Bildannotationen sind auf 8 Seiten pro Dokument begrenzt.",
+            "select_all": "Alle auswählen",
+            "deselect_all": "Alle abwählen",
+            "selected": "{count} ausgewählt",
+            "batch_reprocess": "Auswahl erneut verarbeiten"
+        },
+        "strategy": {
+            "standard": "Standard",
+            "standard_short": "STD",
+            "standard_desc": "Text/OCR-optimiert (Standard)",
+            "reasoning": "Reasoning",
+            "reasoning_short": "CoT",
+            "reasoning_desc": "Tiefenanalyse Gedankenkette",
+            "vision": "Vision",
+            "vision_short": "VIS",
+            "vision_desc": "Visuelle Analyse (experimentell)",
+            "experimental": "Experimentell",
+            "unknown": "Standard"
+        },
+        "dlq": {
+            "banner_title": "Dead-Letter-Warteschlange hat {count} Nachricht(en)",
+            "banner_button": "Details anzeigen",
+            "title": "Dead-Letter-Warteschlange hat {count} Nachricht(en)",
+            "subtitle": "Verarbeitungsfehler werden hierhin nach maximalen Wiederholungsversuchen geleitet",
+            "view_details": "Details anzeigen",
+            "unavailable": "DLQ-Überwachung nicht verfügbar",
+            "modal_title": "Dead Letter Queue (Fehler)",
+            "modal_desc": "Diese Nachrichten sind wiederholt fehlgeschlagen und in der Dead Letter Queue gelandet. Klicken Sie auf 'Anzeigen' zum Debuggen.",
+            "close": "Ansicht schließen",
+            "purge": "Alle bereinigen",
+            "purging": "Bereinigung...",
+            "item_id": "Element-ID / ID",
+            "reason": "Grund",
+            "description": "Beschreibung",
+            "time": "Zeit",
+            "actions": "Aktionen",
+            "view": "Anzeigen"
+        },
+        "developer": {
+            "title": "Umgebung",
+            "readiness": "Bereitschaft",
+            "status_ok": "OK",
+            "status_not_ready": "NICHT BEREIT"
+        },
+        "table": {
+            "subject_sender": "Betreff / Absender",
+            "category": "Kategorie",
+            "status": "Status",
+            "arrival": "Eingang",
+            "processed": "Verarbeitet",
+            "duration": "Dauer",
+            "actions": "Aktionen",
+            "test_badge": "TEST",
+            "no_subject": "Kein Betreff",
+            "unknown_sender": "Unbekannter Absender",
+            "justification": "Begründung",
+            "extra_categories": "Zusätzliche Kategorien",
+            "none": "Keine",
+            "status_review": "Zu prüfen",
+            "status_processed": "Verarbeitet",
+            "status_processing": "Verarbeitung",
+            "status_error": "Fehler"
+        },
+        "actions": {
+            "view": "Anzeigen",
+            "reprocess": "Erneut verarbeiten"
+        },
+        "pagination": {
+            "per_page": "{n} / Seite",
+            "page_of": "Seite {current} von {total}"
+        },
+        "chat": {
+            "title": "KI-Assistent",
+            "how_it_works": "So funktioniert es:",
+            "how_it_works_desc": "Ich kann die E-Mail-Datenbank mit Werkzeugen durchsuchen (Suche, letzte Fehler, Statistiken, Top-Absichten). Fragen Sie mich zu verarbeiteten E-Mails.",
+            "try_asking": "Probieren Sie:",
+            "example_invoices": "E-Mails über Rechnungen finden",
+            "example_errors": "Letzte Fehler anzeigen",
+            "example_intents": "Was sind die häufigsten Absichten?",
+            "example_urgent": "Text suchen, der Dringend enthält",
+            "searching": "Datenbanksuche...",
+            "sources": "Quellen",
+            "chunk": "Fragment",
+            "generated_by": "Generiert von Azure AI",
+            "error": "Fehler:",
+            "placeholder": "Nachricht eingeben...",
+            "send": "Senden"
+        }
+    },
+    "costs": {
+        "title": "Kostenanalyse",
+        "recalculate": "Neu berechnen",
+        "emails_projection": "E-Mails / Monat Prognose",
+        "pricing_source": "Preisquelle",
+        "pricing_options": {
+            "fixed": "Feste Schätzung (POC)",
+            "retail": "Azure Retail Preise API"
+        },
+        "processed_emails": "Verarbeitete E-Mails (OCR + Klassifizierung)",
+        "emails_usage": "Tarifierte E-Mails (Nutzungstelemetrie)",
+        "proc_vs_usage": "Verarbeitet: {processed} · Tarifiert: {priced}",
+        "counts_hint": "Alle E-Mails werden von Mistral OCR und Phi-4 Klassifizierung verarbeitet. Die Preisgestaltung basiert auf Nutzungstelemetrie; Zähler können bei fehlenden oder deduplizierten Daten abweichen.",
+        "pricing_assumptions": {
+            "title": "⚠️ Preisannahmen & Einschränkungen",
+            "model_pricing": "Kosten verwenden modellspezifische Preise, wenn verfügbar. Falls Sie Modelle in den Einstellungen geändert haben, stellen Sie sicher, dass die Umgebungsvariablen übereinstimmen (PHI4_COST_PER_1K_INPUT/OUTPUT).",
+            "reprocessing": "Die erneute Verarbeitung akkumuliert neue Kosten, überschreibt aber alte Telemetrie. Ausgabenhistorie wird nicht pro E-Mail gespeichert.",
+            "adversarial": "Adversarial-Vergleichskosten werden NICHT verfolgt. Zwei-Modell-Vergleiche verdoppeln den Tokenverbrauch, aber nur die Kosten des Primärmodells erscheinen hier.",
+            "env_override": "Für genaue Preise aktualisieren Sie die Umgebungsvariablen entsprechend Ihren bereitgestellten Modellen oder konsultieren Sie Azure Cost Management."
+        },
+        "avg_cost": "Durchschn. KI-Kosten / E-Mail",
+        "actual_spend": "Tatsächliche KI-Ausgaben (Historie)",
+        "total_ai": "KI gesamt",
+        "model_comparison_title": "Modell-Kostenvergleich — Prognose 10K E-Mails",
+        "model_comparison_desc": "Prognostizierte LLM-Klassifizierungskosten für 10K E-Mails basierend auf tatsächlichem durchschnittlichen Tokenverbrauch. Ohne Entitätsextraktion, PII-Erkennung oder adversariale Aufrufe.",
+        "cheapest": "Günstigstes",
+        "monthly_projection": "Monatsprognose",
+        "projection_emails": "Prognostizierte E-Mails/Monat: {n}",
+        "projection_ai_formula": "KI variabel = (durchschn. KI-Kosten/E-Mail aus Historie: ${avg}) × {n}",
+        "projection_ai_no_data": "Noch keine KI-Kostendaten (0 E-Mails mit Nutzung). Verarbeiten Sie mindestens ein Dokument zur Berechnung der variablen Schätzung.",
+        "ai_variable": "KI (Variabel)",
+        "infra_fixed": "Infrastruktur (Feste Schätzung)",
+        "total_estimated": "Geschätzt gesamt",
+        "breakdown_title": "Kostenaufschlüsselung",
+        "col_resource": "Ressource",
+        "col_cost": "Geschätzte Kosten (USD/Monat)",
+        "logic_title": "Berechnungslogik (Azure Retail Prices)",
+        "logic_unit_prices": "Einheitspreise (Region: {region})",
+        "logic_assumptions": "Annahmen / Dimensionierung",
+        "logic_formula": "Kostenformel (Monatlich)",
+        "logic_aca_worker": "ACA Worker",
+        "logic_aca_api": "ACA API",
+        "logic_sb": "Service Bus",
+        "item_vcpu": "vCPU-Preis",
+        "item_gib": "GiB-Preis",
+        "item_req": "Anfrage-Preis",
+        "item_ops": "Operations-Preis",
+        "val_seconds_mail": "Sekunden / E-Mail",
+        "val_replicas": "Min. Replikas",
+        "val_idle": "Leerlaufstunden",
+        "ref_title": "Faustregeln (Referenz)",
+        "ref_subtitle": "Typische Kosten für diese Architektur"
+    },
+    "info": {
+        "date": "Februar 2026",
+        "poc_header": "Proof of Concept (POC) - {org} ({date})",
+        "subtitle": "ClassyMail Agent",
+        "tagline": "GenAI, die genau weiß, wohin jede E-Mail gehört.",
+        "contact": "Kontakt",
+        "est_monthly": "Kostenschätzung (ca./Monat)",
+        "est_email": "Kostenschätzung / E-Mail",
+        "infra_items": {
+            "service_bus": "Service Bus Standard",
+            "cosmos": "Cosmos DB Serverless (leichte Nutzung)",
+            "storage": "Storage (LRS)",
+            "ai_foundry": "AI Foundry S0 (Plattform)",
+            "container_apps": "Container Apps (Verbrauch)"
+        },
+        "email_items": {
+            "ocr": "OCR (Mistral)",
+            "classification": "Klassifizierung (Phi-4)",
+            "infra": "Infra (Warteschlange/Speicher)"
+        },
+        "disclaimer": "*Richtwerte, abhängig von Region und tatsächlicher Nutzung.",
+        "close": "OK",
+        "target_title": "Ziel",
+        "target_desc": "Dieses POC demonstriert eine produktionsreife intelligente Pipeline: adversariale Zwei-Modell-Bewertung, Vektorsuche mit Cache, Warteschlangen-Gesundheitsbewertung und verwaltete Identität ohne Geheimnisse — optimiert für niedrige Latenz im großen Maßstab.",
+        "resources_title": "Azure/Foundry-Architektur",
+        "guide_prompt": "Für weitere Details siehe das",
+        "guide_link": "Benutzerhandbuch / Dokumentation",
+        "features": {
+            "title": "Highlights",
+            "adversarial": "Adversariale Zwei-Modell-Bewertung (Phi-4 vs. angepasst)",
+            "dark_mode": "Semantischer Cache + Vektorsuche Cosmos",
+            "retail_prices": "Pipeline mit Scoring: Warteschlangen-Metriken, Gesundheitssonden, verwaltete Identität",
+            "error_handling": "Vollständige Observability & Fehlerwiederherstellung (DLQ)"
+        }
+    },
+    "guide": {
+        "title": "Anwendungsdokumentation",
+        "subtitle": "Anleitung zur Nutzung von ClassyMail, Verständnis der KI-Fähigkeiten und Verwaltung des Datenschutzes.",
+        "usage": {
+            "title": "Nutzungsanleitung",
+            "step1_title": "1. Dashboard & Monitoring",
+            "step1_desc": "Das Hauptdashboard bietet eine Echtzeit-Ansicht eingehender E-Mails.",
+            "step1_li1": "Statuscodes: Grün (Verarbeitet), Gelb (Zu prüfen), Rot (Fehler).",
+            "step1_li2": "Bewertung: Konfidenzwerte (0-100%) zeigen die Sicherheit der KI an.",
+            "step1_li3": "Indikatoren: Achten Sie auf Sensible-Daten- oder Bild-Badges.",
+            "step2_title": "2. Validierungsprozess",
+            "step2_desc": "Klicken Sie auf 'Details öffnen' bei einer E-Mail, um den Prüfmodus zu starten.",
+            "step2_li1": "Sehen Sie das Original-PDF und den extrahierten Markdown nebeneinander.",
+            "step2_li2": "Sehen Sie den Abschnitt KI-Analyse für die Begründung.",
+            "step2_li3": "Korrigieren Sie Kategorien, wenn die KI falsch liegt. Geben Sie einen Grund an, um zukünftiges Fine-Tuning zu unterstützen.",
+            "step3_title": "3. Import",
+            "step3_desc": "Verwenden Sie den Hochladen-Tab, um PDF-Dateien manuell für Tests zu importieren. In der Produktion kommen Dateien automatisch über E-Mail/Blob Storage.",
+            "step4_title": "4. Einstellungen & Konfiguration",
+            "step4_desc": "Passen Sie das Verhalten der Engine im Tab Einstellungen an.",
+            "step4_li1": "Kategorien: Definieren Sie genaue Absichtsnamen. Änderungen werden sofort angewendet.",
+            "step4_li2": "Verarbeitungsstrategie: Wechseln Sie zwischen Standard-, Reasoning- oder Vision-Modus."
+        },
+        "ai": {
+            "title": "Gesamtkomplexität & Reasoning",
+            "desc": "Das System bestimmt die Komplexität basierend auf:",
+            "li1": "Multi-Absicht: E-Mails, die mehrere verschiedene Aktionen anfordern (z.B. 'Adresse ändern UND Kontoauszug senden').",
+            "li2": "Mehrdeutigkeit: Vage Formulierung, die Inferenz oder Kontext aus Anhängen erfordert.",
+            "li3": "Strategie: Die 'Reasoning'-Strategie (Einstellungen) zwingt die KI, vor der Klassifizierung eine Begründung auszugeben, was die Genauigkeit bei komplexen Fällen verbessert."
+        },
+        "exports": {
+            "title": "Datenexporte & Fine-Tuning",
+            "desc": "Exportieren Sie Ihre verarbeiteten Daten für Reporting oder zum Training besserer KI-Modelle.",
+            "csv_title": "CSV-Export (Reporting)",
+            "csv_desc": "Laden Sie eine vollständige Liste aller verarbeiteten E-Mails mit Status, Kosten und Metadaten herunter.",
+            "csv_streaming": "Streaming-Unterstützung: Dieser Export generiert Daten im laufenden Betrieb und ermöglicht den Download sehr großer Datensätze (10k+ Zeilen) ohne Server-Timeout.",
+            "csv_columns": "Enthält: ID, Status, Erkannte Absichten, Konfidenzwerte, KI-Nutzungskosten (USD) und Verarbeitungszeit.",
+            "jsonl_title": "JSONL-Export (Fine-Tuning)",
+            "jsonl_desc": "Exportieren Sie einen 'Reinforcement Learning'-Datensatz für Azure OpenAI / Phi-4 Fine-tuning.",
+            "jsonl_format": "Format: JSON Lines (JSONL), kompatibel mit Azure AI Foundry."
+        },
+        "privacy": {
+            "title": "Datenschutz & Datensicherheit (PII)",
+            "desc": "DSGVO-konforme Verwaltung personenbezogener Daten (PII) mit konfigurierbarer Erkennung und Anonymisierung:",
+            "detection_title": "PII-Erkennung",
+            "detection_desc": "Die KI markiert E-Mails mit sensiblen Daten. Aktivieren unter Einstellungen > Verarbeitung > E-Mail-Vorverarbeitung.",
+            "detection_li1": "LLM-basiert: Kontextuelles Verständnis mit dem gewählten Modell — extrahiert Namen, E-Mails, Telefonnummern, Adressen, Vertragsnummern und Daten.",
+            "detection_li2": "Azure AI Language: Nativer Dienst mit 40+ vordefinierten PII-Kategorien (~€0.001/E-Mail).",
+            "detection_li3": "Hybrid: Führt beide Methoden parallel aus und fusioniert Ergebnisse für maximale Genauigkeit.",
+            "detection_li4": "Konfigurierbares Modell: PII-Erkennung kann Ihr Klassifizierungsmodell wiederverwenden (Auto) oder ein dediziertes Deployment nutzen (gpt-4o-mini, gpt-5-nano, etc.).",
+            "detection_categories": "Erkannte Kategorien: Namen, E-Mails, Telefonnummern, Adressen, Vertrags-/Policennummern, Daten und andere Identifikatoren (Ausweisnr., Reisepass, IBAN).",
+            "anonymization_title": "Anonymisierung (Fine-Tuning-Export)",
+            "anonymization_desc": "Beim JSONL-Export für Fine-tuning bereinigt das System automatisch alle PII über ein dediziertes Anonymisierungsmodell:",
+            "anonymization_li1": "Namen, E-Mails und Daten werden durch generische Platzhalter ersetzt ([Name], [E-Mail], [Datum]).",
+            "anonymization_li2": "Finanzbeträge, Adressen und Referenznummern werden maskiert.",
+            "anonymization_li3": "Die Markdown-Struktur (Überschriften, Links, Tabellen) wird vollständig beibehalten.",
+            "settings_hint": "Konfigurieren Sie PII-Erkennungsmethode und -Modell unter Einstellungen > Verarbeitung > E-Mail-Vorverarbeitung."
+        },
+        "vision": {
+            "title": "Smart Vision (Mistral Document AI)",
+            "desc": "Das System nutzt Mistrals fortschrittliche Layout-Analyse zur intelligenten Verarbeitung visueller Inhalte.",
+            "standard_title": "Hybride Verarbeitung",
+            "standard_desc": "Die Pipeline ist 'inhaltsabhängig': Textdokumente werden normal per OCR verarbeitet. Wenn jedoch visuelle Elemente (Fotos, Diagramme) *im* Dokument erkannt werden, werden sie automatisch vom Vision-Modell beschriftet.",
+            "vision_title": "Scans vs. Nützliche Bilder",
+            "vision_desc": "Das System unterscheidet intelligent zwischen 'gescannten Seiten' (Textquelle) und 'bedeutungsvollen Bildern' (z.B. Unfallfotos). Redundante Seitenbeschreibungen werden unterdrückt. Hinweis: Mistral-Annotationen sind auf 8 Seiten begrenzt; darüber hinaus liefert GPT-4o-mini Fallback-Beschreibungen."
+        },
+        "flow_title": "Verarbeitungsfluss"
+    },
+    "dialog": {
+        "ok": "OK",
+        "cancel": "Abbrechen",
+        "yes": "Ja",
+        "no": "Nein",
+        "alert": "Warnung",
+        "confirmation": "Bestätigung",
+        "input": "Eingabe",
+        "message": "Nachricht"
+    },
+    "layout": {
+        "toggle_sidebar": "Seitenleiste umschalten",
+        "info": "Info"
+    },
+    "exports": {
+        "title": "Datenexporte",
+        "subtitle": "Exportieren Sie Ihre verarbeiteten Daten für Reporting, Analyse oder Fine-tuning von KI-Modellen.",
+        "reporting": {
+            "title": "Reporting-Daten",
+            "desc": "Laden Sie alle verarbeiteten E-Mails herunter, einschließlich Klassifizierungsergebnisse, Metadaten und Validierungsstatus im CSV-Format. Ideal für Excel, PowerBI oder manuelle Prüfung.",
+            "format_label": "Format",
+            "status_label": "Status",
+            "format_minimal": "Minimalformat (Kunde)",
+            "format_enriched": "Erweitertes Format (Analyse)",
+            "status_all": "Alle Status",
+            "status_review": "Zu prüfen",
+            "status_processed": "Verarbeitet",
+            "status_error": "Fehler",
+            "button": "CSV-Bericht herunterladen",
+            "button_loading": "Exportiere...",
+            "empty": "Keine Daten zum Exportieren vorhanden."
+        },
+        "finetune": {
+            "title": "Fine-Tuning-Datensätze",
+            "desc": "Exportieren Sie anonymisierte Daten im JSONL-Format kompatibel mit OpenAI/Azure OpenAI. Erfordert mindestens {n} verarbeitete Elemente.",
+            "split_hint": "Auto-Aufteilung: 80% Training, 20% Test.",
+            "train": "Trainingssatz",
+            "test": "Testsatz",
+            "all": "Vollständigen Datensatz herunterladen (JSONL)",
+            "requirement_title": "Voraussetzung",
+            "requirement_desc": "Sie benötigen {n} verarbeitete E-Mails, um die Generierung zu aktivieren.",
+            "generate": "Daten mit GPT-5.2 generieren",
+            "generating": "Generiere...",
+            "generate_confirm": "Dies verwendet GPT-5.2, um synthetische E-Mails basierend auf Ihren vorhandenen Daten zu generieren, um die Mindestanforderung zu erreichen. Fortfahren?",
+            "generate_error": "Generierung fehlgeschlagen: {error}"
+        }
+    },
+    "developer_docs": {
+        "title": "Entwickler-Dokumentation",
+        "tabs": {
+            "architecture": "Architektur",
+            "api": "API-Referenz (Redoc)",
+            "repo": "Repository"
+        },
+        "architecture": {
+            "title": "Systemarchitektur",
+            "desc_html": "Das ClassyMail-System nutzt <strong>Azure Container Apps</strong> für zwei separate Microservices: das <strong>FastAPI-Backend</strong> (API-Anfragen) und den <strong>Worker</strong> (Langzeitaufgaben). Diese Trennung ermöglicht unabhängige Skalierung: die API über HTTP-Traffic und der Worker über die Service-Bus-Warteschlangentiefe.",
+            "ref_title": "Referenzarchitektur",
+            "ref_alt": "Referenz-Architekturdiagramm"
+        },
+        "api": {
+            "open_new_tab": "In neuem Tab öffnen ↗"
+        },
+        "repo": {
+            "title": "Quellcode",
+            "desc": "Der Quellcode dieses Proof of Concept ist auf GitHub gehostet.",
+            "cta": "Auf GitHub ansehen"
+        },
+        "diagram": {
+            "client": "Client-Browser",
+            "frontend": "Vue-Frontend",
+            "backend": "FastAPI-Backend",
+            "aca": "Azure Container Apps",
+            "worker": "Worker",
+            "save_upload": "Upload speichern",
+            "metadata": "Metadaten",
+            "queue_job": "Warteschlange",
+            "blob": "Azure Blob Storage",
+            "cosmos": "Cosmos DB",
+            "sb": "Service Bus",
+            "trigger": "Auslöser",
+            "read_file": "Datei lesen",
+            "ocr": "OCR",
+            "mistral": "Mistral AI OCR",
+            "classify": "Klassifizieren",
+            "openai": "Azure OpenAI",
+            "update": "Aktualisierung"
+        }
+    },
+    "email_detail": {
+        "loading": "Laden...",
+        "reason_label": "Grund / Kommentar",
+        "reason_placeholder": "Warum diese Korrektur?...",
+        "mark_garbage": "Als Spam/Ungültig markieren",
+        "validate_save": "Validieren & Speichern",
+        "reasoning": "KI-Reasoning",
+        "reasoning_none": "Reasoning (Keine Kategorie)",
+        "minimize_width": "Breite minimieren",
+        "full_width": "Volle Breite",
+        "reprocess": "Erneut verarbeiten",
+        "processing_mode": "Verarbeitungsmodus",
+        "vision_title": "Visuelle Analyse",
+        "vision_quality": "Analysequalität",
+        "vision_all_described": "Alle Bilder haben KI-Beschreibungen",
+        "vision_partially_described": "Bilder haben KI-Beschreibungen",
+        "vision_no_descriptions": "Keine KI-Beschreibungen verfügbar — GPT-4o-mini-Fallback möglicherweise fehlgeschlagen",
+        "vision_pages": "Seiten",
+        "vision_relevant": "relevant",
+        "vision_described": "Beschrieben",
+        "vision_pending": "Keine Beschreibung",
+        "vision_relevant_badge": "Relevant",
+        "vision_summary": "Zusammenfassung",
+        "vision_no_ai_desc": "Keine KI-Beschreibung für dieses Bild generiert.",
+        "vision_source_ref": "Quellreferenz",
+        "vision_reprocess_hint": "Versuchen Sie, mit der Vision-Strategie erneut zu verarbeiten, um eine Beschreibung über GPT-4o-mini zu generieren.",
+        "vision_details": "Details",
+        "vision_type_detected": "Bildtyp erkannt",
+        "vision_bbox": "Begrenzungsrahmen"
+    }
+}

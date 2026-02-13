@@ -548,6 +548,23 @@
         "minimize_width": "Minimize width",
         "full_width": "Full width",
         "reprocess": "Reprocess",
-        "processing_mode": "Processing Mode"
+        "processing_mode": "Processing Mode",
+        "vision_title": "Vision Analysis",
+        "vision_quality": "Analysis Quality",
+        "vision_all_described": "All images have AI descriptions",
+        "vision_partially_described": "images have AI descriptions",
+        "vision_no_descriptions": "No AI descriptions available — GPT-4o-mini fallback may have failed",
+        "vision_pages": "Pages",
+        "vision_relevant": "relevant",
+        "vision_described": "Described",
+        "vision_pending": "No description",
+        "vision_relevant_badge": "Relevant",
+        "vision_summary": "Summary",
+        "vision_no_ai_desc": "No AI description generated for this image.",
+        "vision_source_ref": "Source reference",
+        "vision_reprocess_hint": "Try reprocessing with Vision strategy to generate a description via GPT-4o-mini.",
+        "vision_details": "Details",
+        "vision_type_detected": "Image type detected",
+        "vision_bbox": "Bounding Box"
     }
 }

@@ -4,7 +4,7 @@ import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon, ArrowsPointi
 import MarkdownIt from 'markdown-it'
 import { useDialog } from '../composables/useDialog'
 import { useI18n } from 'vue-i18n'
-import { trackException } from '../services/telemetry'
+import { trackException, trackEvent } from '../services/telemetry'
 
 const { t } = useI18n()
 
@@ -345,6 +345,37 @@ const parseArrivalDate = (fileUrl) => {
 }
 
 const renderMarkdown = (text) => md.render(text || '')
+
+// --- Vision Analysis helpers ---
+const isFilenameLike = (summary) => {
+  if (!summary || !summary.trim()) return true
+  return /^img[-_]?\d+\.?(jpe?g|png|gif|bmp|webp|svg)?$/i.test(summary.trim())
+}
+
+const visionStats = computed(() => {
+  const items = email.value?.vision_analysis || []
+  if (!items.length) return null
+  const described = items.filter(i => i.summary && !isFilenameLike(i.summary)).length
+  const filenameOnly = items.length - described
+  const pages = [...new Set(items.map(i => (i.page_index || 0) + 1))].sort((a, b) => a - b)
+  const relevant = items.filter(i => i.is_relevant).length
+  return { total: items.length, described, filenameOnly, pages, relevant }
+})
+
+// Track vision detail view in App Insights
+watch(() => email.value, (val) => {
+  if (val && val.vision_analysis && val.vision_analysis.length) {
+    const stats = visionStats.value
+    trackEvent('vision_detail_viewed', {
+      emailId: val.id,
+      strategy: val.processing_strategy,
+      totalImages: stats?.total,
+      describedImages: stats?.described,
+      filenameOnlyImages: stats?.filenameOnly,
+      relevantImages: stats?.relevant,
+    })
+  }
+})
 </script>
 
 <template>
@@ -605,9 +636,36 @@ const renderMarkdown = (text) => md.render(text || '')
                     <h4
                       class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 mt-4 flex items-center gap-2"
                     >
-                      👁 Vision Analysis
+                      👁 {{ t('email_detail.vision_title') }}
                       <span class="text-xs font-normal text-gray-500">({{ email.vision_analysis.length }} image{{ email.vision_analysis.length !== 1 ? 's' : '' }})</span>
                     </h4>
+
+                    <!-- Vision Overview Banner -->
+                    <div
+                      v-if="visionStats"
+                      class="mb-3 p-2.5 rounded-lg text-xs flex flex-wrap items-center gap-3"
+                      :class="visionStats.described > 0
+                        ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 text-green-800 dark:text-green-300'
+                        : 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-300'"
+                    >
+                      <span class="font-semibold">{{ t('email_detail.vision_quality') }}:</span>
+                      <span v-if="visionStats.described === visionStats.total">
+                        ✓ {{ t('email_detail.vision_all_described') }}
+                      </span>
+                      <span v-else-if="visionStats.described > 0">
+                        ⚠ {{ visionStats.described }}/{{ visionStats.total }} {{ t('email_detail.vision_partially_described') }}
+                      </span>
+                      <span v-else>
+                        ⚠ {{ t('email_detail.vision_no_descriptions') }}
+                      </span>
+                      <span class="text-gray-500 dark:text-gray-400">|</span>
+                      <span>{{ t('email_detail.vision_pages') }}: {{ visionStats.pages.join(', ') }}</span>
+                      <span v-if="visionStats.relevant > 0">
+                        <span class="text-gray-500 dark:text-gray-400">|</span>
+                        {{ visionStats.relevant }} {{ t('email_detail.vision_relevant') }}
+                      </span>
+                    </div>
+
                     <div
                       class="space-y-2 border border-green-100 dark:border-green-900/30 rounded-lg p-3 bg-green-50/50 dark:bg-green-900/10"
                     >
@@ -616,9 +674,9 @@ const renderMarkdown = (text) => md.render(text || '')
                         :key="item.id || `vis-${idx}`"
                         class="text-sm p-2.5 rounded bg-white dark:bg-gray-800 border border-green-200 dark:border-green-800/50"
                       >
-                        <!-- Header: Page + Type + Relevance Badge -->
+                        <!-- Header: Page + Type + ID + Relevance Badge -->
                         <div class="flex justify-between items-start mb-2 gap-2">
-                          <div class="flex items-center gap-1">
+                          <div class="flex items-center gap-1 flex-wrap">
                             <span class="font-semibold text-xs text-green-700 dark:text-green-300">
                               Page {{ (item.page_index || 0) + 1 }}
                             </span>
@@ -628,22 +686,54 @@ const renderMarkdown = (text) => md.render(text || '')
                             >
                               • {{ item.image_type }}
                             </span>
+                            <span
+                              v-if="item.id"
+                              class="text-[10px] text-gray-400 dark:text-gray-500 font-mono"
+                            >
+                              ({{ item.id }})
+                            </span>
                           </div>
-                          <span
-                            v-if="item.is_relevant"
-                            class="flex-shrink-0 text-[10px] bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 px-1.5 py-0.5 rounded-full border border-green-200 dark:border-green-800 font-medium"
-                          >
-                            ✓ Relevant
-                          </span>
+                          <div class="flex items-center gap-1.5 flex-shrink-0">
+                            <span
+                              v-if="item.summary && !isFilenameLike(item.summary)"
+                              class="text-[10px] bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 px-1.5 py-0.5 rounded-full border border-green-200 dark:border-green-800 font-medium"
+                            >
+                              ✓ {{ t('email_detail.vision_described') }}
+                            </span>
+                            <span
+                              v-else
+                              class="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 px-1.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800 font-medium"
+                            >
+                              ⚠ {{ t('email_detail.vision_pending') }}
+                            </span>
+                            <span
+                              v-if="item.is_relevant"
+                              class="text-[10px] bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 px-1.5 py-0.5 rounded-full border border-green-200 dark:border-green-800 font-medium"
+                            >
+                              ✓ {{ t('email_detail.vision_relevant_badge') }}
+                            </span>
+                          </div>
                         </div>
 
                         <!-- Summary: Main description -->
                         <div
-                          v-if="item.summary"
+                          v-if="item.summary && !isFilenameLike(item.summary)"
                           class="mb-2 text-gray-900 dark:text-gray-100 text-sm leading-relaxed"
                         >
-                          <strong class="block text-xs text-gray-700 dark:text-gray-300 mb-1">Summary:</strong>
+                          <strong class="block text-xs text-gray-700 dark:text-gray-300 mb-1">{{ t('email_detail.vision_summary') }}:</strong>
                           {{ item.summary }}
+                        </div>
+
+                        <!-- Filename-like summary: Show meaningful message -->
+                        <div
+                          v-else-if="item.summary && isFilenameLike(item.summary)"
+                          class="mb-2 text-amber-700 dark:text-amber-300 text-xs bg-amber-50 dark:bg-amber-900/20 p-2 rounded border border-amber-100 dark:border-amber-800/30"
+                        >
+                          <span class="font-semibold">{{ t('email_detail.vision_no_ai_desc') }}</span>
+                          <span class="text-gray-500 dark:text-gray-400 ml-1">({{ t('email_detail.vision_source_ref') }}: {{ item.summary }})</span>
+                          <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                            {{ t('email_detail.vision_reprocess_hint') }}
+                          </div>
                         </div>
 
                         <!-- Details: Additional context -->
@@ -651,16 +741,24 @@ const renderMarkdown = (text) => md.render(text || '')
                           v-if="item.details"
                           class="text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900/30 p-2.5 rounded border border-green-100 dark:border-green-800/30"
                         >
-                          <span class="font-semibold block mb-1 text-green-700 dark:text-green-400">Details:</span>
+                          <span class="font-semibold block mb-1 text-green-700 dark:text-green-400">{{ t('email_detail.vision_details') }}:</span>
                           {{ item.details }}
                         </div>
 
-                        <!-- Fallback: Show image_type if no summary -->
+                        <!-- BBox info -->
+                        <div
+                          v-if="item.bbox"
+                          class="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500 font-mono"
+                        >
+                          📐 BBox: x{{ Math.round(item.bbox.x_min || 0) }},y{{ Math.round(item.bbox.y_min || 0) }} → x{{ Math.round(item.bbox.x_max || 0) }},y{{ Math.round(item.bbox.y_max || 0) }}
+                        </div>
+
+                        <!-- Fallback: Show image_type if no summary at all -->
                         <div
                           v-if="!item.summary && !item.details && item.image_type"
                           class="text-xs italic text-gray-500 dark:text-gray-400"
                         >
-                          Image type detected: <strong>{{ item.image_type }}</strong>
+                          {{ t('email_detail.vision_type_detected') }}: <strong>{{ item.image_type }}</strong>
                         </div>
                       </div>
                     </div>
