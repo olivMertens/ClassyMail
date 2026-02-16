@@ -1000,3 +1000,83 @@ resource "azurerm_container_app" "worker" {
     ]
   }
 }
+
+# ──────────────────────────────────────────────────────────────────────
+# 6. CI/CD Identity — GitHub Actions OIDC (Workload Identity Federation)
+#
+# Uses a User Assigned Managed Identity + Federated Credential instead
+# of an App Registration.  This keeps everything in the azurerm provider
+# (no azuread provider needed) and avoids long-lived secrets.
+#
+# Enable by setting  github_repo = "owner/repo"  in terraform.tfvars.
+# ──────────────────────────────────────────────────────────────────────
+
+variable "github_repo" {
+  type        = string
+  description = "GitHub repository in 'owner/repo' format for OIDC Workload Identity Federation. Leave empty to skip CI/CD identity creation."
+  default     = ""
+}
+
+variable "github_environment" {
+  type        = string
+  description = "GitHub environment name for OIDC subject claim (e.g. 'production'). Leave empty to use branch-based federation only."
+  default     = ""
+}
+
+# CI/CD Managed Identity (separate from the app runtime identity)
+resource "azurerm_user_assigned_identity" "cicd_id" {
+  count               = var.github_repo != "" ? 1 : 0
+  location            = var.location
+  name                = "${var.prefix}-cicd-id"
+  resource_group_name = azurerm_resource_group.rg.name
+
+  tags = local.common_tags
+}
+
+# Federated credential: main branch pushes
+resource "azurerm_federated_identity_credential" "github_main" {
+  count               = var.github_repo != "" ? 1 : 0
+  name                = "github-main"
+  resource_group_name = azurerm_resource_group.rg.name
+  parent_id           = azurerm_user_assigned_identity.cicd_id[0].id
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = "https://token.actions.githubusercontent.com"
+  subject             = "repo:${var.github_repo}:ref:refs/heads/main"
+}
+
+# Federated credential: GitHub environment (optional, for environment-gated deployments)
+resource "azurerm_federated_identity_credential" "github_environment" {
+  count               = var.github_repo != "" && var.github_environment != "" ? 1 : 0
+  name                = "github-env-${var.github_environment}"
+  resource_group_name = azurerm_resource_group.rg.name
+  parent_id           = azurerm_user_assigned_identity.cicd_id[0].id
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = "https://token.actions.githubusercontent.com"
+  subject             = "repo:${var.github_repo}:environment:${var.github_environment}"
+}
+
+# RBAC: Contributor on RG (manage Container Apps, read identities, Cosmos firewall, etc.)
+resource "azurerm_role_assignment" "cicd_rg_contributor" {
+  count                = var.github_repo != "" ? 1 : 0
+  scope                = azurerm_resource_group.rg.id
+  role_definition_name = "Contributor"
+  principal_id         = azurerm_user_assigned_identity.cicd_id[0].principal_id
+}
+
+# RBAC: AcrPush on ACR (push + pull images)
+resource "azurerm_role_assignment" "cicd_acr_push" {
+  count                = var.github_repo != "" && var.acr_name != "" ? 1 : 0
+  scope                = data.azurerm_container_registry.acr[0].id
+  role_definition_name = "AcrPush"
+  principal_id         = azurerm_user_assigned_identity.cicd_id[0].principal_id
+}
+
+output "CICD_CLIENT_ID" {
+  value       = var.github_repo != "" ? azurerm_user_assigned_identity.cicd_id[0].client_id : null
+  description = "Client ID for GitHub Actions OIDC auth (set as AZURE_CLIENT_ID secret in GitHub)"
+}
+
+output "CICD_TENANT_ID" {
+  value       = var.github_repo != "" ? azurerm_user_assigned_identity.cicd_id[0].tenant_id : null
+  description = "Tenant ID for GitHub Actions OIDC auth (set as AZURE_TENANT_ID secret in GitHub)"
+}

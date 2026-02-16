@@ -10,7 +10,39 @@ Ce document décrit une approche CI/CD GitHub Actions pour :
 
 Utilisez des identifiants fédérés (Workload Identity Federation) afin que GitHub obtienne un jeton court (id-token) sans stocker de mot de passe/secret.
 
-Vue d'ensemble :
+### Provisionné par Terraform (recommandé)
+
+Depuis la version actuelle de l'IaC, l'identité CI/CD est **entièrement gérée par Terraform** :
+
+```hcl
+# Dans terraform.tfvars
+github_repo = "olivMertens/ClassyMail"
+# github_environment = "production"  # optionnel
+```
+
+`terraform apply` crée automatiquement :
+
+1. **User Assigned Managed Identity** (`<prefix>-cicd-id`) — identité dédiée au CI/CD.
+2. **Federated Identity Credential** (`github-main`) — lien OIDC pour `refs/heads/main`.
+3. **Federated Identity Credential** (`github-env-<env>`) — (optionnel) lien OIDC pour un environment GitHub.
+4. **RBAC** :
+   - `Contributor` sur le Resource Group (gérer Container Apps, Cosmos firewall, etc.)
+   - `AcrPush` sur l'ACR (push + pull d'images)
+
+Après `terraform apply`, configurez les secrets GitHub avec les outputs :
+
+```bash
+terraform output CICD_CLIENT_ID       # → secret AZURE_CLIENT_ID
+terraform output CICD_TENANT_ID       # → secret AZURE_TENANT_ID
+# AZURE_SUBSCRIPTION_ID = votre ID de subscription
+```
+
+> **Note** : Cette approche utilise une Managed Identity (pas une App Registration).
+> Aucun provider `azuread` n'est nécessaire.
+
+### Alternative manuelle (App Registration)
+
+Si vous ne pouvez pas utiliser Terraform (par ex. tenant restreint), créez manuellement :
 
 1) Créer une app registration Entra + service principal.
 2) Configurer une federated identity credential pour votre repo/environnement GitHub.
@@ -23,16 +55,16 @@ Il y a **2 identités** distinctes dans ce projet :
 1) **Service principal GitHub OIDC** (CI/CD) : utilisé par `azure/login@v2` dans GitHub Actions.
 2) **User Assigned Managed Identity** de l'app (runtime) : utilisée par la Container App pour accéder aux services Azure **sans clés**.
 
-### 1) RBAC du service principal GitHub OIDC (CI/CD)
+### 1) RBAC du CI/CD Managed Identity (`<prefix>-cicd-id`)
 
 Objectif : build/push l'image et déployer/mettre à jour la Container App.
 
-Recommandation “simple qui marche” (scope = Resource Group) :
+Provisionné automatiquement par Terraform (`github_repo` non vide) :
 
-- **Contributor** sur le RG (ex: `<prefix>-rg`)
-- **AcrPush** + **Reader** sur l'ACR (Reader nécessaire pour `az acr show` / login, et AcrPush pour le push)
+- **Contributor** sur le RG (ex: `<prefix>-rg`) — gère Container Apps, lit les identités, met à jour le firewall Cosmos
+- **AcrPush** sur l'ACR — push + pull d'images Docker
 
-Option “least privilege” (plus strict, plus verbeux) :
+Option "least privilege" (alternative manuelle, plus strict) :
 
 - **Container Apps Contributor** sur le RG
 - **Managed Identity Operator** sur la User Assigned Managed Identity (pour permettre l'assignation à la Container App)
@@ -48,9 +80,11 @@ Objectif : lire/écrire dans Cosmos, Storage, Service Bus, et appeler Azure AI F
 - Cosmos DB (data-plane SQL RBAC): **Custom App Role** (`readMetadata` + CRUD) au scope **Account** (voir `infra/main.tf`)
 - ACR (si pull via identité managée): **AcrPull** sur l'ACR
 
-## App registration + Federated Credential (GitHub OIDC)
+## Federated Identity Credential (GitHub OIDC)
 
-Résumé des champs clés :
+> **Terraform gère cette configuration automatiquement.** Cette section est documentée comme référence.
+
+Résumé des champs clés de la federated credential :
 
 - **Issuer**: `https://token.actions.githubusercontent.com`
 - **Audience**: `api://AzureADTokenExchange`
@@ -58,7 +92,7 @@ Résumé des champs clés :
   - Recommandé (Environment): `repo:<OWNER>/<REPO>:environment:<ENV_NAME>`
   - Alternative (branch): `repo:<OWNER>/<REPO>:ref:refs/heads/<BRANCH>`
 
-Créer le federated credential dans Entra ID sur l'app registration utilisée par `azure/login@v2`.
+Terraform crée les federated credentials sur une **Managed Identity** (`<prefix>-cicd-id`), pas une App Registration.
 Référence officielle : https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure-openid-connect
 
 Références :
@@ -151,9 +185,16 @@ IMPACT: Container Apps may fail to access Azure resources
 
 À définir dans GitHub → Settings → Secrets and variables → Actions → Secrets :
 
-- `AZURE_CLIENT_ID` (client id du service principal OIDC)
-- `AZURE_TENANT_ID`
-- `AZURE_SUBSCRIPTION_ID`
+- `AZURE_CLIENT_ID` — Terraform output: `CICD_CLIENT_ID` (client id de l'identité managée CI/CD)
+- `AZURE_TENANT_ID` — Terraform output: `CICD_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID` — votre subscription Azure
+
+```bash
+# Après terraform apply :
+AZURE_CLIENT_ID=$(terraform -chdir=infra output -raw CICD_CLIENT_ID)
+AZURE_TENANT_ID=$(terraform -chdir=infra output -raw CICD_TENANT_ID)
+AZURE_SUBSCRIPTION_ID="ec8bd34d-34d2-4b35-a587-2904775884b1"
+```
 
 Fallback (si vous n'utilisez pas OIDC) :
 

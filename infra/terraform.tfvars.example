@@ -66,3 +66,12 @@
 # Disable if your tenant restricts custom Azure Policy creation.
 # tag_policy_enabled = true
 # security_cost_policy_enabled = true
+
+# --- CI/CD: GitHub Actions OIDC (Optional) ---
+# Creates a dedicated managed identity + federated credential for passwordless
+# GitHub Actions deployments (Workload Identity Federation).
+# Set to "" to skip (no CI/CD identity created).
+# github_repo = "owner/repo"
+#
+# Optional: constrain OIDC token to a specific GitHub environment.
+# github_environment = "production"
