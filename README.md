@@ -32,7 +32,7 @@ Il valide une architecture moderne sur Azure :
 flowchart TD
     user[User] -->|Upload PDF| ui["SPA Vue 3 + Tailwind"]
     ui -->|API| api["FastAPI API"]
-    mi["🔑 Managed Identity<br/>email-poc-id"] -.->|RBAC| blob
+    mi["Managed Identity - email-poc-id"] -.->|RBAC| blob
     mi -.->|RBAC| sbq
     mi -.->|RBAC| cosmos
     mi -.->|RBAC| ai
@@ -237,7 +237,7 @@ Si un email échoue systématiquement (ex: PDF corrompu faisant crasher le parse
 *   **Dashboard** : L'onglet "Failures" permet de voir ces messages, analyser l'erreur, et les rejouer (`/reprocess`) ou les purger.
 
 ---
-## �️ Scripts & Outils de Développement
+## 🛠️ Scripts & Outils de Développement
 
 Le dossier `scripts/` contient des outils pour le développement, le déploiement et le débogage. Les scripts sont disponibles en versions **PowerShell (.ps1)** et **Bash (.sh)** pour la compatibilité cross-platform.
 
@@ -420,6 +420,41 @@ uv run python scripts/check_i18n.py
 ---
 
 ### 🚢 Scripts de Déploiement
+
+#### `bootstrap.ps1` — **🆕 Déploiement Complet Depuis Zéro**
+Script tout-en-un qui orchestre la création complète de l'infrastructure Azure (Terraform init + apply + secrets.env + verify).
+
+**Usage :**
+```powershell
+# Déploiement standard
+.\scripts\bootstrap.ps1 -TenantId "<tenant-id>" -SubscriptionId "<sub-id>"
+
+# Avec un prefix custom et ACR existant
+.\scripts\bootstrap.ps1 -Prefix "email-poc-test" -AcrName "myexistingacr" -AcrResourceGroup "my-acr-rg"
+```
+
+**Ce que fait le script :**
+1. ✅ Vérifie les prérequis (az, terraform, uv)
+2. ✅ `terraform init` + `terraform apply`
+3. ✅ Génère `secrets.env` via `write_secrets_env.ps1`
+4. ✅ Assigne les rôles RBAC locaux via `assign_local_dev_roles.ps1`
+5. ✅ Vérifie l'infrastructure via `verify-mvp-setup.ps1`
+
+**💡 Voir aussi :** [docs/DEPLOY_FROM_SCRATCH.md](docs/DEPLOY_FROM_SCRATCH.md)
+
+---
+
+#### `assign_local_dev_roles.ps1` — **🆕 RBAC pour Développement Local**
+Assigne les rôles Azure nécessaires à un développeur pour travailler en local.
+
+**Usage :**
+```powershell
+.\scripts\assign_local_dev_roles.ps1 -Prefix "<prefix>"
+```
+
+**Rôles assignés :** Storage Blob Data Contributor, Service Bus Sender/Receiver, Cognitive Services User
+
+---
 
 #### `build_acr` (.ps1 / .sh) — **Build & Push Image Docker**
 Build une image Docker et la pousse vers Azure Container Registry.
@@ -618,11 +653,9 @@ uv run python scripts/test_e2e_flow.py --api-url https://your-api.azurecontainer
 
 ---
 
-## �📚 Documentation
+## 📚 Documentation
 
 L'index complet est disponible ici : **[docs/INDEX.md](docs/INDEX.md)**.
-- [CLI_REFERENCE](docs/CLI_REFERENCE.md)
-- **[ENVIRONMENT_VARIABLES_AUDIT](ENVIRONMENT_VARIABLES_AUDIT.md)** - Liste complète des variables d'environnement
 
 ### Parcours Recommandé
 
@@ -633,6 +666,36 @@ L'index complet est disponible ici : **[docs/INDEX.md](docs/INDEX.md)**.
 4.  **Optimiser** : [docs/MODELS.md](docs/MODELS.md) (Choix des modèles, Coûts, Fine-tuning)
 5.  **Déployer** : [docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md) (Terraform) et [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) (GitHub Actions)
 6.  **Nouveau Tenant** : [docs/DEPLOY_FROM_SCRATCH.md](docs/DEPLOY_FROM_SCRATCH.md) (Déploiement complet depuis zéro + script bootstrap)
+
+### Référence Complète
+
+| Catégorie | Document | Description |
+|-----------|----------|-------------|
+| **Architecture** | [ARCHITECTURE](docs/ARCHITECTURE.md) | Système, RBAC, pipeline |
+| | [MODELS](docs/MODELS.md) | Modèles AI, API params |
+| | [COSTS_LOGIC](docs/COSTS_LOGIC.md) | Analyse coûts (12+ modèles) |
+| | [IMPLEMENTATION_STATUS](docs/IMPLEMENTATION_STATUS.md) | État features (Feb 2026) |
+| **Déploiement** | [DEPLOY_FROM_SCRATCH](docs/DEPLOY_FROM_SCRATCH.md) | Déploiement depuis zéro + bootstrap |
+| | [INFRASTRUCTURE](docs/INFRASTRUCTURE.md) | Terraform, Event Grid, RBAC |
+| | [AZURE_AI_FOUNDRY_SETUP](docs/AZURE_AI_FOUNDRY_SETUP.md) | Setup modèles AI Foundry |
+| | [ACA_ENVIRONMENT_VARIABLES](docs/ACA_ENVIRONMENT_VARIABLES.md) | Env vars Container Apps |
+| | [CLI_REFERENCE](docs/CLI_REFERENCE.md) | CLI : setup, auth, RAG |
+| **Développement** | [LOCAL_DEVELOPMENT](docs/LOCAL_DEVELOPMENT.md) | Setup local, Docker, testing |
+| | [CICD_GITHUB](docs/CICD_GITHUB.md) | Pipeline CI/CD GitHub |
+| **Testing** | [SCENARIO_E2E](docs/SCENARIO_E2E.md) | Scénarios end-to-end |
+| | [TESTING_EMAIL_GENERATION](docs/TESTING_EMAIL_GENERATION.md) | Génération emails de test |
+| | [FINE_TUNING_DATA](docs/FINE_TUNING_DATA.md) | Datasets fine-tuning |
+| | [COMPARISON_ADVERSARIAL](docs/COMPARISON_ADVERSARIAL.md) | Comparaison adversariale |
+| **Sécurité & PII** | [PII_ANONYMIZATION](docs/PII_ANONYMIZATION_AND_USER_CORRECTIONS.md) | Anonymisation PII, corrections |
+| | [RBAC_AUDIT](docs/RBAC_AUDIT.md) | Audit RBAC détaillé |
+| **Interface** | [USER_INTERFACE](docs/USER_INTERFACE.md) | Dashboard, features UI |
+| | [README_DIAGRAMS](docs/README_DIAGRAMS.md) | Diagrammes interactifs |
+| **Analyse** | [ADR_OCR_STRATEGY](docs/ADR_OCR_STRATEGY.md) | ADR: Stratégie OCR |
+| | [VISION_STRATEGY](docs/VISION_STRATEGY_PERFORMANCE_ANALYSIS.md) | Performance Vision |
+| | [TROUBLESHOOTING_MAP](docs/TROUBLESHOOTING_MAP.md) | Troubleshooting architecture |
+| **G2S** | [G2S_CUSTOMIZATION](docs/G2S_CUSTOMIZATION.md) | Tags, catégories, policy |
+| | [INTEGRATION_CLIENT_G2S](docs/INTEGRATION_CLIENT_G2S.md) | Preprocessing, slugs, CSV |
+| **Config** | [ENVIRONMENT_VARIABLES_AUDIT](ENVIRONMENT_VARIABLES_AUDIT.md) | Variables d'env complètes |
 
 ---
 
