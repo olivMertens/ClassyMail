@@ -208,7 +208,8 @@ jobs:
               exit 1
             fi
             az acr login --name "${{ vars.ACR_NAME }}"
-            LOGIN_SERVER=$(az acr show --name "${{ vars.ACR_NAME }}" --query loginServer -o tsv)
+            # ACR login server is always <name>.azurecr.io — no ARM query needed
+            LOGIN_SERVER="${{ vars.ACR_NAME }}.azurecr.io"
             echo "ACR_LOGIN_SERVER=$LOGIN_SERVER" >> $GITHUB_ENV
           fi
 
@@ -323,7 +324,7 @@ jobs:
           REGISTRY="${{ secrets.ACR_LOGIN_SERVER }}"
           if [ -z "$REGISTRY" ]; then
             if [ -n "${{ vars.ACR_NAME }}" ]; then
-               REGISTRY=$(az acr show --name "${{ vars.ACR_NAME }}" --query loginServer -o tsv)
+               REGISTRY="${{ vars.ACR_NAME }}.azurecr.io"
             fi
           fi
 
@@ -466,7 +467,7 @@ jobs:
           REGISTRY="${{ secrets.ACR_LOGIN_SERVER }}"
           if [ -z "$REGISTRY" ]; then
             if [ -n "${{ vars.ACR_NAME }}" ]; then
-               REGISTRY=$(az acr show --name "${{ vars.ACR_NAME }}" --query loginServer -o tsv)
+               REGISTRY="${{ vars.ACR_NAME }}.azurecr.io"
             fi
           fi
 
