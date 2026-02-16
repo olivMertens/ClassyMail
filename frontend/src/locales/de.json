@@ -96,6 +96,7 @@
                 "cancel_adding": "Kategorie-Hinzufügung abbrechen",
                 "remove_confirm": "Sind Sie sicher, dass Sie diese Kategorie entfernen möchten?"
             },
+            "assessment_model": "KI-Beratungsmodell",
             "assessment": {
                 "button": "KI-Beratung erhalten ({model})",
                 "analyzing": "Analysiere...",

@@ -96,6 +96,7 @@
                 "cancel_adding": "Annulla Aggiunta Categoria",
                 "remove_confirm": "Sei sicuro di voler rimuovere questa categoria?"
             },
+            "assessment_model": "Modello di Consulenza IA",
             "assessment": {
                 "button": "Ottieni Consiglio IA ({model})",
                 "analyzing": "Analizzando...",

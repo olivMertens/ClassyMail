@@ -105,6 +105,42 @@ const MODEL_PRICING = {
   'Kimi-K2.5': { label: 'Kimi-K2.5', input: 0.0006, output: 0.003, quality: 0.88 },
 }
 
+// Dynamic deployments fetched from Azure AI Foundry (populated on mount)
+const availableDeployments = ref([])
+const deploymentsLoaded = ref(false)
+
+// Merged model options: real deployments first, then MODEL_PRICING keys as fallback
+const modelOptions = computed(() => {
+  if (availableDeployments.value.length > 0) {
+    return availableDeployments.value.map(d => {
+      const pricing = MODEL_PRICING[d.id] || MODEL_PRICING[d.model]
+      return {
+        value: d.id,
+        label: pricing ? `${pricing.label} (${d.model})` : `${d.id} (${d.model})`,
+      }
+    })
+  }
+  // Fallback: use hardcoded MODEL_PRICING keys
+  return Object.entries(MODEL_PRICING).map(([key, m]) => ({
+    value: key,
+    label: m.label,
+  }))
+})
+
+const loadDeployments = async () => {
+  try {
+    const res = await fetch('/api/admin/deployments')
+    if (res.ok) {
+      const data = await res.json()
+      availableDeployments.value = data.deployments || []
+    }
+  } catch (e) {
+    console.warn('Could not fetch deployments, using defaults:', e.message)
+  } finally {
+    deploymentsLoaded.value = true
+  }
+}
+
 // Hypothesis: tokens per email (classification only — single LLM call)
 const TOKEN_HYPOTHESIS = { inputLow: 800, inputHigh: 1500, outputLow: 200, outputHigh: 500 }
 
@@ -616,6 +652,7 @@ const setLocale = (l) => {
 
 onMounted(() => {
   loadSettings()
+  loadDeployments()
 
   const savedDark = localStorage.getItem('ClassyMail-dark')
   isDark.value = savedDark === 'true'
@@ -831,20 +868,12 @@ onMounted(() => {
               v-model="settings.ai_model"
               class="block w-full max-w-xs rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
             >
-              <option value="phi4">
-                Phi-4 (Standard)
-              </option>
-              <option value="gpt-5-nano">
-                gpt-5-nano
-              </option>
-              <option value="gpt-5-mini">
-                gpt-5-mini
-              </option>
-              <option value="gpt-4.1-nano">
-                gpt-4.1-nano
-              </option>
-              <option value="Kimi-K2.5">
-                Kimi-K2.5 (Moonshot AI)
+              <option
+                v-for="opt in modelOptions"
+                :key="opt.value"
+                :value="opt.value"
+              >
+                {{ opt.label }}
               </option>
             </select>
           </div>
@@ -876,26 +905,12 @@ onMounted(() => {
                 <option :value="null">
                   None (Single Model)
                 </option>
-                <option value="phi4">
-                  Phi-4
-                </option>
-                <option value="gpt-4o">
-                  gpt-4o
-                </option>
-                <option value="gpt-4o-mini">
-                  gpt-4o-mini
-                </option>
-                <option value="gpt-5-nano">
-                  gpt-5-nano
-                </option>
-                <option value="gpt-5-mini">
-                  gpt-5-mini
-                </option>
-                <option value="gpt-4.1-nano">
-                  gpt-4.1-nano
-                </option>
-                <option value="Kimi-K2.5">
-                  Kimi-K2.5 (Moonshot AI)
+                <option
+                  v-for="opt in modelOptions"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.label }}
                 </option>
               </select>
             </div>
@@ -1635,26 +1650,12 @@ onMounted(() => {
                 v-model="settings.ai_assessment_model"
                 class="block w-40 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-xs sm:leading-5 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
               >
-                <option value="gpt-4.1-nano">
-                  GPT-4.1 Nano
-                </option>
-                <option value="gpt-5-nano">
-                  GPT-5 Nano
-                </option>
-                <option value="gpt-5-mini">
-                  GPT-5 Mini
-                </option>
-                <option value="phi4">
-                  Phi-4
-                </option>
-                <option value="gpt-4o-mini">
-                  GPT-4o Mini
-                </option>
-                <option value="gpt-4o">
-                  GPT-4o
-                </option>
-                <option value="Kimi-K2.5">
-                  Kimi-K2.5
+                <option
+                  v-for="opt in modelOptions"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.label }}
                 </option>
               </select>
             </div>

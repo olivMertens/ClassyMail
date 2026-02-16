@@ -1062,3 +1062,54 @@ async def health_score(clients: Clients = Depends(get_clients)):
     )
 
     return HealthScoreResponse(**health)
+
+
+@router.get("/deployments")
+async def list_deployments(clients: Clients = Depends(get_clients)):
+    """
+    List OpenAI model deployments available on the configured Azure AI endpoint.
+
+    Queries the ``/openai/deployments`` API on the primary endpoint so the
+    frontend can populate model selectors dynamically instead of hardcoding.
+    """
+    import httpx
+    from classymail.services.azure_clients import auth_headers
+
+    endpoint = config.PHI_ENDPOINT
+    if not endpoint:
+        raise HTTPException(
+            status_code=503,
+            detail="PHI_ENDPOINT / AZURE_AI_ENDPOINT not configured.",
+        )
+
+    url = f"{endpoint.rstrip('/')}/openai/deployments?api-version={config.AI_API_VERSION}"
+    headers = await auth_headers(clients, model_type="openai")
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(url, headers=headers)
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        logger.error("Failed to list deployments: %s %s", exc.response.status_code, exc.response.text[:300])
+        raise HTTPException(
+            status_code=502,
+            detail=f"Azure AI returned {exc.response.status_code}",
+        )
+    except Exception as exc:
+        logger.error("Failed to list deployments: %s", exc)
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    data = resp.json()
+    deployments = data.get("data", [])
+
+    return {
+        "deployments": [
+            {
+                "id": d.get("id", ""),
+                "model": d.get("model", ""),
+                "status": d.get("status", ""),
+            }
+            for d in deployments
+            if d.get("status") == "succeeded"
+        ],
+    }
