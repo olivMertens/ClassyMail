@@ -710,6 +710,15 @@ async def reclassify_email(
                 item["status"] = "PROCESSED"
                 item["updated_at"] = datetime.now(timezone.utc).isoformat()
                 item["reclassified_with_model"] = model
+
+                # Persist PII detection results (classify_with_phi4 runs PII detection)
+                if "pii_detected" in result:
+                    item["pii_detected"] = result["pii_detected"]
+                if "detected_pii" in result:
+                    item["pii_data"] = result["detected_pii"]
+                if "preprocessing_metadata" in result:
+                    item["preprocessing_metadata"] = result["preprocessing_metadata"]
+
                 await cosmos_container.upsert_item(item)
 
                 return {

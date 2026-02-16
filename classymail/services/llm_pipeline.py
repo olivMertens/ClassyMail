@@ -887,8 +887,11 @@ async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False
             # Resolve "auto" to the classification model
             if pii_llm_model in ("auto", None, ""):
                 pii_llm_model = settings.get("ai_model", "phi4")
-            logger.info(f"Running PII detection with method: {pii_method}, model: {pii_llm_model}")
-            pii_result = await detect_pii(text_markdown, method=pii_method, clients=clients, model=pii_llm_model)
+            # Resolve friendly model name to actual Azure deployment name
+            # e.g. "phi4" → config.PHI_DEPLOYMENT ("Phi-4")
+            _, resolved_deployment, _ = resolve_model_config(pii_llm_model)
+            logger.info(f"Running PII detection with method: {pii_method}, model: {pii_llm_model} → deployment: {resolved_deployment}")
+            pii_result = await detect_pii(text_markdown, method=pii_method, clients=clients, model=resolved_deployment)
             logger.info(f"PII detection: {pii_result.total_count} items ({', '.join(pii_result.pii_types)})")
         except Exception as e:
             logger.warning(f"PII detection failed: {e}")

@@ -292,11 +292,6 @@ async def run_classification_pipeline(
     pii_data_val = classification_raw.get("detected_pii") if isinstance(classification_raw, dict) else None
     preprocessing_meta = classification_raw.get("preprocessing_metadata") if isinstance(classification_raw, dict) else None
 
-    # Extract PII results from classification if present
-    pii_detected_val = classification_raw.get("pii_detected", False) if isinstance(classification_raw, dict) else False
-    pii_data_val = classification_raw.get("detected_pii") if isinstance(classification_raw, dict) else None
-    preprocessing_meta = classification_raw.get("preprocessing_metadata") if isinstance(classification_raw, dict) else None
-
     record = EmailRecord(
         id=blob_id_from_url(blob_url),
         file_url=blob_url,
