@@ -1,6 +1,8 @@
-# RBAC Audit & Managed Identity Configuration
+﻿# RBAC Audit & Managed Identity Configuration
 
 > 🔐 **Purpose**: Document and verify managed identity role assignments for ClassyMail deployment on Azure Container Apps.
+>
+> 📝 **Naming convention**: `<prefix>` refers to your Terraform `prefix` variable (default: `email-poc`). All Azure resource names are derived from it.
 
 ## Overview
 
@@ -17,18 +19,21 @@ ClassyMail uses **Azure Managed Identity** (specifically, User-Assigned Managed 
 
 ## 1. Role Assignment Matrix
 
-The Terraform configuration (`infra/main.tf`) assigns the following roles to the ClassyMail managed identity:
+The Terraform configuration (`infra/main.tf`) assigns the following roles to the ClassyMail managed identity (`<prefix>-id`):
 
-| # | Role Name | Scope | Purpose | Resource |
-|---|-----------|-------|---------|----------|
-| 1 | **Storage Blob Data Contributor** | Blob Storage (all containers) | Download inputs, upload results/logs | `Storage Account` |
-| 2 | **Service Bus Data Receiver** | Service Bus Queue | Consume messages from pdf-processing-queue | `Service Bus` |
-| 3 | **Service Bus Data Sender** | Service Bus Queue | Send messages (retry, async comparison) | `Service Bus` |
-| 4 | **Custom App Role** | Cosmos DB Account | Custom role: `readMetadata` + Data R/W | `Cosmos DB Account` |
-| 5 | **Cognitive Services User** | Azure AI Foundry | Inference (Chat, Embeddings, OCR) | `Foundry Account` |
-| 6 | **AcrPull** | Container Registry | Pull Docker images (optional if using ACR) | `Azure Container Registry` |
+| # | Terraform Resource | Role Name | Scope | Purpose | Conditional |
+|---|---|-----------|-------|---------|-------------|
+| 1 | `aca_storage_contrib` | **Storage Blob Data Contributor** | Storage Account | Upload/download PDFs, results, logs | Always |
+| 2 | `aca_sb_receiver` | **Azure Service Bus Data Receiver** | Service Bus Namespace | Consume messages from pdf-processing-queue | Always |
+| 3 | `aca_sb_sender` | **Azure Service Bus Data Sender** | Service Bus Namespace | Send messages (retry, async comparison) | Always |
+| 4 | `app_role` | **Custom Cosmos DB Role** | Cosmos DB Account | `readMetadata` + CRUD + Query (see §9) | Assignment gated by `cosmos_use_rbac` |
+| 5 | `rbac_ai` | **Cognitive Services User** | AI Foundry Account | Inference (Chat, Embeddings, OCR) | Always |
+| 6 | `acr_pull` | **AcrPull** | Container Registry | Pull Docker images | Only if `acr_name` is set |
+| 7 | `aca_language_reader` | **Cognitive Services Language Reader** | Language Service | PII detection / NER | Only if `deploy_language_service` is true |
 
-**Note**: The Python SDK requires Cosmos DB permissions at the **Account Scope** to perform metadata operations. Database-level scoping will cause SDK failures.
+**Notes**:
+- The Custom Cosmos DB Role is defined via `azurerm_cosmosdb_sql_role_definition` — it is **not** the built-in "Cosmos DB Built-in Data Contributor" role. See section 9 for details.
+- The Python SDK requires Cosmos DB permissions at the **Account Scope** to perform metadata operations. Database-level scoping will cause SDK failures.
 
 ---
 
@@ -38,8 +43,8 @@ The Terraform configuration (`infra/main.tf`) assigns the following roles to the
 
 ```bash
 # Set variables
-IDENTITY_NAME="email-poc-identity"
-RESOURCE_GROUP="rg-email-poc"
+IDENTITY_NAME="<prefix>-id"
+RESOURCE_GROUP="<prefix>-rg"
 
 # Get the managed identity object ID
 IDENTITY_ID=$(az identity show \
@@ -66,12 +71,11 @@ az role assignment list \
 ```
 Role                                          Scope
 --------------------------------------------------------------
-Storage Blob Data Reader                      /subscriptions/.../resourceGroups/rg-email-poc/providers/Microsoft.Storage/storageAccounts/stgemailpoc
-Storage Blob Data Contributor                 /subscriptions/.../resourceGroups/rg-email-poc/providers/Microsoft.Storage/storageAccounts/stgemailpoc
-Service Bus Data Receiver                      /subscriptions/.../resourceGroups/rg-email-poc/providers/Microsoft.ServiceBus/namespaces/sbemailpoc
-Service Bus Data Sender                        /subscriptions/.../resourceGroups/rg-email-poc/providers/Microsoft.ServiceBus/namespaces/sbemailpoc
-Cosmos DB Built-in Data Contributor            /subscriptions/.../resourceGroups/rg-email-poc/providers/Microsoft.DocumentDB/databaseAccounts/cosmosemailpoc
-... (more roles)
+Storage Blob Data Contributor                 /subscriptions/.../resourceGroups/<prefix>-rg/providers/Microsoft.Storage/storageAccounts/<prefix>sto...
+Azure Service Bus Data Receiver               /subscriptions/.../resourceGroups/<prefix>-rg/providers/Microsoft.ServiceBus/namespaces/<prefix>-sbus
+Azure Service Bus Data Sender                 /subscriptions/.../resourceGroups/<prefix>-rg/providers/Microsoft.ServiceBus/namespaces/<prefix>-sbus
+Cognitive Services User                       /subscriptions/.../resourceGroups/<prefix>-rg/providers/Microsoft.CognitiveServices/accounts/<prefix>-aifoundry
+... (Cosmos DB custom role shown separately via az cosmosdb sql role assignment list)
 ```
 
 ### 2.2 Check a specific role assignment
@@ -92,12 +96,12 @@ When the app runs in **Container Apps**, it uses the managed identity assigned t
 ```bash
 # List identities assigned to a Container App
 az containerapp identity show \
-  --name email-poc-api \
-  --resource-group rg-email-poc
+  --name <prefix>-api \
+  --resource-group <prefix>-rg
 
 # Expected output includes:
 # "userAssignedIdentities": {
-#   "/subscriptions/.../resourceGroups/rg-email-poc/providers/Microsoft.ManagedIdentity/userAssignedIdentities/email-poc-identity": {...}
+#   "/subscriptions/.../resourceGroups/<prefix>-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<prefix>-id": {...}
 # }
 ```
 
@@ -108,7 +112,7 @@ az containerapp identity show \
 ### Error: `Unauthorized (401)` when calling Azure AI Foundry
 
 **Possible Causes**:
-1. Missing `Cognitive Services OpenAI Contributor` or `Cognitive Services OpenAI User` role
+1. Missing `Cognitive Services User` role on the AI Foundry account
 2. Endpoint region mismatch (model deployed in different region than identity)
 3. Managed identity not assigned to Container App
 
@@ -116,23 +120,23 @@ az containerapp identity show \
 
 ```bash
 # Check if identity has required AI roles
-IDENTITY_ID=$(az identity show --name email-poc-identity --resource-group rg-email-poc --query principalId --output tsv)
+IDENTITY_ID=$(az identity show --name <prefix>-id --resource-group <prefix>-rg --query principalId --output tsv)
 
 az role assignment list \
   --assignee $IDENTITY_ID \
-  --role "Cognitive Services OpenAI Contributor" \
+  --role "Cognitive Services User" \
   --query "[].scope" \
   --output tsv
 
 # If empty, assign the role manually
 AI_ACCOUNT_ID=$(az cognitiveservices account show \
-  --name ai-email-poc \
-  --resource-group rg-email-poc \
+  --name <prefix>-aifoundry \
+  --resource-group <prefix>-rg \
   --query id \
   --output tsv)
 
 az role assignment create \
-  --role "Cognitive Services OpenAI Contributor" \
+  --role "Cognitive Services User" \
   --assignee $IDENTITY_ID \
   --scope $AI_ACCOUNT_ID
 ```
@@ -145,8 +149,8 @@ az role assignment create \
 ```bash
 # Assign role to Storage Account
 STORAGE_ID=$(az storage account show \
-  --name stgemailpoc \
-  --resource-group rg-email-poc \
+  --name <prefix>sto<region> \
+  --resource-group <prefix>-rg \
   --query id \
   --output tsv)
 
@@ -171,8 +175,8 @@ az role assignment list \
 # Check Service Bus connectivity (if needed, test via portal)
 az servicebus queue show \
   --name pdf-processing-queue \
-  --namespace-name sbemailpoc \
-  --resource-group rg-email-poc
+  --namespace-name <prefix>-sbus \
+  --resource-group <prefix>-rg
 ```
 
 ### Error: Event Grid not triggering Service Bus
@@ -184,8 +188,8 @@ az servicebus queue show \
 ```bash
 # Enable Local Authentication
 az servicebus namespace update \
-  --resource-group rg-email-poc \
-  --name sbemailpoc \
+  --resource-group <prefix>-rg \
+  --name <prefix>-sbus \
   --disable-local-auth false
 ```
 
@@ -216,9 +220,9 @@ az servicebus namespace update \
    ```bash
    # Create service principal
    SERVICE_PRINCIPAL=$(az ad sp create-for-rbac \
-     --name email-poc-sp \
+     --name <prefix>-sp \
      --role "Contributor" \
-     --scopes $(az group show --name rg-email-poc --query id --output tsv))
+     --scopes $(az group show --name <prefix>-rg --query id --output tsv))
 
    # Export credentials (for use in GitHub Actions, etc)
    echo $SERVICE_PRINCIPAL | jq '{clientId, clientSecret, subscriptionId, tenantId}'
@@ -235,16 +239,16 @@ When `AZURE_PREFERRED_DATA_ZONE` is set (e.g., `eu-central`), the system logs wa
 ```bash
 # View Foundry account location
 az cognitiveservices account show \
-  --name ai-email-poc \
-  --resource-group rg-email-poc \
+  --name <prefix>-aifoundry \
+  --resource-group <prefix>-rg \
   --query location \
   --output tsv
 # Expected: eastus, westeurope, etc.
 
 # View Storage Account location
 az storage account show \
-  --name stgemailpoc \
-  --resource-group rg-email-poc \
+  --name <prefix>sto<region> \
+  --resource-group <prefix>-rg \
   --query primaryLocation \
   --output tsv
 ```
@@ -289,8 +293,8 @@ Use this script to validate all role assignments at deployment time:
 #!/bin/bash
 # health_check_rbac.sh
 
-IDENTITY_NAME="email-poc-identity"
-RG="rg-email-poc"
+IDENTITY_NAME="<prefix>-id"
+RG="<prefix>-rg"
 
 IDENTITY_ID=$(az identity show --name $IDENTITY_NAME --resource-group $RG --query principalId --output tsv)
 
@@ -301,12 +305,10 @@ echo ""
 
 # Check each required role
 ROLES=(
-  "Storage Blob Data Reader"
   "Storage Blob Data Contributor"
-  "Service Bus Data Receiver"
-  "Service Bus Data Sender"
-  "Cosmos DB Built-in Data Contributor"
-  "Cognitive Services OpenAI Contributor"
+  "Azure Service Bus Data Receiver"
+  "Azure Service Bus Data Sender"
+  "Cognitive Services User"
 )
 
 for role in "${ROLES[@]}"; do
@@ -318,6 +320,9 @@ for role in "${ROLES[@]}"; do
   fi
 done
 
+echo ""
+echo "ℹ️  Note: Cosmos DB uses a custom SQL role (not listed above). Check with:"
+echo "  az cosmosdb sql role assignment list --account-name <prefix>-cosmos --resource-group <prefix>-rg"
 echo ""
 echo "ℹ️  Run 'terraform apply' in infra/ to assign missing roles."
 ```
@@ -356,8 +361,35 @@ SUBSCRIBER_ID=$(az account show --query id --output tsv)
 az role assignment create \
   --role "Storage Blob Data Reader" \
   --assignee $(az account show --query user.name --output tsv) \
-  --scope /subscriptions/$SUBSCRIBER_ID/resourceGroups/rg-email-poc
+  --scope /subscriptions/$SUBSCRIBER_ID/resourceGroups/<prefix>-rg
 ```
+
+---
+
+## 8. Manual / Extra Roles (Historical — Cleaned Up)
+
+> **Status**: These 4 extra roles were found as manual leftovers on the original `email-poc`
+> environment. After a deep code-level audit confirmed none are used by the application,
+> they were **removed on 2026-02-16**. A clean Terraform deployment will never create them.
+
+| Extra Role | Scope | Verdict | Evidence |
+|---|---|---|---|
+| Storage Blob Data Reader | Storage Account | **REDUNDANT** — removed | Superset role (Data Contributor) already assigned by TF. All code uses a single `BlobServiceClient` for both reads and writes. |
+| AcrPush | Container Registry | **UNUSED** — removed | Image pushing uses operator/CI-CD context (`az acr build`, `docker push`), never the managed identity. |
+| Reader | Container Registry | **UNUSED** — removed | AcrPull (TF `acr_pull`) suffices for Container Apps image pulls. `az acr show` only runs in CI/CD or operator context. |
+| Contributor | Resource Group | **UNUSED** — removed | No `azure-mgmt-*` SDK in `pyproject.toml`. All management-plane ops run via Terraform or CI/CD SP. |
+
+**If you ever find unexpected extra roles**, they can be removed:
+
+```bash
+# List all roles for the managed identity
+az role assignment list --assignee <principalId> --all -o table
+
+# Remove a specific extra role
+az role assignment delete --assignee <principalId> --role "<RoleName>" --scope <resourceId>
+```
+
+The verification scripts (`verify_infra.ps1`, `verify-mvp-setup.ps1`) **warn** about unexpected extra roles.
 
 ---
 
@@ -387,5 +419,5 @@ While Database-level scope (`/dbs/emailsdb`) is theoretically more secure, it br
 
 ---
 
-**Last Updated**: 2024-12-01
+**Last Updated**: 2026-02-16
 **Maintained by**: ClassyMail Team

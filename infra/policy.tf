@@ -23,6 +23,7 @@ locals {
 }
 
 resource "azurerm_policy_definition" "add_g2s_mandatory_tags" {
+  count        = var.g2s_tags_enabled ? 1 : 0
   name         = "add-g2s-mandatory-tags"
   policy_type  = "Custom"
   mode         = "All"
@@ -122,10 +123,10 @@ resource "azurerm_policy_definition" "add_g2s_mandatory_tags" {
 }
 
 resource "azurerm_resource_group_policy_assignment" "add_g2s_mandatory_tags_rg" {
-  count                = var.tag_policy_enabled && var.tag_policy_scope == "resource_group" ? 1 : 0
+  count                = var.g2s_tags_enabled && var.tag_policy_enabled && var.tag_policy_scope == "resource_group" ? 1 : 0
   name                 = "add-g2s-mandatory-tags"
   resource_group_id    = azurerm_resource_group.rg.id
-  policy_definition_id = azurerm_policy_definition.add_g2s_mandatory_tags.id
+  policy_definition_id = azurerm_policy_definition.add_g2s_mandatory_tags[0].id
   location             = var.location
 
   identity {
@@ -134,10 +135,10 @@ resource "azurerm_resource_group_policy_assignment" "add_g2s_mandatory_tags_rg" 
 }
 
 resource "azurerm_subscription_policy_assignment" "add_g2s_mandatory_tags_sub" {
-  count                = var.tag_policy_enabled && var.tag_policy_scope == "subscription" ? 1 : 0
+  count                = var.g2s_tags_enabled && var.tag_policy_enabled && var.tag_policy_scope == "subscription" ? 1 : 0
   name                 = "add-g2s-mandatory-tags"
   subscription_id      = data.azurerm_subscription.current.subscription_id
-  policy_definition_id = azurerm_policy_definition.add_g2s_mandatory_tags.id
+  policy_definition_id = azurerm_policy_definition.add_g2s_mandatory_tags[0].id
   location             = var.location
 
   identity {
@@ -147,7 +148,7 @@ resource "azurerm_subscription_policy_assignment" "add_g2s_mandatory_tags_sub" {
 
 # The assignment's managed identity needs the role specified in the policy's modify.details.roleDefinitionIds.
 resource "azurerm_role_assignment" "add_g2s_mandatory_tags_role_rg" {
-  count = var.tag_policy_enabled && var.tag_policy_scope == "resource_group" ? 1 : 0
+  count = var.g2s_tags_enabled && var.tag_policy_enabled && var.tag_policy_scope == "resource_group" ? 1 : 0
 
   scope              = local.tag_policy_rg_scope_id
   role_definition_id = "/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
@@ -155,7 +156,7 @@ resource "azurerm_role_assignment" "add_g2s_mandatory_tags_role_rg" {
 }
 
 resource "azurerm_role_assignment" "add_g2s_mandatory_tags_role_sub" {
-  count = var.tag_policy_enabled && var.tag_policy_scope == "subscription" ? 1 : 0
+  count = var.g2s_tags_enabled && var.tag_policy_enabled && var.tag_policy_scope == "subscription" ? 1 : 0
 
   scope              = local.tag_policy_sub_scope_id
   role_definition_id = "/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c"
@@ -164,7 +165,7 @@ resource "azurerm_role_assignment" "add_g2s_mandatory_tags_role_sub" {
 
 # Optional: remediate existing resources that are already missing the tags.
 resource "azurerm_resource_group_policy_remediation" "add_g2s_mandatory_tags_rg" {
-  count = var.tag_policy_enabled && var.tag_policy_scope == "resource_group" ? 1 : 0
+  count = var.g2s_tags_enabled && var.tag_policy_enabled && var.tag_policy_scope == "resource_group" ? 1 : 0
 
   name                 = "remediate-add-g2s-tags"
   resource_group_id    = azurerm_resource_group.rg.id
@@ -174,7 +175,7 @@ resource "azurerm_resource_group_policy_remediation" "add_g2s_mandatory_tags_rg"
 }
 
 resource "azurerm_subscription_policy_remediation" "add_g2s_mandatory_tags_sub" {
-  count = var.tag_policy_enabled && var.tag_policy_scope == "subscription" ? 1 : 0
+  count = var.g2s_tags_enabled && var.tag_policy_enabled && var.tag_policy_scope == "subscription" ? 1 : 0
 
   name                 = "remediate-add-g2s-tags"
   subscription_id      = data.azurerm_subscription.current.subscription_id

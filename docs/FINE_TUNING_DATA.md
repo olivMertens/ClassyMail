@@ -149,16 +149,18 @@ Pour le MVP/demo (pas de données de prod), le repo inclut **deux scripts** pour
 **Script** : [scripts/generate_realistic_emails.py](../scripts/generate_realistic_emails.py)
 
 Génère des PDFs d'emails réalistes avec :
-- Templates par catégorie (Attestation, Résiliation, Sinistre, etc.)
+- Templates par catégorie (personnalisables par domaine)
 - Variantes de formulation
 - Coordonnées fictives mais réalistes
 - Formatage email authentique (From:, Subject:, Date:)
+
+> **Catégories G2S** : Voir [G2S_CUSTOMIZATION.md](G2S_CUSTOMIZATION.md#insurance-category-taxonomy) pour la taxonomie complète (Attestation, Résiliation, Sinistre, etc.).
 
 ```bash
 # Générer 50 emails aléatoires
 uv run python scripts/generate_realistic_emails.py --count 50
 
-# Générer pour catégories spécifiques
+# Générer pour catégories spécifiques (exemple G2S)
 uv run python scripts/generate_realistic_emails.py --count 20 --categories "Attestation habitation" "Résiliation"
 
 # Dossier de sortie personnalisé
@@ -318,11 +320,15 @@ La plupart des systèmes de fine-tuning attendent du **JSONL** : un objet JSON p
 
 ```json
 {"messages":[
-  {"role":"system","content":"Tu classes des emails d'assurance en intentions et tu renvoies uniquement du JSON strict."},
+  {"role":"system","content":"<SYSTEM_PROMPT - ex: Tu classes des emails en intentions et tu renvoies uniquement du JSON strict.>"},
   {"role":"user","content":"<MARKDOWN OCR ANONYMISÉ ICI>"},
   {"role":"assistant","content":"{\"detected_intents\":[...],\"global_complexity\":\"Simple\"}"}
 ],"metadata":{"taxonomy_version":"v1","language":"fr"}}
 ```
+
+> **G2S system prompt**: `Tu classes des emails d'assurance en intentions et tu renvoies uniquement du JSON strict.` — See [G2S_CUSTOMIZATION.md](G2S_CUSTOMIZATION.md#fine-tuning-with-g2s-categories) for details.
+>
+> **Custom deployments**: Override via `FINETUNE_SYSTEM_PROMPT` env var.
 
 Référence :
 

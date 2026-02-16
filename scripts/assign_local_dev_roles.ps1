@@ -17,22 +17,39 @@
     Name of the Azure Cosmos DB account
 
 .EXAMPLE
-    .\assign_local_dev_roles.ps1 -StorageAccountName "emailpocst" -ServiceBusNamespace "email-poc-sbus" -CosmosAccountName "email-poc-cosmos"
+    .\assign_local_dev_roles.ps1 -Prefix "email-poc"
+    .\assign_local_dev_roles.ps1 -Prefix "myapp" -ResourceGroup "myapp-rg"
 #>
 
 param(
     [Parameter(Mandatory=$false)]
-    [string]$StorageAccountName = "emailpocst",
+    [string]$Prefix = "email-poc",
 
     [Parameter(Mandatory=$false)]
-    [string]$ServiceBusNamespace = "email-poc-sbus",
+    [string]$StorageAccountName,
 
     [Parameter(Mandatory=$false)]
-    [string]$CosmosAccountName = "email-poc-cosmos",
+    [string]$ServiceBusNamespace,
 
     [Parameter(Mandatory=$false)]
-    [string]$ResourceGroup = "rg-email-poc"
+    [string]$CosmosAccountName,
+
+    [Parameter(Mandatory=$false)]
+    [string]$AiAccountName,
+
+    [Parameter(Mandatory=$false)]
+    [string]$ResourceGroup
 )
+
+# Derive defaults from prefix if not explicitly set
+if (-not $ResourceGroup) { $ResourceGroup = "$Prefix-rg" }
+if (-not $StorageAccountName) {
+    $cleanPrefix = $Prefix -replace "[-_]", ""
+    $StorageAccountName = "${cleanPrefix}st"
+}
+if (-not $ServiceBusNamespace) { $ServiceBusNamespace = "$Prefix-sbus" }
+if (-not $CosmosAccountName) { $CosmosAccountName = "$Prefix-cosmos" }
+if (-not $AiAccountName) { $AiAccountName = "$Prefix-aifoundry" }
 
 Write-Host "🔐 Assigning RBAC roles for local development..." -ForegroundColor Cyan
 Write-Host ""
@@ -83,7 +100,9 @@ $cosmosId = az cosmosdb show --name $CosmosAccountName --resource-group $Resourc
 
 if ($LASTEXITCODE -eq 0) {
     # Cosmos DB Built-in Data Contributor (RBAC for data plane)
-    Write-Host "  - Cosmos DB Built-in Data Contributor (data plane)"
+    # Note: For local dev we use the built-in role (superset of the Terraform-managed Custom App Role).
+    # The Custom App Role is narrower (readMetadata + specific CRUD) and is managed by Terraform for the Managed Identity.
+    Write-Host "  - Cosmos DB Built-in Data Contributor (data plane, local dev)"
 
     # For Cosmos DB RBAC, we need to use a different command
     $roleDefinitionId = "00000000-0000-0000-0000-000000000002"  # Built-in Data Contributor
@@ -97,6 +116,20 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "✅ Cosmos DB roles assigned" -ForegroundColor Green
 } else {
     Write-Warning "  ⚠️  Cosmos DB account not found or not accessible"
+}
+Write-Host ""
+
+# AI Foundry roles
+Write-Host "🤖 Assigning AI Foundry roles..." -ForegroundColor Yellow
+$aiId = az cognitiveservices account show --name $AiAccountName --resource-group $ResourceGroup --query id -o tsv 2>$null
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "  - Cognitive Services User"
+    az role assignment create --assignee $currentUser --role "Cognitive Services User" --scope $aiId 2>$null
+
+    Write-Host "✅ AI Foundry roles assigned" -ForegroundColor Green
+} else {
+    Write-Warning "  ⚠️  AI Foundry account not found or not accessible"
 }
 Write-Host ""
 

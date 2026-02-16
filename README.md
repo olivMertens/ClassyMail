@@ -1,9 +1,11 @@
-# ClassyMail — GenAI Email Classification
+﻿# ClassyMail — GenAI Email Classification
 
 **GenAI that knows exactly where every email belongs.**
 
 **Author:** Olivier Mertens — olmertens@microsoft.com
 **Update:** Février 2026 (POC Refonte UI & Infra)
+
+> 📝 **Naming convention**: Throughout this document, `<prefix>` refers to your Terraform `prefix` variable (default: `email-poc`). All Azure resource names are derived from it (e.g. `<prefix>-rg`, `<prefix>-api`).
 
 [![Dashboard UI](docs/assets/dashboard_preview.png)](docs/assets/dashboard_preview.png)
 
@@ -89,7 +91,7 @@ Voir [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) pour la configuratio
 **Configuration des secrets :**
 ```bash
 # Option 1: Générer automatiquement depuis Azure (recommandé)
-.\scripts\write_secrets_env.ps1 -ResourceGroup "email-poc-rg" -Force
+.\scripts\write_secrets_env.ps1 -ResourceGroup "<prefix>-rg" -Force
 
 # Option 2: Copier l'exemple et ajuster manuellement
 cp secrets.env.example secrets.env
@@ -247,21 +249,21 @@ Le dossier `scripts/` contient des outils pour le développement, le déploiemen
 **Usage :**
 ```bash
 # PowerShell - Ajouter les IPs des Container Apps
-.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "email-poc-rg"
+.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "<prefix>-rg"
 
 # PowerShell - Inclure aussi votre IP locale (pour scripts de debug)
-.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "email-poc-rg" -IncludeLocalIP
+.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "<prefix>-rg" -IncludeLocalIP
 
 # Bash
-./scripts/update_cosmos_firewall.sh -g email-poc-rg
+./scripts/update_cosmos_firewall.sh -g <prefix>-rg
 
 # Bash avec IP locale
-./scripts/update_cosmos_firewall.sh -g email-poc-rg --include-local-ip
+./scripts/update_cosmos_firewall.sh -g <prefix>-rg --include-local-ip
 ```
 
 **Ce que fait le script :**
-1. ✅ Récupère les IPs sortantes de `email-poc-api`
-2. ✅ Récupère les IPs sortantes de `email-poc-worker`
+1. ✅ Récupère les IPs sortantes de `<prefix>-api`
+2. ✅ Récupère les IPs sortantes de `<prefix>-worker`
 3. ✅ Ajoute `0.0.0.0` (Azure Services)
 4. ✅ (Optionnel) Ajoute votre IP publique pour développement local
 5. ✅ Met à jour le firewall Cosmos DB avec la liste complète dédupliquée
@@ -281,16 +283,16 @@ Le dossier `scripts/` contient des outils pour le développement, le déploiemen
 **Usage :**
 ```bash
 # Vérification uniquement (compliance check)
-./scripts/verify_security_cost_tags.sh email-poc-rg
+./scripts/verify_security_cost_tags.sh <prefix>-rg
 
 # Créer/Mettre à jour la définition et l'assignation de la politique
-./scripts/verify_security_cost_tags.sh email-poc-rg --apply
+./scripts/verify_security_cost_tags.sh <prefix>-rg --apply
 
 # Créer la tâche de remédiation pour corriger les ressources non-conformes
-./scripts/verify_security_cost_tags.sh email-poc-rg --remediate
+./scripts/verify_security_cost_tags.sh <prefix>-rg --remediate
 
 # Workflow complet : appliquer la politique ET corriger les ressources
-./scripts/verify_security_cost_tags.sh email-poc-rg --apply --remediate
+./scripts/verify_security_cost_tags.sh <prefix>-rg --apply --remediate
 ```
 
 **Ce que fait le script :**
@@ -315,11 +317,11 @@ Le dossier `scripts/` contient des outils pour le développement, le déploiemen
 ```
 Resource Compliance Report:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✓ email-poc-cosmos (Microsoft.DocumentDB/databaseAccounts)
+✓ <prefix>-cosmos (Microsoft.DocumentDB/databaseAccounts)
   Status: COMPLIANT
   Tags: SecurityControl=ignore, CostControl=ignore
 
-✗ email-poc-storage (Microsoft.Storage/storageAccounts)
+✗ <prefix>-storage (Microsoft.Storage/storageAccounts)
   Status: NON-COMPLIANT
   Missing: SecurityControl tag
   Missing: CostControl tag
@@ -342,10 +344,10 @@ Valide l'ensemble de l'infrastructure Azure déployée.
 **Usage :**
 ```bash
 # PowerShell
-.\scripts\verify-mvp-setup.ps1 -ResourceGroup "email-poc-rg"
+.\scripts\verify-mvp-setup.ps1 -ResourceGroup "<prefix>-rg"
 
 # Bash
-./scripts/verify-mvp-setup.sh email-poc-rg
+./scripts/verify-mvp-setup.sh <prefix>-rg
 ```
 
 **Vérifications effectuées :**
@@ -370,10 +372,10 @@ Version allégée pour vérifier les rôles RBAC et la connectivité Azure.
 **Usage :**
 ```bash
 # PowerShell
-.\scripts\verify_infra.ps1 -ResourceGroup "email-poc-rg"
+.\scripts\verify_infra.ps1 -ResourceGroup "<prefix>-rg"
 
 # Bash
-export RESOURCE_GROUP=email-poc-rg
+export RESOURCE_GROUP=<prefix>-rg
 ./scripts/verify_infra.sh
 ```
 
@@ -388,7 +390,7 @@ Génère automatiquement le fichier `secrets.env` en interrogeant Azure CLI.
 
 **Usage :**
 ```powershell
-.\scripts\write_secrets_env.ps1 -ResourceGroup "email-poc-rg" -Prefix "email-poc"
+.\scripts\write_secrets_env.ps1 -ResourceGroup "<prefix>-rg" -Prefix "<prefix>"
 
 # Écraser un fichier existant
 .\scripts\write_secrets_env.ps1 -Force
@@ -497,7 +499,7 @@ uv run python scripts/test_e2e_flow.py --count 5 --wait 10
 
 # Test sur environnement déployé
 uv run python scripts/test_e2e_flow.py --count 10 \
-  --api-url "https://email-poc-api.azurecontainerapps.io" \
+  --api-url "https://<prefix>-api.azurecontainerapps.io" \
   --use-aoai
 ```
 
@@ -562,22 +564,22 @@ ln -s ../../scripts/pre-push.sh .git/hooks/pre-push  # Linux/Mac
 #### **🏗️ Setup Initial (après `terraform apply`)**
 ```bash
 # 1. Générer secrets.env avec les ressources Azure
-.\scripts\write_secrets_env.ps1 -ResourceGroup "email-poc-rg" -Force
+.\scripts\write_secrets_env.ps1 -ResourceGroup "<prefix>-rg" -Force
 
 # 2. Mettre à jour le firewall Cosmos DB avec les IPs des Container Apps
-.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "email-poc-rg" -IncludeLocalIP
+.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "<prefix>-rg" -IncludeLocalIP
 
 # 3. Vérifier et appliquer la politique de tags (gouvernance)
-./scripts/verify_security_cost_tags.sh email-poc-rg --apply --remediate
+./scripts/verify_security_cost_tags.sh <prefix>-rg --apply --remediate
 
 # 4. Vérifier l'infrastructure complète
-.\scripts\verify-mvp-setup.ps1 -ResourceGroup "email-poc-rg"
+.\scripts\verify-mvp-setup.ps1 -ResourceGroup "<prefix>-rg"
 ```
 
 #### **🧪 Développement & Tests**
 ```bash
 # 1. Tester le pipeline complet avec l'API déployée
-uv run python scripts/test_e2e_flow.py --api-url https://email-poc-api.azurecontainerapps.io --count 5
+uv run python scripts/test_e2e_flow.py --api-url https://<prefix>-api.azurecontainerapps.io --count 5
 
 # 2. Tester en local
 uvicorn main:app --reload  # Terminal 1
@@ -593,22 +595,22 @@ uv run python scripts/test_e2e_flow.py --count 3  # Terminal 2
 .\scripts\build_acr.ps1 -AcrName "emailpocacr" -Tag "v1.0.0" -PushMethod acr
 
 # 3. Mise à jour firewall Cosmos DB après déploiement
-.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "email-poc-rg"
+.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "<prefix>-rg"
 
 # 4. Vérification post-déploiement
-.\scripts\verify-mvp-setup.ps1 -ResourceGroup "email-poc-rg"
+.\scripts\verify-mvp-setup.ps1 -ResourceGroup "<prefix>-rg"
 ```
 
 #### **🔧 Troubleshooting**
 ```bash
 # 403 Forbidden depuis Container Apps vers Cosmos DB
-.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "email-poc-rg"
+.\scripts\update_cosmos_firewall.ps1 -ResourceGroup "<prefix>-rg"
 
 # Vérifier la santé de l'infrastructure
-.\scripts\verify-mvp-setup.ps1 -ResourceGroup "email-poc-rg"
+.\scripts\verify-mvp-setup.ps1 -ResourceGroup "<prefix>-rg"
 
 # Vérifier la conformité des tags (audit gouvernance)
-./scripts/verify_security_cost_tags.sh email-poc-rg
+./scripts/verify_security_cost_tags.sh <prefix>-rg
 
 # Tester l'API end-to-end
 uv run python scripts/test_e2e_flow.py --api-url https://your-api.azurecontainerapps.io --count 2
@@ -619,8 +621,7 @@ uv run python scripts/test_e2e_flow.py --api-url https://your-api.azurecontainer
 ## �📚 Documentation
 
 L'index complet est disponible ici : **[docs/INDEX.md](docs/INDEX.md)**.
-- [CLI_SETUP](docs/CLI_SETUP.md)
-- [CLI_RAG](docs/CLI_RAG.md)
+- [CLI_REFERENCE](docs/CLI_REFERENCE.md)
 - **[ENVIRONMENT_VARIABLES_AUDIT](ENVIRONMENT_VARIABLES_AUDIT.md)** - Liste complète des variables d'environnement
 
 ### Parcours Recommandé
@@ -631,6 +632,7 @@ L'index complet est disponible ici : **[docs/INDEX.md](docs/INDEX.md)**.
 3.  **Comprendre** : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (Composants, Flux, Sécurité)
 4.  **Optimiser** : [docs/MODELS.md](docs/MODELS.md) (Choix des modèles, Coûts, Fine-tuning)
 5.  **Déployer** : [docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md) (Terraform) et [docs/CICD_GITHUB.md](docs/CICD_GITHUB.md) (GitHub Actions)
+6.  **Nouveau Tenant** : [docs/DEPLOY_FROM_SCRATCH.md](docs/DEPLOY_FROM_SCRATCH.md) (Déploiement complet depuis zéro + script bootstrap)
 
 ---
 

@@ -1,4 +1,4 @@
-# Azure AI Foundry Setup Guide
+﻿# Azure AI Foundry Setup Guide
 
 This guide explains how to configure Azure AI Foundry models for the ClassyMail MVP, including deployment creation, environment variable configuration, and Container Apps integration.
 
@@ -401,7 +401,7 @@ az role assignment list \
 
 **Symptom**:
 ```
-Database unavailable: (Forbidden) Database Account 'email-poc-cosmos-swedencentral' does not exist
+Database unavailable: (Forbidden) Database Account '<prefix>-cosmos-<region>' does not exist
 ActivityId: 2549f7ad-627a-4c2c-8e6c-09e482509f40
 ```
 

@@ -1,4 +1,4 @@
-# Local Development Guide
+﻿# Local Development Guide
 
 > 📋 **Consolidated Guide**: This document combines setup, running, building, and deployment instructions for local development.
 
@@ -331,8 +331,8 @@ Even with public access, data remains protected by RBAC (`Storage Blob Data Cont
 **Solution:**
 ```bash
 az resource update \
-  --resource-group email-poc-rg \
-  --name email-poc-aifoundry \
+  --resource-group <prefix>-rg \
+  --name <prefix>-aifoundry \
   --resource-type Microsoft.CognitiveServices/accounts \
   --set properties.disableLocalAuth=false
 ```

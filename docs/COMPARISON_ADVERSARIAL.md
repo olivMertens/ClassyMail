@@ -1,4 +1,4 @@
-# Model Comparison & Adversarial Testing Guide
+﻿# Model Comparison & Adversarial Testing Guide
 
 > 🧪 **Purpose**: Enable side-by-side evaluation of dual-model results (Phi-4 vs gpt-4o-mini) for quality assurance, fine-tuning dataset creation, and confidence validation.
 
@@ -445,7 +445,7 @@ if estimate_tokens(content) > 6000:
 az servicebus queue show \
   --namespace-name sbemailpoc \
   --name pdf-processing-queue \
-  --resource-group rg-email-poc
+  --resource-group <prefix>-rg
 
 # Check dead-letter queue for failed messages
 az servicebus queue show \

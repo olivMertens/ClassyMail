@@ -1,13 +1,15 @@
-# Infrastructure & Deployment Guide
+﻿# Infrastructure & Deployment Guide
 
 > 🏗️ **Comprehensive Guide**: Terraform provisioning, resource configuration, Event Grid setup, RBAC, and network strategy.
 >
 > 📌 **Note**: This project originated as a POC but has evolved into a production-ready MVP with enterprise-grade features including vector search, PII detection, multi-model classification, and comprehensive monitoring.
+>
+> 📝 **Naming convention**: `<prefix>` refers to your Terraform `prefix` variable (default: `email-poc`). All Azure resource names are derived from it.
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [G2S Mandatory Tags](#g2s-mandatory-tags)
+2. [Custom Tags](#custom-tags-optional)
 3. [Terraform Deployment](#terraform-deployment)
 4. [Resource Configuration](#resource-configuration)
 5. [Event Grid Configuration](#event-grid-configuration)
@@ -31,50 +33,19 @@ Terraform provisions the complete Azure infrastructure:
 
 ---
 
-## G2S Mandatory Tags
+## Custom Tags (Optional)
 
-🏷️ **Toutes les ressources Azure déployées sont automatiquement tagées avec les standards G2S :**
+🏷️ Resource tagging is **optional** and configurable. By default, G2S mandatory tags are applied to all resources.
 
-| Tag | Valeur | Description |
-|-----|--------|-------------|
-| `cp-code-sa` | `devin` | Code service applicatif - Projet DEVIN (email classification MVP) |
-| `cp-deploiement` | `terraform` | Méthode de déploiement (Infrastructure as Code) |
-| `cp-environnement` | `d` | Environnement : **d** (développement), **t** (test), **p** (production) |
-| `cp-proprietaire` | `g2s-dtpo-iaf` | Propriétaire de la ressource (Direction Technique - Plateforme & Outils) |
-| `cp-responsable` | `g2s-dtpo-iaf` | Responsable technique de la ressource |
-| `cp-supervision` | `oui` | Activer la supervision/monitoring (Application Insights, Azure Monitor) |
+> **G2S deployments**: See [G2S_CUSTOMIZATION.md](G2S_CUSTOMIZATION.md#g2s-mandatory-tags) for the full tag table and Azure Policy enforcement.
+>
+> **Non-G2S deployments**: Set `g2s_tags_enabled = false` in `terraform.tfvars` to disable G2S tags.
 
-### Application des Tags
+Tags are applied via `local.common_tags` in `infra/main.tf` and optionally enforced by Azure Policy (`infra/policy.tf`).
 
-**1. Via Terraform** (`infra/main.tf`):
-```terraform
-locals {
-  common_tags = {
-    "cp-code-sa"      = "devin"
-    "cp-deploiement"  = "terraform"
-    "cp-environnement" = "d"
-    "cp-proprietaire" = "g2s-dtpo-iaf"
-    "cp-responsable"  = "g2s-dtpo-iaf"
-    "cp-supervision"  = "oui"
-  }
-}
-
-# Tags propagés à toutes les ressources via `tags = local.common_tags`
-```
-
-**2. Via Azure Policy** (`infra/policy.tf`):
-- **Policy Definition**: `add-g2s-mandatory-tags`
-- **Scope**: Resource Group ou Subscription (configurable via `var.tag_policy_scope`)
-- **Action**: Ajout automatique des tags manquants sur les ressources existantes
-- **Remediation**: Tâche de réparation pour appliquer les tags aux ressources pré-existantes
-
-**Vérification des tags :**
 ```bash
-# Lister les tags sur une ressource
+# Verify tags on a resource
 az resource show --ids <RESOURCE_ID> --query tags -o json
-
-# Lister toutes les ressources avec un tag spécifique
-az resource list --tag "cp-code-sa=devin" --query "[].{name:name, type:type}" -o table
 ```
 
 ---
@@ -217,15 +188,15 @@ Some AzureRM provider versions don't auto-detect subscription from Azure CLI. Th
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `AZURE_CLIENT_ID` | Managed Identity Client ID | `3ae24af5-97c6-437f-a4d2-521fbd5524d4` |
-| `AZURE_SERVICE_BUS_FQDN` | Service Bus Hostname | `email-poc-sbus.servicebus.windows.net` |
+| `AZURE_CLIENT_ID` | Managed Identity Client ID | `<your-managed-identity-client-id>` |
+| `AZURE_SERVICE_BUS_FQDN` | Service Bus Hostname | `<prefix>-sbus.servicebus.windows.net` |
 | `AZURE_SERVICE_BUS_QUEUE` | Queue Name | `pdf-processing-queue` |
-| `AZURE_STORAGE_ACCOUNT_URL` | Blob Storage Endpoint | `https://emailpocst.blob.core.windows.net` |
+| `AZURE_STORAGE_ACCOUNT_URL` | Blob Storage Endpoint | `https://<prefix>sto<region>.blob.core.windows.net` |
 | `AZURE_STORAGE_CONTAINER` | Blob Container | `pdf-inputs` |
-| `AZURE_COSMOS_ENDPOINT` | Cosmos DB URI | `https://email-poc-cosmos.documents.azure.com:443/` |
+| `AZURE_COSMOS_ENDPOINT` | Cosmos DB URI | `https://<prefix>-cosmos.documents.azure.com:443/` |
 | `AZURE_COSMOS_DB` | Database Name | `emailsdb` |
 | `AZURE_COSMOS_CONTAINER` | Container Name | `emails` |
-| `AZURE_AI_ENDPOINT` | Azure AI Foundry Endpoint | `https://email-poc-aifoundry.cognitiveservices.azure.com/` |
+| `AZURE_AI_ENDPOINT` | Azure AI Foundry Endpoint | `https://<prefix>-aifoundry.cognitiveservices.azure.com/` |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | App Insights telemetry | `InstrumentationKey=...;IngestionEndpoint=...` |
 | `LOG_ANALYTICS_WORKSPACE_ID` | Log Analytics Workspace ID | `9f225d73-351d-471e-9371-c15d265e9bd4` |
 | `OTEL_SERVICE_NAME` | OpenTelemetry service name | `classymail-api` |
@@ -242,15 +213,15 @@ Some AzureRM provider versions don't auto-detect subscription from Azure CLI. Th
 | Variable | Description | Example |
 |----------|-------------|---------|
 | **`ENABLE_WORKER`** | **MANDATORY** | `true` |
-| `AZURE_CLIENT_ID` | Managed Identity Client ID | `3ae24af5-97c6-437f-a4d2-521fbd5524d4` |
-| `AZURE_SERVICE_BUS_FQDN` | Service Bus Hostname | `email-poc-sbus.servicebus.windows.net` |
+| `AZURE_CLIENT_ID` | Managed Identity Client ID | `<your-managed-identity-client-id>` |
+| `AZURE_SERVICE_BUS_FQDN` | Service Bus Hostname | `<prefix>-sbus.servicebus.windows.net` |
 | `AZURE_SERVICE_BUS_QUEUE` | Queue Name | `pdf-processing-queue` |
-| `AZURE_STORAGE_ACCOUNT_URL` | Blob Storage Endpoint | `https://emailpocst.blob.core.windows.net` |
+| `AZURE_STORAGE_ACCOUNT_URL` | Blob Storage Endpoint | `https://<prefix>sto<region>.blob.core.windows.net` |
 | `AZURE_STORAGE_CONTAINER` | Blob Container | `pdf-inputs` |
-| `AZURE_COSMOS_ENDPOINT` | Cosmos DB URI | `https://email-poc-cosmos.documents.azure.com:443/` |
+| `AZURE_COSMOS_ENDPOINT` | Cosmos DB URI | `https://<prefix>-cosmos.documents.azure.com:443/` |
 | `AZURE_COSMOS_DB` | Database Name | `emailsdb` |
 | `AZURE_COSMOS_CONTAINER` | Container Name | `emails` |
-| `AZURE_AI_ENDPOINT` | Azure AI Foundry Endpoint | `https://email-poc-aifoundry.cognitiveservices.azure.com/` |
+| `AZURE_AI_ENDPOINT` | Azure AI Foundry Endpoint | `https://<prefix>-aifoundry.cognitiveservices.azure.com/` |
 | `PHI_DEPLOYMENT` | Classification Model Deployment Name | `Phi-4` |
 | `MISTRAL_DEPLOYMENT` | OCR Model Deployment | `mistral-document-ai-2505` |
 | `MISTRAL_MODE` | Mistral API mode | `maas` |
@@ -354,67 +325,86 @@ resource "azurerm_servicebus_namespace" "sb" {
 
 ## RBAC & Managed Identity
 
-### Deployed Configuration (email-poc-rg)
+### Deployed Configuration (<prefix>-rg)
 
 **Managed Identity Details:**
-- **Name**: `email-poc-id`
-- **Client ID**: `3ae24af5-97c6-437f-a4d2-521fbd5524d4`
-- **Principal ID**: `fdf02fa5-2cd5-42f9-9b78-5cb7905d94d0`
-- **Resource Group**: `email-poc-rg`
-- **Location**: `swedencentral`
+- **Name**: `<prefix>-id` (Terraform: `azurerm_user_assigned_identity.app_id`)
+- **Client ID**: set as `AZURE_CLIENT_ID` env var on both Container Apps
+- **Principal ID**: used for all RBAC role assignments
+- **Resource Group**: `<prefix>-rg`
+- **Attached to**: both `<prefix>-api` and `<prefix>-worker` Container Apps
 
 ### Role Assignment Matrix (Verified)
 
 The Container Apps use a **User-Assigned Managed Identity** with the following role assignments verified in Azure:
 
-| Azure Resource | Role Name | Role Definition ID | Scope | Status |
-|----------------|-----------|-------------------|-------|--------|
-| **Blob Storage** | Storage Blob Data Contributor | `ba92f5b4-2d11-453d-a403-e96b0029c9fe` | Storage Account (`emailpocst`) | ✅ Verified |
-| **Blob Storage** | Storage Blob Data Reader | `2a2b9908-6ea1-4ae2-8e65-a410df84e7d1` | Storage Account (`emailpocst`) | ✅ Verified |
-| **Service Bus** | Azure Service Bus Data Sender | `69a216fc-b8fb-44d8-bc22-1f3c2cd27a39` | Service Bus Namespace (`email-poc-sbus`) | ✅ Verified |
-| **Service Bus** | Azure Service Bus Data Receiver | `4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0` | Service Bus Namespace (`email-poc-sbus`) | ✅ Verified |
-| **Cosmos DB** | Cosmos DB Built-in Data Contributor | `00000000-0000-0000-0000-000000000002` | Database Scope (`/dbs/emailsdb`) | ✅ Verified |
-| **AI Foundry** | Cognitive Services User | `a97b65f3-24c7-4388-baec-2e87135dc908` | AI Services Account (`email-poc-aifoundry`) | ✅ Verified |
-| **Container Registry** | AcrPull | `7f951dda-4ed3-4680-a7ca-43fe172d538d` | ACR (`emailpocacrxr0bjv`) | ✅ Verified |
+| Azure Resource | Role Name | Terraform Resource | Scope | Conditional |
+|----------------|-----------|-------------------|-------|-------------|
+| **Blob Storage** | Storage Blob Data Contributor | `aca_storage_contrib` | Storage Account | Always |
+| **Service Bus** | Azure Service Bus Data Receiver | `aca_sb_receiver` | Namespace | Always |
+| **Service Bus** | Azure Service Bus Data Sender | `aca_sb_sender` | Namespace | Always |
+| **Cosmos DB** | Custom App Role (readMetadata + CRUD) | `app_role` + `aca_cosmos_sql_contrib` | Account Scope | `cosmos_use_rbac` |
+| **AI Foundry** | Cognitive Services User | `rbac_ai` | AI Foundry Account | Always |
+| **Container Registry** | AcrPull | `acr_pull` | ACR | `acr_name != ""` |
+| **Language Service** | Cognitive Services Language Reader | `aca_language_reader` | Language Account | `deploy_language_service` |
+
+> ⚠️ **Cosmos DB uses a Custom Role** (not the built-in `Cosmos DB Built-in Data Contributor`). The custom role grants `readMetadata` + specific CRUD actions at **Account scope**. See [RBAC_AUDIT.md](RBAC_AUDIT.md) §9 for why.
 
 ### Terraform Configuration
 
 ```hcl
 # Storage Contributor
-resource "azurerm_role_assignment" "storage_contributor" {
-  scope                = azurerm_storage_account.storage.id
+resource "azurerm_role_assignment" "aca_storage_contrib" {
+  scope                = azurerm_storage_account.st.id
   role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_user_assigned_identity.aca_identity.principal_id
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
 # Service Bus Sender
-resource "azurerm_role_assignment" "servicebus_sender" {
+resource "azurerm_role_assignment" "aca_sb_sender" {
   scope                = azurerm_servicebus_namespace.sb.id
   role_definition_name = "Azure Service Bus Data Sender"
-  principal_id         = azurerm_user_assigned_identity.aca_identity.principal_id
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
 # Service Bus Receiver
-resource "azurerm_role_assignment" "servicebus_receiver" {
+resource "azurerm_role_assignment" "aca_sb_receiver" {
   scope                = azurerm_servicebus_namespace.sb.id
   role_definition_name = "Azure Service Bus Data Receiver"
-  principal_id         = azurerm_user_assigned_identity.aca_identity.principal_id
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
-# Cosmos DB Contributor (SQL RBAC)
-resource "azurerm_cosmosdb_sql_role_assignment" "cosmos_contributor" {
+# Cosmos DB Custom Role (readMetadata + data CRUD at Account scope)
+resource "azurerm_cosmosdb_sql_role_definition" "app_role" {
+  name                = "${var.prefix}-app-role"
   resource_group_name = azurerm_resource_group.rg.name
-  account_name        = azurerm_cosmosdb_account.cosmos.name
-  role_definition_id  = "${azurerm_cosmosdb_account.cosmos.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
-  principal_id        = azurerm_user_assigned_identity.aca_identity.principal_id
-  scope               = azurerm_cosmosdb_account.cosmos.id
+  account_name        = azurerm_cosmosdb_account.db.name
+  type                = "CustomRole"
+  assignable_scopes   = [azurerm_cosmosdb_account.db.id]
+  permissions {
+    data_actions = [
+      "Microsoft.DocumentDB/databaseAccounts/readMetadata",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/executeQuery",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/readChangeFeed"
+    ]
+  }
+}
+
+resource "azurerm_cosmosdb_sql_role_assignment" "aca_cosmos_sql_contrib" {
+  count               = var.cosmos_use_rbac ? 1 : 0
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.db.name
+  principal_id        = azurerm_user_assigned_identity.app_id.principal_id
+  role_definition_id  = azurerm_cosmosdb_sql_role_definition.app_role.id
+  scope               = azurerm_cosmosdb_account.db.id  # Account scope!
 }
 
 # AI Foundry User
-resource "azurerm_role_assignment" "ai_user" {
-  scope                = azurerm_cognitive_account.ai.id
+resource "azurerm_role_assignment" "rbac_ai" {
+  scope                = azapi_resource.ai_foundry.id
   role_definition_name = "Cognitive Services User"
-  principal_id         = azurerm_user_assigned_identity.aca_identity.principal_id
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 ```
 
@@ -428,14 +418,14 @@ This is required because the Azure Cosmos DB Python SDK performs a `readMetadata
 **Deployed Configuration:**
 ```plaintext
 Role: Custom App Role (readMetadata + data actions)
-Scope: /subscriptions/.../resourceGroups/email-poc-rg/providers/Microsoft.DocumentDB/databaseAccounts/email-poc-cosmos
+Scope: /subscriptions/.../resourceGroups/<prefix>-rg/providers/Microsoft.DocumentDB/databaseAccounts/<prefix>-cosmos
 ```
 
 **Verification Command:**
 ```bash
 az cosmosdb sql role assignment list \
-  --account-name email-poc-cosmos \
-  --resource-group email-poc-rg \
+  --account-name <prefix>-cosmos \
+  --resource-group <prefix>-rg \
   --query "[?principalId=='<managed-identity-principal-id>'].roleDefinitionId"
 
 ## Network Strategy
@@ -534,24 +524,31 @@ az servicebus namespace update \
 **Fix:**
 ```bash
 az containerapp show \
-  --name email-poc-worker \
+  --name <prefix>-worker \
   --resource-group <rg> \
   --query "properties.template.containers[0].env[?name=='ENABLE_WORKER'].value"
 ```
 
 ### Troubleshooting: Cosmos DB "Unauthorized"
 
-**Cause:** Managed Identity missing "Cosmos DB Built-in Data Contributor" role
+**Cause:** Managed Identity missing the Custom App Role, or role scoped to database instead of account.
 
-**Fix:**
+> ⚠️ The scope **must** be the account ID (not `/dbs/emailsdb`), because the Python SDK calls `readMetadata` at account level on initialization.
+
+**Quick fix (uses built-in role as workaround):**
 ```bash
+PRINCIPAL=$(az identity show -n <prefix>-id -g <prefix>-rg --query principalId -o tsv)
+ACCOUNT_ID=$(az cosmosdb show -n <prefix>-cosmos -g <prefix>-rg --query id -o tsv)
+
 az cosmosdb sql role assignment create \
-  --account-name <cosmos-account> \
-  --resource-group <rg> \
+  --account-name <prefix>-cosmos \
+  --resource-group <prefix>-rg \
   --role-definition-id 00000000-0000-0000-0000-000000000002 \
-  --principal-id <managed-identity-principal-id> \
-  --scope "/dbs/emailsdb"
+  --principal-id "$PRINCIPAL" \
+  --scope "$ACCOUNT_ID"
 ```
+
+**Permanent fix:** Run `terraform apply` — the custom role definition and assignment are managed in `main.tf`.
 
 ### Troubleshooting: Cosmos DB "Request originated from IP ... through public internet"
 
@@ -573,7 +570,7 @@ Even with `ip_range_filter = ["0.0.0.0"]` (Allow Azure Services), if `publicNetw
 **Verification:**
 ```bash
 # Check current public network access status
-az cosmosdb show --name email-poc-cosmos --resource-group email-poc-rg \
+az cosmosdb show --name <prefix>-cosmos --resource-group <prefix>-rg \
   --query "{publicAccess:publicNetworkAccess, ipRules:ipRules}" -o json
 
 # Should show:
@@ -581,7 +578,7 @@ az cosmosdb show --name email-poc-cosmos --resource-group email-poc-rg \
 # "ipRules": [{"ipAddressOrRange": "0.0.0.0"}, ...]
 
 # Check Container App outbound IP
-az containerapp show --name email-poc-api --resource-group email-poc-rg \
+az containerapp show --name <prefix>-api --resource-group <prefix>-rg \
   --query properties.outboundIpAddresses -o json
 ```
 
@@ -589,8 +586,8 @@ az containerapp show --name email-poc-api --resource-group email-poc-rg \
 ```bash
 # Enable public network access
 az cosmosdb update \
-  --name email-poc-cosmos \
-  --resource-group email-poc-rg \
+  --name <prefix>-cosmos \
+  --resource-group <prefix>-rg \
   --public-network-access Enabled
 ```
 
@@ -616,4 +613,4 @@ Someone may have manually disabled public network access via Azure Portal or CLI
 - [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md) - Local setup & testing
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
 - [RBAC_AUDIT.md](RBAC_AUDIT.md) - RBAC troubleshooting
-- [CLI_SETUP.md](CLI_SETUP.md) - CLI commands reference
+- [CLI_REFERENCE.md](CLI_REFERENCE.md) - CLI commands reference

@@ -14,49 +14,50 @@ These variables **must** be configured for the application to function correctly
 
 ### Cosmos DB
 
-- **`COSMOS_ENDPOINT`** - The endpoint URL for Azure Cosmos DB
-  - Example: `https://email-poc-cosmos-swedencentral.documents.azure.com:443/`
+- **`AZURE_COSMOS_ENDPOINT`** - The endpoint URL for Azure Cosmos DB
+  - Example: `https://<prefix>-cosmos-swedencentral.documents.azure.com:443/`
   - Used for: Storing email records, chat history, and metadata
 
-- **`COSMOS_DATABASE_NAME`** - The name of the Cosmos DB database
-  - Example: `EmailClassificationDB`
+- **`AZURE_COSMOS_DB`** - The name of the Cosmos DB database
+  - Example: `emailsdb`
   - Used for: Specifying which database to use
 
-- **`COSMOS_CONTAINER_NAME`** - The name of the main container for email records
-  - Example: `emails_classified`
+- **`AZURE_COSMOS_CONTAINER`** - The name of the main container for email records
+  - Example: `emails`
   - Used for: Storing classification results
 
-- **`COSMOS_CHAT_CONTAINER`** - The name of the container for chat history
+- **`AZURE_COSMOS_CHAT_CONTAINER`** - The name of the container for chat history
   - Example: `chat_history`
   - Used for: RAG chat functionality with vector search
 
 ### Azure Storage
 
-- **`STORAGE_ACCOUNT_NAME`** - The name of the Azure Storage account (Blob Storage)
-  - Example: `emailpocstoswedenc`
+- **`AZURE_STORAGE_ACCOUNT_URL`** - The blob endpoint URL for the Azure Storage account
+  - Example: `https://<prefix>stoswedenc.blob.core.windows.net/`
   - Used for: Storing PDF files and embeddings
 
-- **`CONTAINER_NAME_PDF`** - The name of the blob container for PDF files
-  - Example: `pdfs`
+- **`AZURE_STORAGE_CONTAINER`** - The name of the blob container for PDF files
+  - Example: `pdf-inputs`
   - Used for: Storing uploaded PDF documents
 
 ### Service Bus
 
-- **`SERVICE_BUS_FQDN`** - The fully qualified domain name of the Service Bus namespace
-  - Example: `email-poc-sb-swedencentral.servicebus.windows.net`
+- **`AZURE_SERVICE_BUS_FQDN`** - The fully qualified domain name of the Service Bus namespace
+  - Example: `<prefix>-sb-swedencentral.servicebus.windows.net`
   - Used for: Queue-based communication between API and Worker
 
-- **`QUEUE_NAME_PDF`** - The name of the Service Bus queue for PDF processing
-  - Example: `pdf-emails`
+- **`AZURE_SERVICE_BUS_QUEUE`** - The name of the Service Bus queue for PDF processing
+  - Example: `pdf-processing-queue`
   - Used for: Asynchronous PDF processing workflow
 
 ### Azure AI Foundry
 
-- **`AI_ENDPOINT`** - The endpoint URL for Azure AI Foundry (OpenAI models)
+- **`AZURE_AI_ENDPOINT`** - The endpoint URL for Azure AI Foundry (OpenAI models)
   - Example: `https://swedencentral.api.cognitive.microsoft.com/`
   - Used for: Accessing GPT, Phi-4, and Mistral models
+  - Note: `PHI_ENDPOINT` and `MISTRAL_ENDPOINT` fall back to this value if not set
 
-- **`AI_API_VERSION`** - The API version for Azure AI Foundry
+- **`AZURE_AI_API_VERSION`** - The API version for Azure AI Foundry
   - Example: `2024-08-01-preview`
   - Used for: API compatibility
 
@@ -130,8 +131,9 @@ These variables provide additional functionality but are not required for core o
   - Default: `true`
 
 - **`ORGANIZATION_NAME`** - Organization name displayed in UI
-  - Example: `G2S Insurance`
+  - Example: `My Company`
   - Default: `ClassyMail`
+  - Note: G2S deployments set this to `G2S Insurance` (see [G2S_CUSTOMIZATION.md](G2S_CUSTOMIZATION.md))
 
 ## Validation Scripts
 
@@ -141,16 +143,16 @@ These variables provide additional functionality but are not required for core o
 # validate-aca-env.ps1
 $required = @(
     "AZURE_CLIENT_ID",
-    "COSMOS_ENDPOINT",
-    "COSMOS_DATABASE_NAME",
-    "COSMOS_CONTAINER_NAME",
-    "COSMOS_CHAT_CONTAINER",
-    "STORAGE_ACCOUNT_NAME",
-    "CONTAINER_NAME_PDF",
-    "SERVICE_BUS_FQDN",
-    "QUEUE_NAME_PDF",
-    "AI_ENDPOINT",
-    "AI_API_VERSION",
+    "AZURE_COSMOS_ENDPOINT",
+    "AZURE_COSMOS_DB",
+    "AZURE_COSMOS_CONTAINER",
+    "AZURE_COSMOS_CHAT_CONTAINER",
+    "AZURE_STORAGE_ACCOUNT_URL",
+    "AZURE_STORAGE_CONTAINER",
+    "AZURE_SERVICE_BUS_FQDN",
+    "AZURE_SERVICE_BUS_QUEUE",
+    "AZURE_AI_ENDPOINT",
+    "AZURE_AI_API_VERSION",
     "PHI_DEPLOYMENT",
     "PHI_FALLBACK_DEPLOYMENT",
     "MISTRAL_DEPLOYMENT",
@@ -212,16 +214,16 @@ if ($missing.Count -gt 0) {
 
 required=(
     "AZURE_CLIENT_ID"
-    "COSMOS_ENDPOINT"
-    "COSMOS_DATABASE_NAME"
-    "COSMOS_CONTAINER_NAME"
-    "COSMOS_CHAT_CONTAINER"
-    "STORAGE_ACCOUNT_NAME"
-    "CONTAINER_NAME_PDF"
-    "SERVICE_BUS_FQDN"
-    "QUEUE_NAME_PDF"
-    "AI_ENDPOINT"
-    "AI_API_VERSION"
+    "AZURE_COSMOS_ENDPOINT"
+    "AZURE_COSMOS_DB"
+    "AZURE_COSMOS_CONTAINER"
+    "AZURE_COSMOS_CHAT_CONTAINER"
+    "AZURE_STORAGE_ACCOUNT_URL"
+    "AZURE_STORAGE_CONTAINER"
+    "AZURE_SERVICE_BUS_FQDN"
+    "AZURE_SERVICE_BUS_QUEUE"
+    "AZURE_AI_ENDPOINT"
+    "AZURE_AI_API_VERSION"
     "PHI_DEPLOYMENT"
     "PHI_FALLBACK_DEPLOYMENT"
     "MISTRAL_DEPLOYMENT"
@@ -290,17 +292,17 @@ All environment variables are automatically configured in Terraform ([infra/main
 After deploying with Terraform, verify environment variables are set correctly:
 
 ```bash
-# API Container
+# API Container (replace <prefix> with your deployment prefix, e.g. email-poc)
 az containerapp show \
-  --name email-poc-api \
-  --resource-group email-poc-rg \
+  --name <prefix>-api \
+  --resource-group <prefix>-rg \
   --query "properties.template.containers[0].env" \
   -o table
 
 # Worker Container
 az containerapp show \
-  --name email-poc-worker \
-  --resource-group email-poc-rg \
+  --name <prefix>-worker \
+  --resource-group <prefix>-rg \
   --query "properties.template.containers[0].env" \
   -o table
 ```
@@ -310,17 +312,17 @@ az containerapp show \
 ### Common Issues
 
 1. **Cosmos DB Connection Failed**
-   - Verify `COSMOS_ENDPOINT` is correct
-   - Ensure managed identity has `Cosmos DB Built-in Data Contributor` role
-   - Check `COSMOS_DATABASE_NAME` and `COSMOS_CONTAINER_NAME` exist
+   - Verify `AZURE_COSMOS_ENDPOINT` is correct
+   - Ensure managed identity has **Custom App Role** (`readMetadata` + CRUD) at Account scope (or built-in `Data Contributor` as fallback)
+   - Check `AZURE_COSMOS_DB` and `AZURE_COSMOS_CONTAINER` exist
 
 2. **Service Bus Connection Failed**
-   - Verify `SERVICE_BUS_FQDN` format (must end with `.servicebus.windows.net`)
+   - Verify `AZURE_SERVICE_BUS_FQDN` format (must end with `.servicebus.windows.net`)
    - Ensure managed identity has `Azure Service Bus Data Receiver` and `Azure Service Bus Data Sender` roles
-   - Check `QUEUE_NAME_PDF` exists in Service Bus namespace
+   - Check `AZURE_SERVICE_BUS_QUEUE` exists in Service Bus namespace
 
 3. **AI Model Connection Failed**
-   - Verify `AI_ENDPOINT` is correct
+   - Verify `AZURE_AI_ENDPOINT` is correct
    - Ensure deployment names (`PHI_DEPLOYMENT`, `MISTRAL_DEPLOYMENT`) match Azure AI Foundry deployments
    - Check managed identity has `Cognitive Services User` role
 

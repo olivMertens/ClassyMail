@@ -4,9 +4,10 @@ Terraform and deployment documentation lives in [docs/INFRASTRUCTURE.md](../docs
 
 **Quick Reference:**
 - **Deployment Guide**: Run `./infra/deploy.ps1` from repo root
+- **Fresh Tenant**: See [docs/DEPLOY_FROM_SCRATCH.md](../docs/DEPLOY_FROM_SCRATCH.md) for complete onboarding
 - **Required Models**: See [docs/MODELS.md](../docs/MODELS.md#required-models-for-poc)
 - **Model Deployments**: Must be created manually in Azure AI Foundry after Terraform provisioning
-- **Mandatory G2S Tags**: All resources are tagged with G2S standards (cp-code-sa=devin, cp-deploiement=terraform, etc.)
+- **Custom Tags**: Configurable via `g2s_tags_enabled` variable (see [G2S_CUSTOMIZATION.md](../docs/G2S_CUSTOMIZATION.md#g2s-mandatory-tags))
 
 **Mandatory AI Model Deployments for POC:**
 1. `mistral-document-ai-2505` - OCR + Vision extraction
@@ -17,25 +18,6 @@ Terraform and deployment documentation lives in [docs/INFRASTRUCTURE.md](../docs
 6. `gpt-5-nano` - Category assessment AI (recommended)
 
 See [docs/INFRASTRUCTURE.md#required-ai-model-deployments](../docs/INFRASTRUCTURE.md#required-ai-model-deployments) for deployment instructions.
-
----
-
-## Tags Obligatoires G2S
-
-Toutes les ressources Azure déployées par Terraform sont automatiquement tagées avec les valeurs suivantes :
-
-| Tag | Valeur | Description |
-|-----|--------|-------------|
-| `cp-code-sa` | `devin` | Code service applicatif (projet DEVIN) |
-| `cp-deploiement` | `terraform` | Méthode de déploiement |
-| `cp-environnement` | `d` | Environnement de développement |
-| `cp-proprietaire` | `g2s-dtpo-iaf` | Propriétaire de la ressource |
-| `cp-responsable` | `g2s-dtpo-iaf` | Responsable technique |
-| `cp-supervision` | `oui` | Activer la supervision |
-
-Ces tags sont appliqués via :
-1. **`local.common_tags`** dans `main.tf` (propagation aux ressources)
-2. **Azure Policy** dans `policy.tf` (application automatique sur ressources existantes)
 
 ---
 

@@ -1,4 +1,4 @@
-# Analyse de la Logique des Coûts
+﻿# Analyse de la Logique des Coûts
 
 ## Vue d'ensemble
 
@@ -267,7 +267,7 @@ const pricingSource = ref('retail')  // Mode production
 # Comparer coûts réels vs projetés chaque mois
 az costmanagement query \
   --type Usage \
-  --dataset-filter "ResourceGroup eq 'email-poc-rg'" \
+  --dataset-filter "ResourceGroup eq '<prefix>-rg'" \
   --timeframe MonthToDate
 ```
 

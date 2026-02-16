@@ -108,10 +108,75 @@ if ($storageId){ Ensure-Role $storageId "Storage Blob Data Contributor" "Storage
 if ($sbId){ Ensure-Role $sbId "Azure Service Bus Data Sender" "Service Bus"; Ensure-Role $sbId "Azure Service Bus Data Receiver" "Service Bus" }
 if ($cosmosId){
   Info "Checking Cosmos DB SQL Role Assignments..."
-  $cosmosAssignments = az cosmosdb sql role assignment list --account-name $CosmosAccount --resource-group $ResourceGroup --query "[?principalId=='$principalId']" -o tsv 2>$null
-  if ($cosmosAssignments) { Ok "Cosmos DB SQL Role assigned" } else { Warn "Cosmos DB SQL Role MISSING. Run Terraform to fix." }
+  $cosmosAssignments = az cosmosdb sql role assignment list --account-name $CosmosAccount --resource-group $ResourceGroup 2>$null | ConvertFrom-Json
+  $myAssignments = $cosmosAssignments | Where-Object { $_.principalId -eq $principalId }
+  if ($myAssignments) {
+    Ok "Cosmos DB SQL Role assigned ($($myAssignments.Count) assignment(s))"
+    foreach ($a in $myAssignments) {
+      # Check scope is account-level (not database-scoped)
+      if ($a.scope -match '/dbs/') {
+        Warn "  Cosmos role scoped to DATABASE ($($a.scope)) — should be Account scope for SDK readMetadata"
+      } else {
+        Ok "  Scope: Account-level (correct)"
+      }
+      # Check if custom role or built-in
+      if ($a.roleDefinitionId -match '00000000-0000-0000-0000-000000000002') {
+        Info "  Using built-in Data Contributor role"
+      } else {
+        Ok "  Using Custom App Role ($($a.roleDefinitionId | Split-Path -Leaf))"
+      }
+    }
+  } else { Warn "Cosmos DB SQL Role MISSING. Run Terraform to fix." }
 }
 $acrId = az acr list -g $ResourceGroup --query "[0].id" -o tsv 2>$null; if ($acrId){ Ensure-Role $acrId "AcrPull" "ACR" }
+
+# Language Reader — only needed when a Language service exists in the RG
+Info "Checking for Language Service (optional)..."
+$langId = az cognitiveservices account list -g $ResourceGroup --query "[?kind=='TextAnalytics'] | [0].id" -o tsv 2>$null
+if ($langId) {
+  Ensure-Role $langId "Cognitive Services Language Reader" "Language Service"
+} else {
+  Info "No Language Service found in RG — skipping Language Reader check"
+}
+
+# AZURE_CLIENT_ID env var on Container Apps
+Info "Checking AZURE_CLIENT_ID env var on Container Apps..."
+foreach ($caName in @($ContainerAppApi, $ContainerAppWorker)) {
+  $envVars = az containerapp show -g $ResourceGroup -n $caName --query "properties.template.containers[0].env[].name" -o tsv 2>$null
+  if ($envVars) {
+    if ($envVars -contains "AZURE_CLIENT_ID") {
+      Ok "AZURE_CLIENT_ID set on $caName"
+    } else {
+      Warn "AZURE_CLIENT_ID MISSING on $caName — DefaultAzureCredential may pick wrong identity"
+    }
+  } else {
+    Info "Could not read env vars for $caName (may not be deployed yet)"
+  }
+}
+
+# --- Unexpected / Extra Roles Detection ---
+Info "Checking for unexpected extra roles on managed identity..."
+$expectedRoles = @(
+  "Storage Blob Data Contributor",
+  "Azure Service Bus Data Receiver",
+  "Azure Service Bus Data Sender",
+  "Cognitive Services User",
+  "AcrPull",
+  "Cognitive Services Language Reader"  # optional but expected when Language service deployed
+)
+$allRoles = az role assignment list --assignee $principalId --all 2>$null | ConvertFrom-Json
+if ($allRoles) {
+  $unexpectedRoles = $allRoles | Where-Object { $_.roleDefinitionName -notin $expectedRoles }
+  if ($unexpectedRoles -and $unexpectedRoles.Count -gt 0) {
+    Warn "Found $($unexpectedRoles.Count) extra role(s) NOT managed by Terraform:"
+    foreach ($ur in $unexpectedRoles) {
+      Warn "  - $($ur.roleDefinitionName) on $($ur.scope | Split-Path -Leaf)"
+    }
+    Info "These may be manual leftovers. See docs/RBAC_AUDIT.md section 8."
+  } else {
+    Ok "No unexpected extra roles found — clean deployment"
+  }
+}
 
 Warn "Policy check: TODO - awaiting policy level details for RG policies."
 

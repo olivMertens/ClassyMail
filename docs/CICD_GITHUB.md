@@ -1,4 +1,4 @@
-# CICD_GITHUB
+﻿# CICD_GITHUB
 
 Ce document décrit une approche CI/CD GitHub Actions pour :
 
@@ -29,7 +29,7 @@ Objectif : build/push l'image et déployer/mettre à jour la Container App.
 
 Recommandation “simple qui marche” (scope = Resource Group) :
 
-- **Contributor** sur le RG (ex: `email-poc-rg`)
+- **Contributor** sur le RG (ex: `<prefix>-rg`)
 - **AcrPush** + **Reader** sur l'ACR (Reader nécessaire pour `az acr show` / login, et AcrPush pour le push)
 
 Option “least privilege” (plus strict, plus verbeux) :
@@ -45,7 +45,7 @@ Objectif : lire/écrire dans Cosmos, Storage, Service Bus, et appeler Azure AI F
 - Storage Account (scope = storage account): **Storage Blob Data Contributor**
 - Service Bus Namespace (scope = namespace): **Azure Service Bus Data Receiver** + **Azure Service Bus Data Sender**
 - Azure AI Foundry account (scope = AI account): **Cognitive Services User**
-- Cosmos DB (data-plane SQL RBAC): **Cosmos DB Built-in Data Contributor** au scope **database** `/dbs/emailsdb` (voir `infra/main.tf`)
+- Cosmos DB (data-plane SQL RBAC): **Custom App Role** (`readMetadata` + CRUD) au scope **Account** (voir `infra/main.tf`)
 - ACR (si pull via identité managée): **AcrPull** sur l'ACR
 
 ## App registration + Federated Credential (GitHub OIDC)
@@ -163,13 +163,13 @@ Fallback (si vous n'utilisez pas OIDC) :
 
 À définir dans GitHub → Settings → Secrets and variables → Actions → Variables :
 
-- `AZURE_RESOURCE_GROUP` (ex: `email-poc-rg`)
-- `AZURE_IDENTITY_NAME` (ex: `email-poc-id`)
+- `AZURE_RESOURCE_GROUP` (ex: `<prefix>-rg`)
+- `AZURE_IDENTITY_NAME` (ex: `<prefix>-id`)
 - `AZURE_APP_CLIENT_ID` (clientId de l'identité managée **de l'app** ; Terraform output: `APP_ID_CLIENT_ID`)
 
 Optionnel (recommandé) :
 
-- `AZURE_CONTAINERAPP_ENV` (ex: `email-poc-env`). Si absent, le workflow utilise `email-poc-env` par défaut.
+- `AZURE_CONTAINERAPP_ENV` (ex: `<prefix>-env`). Si absent, le workflow utilise `<prefix>-env` par défaut.
 
 Terraform outputs → variables à renseigner :
 

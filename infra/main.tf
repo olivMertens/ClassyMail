@@ -34,15 +34,16 @@ locals {
   # If not provided, rely on the active Azure CLI subscription.
   subscription_id = try(trimspace(var.subscription_id), "")
 
-  # Tags obligatoires G2S pour toutes les ressources déployées
-  common_tags = {
+  # Tags obligatoires G2S pour toutes les ressources déployées.
+  # Set g2s_tags_enabled = false in terraform.tfvars for non-G2S deployments.
+  common_tags = var.g2s_tags_enabled ? {
     "cp-code-sa"       = "devin"
     "cp-deploiement"   = "terraform"
     "cp-environnement" = "d"
     "cp-proprietaire"  = "g2s-dtpo-iaf"
     "cp-responsable"   = "g2s-dtpo-iaf"
     "cp-supervision"   = "oui"
-  }
+  } : {}
 }
 
 provider "azurerm" {
@@ -75,6 +76,12 @@ variable "deploy_language_service" {
   type        = bool
   description = "Deploy Azure AI Language service for native PII detection (optional). Uses Standard SKU (S tier). Free tier (F0) can be used manually if preferred."
   default     = false
+}
+
+variable "g2s_tags_enabled" {
+  type        = bool
+  description = "Enable G2S mandatory corporate tags (cp-code-sa, cp-proprietaire, etc.) on all resources. Set to false for non-G2S deployments."
+  default     = true
 }
 
 variable "organization_name" {

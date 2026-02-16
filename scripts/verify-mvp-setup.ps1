@@ -260,6 +260,20 @@ if ($cosmosAccounts -and $cosmosAccounts.Count -gt 0) {
             $identityRoles = $roleAssignments | Where-Object { $_.principalId -eq $identityId }
             if ($identityRoles -and $identityRoles.Count -gt 0) {
                 Write-Status -Status success -Message "Cosmos DB RBAC assigned to managed identity ($($identityRoles.Count) role(s))"
+                foreach ($role in $identityRoles) {
+                    # Validate scope — must be Account-level, not database-scoped
+                    if ($role.scope -match '/dbs/') {
+                        Write-Status -Status error -Message "  Cosmos role scoped to DATABASE ($($role.scope)) — must be Account scope for SDK readMetadata"
+                    } else {
+                        Write-Status -Status success -Message "  Scope: Account-level (correct)"
+                    }
+                    # Validate role type — should be Custom, not built-in 00000000-...-02
+                    if ($role.roleDefinitionId -match '00000000-0000-0000-0000-000000000002') {
+                        Write-Status -Status warning -Message "  Using built-in Data Contributor — consider Custom App Role for readMetadata"
+                    } else {
+                        Write-Status -Status success -Message "  Using Custom App Role (correct)"
+                    }
+                }
             } else {
                 Write-Status -Status error -Message "Cosmos DB RBAC NOT assigned to managed identity"
                 Write-Host "  Action: Run 'cd infra && terraform apply' to assign RBAC"
@@ -352,6 +366,17 @@ if ($languageAccount) {
     Write-Status -Status success -Message "Azure AI Language '$($languageAccount.name)' found"
     Write-Host "  Provisioning state: $($languageAccount.properties.provisioningState)"
     Write-Host "  Endpoint: $($languageAccount.properties.endpoint)"
+
+    # Check Language Reader role for managed identity
+    if ($identityId) {
+        $langRoles = az role assignment list --assignee $identityId --scope $languageAccount.id --query "[?roleDefinitionName=='Cognitive Services Language Reader']" 2>$null | ConvertFrom-Json
+        if ($langRoles -and $langRoles.Count -gt 0) {
+            Write-Status -Status success -Message "Cognitive Services Language Reader role assigned"
+        } else {
+            Write-Status -Status warning -Message "Cognitive Services Language Reader role MISSING on Language Service"
+            Write-Host "    Fix: terraform apply with deploy_language_service = true"
+        }
+    }
 } else {
     Write-Status -Status warning -Message "Azure AI Language service not found (optional for PII detection)"
 }
@@ -379,6 +404,15 @@ if ($containerApps -and $containerApps.Count -gt 0) {
             Write-Status -Status success -Message "  $($app.name) is running"
         } else {
             Write-Status -Status warning -Message "  $($app.name) is not running (status: $runningStatus)"
+        }
+
+        # Check AZURE_CLIENT_ID env var
+        $envVars = $appDetail.properties.template.containers[0].env | ForEach-Object { $_.name }
+        if ($envVars -contains "AZURE_CLIENT_ID") {
+            Write-Status -Status success -Message "  AZURE_CLIENT_ID set on $($app.name)"
+        } else {
+            Write-Status -Status error -Message "  AZURE_CLIENT_ID MISSING on $($app.name) — DefaultAzureCredential may pick wrong identity"
+            Write-Host "      Fix: Set AZURE_CLIENT_ID env var to the managed identity client ID in Terraform"
         }
     }
 } else {
@@ -438,6 +472,30 @@ if ($identityId) {
                 Write-Status -Status error -Message "  Service Bus RBAC roles missing"
             }
 
+            # Check for unexpected extra roles (not managed by Terraform)
+            Write-Host ""
+            Write-Host "  Checking for unexpected extra roles:"
+            $expectedRoleNames = @(
+              "Storage Blob Data Contributor",
+              "Azure Service Bus Data Receiver",
+              "Azure Service Bus Data Sender",
+              "Azure Service Bus Data Owner",
+              "Cognitive Services User",
+              "AcrPull",
+              "Cognitive Services Language Reader"
+            )
+            $unexpectedRoles = $roleAssignments | Where-Object { $_.roleDefinitionName -notin $expectedRoleNames }
+            if ($unexpectedRoles -and $unexpectedRoles.Count -gt 0) {
+                Write-Status -Status warning -Message "Found $($unexpectedRoles.Count) extra role(s) NOT managed by Terraform:"
+                foreach ($ur in $unexpectedRoles) {
+                    $scopeLeaf = ($ur.scope -split '/')[-1]
+                    Write-Host "    ! $($ur.roleDefinitionName) on $scopeLeaf" -ForegroundColor Yellow
+                }
+                Write-Host "    These are safe to remove. See docs/RBAC_AUDIT.md section 8." -ForegroundColor Cyan
+            } else {
+                Write-Status -Status success -Message "No unexpected extra roles - clean Terraform-only RBAC"
+            }
+
         } else {
             Write-Status -Status error -Message "No role assignments found for managed identity"
             Write-Host "  Action: Run 'cd infra && terraform apply' to assign RBAC roles"
@@ -458,9 +516,6 @@ if ($apiApp) {
         $appDetail = az containerapp show --name $apiApp.name --resource-group $ResourceGroup 2>$null | ConvertFrom-Json
         $apiFqdn = $appDetail.properties.configuration.ingress.fqdn
 
-    Write-Host ""
-    Write-Host "Tip: Use -AutoFixNetwork to automatically fix Cosmos DB firewall issues"
-    Write-Host "     .\scripts\verify-mvp-setup.ps1 -ResourceGroup `"$ResourceGroup`" -AutoFixNetwork"
         if ($apiFqdn) {
             $apiUrl = "https://$apiFqdn"
             Write-Host "  API URL: $apiUrl"
@@ -533,16 +588,14 @@ if ($script:Failed -eq 0) {
     Write-Host "  4. Review warnings above and address if needed"
 } else {
     Write-Status -Status error -Message "Some checks failed. Please review errors above."
-    Write-Host ""Network issues: .\scripts\update_cosmos_firewall.ps1 -ResourceGroup `"$ResourceGroup`""
+    Write-Host ""
+    Write-Host "  - Network issues: .\scripts\update_cosmos_firewall.ps1 -ResourceGroup `"$ResourceGroup`""
     Write-Host "  - Container Apps not running: az containerapp restart --name <app-name> -g $ResourceGroup"
     Write-Host "  - Cosmos DB errors: Wait 5-10 min for RBAC propagation, then restart apps"
     Write-Host "  - Missing deployments: See docs/AZURE_AI_FOUNDRY_SETUP.md"
     Write-Host ""
     Write-Host "Tip: Use -AutoFixNetwork to automatically fix network issues"
-    Write-Host "     .\scripts\verify-mvp-setup.ps1 -ResourceGroup `"$ResourceGroup`" -AutoFixNetwork
-    Write-Host "  - Container Apps not running: az containerapp restart --name <app-name> -g $ResourceGroup"
-    Write-Host "  - Cosmos DB errors: Wait 5-10 min for RBAC propagation, then restart apps"
-    Write-Host "  - Missing deployments: See docs/AZURE_AI_FOUNDRY_SETUP.md"
+    Write-Host "     .\scripts\verify-mvp-setup.ps1 -ResourceGroup `"$ResourceGroup`" -AutoFixNetwork"
 }
 
 Write-Host ""

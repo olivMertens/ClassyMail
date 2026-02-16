@@ -1,4 +1,4 @@
-# Scénario de test bout en bout (E2E)
+﻿# Scénario de test bout en bout (E2E)
 > 📊 **Interactive Diagrams**: Each diagram has zoom 🔍 and download 📥 controls. See [README_DIAGRAMS.md](./README_DIAGRAMS.md).
 Ce document décrit un scénario complet pour tester le système de bout en bout : génération de PDFs → dépôt dans Blob Storage → (Event Grid) → Service Bus → worker → stockage dans Cosmos DB → consultation via l’API/UI.
 
@@ -161,8 +161,8 @@ Prérequis : `az login` puis sélectionner la bonne subscription si besoin.
 az login
 az account set --subscription <subscription-id>
 
-$rg = "<rg-name>"   # ex: email-poc-rg
-$prefix = "email-poc"  # si vous avez gardé le préfixe Terraform
+$rg = "<rg-name>"   # ex: <prefix>-rg
+$prefix = "<prefix>"  # si vous avez gardé le préfixe Terraform
 
 # URL publique de l'API (Container App avec ingress)
 $apiFqdn = az containerapp show -g $rg -n "$prefix-api" --query "properties.configuration.ingress.fqdn" -o tsv

@@ -24,15 +24,11 @@ uv run python scripts/generate_realistic_emails.py --count 20 --out dataset/test
 
 ## Available Categories
 
-The script includes realistic email templates for all supported categories:
+The script includes realistic email templates for all supported categories.
 
-1. **Attestation habitation** - Housing insurance certificates
-2. **Résiliation** - Contract cancellations
-3. **Dommages électriques** - Electrical damage claims
-4. **Sinistre dégât des eaux** - Water damage claims
-5. **Modification contrat** - Contract modifications
-6. **Demande de devis** - Quote requests
-7. **Réclamation** - Complaints
+> **G2S Insurance categories**: See [G2S_CUSTOMIZATION.md](G2S_CUSTOMIZATION.md#insurance-category-taxonomy) for the full category taxonomy (Attestation habitation, Résiliation, Sinistre, etc.).
+>
+> **Other organizations**: Customize the category templates in `scripts/generate_realistic_emails.py` for your domain.
 
 ## Email Content
 
@@ -40,7 +36,7 @@ Each generated email includes:
 
 - **Realistic sender** (name + email)
 - **Contextual subject line**
-- **Natural French text** with insurance-specific vocabulary
+- **Natural text** with domain-specific vocabulary
 - **Specific details** (addresses, contract numbers, dates, amounts)
 - **Proper formatting** (greetings, body, signature)
 

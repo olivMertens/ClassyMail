@@ -1,20 +1,26 @@
 """List all OpenAI deployments on the Foundry endpoint."""
 
 import asyncio
+import os
+
 import httpx
 from dotenv import load_dotenv
 
 load_dotenv("secrets.env")
 
+from classymail.core.config import AI_API_VERSION, PHI_ENDPOINT  # noqa: E402
 from classymail.services.azure_clients import Clients, auth_headers  # noqa: E402
 
 
 async def main() -> None:
     clients = Clients()
     headers = await auth_headers(clients, model_type="openai")
-    ep = "https://email-poc-aifoundry.cognitiveservices.azure.com"
+    ep = os.getenv("AZURE_AI_ENDPOINT") or PHI_ENDPOINT
+    if not ep:
+        print("Error: Set AZURE_AI_ENDPOINT or PHI_ENDPOINT in secrets.env")
+        return
 
-    url = f"{ep}/openai/deployments?api-version=2024-08-01-preview"
+    url = f"{ep}/openai/deployments?api-version={AI_API_VERSION}"
     async with httpx.AsyncClient(timeout=30) as c:
         r = await c.get(url, headers=headers)
 

@@ -1,4 +1,4 @@
-# ARCHITECTURE
+﻿# ARCHITECTURE
 
 > 📊 **Interactive Diagrams**: Each diagram below has zoom 🔍 and download 📥 buttons. See [README_DIAGRAMS.md](./README_DIAGRAMS.md) for usage guide.
 >
@@ -110,7 +110,7 @@ L'identité managée assignée aux Container Apps (`api` et `worker`) doit dispo
 | **Storage Account** | `Storage Blob Data Reader` | `2a2b9908-6ea1-4ae2-8e65-a410df84e7d1` | **Lecture**: Worker télécharge les PDFs, API stream les PDFs vers le navigateur pour visualisation. |
 | **Service Bus** | `Azure Service Bus Data Receiver` | `4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0` | Permet au `worker` de consommer les messages de la queue. |
 | **Service Bus** | `Azure Service Bus Data Sender` | `69a216fc-b8fb-44d8-bc22-1f3c2cd27a39` | Permet à l'API (et DLQ retry) d'envoyer des messages. |
-| **Cosmos DB (SQL)** | `Cosmos DB Built-in Data Contributor` | `00000000-0000-0000-0000-000000000002` | **Data Plane RBAC**. Lecture/Écriture des documents JSON. *Note: Ce n'est pas un rôle IAM Azure classique, mais un rôle SQL natif Cosmos.* |
+| **Cosmos DB (SQL)** | Custom App Role (`readMetadata` + CRUD) | Terraform-managed (`app_role`) | **Data Plane RBAC** au scope **Account**. Lecture/Écriture des documents JSON. *Note: Ce n'est pas un rôle IAM Azure classique, mais un rôle SQL natif Cosmos. Voir [RBAC_AUDIT.md](RBAC_AUDIT.md).* |
 | **AI Foundry Project** | `Cognitive Services User` | `a97b65f3-2400-443d-9d23-a1288a8760ba` | **Modèles Déployés**: Phi-4 (Classification primaire), Mistral Document AI 2505 (OCR + Vision), GPT-5-nano (Category Assessment, reasoning), GPT-5.2-chat (Conversational AI), GPT-4o-mini (Fallback + PII), text-embedding-3-small (Embeddings) |
 | **Azure AI Language** ⚙️ | `Cognitive Services Language Reader` | `36e80216-4058-40c5-bf25-3b30a0199a10` | **PII Detection Native API** (optionnel, `deploy_language_service=true`). Service TextAnalytics avec 43+ catégories PII prédéfinies. |
 | **Container Registry**| `AcrPull` | `7f951dda-4ed3-4680-a7ca-43fe172d538d` | Pull de l'image Docker par l'environnement Container Apps. |
@@ -248,7 +248,7 @@ The LLM pipeline (`#classymail/services/llm_pipeline.py`) and anonymizer (`#clas
 
 - Build : `docker build -t <acr>.azurecr.io/classymail:local .`
 - Push : `az acr login --name <acr>; docker push <acr>.azurecr.io/classymail:local`
-- ACA : `az containerapp update --name email-poc-api --resource-group email-poc-rg --image <acr>.azurecr.io/classymail:local`
+- ACA : `az containerapp update --name <prefix>-api --resource-group <prefix>-rg --image <acr>.azurecr.io/classymail:local`
 
 ## 9. Pipeline Processing Details
 
@@ -335,4 +335,4 @@ flowchart LR
 - API expose `/healthz` + `/readyz` (alias `/health`, `/ready`).
 - Worker scale avec KEDA (scaler azure-servicebus, min=1, max=10).
 - Même image Docker pour les deux; worker: `python -m classymail.worker_main`.
-- MI `app_id` a les rôles: Storage Blob Data Contributor, Azure Service Bus Data Receiver/Sender, Cosmos DB Built-in Data Contributor, Cognitive Services User, Monitoring Metrics Publisher.
+- MI `app_id` a les rôles: Storage Blob Data Contributor, Azure Service Bus Data Receiver/Sender, Custom App Role Cosmos (readMetadata + CRUD), Cognitive Services User, Cognitive Services Language Reader.

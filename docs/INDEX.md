@@ -14,9 +14,9 @@
 - [IMPLEMENTATION_STATUS](IMPLEMENTATION_STATUS.md) - État d'avancement des features (Feb 2026)
 
 ### 🚀 Déploiement & Infrastructure
+- [DEPLOY_FROM_SCRATCH](DEPLOY_FROM_SCRATCH.md) - **Déploiement complet depuis zéro** dans un nouveau tenant Azure (guide + script bootstrap)
 - [INFRASTRUCTURE](INFRASTRUCTURE.md) - Déploiement Terraform, configuration Azure, Event Grid, RBAC, **Required Models**
-- [CLI_SETUP](CLI_SETUP.md) - Configuration CLI et identité managée (commandes rapides)
-- [CLI_RAG](CLI_RAG.md) - Scripts de vérification RAG, backfill embeddings/chunks
+- [CLI_REFERENCE](CLI_REFERENCE.md) - Commandes CLI complètes : setup, authentification, identité managée, RAG
 
 ### 💻 Développement Local
 - [LOCAL_DEVELOPMENT](LOCAL_DEVELOPMENT.md) - Setup, exécution locale, build Docker, testing, troubleshooting
@@ -33,7 +33,8 @@
 
 ### 📱 Interface & Features
 - [USER_INTERFACE](USER_INTERFACE.md) - Guide complet interface utilisateur (PII indicators, reprocessing, AI advice)
-- [INTEGRATION_CLIENT_G2S](INTEGRATION_CLIENT_G2S.md) - Preprocessing avancé, slugs, export CSV
+- [INTEGRATION_CLIENT_G2S](INTEGRATION_CLIENT_G2S.md) - Preprocessing avancé, slugs, export CSV (**G2S-specific**)
+- [G2S_CUSTOMIZATION](G2S_CUSTOMIZATION.md) - **Configuration G2S** : tags, catégories assurance, branding, policy Azure
 - [ADR_OCR_STRATEGY](ADR_OCR_STRATEGY.md) - Architecture Decision Record: OCR Strategy
 - [RBAC_AUDIT](RBAC_AUDIT.md) - Audit et troubleshooting RBAC détaillé
 
