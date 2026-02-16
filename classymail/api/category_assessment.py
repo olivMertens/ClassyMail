@@ -35,6 +35,7 @@ class CategoryAssessmentRequest(BaseModel):
     description: str | None = Field(default="", description="Category definition (what it IS)")
     exclusions: str | None = Field(default="", description="Category exclusions (what it ISN'T)")
     language: str = Field(default="en", description="Response language: 'en' or 'fr'")
+    model: str | None = Field(default=None, description="Override assessment model (e.g. 'gpt-5-nano', 'phi4')")
 
 
 class CategoryAssessmentResponse(BaseModel):
@@ -63,11 +64,12 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
         span.set_attribute("category.slug", slug)
 
         try:
-            # Resolve assessment model: settings > env > default (gpt-4.1-nano)
+            # Resolve assessment model: request > settings > env > default (gpt-4.1-nano)
             import os
             settings = load_settings()
             assessment_model = (
-                settings.get("ai_assessment_model")
+                request.model
+                or settings.get("ai_assessment_model")
                 or os.getenv("ASSESSMENT_MODEL")
                 or DEFAULT_ASSESSMENT_MODEL
             )

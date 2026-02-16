@@ -96,6 +96,7 @@
                 "cancel_adding": "Cancel Adding Category",
                 "remove_confirm": "Are you sure you want to remove this category?"
             },
+            "assessment_model": "Advice Model",
             "assessment": {
                 "button": "Get AI Advice ({model})",
                 "analyzing": "Analyzing...",

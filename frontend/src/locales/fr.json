@@ -96,6 +96,7 @@
                 "cancel_adding": "Annuler l'Ajout de Catégorie",
                 "remove_confirm": "Êtes-vous sûr de vouloir supprimer cette catégorie ?"
             },
+            "assessment_model": "Modèle IA Conseil",
             "assessment": {
                 "button": "Obtenir des Conseils IA ({model})",
                 "analyzing": "Analyse en cours...",

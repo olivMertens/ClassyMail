@@ -222,7 +222,8 @@ const assessCategory = async (index) => {
         slug: category.slug,
         description: category.description || '',
         exclusions: category.exclusions || '',
-        language: locale.value || 'en'
+        language: locale.value || 'en',
+        model: settings.value.ai_assessment_model || 'gpt-4.1-nano'
       })
     })
 
@@ -1624,6 +1625,39 @@ onMounted(() => {
             {{ t('settings.categories.managed_title') }}
           </h3>
           <div class="flex items-center gap-3">
+            <!-- AI Assessment Model Selector -->
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                <CpuChipIcon class="inline h-4 w-4 -mt-0.5 mr-0.5" />
+                {{ t('settings.categories.assessment_model') }}
+              </label>
+              <select
+                v-model="settings.ai_assessment_model"
+                class="block w-40 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-xs sm:leading-5 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+              >
+                <option value="gpt-4.1-nano">
+                  GPT-4.1 Nano
+                </option>
+                <option value="gpt-5-nano">
+                  GPT-5 Nano
+                </option>
+                <option value="gpt-5-mini">
+                  GPT-5 Mini
+                </option>
+                <option value="phi4">
+                  Phi-4
+                </option>
+                <option value="gpt-4o-mini">
+                  GPT-4o Mini
+                </option>
+                <option value="gpt-4o">
+                  GPT-4o
+                </option>
+                <option value="Kimi-K2.5">
+                  Kimi-K2.5
+                </option>
+              </select>
+            </div>
             <!-- Import Excel Button -->
             <label
               class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
