@@ -923,9 +923,9 @@ async def export_emails_csv(
 
                 intentions_str = ",".join(intent_slugs) if intent_slugs else unclassified_label
 
-                # Calculate average confidence
+                # Calculate average confidence (stored as 0.0-1.0, display as percentage)
                 avg_confidence = round(sum(confidences) / len(confidences), 2) if confidences else 0.0
-                confidence_pct = f"{avg_confidence}%"
+                confidence_pct = f"{round(avg_confidence * 100)}%" if confidences else "N/A"
 
                 writer.writerow([pdf_filename, intentions_str, confidence_pct])
 
@@ -975,28 +975,33 @@ async def export_emails_csv(
                     slug = slug_map.get(intent_name, intent_name.lower().replace(" ", "_"))
                     intent_slugs.append(slug)
                     confidences.append(confidence)
-                    # Format: "CategoryName: 95%"
-                    confidence_details.append(f"{intent_name}: {confidence}%")
+                    # Format: "CategoryName: 95%" (confidence stored as 0.0-1.0)
+                    confidence_details.append(f"{intent_name}: {round(confidence * 100)}%")
                     justifications.append(intent_obj.get("justification", ""))
 
                 intentions_str = ",".join(intent_slugs) if intent_slugs else unclassified_label
 
-                # Calculate average confidence
+                # Calculate average confidence (stored as 0.0-1.0, display as percentage)
                 avg_confidence = round(sum(confidences) / len(confidences), 2) if confidences else 0.0
-                confidence_pct = f"{avg_confidence}%"
+                confidence_pct = f"{round(avg_confidence * 100)}%" if confidences else "N/A"
 
                 # Details confidences
                 details_str = ", ".join(confidence_details) if confidence_details else ""
 
-                # Quality indicator
-                if avg_confidence >= 90:
+                # Quality indicator (avg_confidence is 0.0-1.0 scale)
+                if not confidences:
+                    quality = "Non classifié"
+                elif avg_confidence >= 0.90:
                     quality = "Excellent"
-                elif avg_confidence >= 85:
+                elif avg_confidence >= 0.85:
                     quality = "Bon"
                 else:
                     quality = "À revoir"
 
-                justification_str = " | ".join(justifications) if justifications else ""
+                # Justification: per-intent justifications or fallback to classification_reason
+                justification_str = " | ".join(j for j in justifications if j) if justifications else ""
+                if not justification_str:
+                    justification_str = classification.get("classification_reason", "") or ""
 
                 # Convert processing time from ms to seconds with 2 decimal places
                 processing_time_s = ""
