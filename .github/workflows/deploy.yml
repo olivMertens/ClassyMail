@@ -202,8 +202,13 @@ jobs:
             exit 1
           fi
           LOGIN_SERVER="${{ vars.ACR_NAME }}.azurecr.io"
-          # Use Azure CLI identity (OIDC or SP) — ACR admin is disabled
-          az acr login --name "${{ vars.ACR_NAME }}"
+          echo "::group::ACR authentication"
+          # Use --expose-token to bypass Docker credential helper issues
+          # with OIDC tokens on GitHub Actions runners
+          TOKEN=$(az acr login --name "${{ vars.ACR_NAME }}" --expose-token --output tsv --query accessToken)
+          echo "::add-mask::$TOKEN"
+          echo "$TOKEN" | docker login "$LOGIN_SERVER" -u 00000000-0000-0000-0000-000000000000 --password-stdin
+          echo "::endgroup::"
           echo "ACR_LOGIN_SERVER=$LOGIN_SERVER" >> $GITHUB_ENV
 
       - name: Fetch Vue runtime (UI)
