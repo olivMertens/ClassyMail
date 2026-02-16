@@ -195,23 +195,16 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Docker login to ACR (via Azure CLI)
-        env:
-          ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
-          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
-          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
         run: |
-          if [ -n "$ACR_LOGIN_SERVER" ] && [ -n "$ACR_USERNAME" ] && [ -n "$ACR_PASSWORD" ]; then
-            echo "$ACR_PASSWORD" | docker login "$ACR_LOGIN_SERVER" -u "$ACR_USERNAME" --password-stdin
-          else
-            if [ -z "${{ vars.ACR_NAME }}" ]; then
-              echo "Missing vars.ACR_NAME (ACR registry name)." >&2
-              exit 1
-            fi
-            az acr login --name "${{ vars.ACR_NAME }}"
-            # ACR login server is always <name>.azurecr.io — no ARM query needed
-            LOGIN_SERVER="${{ vars.ACR_NAME }}.azurecr.io"
-            echo "ACR_LOGIN_SERVER=$LOGIN_SERVER" >> $GITHUB_ENV
+          set -euo pipefail
+          if [ -z "${{ vars.ACR_NAME }}" ]; then
+            echo "::error::Missing vars.ACR_NAME repository variable." >&2
+            exit 1
           fi
+          LOGIN_SERVER="${{ vars.ACR_NAME }}.azurecr.io"
+          # Use Azure CLI identity (OIDC or SP) — ACR admin is disabled
+          az acr login --name "${{ vars.ACR_NAME }}"
+          echo "ACR_LOGIN_SERVER=$LOGIN_SERVER" >> $GITHUB_ENV
 
       - name: Fetch Vue runtime (UI)
         run: |
@@ -220,10 +213,10 @@ jobs:
       - name: Build & push image
         id: build
         run: |
-          REGISTRY="${{ secrets.ACR_LOGIN_SERVER }}"
-          if [ -z "$REGISTRY" ]; then REGISTRY="$ACR_LOGIN_SERVER"; fi
+          set -euo pipefail
+          REGISTRY="${{ env.ACR_LOGIN_SERVER }}"
           if [ -z "$REGISTRY" ]; then
-            echo "Missing ACR login server. Provide secrets.ACR_LOGIN_SERVER or vars.ACR_NAME." >&2
+            echo "::error::ACR_LOGIN_SERVER not set. Docker login step must run first." >&2
             exit 1
           fi
           IMAGE=${REGISTRY}/${{ env.IMAGE_NAME }}:${{ github.sha }}
@@ -321,18 +314,8 @@ jobs:
 
       - name: Configure ACR pull (API)
         run: |
-          REGISTRY="${{ secrets.ACR_LOGIN_SERVER }}"
-          if [ -z "$REGISTRY" ]; then
-            if [ -n "${{ vars.ACR_NAME }}" ]; then
-               REGISTRY="${{ vars.ACR_NAME }}.azurecr.io"
-            fi
-          fi
-
-          if [ -z "$REGISTRY" ]; then
-            echo "Error: Could not determine ACR registry name from secrets.ACR_LOGIN_SERVER or vars.ACR_NAME" >&2
-            exit 1
-          fi
-
+          set -euo pipefail
+          REGISTRY="${{ vars.ACR_NAME }}.azurecr.io"
           IDENTITY_ID=$(az identity show -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "${{ vars.AZURE_IDENTITY_NAME }}" --query id -o tsv)
           az containerapp registry set \
             --name "${{ env.IMAGE_NAME }}" \
@@ -464,18 +447,7 @@ jobs:
       - name: Configure ACR pull (Worker)
         run: |
           set -euo pipefail
-          REGISTRY="${{ secrets.ACR_LOGIN_SERVER }}"
-          if [ -z "$REGISTRY" ]; then
-            if [ -n "${{ vars.ACR_NAME }}" ]; then
-               REGISTRY="${{ vars.ACR_NAME }}.azurecr.io"
-            fi
-          fi
-
-          if [ -z "$REGISTRY" ]; then
-            echo "Error: Could not determine ACR registry name from secrets.ACR_LOGIN_SERVER or vars.ACR_NAME" >&2
-            exit 1
-          fi
-
+          REGISTRY="${{ vars.ACR_NAME }}.azurecr.io"
           IDENTITY_ID=$(az identity show -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "${{ vars.AZURE_IDENTITY_NAME }}" --query id -o tsv)
           az containerapp registry set \
             --name "${{ env.WORKER_APP_NAME }}" \
