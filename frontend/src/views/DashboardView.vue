@@ -1529,7 +1529,7 @@ const emit = defineEmits(['open-email'])
   </div>
 
   <!-- Pagination -->
-  <div class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
+  <div class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4 pr-16">
     <div class="flex items-center">
       <select
         v-model="pageSize"

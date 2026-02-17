@@ -1262,7 +1262,7 @@ watch(() => email.value, (val) => {
             :key="s"
             class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all"
             :class="reprocessStrategy === s
-              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/40 dark:border-primary-400'
+              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-400'
               : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600'"
           >
             <input
@@ -1276,7 +1276,7 @@ watch(() => email.value, (val) => {
                 <span
                   class="text-sm font-medium"
                   :class="reprocessStrategy === s
-                    ? 'text-primary-900 dark:text-primary-100'
+                    ? 'text-primary-900 dark:text-white'
                     : 'text-gray-900 dark:text-white'"
                 >
                   {{ t('dashboard.strategy.' + s) }}
