@@ -714,19 +714,19 @@ async def ocr_with_document_intelligence(
     if not config.DOC_INTELLIGENCE_ENDPOINT:
         raise RuntimeError("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT not configured — cannot use Document Intelligence fallback.")
 
-    import base64
-
     # Auth: prefer Managed Identity, fall back to key
+    # v4.0 REST API expects Content-Type: application/json with base64Source body
+    # Ref: https://learn.microsoft.com/en-us/rest/api/aiservices/document-models/analyze-document
     if config.DOC_INTELLIGENCE_KEY:
         headers = {
-            "Content-Type": "application/pdf",
+            "Content-Type": "application/json",
             "Ocp-Apim-Subscription-Key": config.DOC_INTELLIGENCE_KEY,
         }
     else:
         clients_ref = clients or __import__("classymail.services.azure_clients", fromlist=["get_default_clients"]).get_default_clients()
         token = await clients_ref.credential.get_token("https://cognitiveservices.azure.com/.default")
         headers = {
-            "Content-Type": "application/pdf",
+            "Content-Type": "application/json",
             "Authorization": f"Bearer {token.token}",
         }
 
@@ -734,17 +734,21 @@ async def ocr_with_document_intelligence(
     api_version = config.DOC_INTELLIGENCE_API_VERSION
     url = f"{base_url}/documentintelligence/documentModels/prebuilt-layout:analyze?api-version={api_version}&outputContentFormat=markdown"
 
-    pdf_bytes = base64.b64decode(base64_pdf)
+    # Estimate raw PDF size for telemetry (without fully decoding)
+    pdf_size_estimate = len(base64_pdf) * 3 // 4
 
     with tracer.start_as_current_span("document_intelligence_ocr") as span:
         span.set_attribute("gen_ai.system", "azure_document_intelligence")
         span.set_attribute("gen_ai.operation", "document.analyze")
-        span.set_attribute("app.pdf_size_bytes", len(pdf_bytes))
+        span.set_attribute("app.pdf_size_bytes", pdf_size_estimate)
+
+        # v4.0 REST API: POST JSON body with base64Source field
+        request_body = {"base64Source": base64_pdf}
 
         async with httpx.AsyncClient(timeout=180) as client:
             # Step 1: Submit the analysis request
-            logger.info(f"[metrics] Document Intelligence OCR: submitting {len(pdf_bytes)} bytes to {url}")
-            resp = await client.post(url, content=pdf_bytes, headers=headers)
+            logger.info(f"[metrics] Document Intelligence OCR: submitting ~{pdf_size_estimate} bytes to {url}")
+            resp = await client.post(url, json=request_body, headers=headers)
 
             if resp.status_code not in (200, 202):
                 error_text = resp.text[:500]
