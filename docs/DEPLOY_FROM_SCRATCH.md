@@ -169,9 +169,12 @@ allowed_ip_ranges = ["<YOUR_PUBLIC_IP>"]
 
 The script will:
 1. Verify Azure CLI auth
-2. Run `terraform init -upgrade`
-3. Run `terraform plan` and show the plan
-4. Ask for confirmation before `terraform apply`
+2. **Set `ARM_USE_MSI=false`** (Fortinet/corporate firewall workaround — prevents IMDS calls)
+3. Run `terraform init -upgrade`
+4. Run `terraform plan` and show the plan
+5. Ask for confirmation before `terraform apply`
+
+> **Linux/macOS**: `bash infra/deploy.sh --tenant-id <TENANT_ID> --subscription-id <SUBSCRIPTION_ID>`
 
 ### 3.2 Manual (for transparency)
 
@@ -179,10 +182,16 @@ The script will:
 az login --tenant <TENANT_ID>
 az account set --subscription <SUBSCRIPTION_ID>
 
+# Fortinet / corporate firewall workaround (mandatory on corp networks)
+$env:ARM_USE_MSI  = "false"
+$env:ARM_USE_OIDC = "false"
+
 terraform -chdir=infra init -upgrade
 terraform -chdir=infra plan -var "subscription_id=<SUBSCRIPTION_ID>" -out tfplan
 terraform -chdir=infra apply tfplan
 ```
+
+> **Linux/macOS**: use `export ARM_USE_MSI="false"` and `export ARM_USE_OIDC="false"` instead.
 
 ### 3.3 Expected Resources Created
 
@@ -666,26 +675,33 @@ uv run pytest
 The `azapi` provider v1.13 defaults `use_msi = true` (unlike `azurerm` which defaults to `false`).
 On corporate networks where firewalls (FortiGuard, Zscaler) block the IMDS endpoint (`169.254.169.254`), this causes a 403 HTML response that crashes the credential chain.
 
-**Checklist for The deployer:**
+**Checklist for the deployer:**
 
 ```powershell
 # 1. Pull the latest code (the fix is already committed)
 git pull origin main
 
-# 2. Verify main.tf providers have these flags:
-#    provider "azurerm" { use_cli = true; use_msi = false; use_oidc = false }
-#    provider "azapi"   { use_cli = true; use_msi = false; use_oidc = false }
+# 2. Use the deploy script (sets ARM_USE_MSI=false automatically)
+.\infra\deploy.ps1 -SubscriptionId "<SUBSCRIPTION_ID>"
+# Linux/macOS: bash infra/deploy.sh --subscription-id <SUBSCRIPTION_ID>
 
-# 3. Re-initialize Terraform providers
+# -- OR if deploying manually --
+
+# 2b. Set environment variables BEFORE terraform commands:
+$env:ARM_USE_MSI  = "false"   # PowerShell
+$env:ARM_USE_OIDC = "false"
+# export ARM_USE_MSI="false"  # bash
+# export ARM_USE_OIDC="false"
+
+# 3. Delete cached providers and re-initialize
+Remove-Item -Recurse -Force infra\.terraform -ErrorAction SilentlyContinue
+Remove-Item -Force infra\.terraform.lock.hcl -ErrorAction SilentlyContinue
 terraform -chdir=infra init -upgrade
 
-# 4. (Belt-and-suspenders) Set environment variable:
-$env:ARM_USE_MSI = "false"
-
-# 5. Verify Azure CLI login is active:
+# 4. Verify Azure CLI login is active:
 az account show
 
-# 6. Re-run plan/apply
+# 5. Re-run plan/apply
 terraform -chdir=infra plan -out=tfplan
 terraform -chdir=infra apply tfplan
 ```

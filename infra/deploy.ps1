@@ -66,6 +66,16 @@ if ([string]::IsNullOrWhiteSpace($DetectedSub)) {
 
 Write-Host "Using subscription: $DetectedSub" -ForegroundColor Green
 
+# ── Fortinet / corporate firewall workaround ──────────────────────────
+# The azapi provider v1.x defaults use_msi=true, which makes Terraform
+# call the IMDS endpoint (169.254.169.254). Corporate firewalls such as
+# FortiGuard IPS block this endpoint, causing a 403 that crashes the
+# credential chain. Setting ARM_USE_MSI=false prevents the attempt.
+# The same flags are also set in provider blocks in main.tf.
+$env:ARM_USE_MSI   = "false"
+$env:ARM_USE_OIDC  = "false"
+# ──────────────────────────────────────────────────────────────────────
+
 Write-Host "== Terraform ==" -ForegroundColor Cyan
 terraform -chdir=infra init -upgrade
 terraform -chdir=infra plan -var "subscription_id=$DetectedSub" -out tfplan
