@@ -17,11 +17,13 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# 3. I18N Check
-Write-Host "Verifying I18N Locales..."
-python scripts/check_i18n.py
+# 3. Mermaid Validation
+Write-Host "Validating Mermaid diagrams..."
+$mdFiles = Get-ChildItem -Path "docs" -Filter "*.md" | Select-Object -ExpandProperty FullName
+$mdFiles += "README.md"
+uv run python scripts/validate_mermaid.py $mdFiles
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "I18N verification failed. Locales are not synchronized."
+    Write-Error "Mermaid validation failed. Fix diagram syntax."
     exit 1
 }
 

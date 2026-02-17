@@ -158,7 +158,7 @@ Le pipeline utilise une approche à deux temps pour maximiser la précision des 
 Résilience OCR avec basculement automatique vers Azure Document Intelligence via l'endpoint AI Foundry :
 *   **Fallback Transparent** : Si Mistral OCR échoue (timeout, quota, erreur), le pipeline bascule automatiquement vers Azure Document Intelligence
 *   **Via AI Foundry** : Document Intelligence est accessible via l'endpoint AI Foundry (`Cognitive Services User` RBAC) — aucune ressource DI séparée nécessaire
-*   **Circuit Breaker** : Chaque provider a son propre circuit breaker (Mistral: 5 échecs / 60s reset, DI: 3 échecs / 30s reset)
+*   **Circuit Breaker** : Chaque provider a son propre circuit breaker (Mistral: 5 échecs / 60s reset, DI: 5 échecs / 120s reset, Classification: 7 échecs / 45s reset)
 *   **ConnectTimeout Fast-Fail** : Les erreurs de connexion ne sont pas réessayées, déclenchant immédiatement le fallback
 *   **Tracking Provider** : Le dashboard affiche un badge ambre "Doc Intelligence" quand le fallback est utilisé
 *   **Option Standalone** : Activable via `deploy_document_intelligence=true` dans Terraform pour une ressource DI dédiée (quotas séparés)
@@ -166,7 +166,7 @@ Résilience OCR avec basculement automatique vers Azure Document Intelligence vi
 
 ### 🎯 Category Assessment AI Advice (NEW)
 Optimisez vos catégories avec l'aide de l'IA :
-*   **Assistant IA GPT-5 Nano** : Analyse vos définitions de catégories pour améliorer la précision de classification
+*   **Assistant IA GPT-4.1-nano** : Analyse vos définitions de catégories pour améliorer la précision de classification
 *   **Prompt Engineering Focus** : Conseils spécifiques pour structurer vos prompts LLM
 *   **Évaluation Qualité** : Note Good / Needs Improvement / Poor avec justifications détaillées
 *   **Exemples Concrets** : Suggestions de reformulation copy-paste ready pour vos catégories
@@ -175,7 +175,7 @@ Optimisez vos catégories avec l'aide de l'IA :
 
 ### 🔄 Per-Email Reprocessing (NEW)
 Retraitez des emails individuels avec des stratégies personnalisées :
-*   **Sélection Modèle** : Choisissez Phi-4, GPT-4o-mini, GPT-5-mini ou les deux (comparison mode)
+*   **Sélection Modèle** : Choisissez Phi-4, GPT-4o-mini ou les deux (comparison mode)
 *   **Stratégie Override** : Changez entre Standard/Reasoning/Vision pour un email spécifique
 *   **Mode Sync/Async** : Traitement immédiat (<30s) ou en arrière-plan
 *   **Comparaison A/B** : Testez plusieurs configurations sur le même email
@@ -223,7 +223,7 @@ Configuration avancée pour le traitement professionnel des emails :
 ### 🔒 PII Anonymization & Fine-Tuning Export (NEW)
 **Protection des données personnelles avec système dual-band pour fine-tuning** :
 *   **Niveau 1 - Regex** : Suppression rapide (<1ms) des emails, téléphones, IPs, IBANs
-*   **Niveau 2 - LLM (GPT-4o)** : Anonymisation contextuelle des noms, sociétés, adresses, montants
+*   **Niveau 2 - LLM (GPT-4o-mini)** : Anonymisation contextuelle des noms, sociétés, adresses, montants
 *   **Protection en couches** : L'IA anonymisatrice ne voit jamais les emails bruts (déjà scrubés par regex)
 *   **Export JSONL sécurisé** : Format Azure AI Foundry avec anonymisation automatique (subject/sender inclus)
 *   **Corrections utilisateur** : Tracking complet des modifications manuelles avec feedback AI
@@ -234,11 +234,8 @@ Configuration avancée pour le traitement professionnel des emails :
 **Commandes rapides :**
 ```bash
 # Export JSONL anonymisé pour fine-tuning (par défaut anonymize=true)
-curl "http://localhost:8000/api/v1/emails/export-finetune-jsonl?split=train" > train.jsonl
-curl "http://localhost:8000/api/v1/emails/export-finetune-jsonl?split=test" > test.jsonl
-
-# Générer des emails synthétiques pour tests (fake data)
-uv run python scripts/generate_realistic_emails.py --count 50 --out dataset/test_pdfs
+curl "http://localhost:8000/api/emails/export-finetune-jsonl?split=train" > train.jsonl
+curl "http://localhost:8000/api/emails/export-finetune-jsonl?split=test" > test.jsonl
 
 # Uploader et traiter les PDFs générés
 uv run python scripts/test_e2e_flow.py --count 50
@@ -246,10 +243,10 @@ uv run python scripts/test_e2e_flow.py --count 50
 
 ### 🌍 Internationalization (i18n)
 Interface multilingue complète :
-*   **Français & Anglais** : Traductions exhaustives (500+ clés synchronisées)
-*   **Terminologie Métier** : "Niveau de confiance" (FR), "Confidence Level" (EN)
+*   **5 Langues** : Allemand (DE), Anglais (EN), Espagnol (ES), Français (FR), Italien (IT) — 500+ clés synchronisées
+*   **Terminologie Métier** : "Niveau de confiance" (FR), "Confidence Level" (EN), "Konfidenzniveau" (DE)
 *   **Vue Legacy-Free** : Utilise vue-i18n Composition API (`createI18n({ legacy: false })`)
-*   **Maintenance** : Script `check_i18n.py` pour vérifier la cohérence EN/FR
+*   **Guide Intégré** : Vue `UsageDocsView` avec flowchart interactif, légende couleur et stratégies de traitement
 
 ---
 ## 💪 Résilience & Tolérance aux Pannes
@@ -444,18 +441,6 @@ Génère automatiquement le fichier `secrets.env` en interrogeant Azure CLI.
 
 ---
 
-#### `check_i18n.py` — **Validation Locales i18n**
-Vérifie que les fichiers `en.json` et `fr.json` sont synchronisés.
-
-**Usage :**
-```bash
-uv run python scripts/check_i18n.py
-```
-
-**Intégré dans :** Pre-push hook (`.git/hooks/pre-push`)
-
----
-
 ### 🚢 Scripts de Déploiement
 
 #### `bootstrap.ps1` — **🆕 Déploiement Complet Depuis Zéro**
@@ -561,6 +546,16 @@ Télécharge le runtime Vue.js pour le frontend (offline fallback).
 
 
 
+#### `test_vision_performance.py` — **Benchmark Performance Vision**
+Compare les performances des stratégies OCR/Vision sur un jeu de PDFs.
+
+**Usage :**
+```bash
+uv run python scripts/test_vision_performance.py
+```
+
+---
+
 #### `test_e2e_flow.py` — **Test End-to-End Complet**
 Upload des PDFs générés vers l'API et vérifie le traitement.
 
@@ -586,6 +581,35 @@ uv run python scripts/test_e2e_flow.py --count 10 \
 ---
 
 ### 🔍 Scripts de Validation
+
+#### `validate_terraform` (.ps1 / .sh) — **Validation Configuration Terraform**
+Vérifie la configuration Terraform (format, validation, plan).
+
+**Usage :**
+```bash
+# PowerShell
+.\scripts\validate_terraform.ps1
+
+# Bash
+./scripts/validate_terraform.sh
+```
+
+**Vérifie :**
+- ✅ `terraform fmt -check`
+- ✅ `terraform validate`
+- ✅ `terraform plan` (dry-run)
+
+---
+
+#### `list_deployments.py` — **Liste des Déploiements AI Foundry**
+Liste les modèles déployés sur votre endpoint AI Foundry.
+
+**Usage :**
+```bash
+uv run python scripts/list_deployments.py
+```
+
+---
 
 #### `validate_mermaid.py` — **Validation Diagrammes Mermaid**
 Vérifie la syntaxe des diagrammes Mermaid dans les fichiers Markdown.
@@ -625,7 +649,8 @@ ln -s ../../scripts/pre-push.sh .git/hooks/pre-push  # Linux/Mac
 **Vérifications :**
 1. ✅ Ruff linting (`uv run ruff check .`)
 2. ✅ Tests smoke (`uv run pytest -q tests/test_smoke.py`)
-3. ✅ Synchronisation i18n (`python scripts/check_i18n.py`)
+3. ✅ Validation Mermaid (`python scripts/validate_mermaid.py`)
+4. ✅ ESLint frontend (`npm run lint`)
 
 **Résultat :** Bloque le push si erreurs détectées
 
