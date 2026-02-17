@@ -270,15 +270,25 @@ Assess quality and provide rewrites."""
             # Detect model family for correct API parameters
             # Classic models: 2000 tokens is plenty for structured JSON advice.
             # Reasoning models: keep 10k budget for thinking overhead.
-            token_budget = 10000 if is_reasoning_model(deployment) else 2000
+            # SLMs (Phi-4): need more tokens (3000) as they tend to be more verbose.
+            _d_lower = deployment.lower()
+            _is_slm = any(s in _d_lower for s in ("phi", "mistral", "llama"))
+            if is_reasoning_model(deployment):
+                token_budget = 10000
+            elif _is_slm:
+                token_budget = 3000
+            else:
+                token_budget = 2000
             payload = {
                 "model": deployment,
                 "messages": messages,
                 **build_chat_params(deployment, temperature=0.3, max_output_tokens=token_budget),
             }
 
-            # Reasoning models (GPT-5, o1) often do not support 'response_format'={"type": "json_object"}
-            if not is_reasoning_model(deployment):
+            # response_format=json_object: supported by OpenAI models, but some
+            # SLMs (Phi-4 on Azure AI Foundry) may not support it.  Skip for SLMs
+            # to avoid 4xx errors; the JSON cleanup logic handles raw output.
+            if not is_reasoning_model(deployment) and not _is_slm:
                 payload["response_format"] = {"type": "json_object"}
 
             span.set_attribute("gen_ai.system", "azure_openai")
@@ -287,8 +297,16 @@ Assess quality and provide rewrites."""
             logger.info("[assessment] Calling LLM for category '%s' (model=%s, reasoning=%s)",
                         name, deployment, is_reasoning_model(deployment))
 
-            # Reasoning models need longer timeout; classic models respond in 2-5s
-            timeout_s = 90 if is_reasoning_model(deployment) else 30
+            # Timeout per model family:
+            # - Reasoning models (o1/o3/o4/gpt-5): 120s (thinking overhead)
+            # - SLMs (phi-4, mistral): 90s (smaller GPU, slower inference)
+            # - Fast classic models (gpt-4.1-nano, gpt-4o-mini): 30s
+            if is_reasoning_model(deployment):
+                timeout_s = 120
+            elif _is_slm:
+                timeout_s = 90
+            else:
+                timeout_s = 30
             async with httpx.AsyncClient(timeout=timeout_s) as client:
                 response = await client.post(url, headers=headers, json=payload)
                 response.raise_for_status()

@@ -1717,7 +1717,7 @@ onMounted(() => {
           <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
             {{ t('settings.categories.managed_title') }}
           </h3>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-4">
             <!-- AI Assessment Model Selector -->
             <div class="flex items-center gap-2">
               <label class="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
@@ -1726,7 +1726,7 @@ onMounted(() => {
               </label>
               <select
                 v-model="settings.ai_assessment_model"
-                class="block w-40 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-xs sm:leading-5 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+                class="block w-44 rounded-md border-0 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
               >
                 <option
                   v-for="opt in modelOptions"
