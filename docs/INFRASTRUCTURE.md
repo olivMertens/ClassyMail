@@ -252,7 +252,7 @@ Some AzureRM provider versions don't auto-detect subscription from Azure CLI. Th
 
 ### Images & Container Registry
 
-- `variable "container_image"` **required**: Public image (e.g., `mcr.microsoft.com/azuredocs/containerapps-helloworld:latest`) or private (e.g., `<monacr>.azurecr.io/ClassyMail-agent:tag`)
+- `variable "container_image"` **required**: Public image (e.g., `mcr.microsoft.com/azuredocs/containerapps-helloworld:latest`) or private (e.g., `<monacr>.azurecr.io/classymail-agent:tag`)
 - ACR **not required** for public images
 - ACR private: set `acr_name` (+ `acr_resource_group` if different) for Terraform to assign **AcrPull** role to managed identity
 

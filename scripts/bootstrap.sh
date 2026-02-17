@@ -202,7 +202,7 @@ else
   fi
 fi
 
-CONTAINER_IMAGE="${ACR_NAME}.azurecr.io/ClassyMail-agent:${IMAGE_TAG}"
+CONTAINER_IMAGE="${ACR_NAME}.azurecr.io/classymail-agent:${IMAGE_TAG}"
 echo "  Image target: $CONTAINER_IMAGE"
 
 # ─────────────────────────────────────────────────────────────────────
@@ -315,7 +315,7 @@ if [[ "$SKIP_IMAGE_BUILD" == false ]]; then
     docker push "$CONTAINER_IMAGE"
   else
     # Remote build via ACR
-    az acr build --registry "$ACR_NAME" --image "ClassyMail-agent:$IMAGE_TAG" .
+    az acr build --registry "$ACR_NAME" --image "classymail-agent:$IMAGE_TAG" .
   fi
 
   popd > /dev/null

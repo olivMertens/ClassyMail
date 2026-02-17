@@ -263,7 +263,7 @@ cd ..
 **Option B — Local Docker build and push:**
 
 ```powershell
-$IMAGE = "emailpoctestacr.azurecr.io/ClassyMail-agent:v1"
+$IMAGE = "emailpoctestacr.azurecr.io/classymail-agent:v1"
 az acr login --name emailpoctestacr
 docker build -t $IMAGE .
 docker push $IMAGE
@@ -274,7 +274,7 @@ docker push $IMAGE
 Edit `infra/terraform.tfvars`:
 
 ```hcl
-container_image = "emailpoctestacr.azurecr.io/ClassyMail-agent:v1"
+container_image = "emailpoctestacr.azurecr.io/classymail-agent:v1"
 ```
 
 Re-apply:
@@ -303,19 +303,35 @@ This updates both Container Apps (API + Worker) to use your real image.
 
 Deploy these **three models** (strictly required):
 
-| Model | Deployment Name | Type | Purpose |
-|-------|----------------|------|---------|
-| **Phi-4** | `phi-4` | Standard (Global) | Email classification |
-| **Mistral Document AI 2505** | `mistral-document-ai-2505` | Serverless API | OCR / PDF extraction |
-| **text-embedding-3-small** | `text-embedding-3-small` | Standard (Global) | RAG embeddings |
+| Model | Deployment Name | Type | Data Zone | Regions (Hub/Project) | Purpose |
+|-------|----------------|------|:---------:|----------------------|---------|
+| **Phi-4** | `phi-4` | Serverless API | ✅ | eastus, eastus2, northcentralus, southcentralus, swedencentral, westus, westus3 | Email classification |
+| **Mistral Document AI 2505** | `mistral-document-ai-2505` | Serverless API | ❌ | eastus2, swedencentral | OCR / PDF extraction |
+| **text-embedding-3-small** | `text-embedding-3-small` | Standard (Global) | ✅ | All Global Standard regions ¹ | RAG embeddings |
+
+> ¹ [Full Global Standard region table](https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-models/concepts/models-sold-directly-by-azure?view=foundry-classic&tabs=global-standard-aoai,global-standard&pivots=azure-openai#global-standard-model-availability)
 
 ### 5.3 Recommended Optional Models
 
-| Model | Deployment Name | Type | Purpose |
-|-------|----------------|------|---------|
-| GPT-4o-mini | `gpt-4o-mini` | Standard | Fallback classifier (long context) |
-| GPT-4.1-nano / GPT-5-nano | `gpt-4o-mini` | Standard | Vision / anonymization |
-| GPT-5.2-chat | `gpt-5.2-chat` | Standard | RAG chat model |
+These models appear in the UI model selector and are used by various features.
+Deploy them as **Global Standard** (Azure OpenAI) or **Serverless API** (partner) deployments in Azure AI Foundry with the exact deployment names below.
+
+| Model | Deployment Name | Type | Data Zone | Regions (Hub/Project) | Purpose |
+|-------|----------------|------|:---------:|----------------------|---------|
+| GPT-4o-mini | `gpt-4o-mini` | Global Standard | ✅ | 20+ regions (all major) ¹ | Fallback classifier, vision, anonymization |
+| GPT-4.1-nano | `gpt-4.1-nano` | Global Standard | ✅ | 20+ regions (all major) ¹ | Category assessment (fast, default) |
+| GPT-5-nano | `gpt-5-nano` | Global Standard | ✅ | 20+ regions (all major) ¹ | Category assessment (alternative) |
+| GPT-5-mini | `gpt-5-mini` | Global Standard | ✅ | 20+ regions (all major) ¹ | Higher-quality classification |
+| GPT-5.2-chat | `gpt-5.2-chat` | Global Standard | ✅ | eastus2, swedencentral + more ¹ | RAG chat model (preview) |
+| Kimi-K2.5 | `Kimi-K2.5` | Serverless (Moonshot AI) | ❌ | See Foundry model catalog ² | Multilingual classification |
+| GPT-4o | `gpt-4o` | Global Standard | ✅ | 20+ regions (all major) ¹ | Premium classification (high cost) |
+
+> ¹ [Full Global Standard region table](https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-models/concepts/models-sold-directly-by-azure?view=foundry-classic&tabs=global-standard-aoai,global-standard&pivots=azure-openai#global-standard-model-availability)
+> ² [Serverless API region availability](https://learn.microsoft.com/en-us/azure/ai-foundry/how-to/deploy-models-serverless-availability?view=foundry-classic)
+>
+> **Note**: The UI dynamically fetches available deployments from `/api/admin/deployments`.
+> Models not deployed will still appear as selectable options (from a hardcoded fallback list)
+> but will fail at inference time. Deploy at minimum **GPT-4o-mini** and **GPT-4.1-nano**.
 
 ### 5.4 Verify Deployments
 

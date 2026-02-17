@@ -216,7 +216,7 @@ if ($acrExists) {
     }
 }
 
-$containerImage = "$AcrName.azurecr.io/ClassyMail-agent:$ImageTag"
+$containerImage = "$AcrName.azurecr.io/classymail-agent:$ImageTag"
 Write-Host "  Image target: $containerImage" -ForegroundColor Cyan
 
 # ─────────────────────────────────────────────────────────────────────
@@ -336,7 +336,7 @@ if (-not $SkipImageBuild) {
             if ($LASTEXITCODE -ne 0) { throw "Docker push failed" }
         } else {
             # Remote build via ACR
-            az acr build --registry $AcrName --image "ClassyMail-agent:$ImageTag" .
+            az acr build --registry $AcrName --image "classymail-agent:$ImageTag" .
             if ($LASTEXITCODE -ne 0) { throw "ACR build failed" }
         }
         Write-Host "  Image pushed: $containerImage" -ForegroundColor Green

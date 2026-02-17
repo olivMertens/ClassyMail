@@ -1,7 +1,7 @@
 param(
   [string]$AcrName,
   [string]$Registry,
-  [string]$ImageName = "ClassyMail-agent",
+  [string]$ImageName = "classymail-agent",
   [string]$Tag = "local",
   [ValidateSet('acr','docker')][string]$PushMethod = "acr"
 )

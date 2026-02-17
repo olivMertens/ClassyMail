@@ -169,7 +169,7 @@ bash ./scripts/fetch_vue_runtime.sh
 ```bash
 # Set variables
 $env:ACR_NAME = "<acrname>"
-$env:IMAGE_NAME = "ClassyMail-agent"
+$env:IMAGE_NAME = "classymail-agent"
 $env:TAG = "local"
 
 # Get ACR login server

@@ -462,14 +462,14 @@ Build une image Docker et la pousse vers Azure Container Registry.
 **Usage :**
 ```bash
 # PowerShell (méthode ACR build)
-.\scripts\build_acr.ps1 -AcrName "emailpocacr" -ImageName "ClassyMail-agent" -Tag "v1.0" -PushMethod acr
+.\.scripts\build_acr.ps1 -AcrName "emailpocacr" -ImageName "classymail-agent" -Tag "v1.0" -PushMethod acr
 
 # PowerShell (méthode Docker local)
 .\scripts\build_acr.ps1 -AcrName "emailpocacr" -PushMethod docker
 
 # Bash
 export ACR_NAME=emailpocacr
-export IMAGE_NAME=ClassyMail-agent
+export IMAGE_NAME=classymail-agent
 export TAG=v1.0
 ./scripts/build_acr.sh
 ```

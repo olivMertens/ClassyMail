@@ -33,7 +33,7 @@
 # First deploy: use a placeholder, then re-apply after building your real image.
 # container_image = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
 # After ACR push:
-# container_image = "myregistry.azurecr.io/ClassyMail-agent:local"
+# container_image = "myregistry.azurecr.io/classymail-agent:local"
 
 # --- CONTAINER REGISTRY (Optional) ---
 # If using a private ACR, set these so Terraform grants AcrPull to the managed identity.
