@@ -104,6 +104,8 @@
                 "title": "Evaluación IA",
                 "quality": "Calidad",
                 "suggestions": "Sugerencias Específicas:",
+                "apply": "Aplicar",
+                "applied": "Aplicado ✓",
                 "success": "¡Evaluación Completada!\n\nCalidad: {score}\n\nRevise los consejos a continuación.",
                 "error": "Error en la Evaluación: {error}"
             },

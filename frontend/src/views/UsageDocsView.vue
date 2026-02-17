@@ -117,7 +117,9 @@ flowchart LR
 
     <!-- Feature Highlights -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-center">
+      <div
+        class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-center"
+      >
         <CpuChipIcon class="h-8 w-8 text-blue-600 dark:text-blue-400 mx-auto" />
         <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
           {{ t('guide.highlights.ai_models') }}
@@ -126,7 +128,9 @@ flowchart LR
           {{ t('guide.highlights.ai_models_desc') }}
         </p>
       </div>
-      <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 text-center">
+      <div
+        class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 text-center"
+      >
         <ShieldCheckIcon class="h-8 w-8 text-green-600 dark:text-green-400 mx-auto" />
         <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
           {{ t('guide.highlights.pii') }}
@@ -135,7 +139,9 @@ flowchart LR
           {{ t('guide.highlights.pii_desc') }}
         </p>
       </div>
-      <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-center">
+      <div
+        class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-center"
+      >
         <EyeIcon class="h-8 w-8 text-amber-600 dark:text-amber-400 mx-auto" />
         <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
           {{ t('guide.highlights.vision') }}
@@ -144,7 +150,9 @@ flowchart LR
           {{ t('guide.highlights.vision_desc') }}
         </p>
       </div>
-      <div class="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4 text-center">
+      <div
+        class="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4 text-center"
+      >
         <ChartBarIcon class="h-8 w-8 text-purple-600 dark:text-purple-400 mx-auto" />
         <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
           {{ t('guide.highlights.exports') }}
@@ -289,7 +297,9 @@ flowchart LR
               {{ t('guide.strategies.standard_desc') }}
             </p>
           </div>
-          <div class="border border-indigo-200 dark:border-indigo-700 rounded-lg p-4 bg-indigo-50/50 dark:bg-indigo-900/10">
+          <div
+            class="border border-indigo-200 dark:border-indigo-700 rounded-lg p-4 bg-indigo-50/50 dark:bg-indigo-900/10"
+          >
             <div class="flex items-center gap-2 mb-2">
               <span class="inline-block w-2.5 h-2.5 rounded-full bg-indigo-500" />
               <h5 class="font-medium text-sm text-gray-900 dark:text-white">
@@ -443,7 +453,9 @@ flowchart LR
         </p>
 
         <!-- Detection sub-section -->
-        <div class="mt-4 border border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50/50 dark:bg-green-900/10">
+        <div
+          class="mt-4 border border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50/50 dark:bg-green-900/10"
+        >
           <h4 class="font-medium text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
             <span class="inline-block w-2 h-2 rounded-full bg-green-500" />
             {{ t('guide.privacy.detection_title') }}
@@ -475,7 +487,9 @@ flowchart LR
         </div>
 
         <!-- Anonymization sub-section -->
-        <div class="mt-3 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4 bg-indigo-50/50 dark:bg-indigo-900/10">
+        <div
+          class="mt-3 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4 bg-indigo-50/50 dark:bg-indigo-900/10"
+        >
           <h4 class="font-medium text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
             <span class="inline-block w-2 h-2 rounded-full bg-indigo-500" />
             {{ t('guide.privacy.anonymization_title') }}

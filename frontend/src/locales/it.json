@@ -104,6 +104,8 @@
                 "title": "Valutazione IA",
                 "quality": "Qualità",
                 "suggestions": "Suggerimenti Specifici:",
+                "apply": "Applica",
+                "applied": "Applicato ✓",
                 "success": "Valutazione Completata!\n\nQualità: {score}\n\nControlla i consigli qui sotto.",
                 "error": "Valutazione Fallita: {error}"
             },

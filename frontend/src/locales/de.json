@@ -104,6 +104,8 @@
                 "title": "KI-Bewertung",
                 "quality": "Qualität",
                 "suggestions": "Spezifische Vorschläge:",
+                "apply": "Anwenden",
+                "applied": "Angewendet ✓",
                 "success": "Bewertung abgeschlossen!\n\nQualität: {score}\n\nÜberprüfen Sie die Empfehlungen unten.",
                 "error": "Bewertung fehlgeschlagen: {error}"
             },

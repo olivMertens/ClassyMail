@@ -500,7 +500,8 @@ watch(() => email.value, (val) => {
                 :class="ocrProviderBadge(email.ocr_provider).color"
                 :title="t('dashboard.ocr_provider.' + email.ocr_provider)"
               >
-                {{ ocrProviderBadge(email.ocr_provider).icon }} {{ t('dashboard.ocr_provider.' + ocrProviderBadge(email.ocr_provider).key) }}
+                {{ ocrProviderBadge(email.ocr_provider).icon }} {{ t('dashboard.ocr_provider.' +
+                  ocrProviderBadge(email.ocr_provider).key) }}
               </span>
               <span
                 v-if="formatDuration(email)"
@@ -706,7 +707,8 @@ watch(() => email.value, (val) => {
                       class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 mt-4 flex items-center gap-2"
                     >
                       👁 {{ t('email_detail.vision_title') }}
-                      <span class="text-xs font-normal text-gray-500">({{ email.vision_analysis.length }} image{{ email.vision_analysis.length !== 1 ? 's' : '' }})</span>
+                      <span class="text-xs font-normal text-gray-500">({{ email.vision_analysis.length }} image{{
+                        email.vision_analysis.length !== 1 ? 's' : '' }})</span>
                     </h4>
 
                     <!-- Vision Overview Banner -->
@@ -722,7 +724,8 @@ watch(() => email.value, (val) => {
                         ✓ {{ t('email_detail.vision_all_described') }}
                       </span>
                       <span v-else-if="visionStats.described > 0">
-                        ⚠ {{ visionStats.described }}/{{ visionStats.total }} {{ t('email_detail.vision_partially_described') }}
+                        ⚠ {{ visionStats.described }}/{{ visionStats.total }} {{
+                          t('email_detail.vision_partially_described') }}
                       </span>
                       <span v-else>
                         ⚠ {{ t('email_detail.vision_no_descriptions') }}
@@ -789,7 +792,9 @@ watch(() => email.value, (val) => {
                           v-if="item.summary && !isFilenameLike(item.summary)"
                           class="mb-2 text-gray-900 dark:text-gray-100 text-sm leading-relaxed"
                         >
-                          <strong class="block text-xs text-gray-700 dark:text-gray-300 mb-1">{{ t('email_detail.vision_summary') }}:</strong>
+                          <strong class="block text-xs text-gray-700 dark:text-gray-300 mb-1">{{
+                            t('email_detail.vision_summary')
+                          }}:</strong>
                           {{ item.summary }}
                         </div>
 
@@ -799,7 +804,9 @@ watch(() => email.value, (val) => {
                           class="mb-2 text-amber-700 dark:text-amber-300 text-xs bg-amber-50 dark:bg-amber-900/20 p-2 rounded border border-amber-100 dark:border-amber-800/30"
                         >
                           <span class="font-semibold">{{ t('email_detail.vision_no_ai_desc') }}</span>
-                          <span class="text-gray-500 dark:text-gray-400 ml-1">({{ t('email_detail.vision_source_ref') }}: {{ item.summary }})</span>
+                          <span class="text-gray-500 dark:text-gray-400 ml-1">({{ t('email_detail.vision_source_ref')
+                          }}: {{ item.summary
+                          }})</span>
                           <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                             {{ t('email_detail.vision_reprocess_hint') }}
                           </div>
@@ -810,7 +817,9 @@ watch(() => email.value, (val) => {
                           v-if="item.details"
                           class="text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900/30 p-2.5 rounded border border-green-100 dark:border-green-800/30"
                         >
-                          <span class="font-semibold block mb-1 text-green-700 dark:text-green-400">{{ t('email_detail.vision_details') }}:</span>
+                          <span class="font-semibold block mb-1 text-green-700 dark:text-green-400">{{
+                            t('email_detail.vision_details')
+                          }}:</span>
                           {{ item.details }}
                         </div>
 
@@ -819,7 +828,8 @@ watch(() => email.value, (val) => {
                           v-if="item.bbox"
                           class="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500 font-mono"
                         >
-                          📐 BBox: x{{ Math.round(item.bbox.x_min || 0) }},y{{ Math.round(item.bbox.y_min || 0) }} → x{{ Math.round(item.bbox.x_max || 0) }},y{{ Math.round(item.bbox.y_max || 0) }}
+                          📐 BBox: x{{ Math.round(item.bbox.x_min || 0) }},y{{ Math.round(item.bbox.y_min || 0) }} → x{{
+                            Math.round(item.bbox.x_max || 0) }},y{{ Math.round(item.bbox.y_max || 0) }}
                         </div>
 
                         <!-- Fallback: Show image_type if no summary at all -->

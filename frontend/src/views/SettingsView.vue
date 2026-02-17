@@ -296,6 +296,65 @@ const assessCategory = async (index) => {
   }
 }
 
+/**
+ * Parse an AI suggestion and apply it to the category's definition or exclusions field.
+ * Detects REWRITE (replace all) vs ADD (append) and target field (Definition / Exclusions).
+ */
+const applySuggestion = (catIndex, suggestion) => {
+  const cat = settings.value.categories[catIndex]
+  if (!cat) return
+
+  const text = suggestion.trim()
+
+  // Detect target field (case-insensitive, FR + EN)
+  const isExclusions = /champ\s*['"]?Exclusions['"]?|'Exclusions'\s*field|Exclusions\s*field/i.test(text)
+
+  // Detect action: REWRITE (replace) vs ADD (append)
+  const isRewrite = /^R[EÉ]{1,2}[CÉE]RIRE|^REWRITE/i.test(text)
+  const isAdd = /^AJOUTER|^ADD/i.test(text)
+
+  // Extract content after "): " or the first ": " following the paren
+  let content = ''
+  const parenColonMatch = text.match(/\)\s*:\s*(.+)$/s)
+  if (parenColonMatch) {
+    content = parenColonMatch[1].trim()
+  } else {
+    // Fallback: content after first ": "
+    const colonMatch = text.match(/:\s*(.+)$/s)
+    if (colonMatch) content = colonMatch[1].trim()
+  }
+
+  // Strip leading "DEFINITION " or "EXCLUSIONS - " label from content if present
+  content = content.replace(/^DEFINITION\s+/i, '').replace(/^EXCLUSIONS\s*[-–]\s*/i, '')
+
+  if (!content) return
+
+  const field = isExclusions ? 'exclusions' : 'description' // default to definition
+
+  if (isRewrite) {
+    cat[field] = content
+  } else if (isAdd) {
+    // Append: add to end of current value
+    const current = (cat[field] || '').trimEnd()
+    cat[field] = current ? current + content : content
+  } else {
+    // Default: replace
+    cat[field] = content
+  }
+
+  // Mark the suggestion as applied in the assessment data
+  const assessment = categoryAssessments.value.get(catIndex)
+  if (assessment) {
+    if (!assessment.appliedSuggestions) assessment.appliedSuggestions = new Set()
+    assessment.appliedSuggestions.add(suggestion)
+  }
+}
+
+const isSuggestionApplied = (catIndex, suggestion) => {
+  const assessment = categoryAssessments.value.get(catIndex)
+  return assessment?.appliedSuggestions?.has(suggestion) || false
+}
+
 const handleExcelImport = async (event) => {
   const file = event.target.files?.[0]
   if (!file) return
@@ -1931,12 +1990,32 @@ onMounted(() => {
                                 <p class="font-semibold mb- 1">
                                   {{ t('settings.categories.assessment.suggestions') }}
                                 </p>
-                                <ul class="list-disc list-inside space-y-1 ml-2">
+                                <ul class="list-none space-y-2 ml-0">
                                   <li
                                     v-for="(suggestion, sidx) in categoryAssessments.get(idx).specific_suggestions"
                                     :key="sidx"
+                                    class="flex items-start gap-2"
                                   >
-                                    {{ suggestion }}
+                                    <div class="flex-1 text-xs">
+                                      <span class="inline-block align-top">{{ suggestion }}</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      class="flex-shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-all"
+                                      :class="isSuggestionApplied(idx, suggestion)
+                                        ? 'bg-green-600 text-white cursor-default'
+                                        : 'bg-purple-600 text-white hover:bg-purple-500 cursor-pointer'"
+                                      :disabled="isSuggestionApplied(idx, suggestion)"
+                                      @click="applySuggestion(idx, suggestion)"
+                                    >
+                                      <CheckCircleIcon
+                                        v-if="isSuggestionApplied(idx, suggestion)"
+                                        class="h-3.5 w-3.5"
+                                      />
+                                      {{ isSuggestionApplied(idx, suggestion)
+                                        ? t('settings.categories.assessment.applied')
+                                        : t('settings.categories.assessment.apply') }}
+                                    </button>
                                   </li>
                                 </ul>
                               </div>

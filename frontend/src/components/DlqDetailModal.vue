@@ -95,7 +95,9 @@ const stageIcon = (stage) => {
           <div class="text-gray-500 text-xs uppercase mb-1">
             Service Bus Metadata
           </div>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700 text-xs">
+          <div
+            class="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700 text-xs"
+          >
             <div>
               <span class="text-gray-400">Delivery Count</span>
               <div
@@ -160,18 +162,22 @@ const stageIcon = (stage) => {
           <div class="text-gray-500 text-xs uppercase mb-1">
             Worker Error Record (Cosmos DB)
           </div>
-          <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700 text-xs space-y-1">
+          <div
+            class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700 text-xs space-y-1"
+          >
             <div class="flex gap-4">
               <div>
                 <span class="text-gray-400">Status:</span>
                 <span
                   class="ml-1 font-semibold"
                   :class="statusColor(message.cosmos_status)"
-                >{{ message.cosmos_status || '—' }}</span>
+                >{{ message.cosmos_status ||
+                  '—' }}</span>
               </div>
               <div v-if="message.cosmos_error_stage">
                 <span class="text-gray-400">Failed Stage:</span>
-                <span class="ml-1 font-mono text-orange-500 dark:text-orange-400">{{ message.cosmos_error_stage }}</span>
+                <span class="ml-1 font-mono text-orange-500 dark:text-orange-400">{{ message.cosmos_error_stage
+                }}</span>
               </div>
             </div>
             <div
@@ -179,7 +185,9 @@ const stageIcon = (stage) => {
               class="mt-1"
             >
               <span class="text-gray-400">Error:</span>
-              <pre class="whitespace-pre-wrap text-red-600 dark:text-red-300 mt-0.5 font-mono">{{ message.cosmos_error }}</pre>
+              <pre
+                class="whitespace-pre-wrap text-red-600 dark:text-red-300 mt-0.5 font-mono"
+              >{{ message.cosmos_error }}</pre>
             </div>
           </div>
         </div>
@@ -210,7 +218,9 @@ const stageIcon = (stage) => {
                 <span>{{ stageIcon(entry.stage) }}</span>
                 <span class="font-semibold text-gray-800 dark:text-gray-200">{{ entry.stage || '—' }}</span>
                 <span class="text-gray-400">·</span>
-                <span :class="entry.event === 'error' ? 'text-red-500' : entry.event === 'ok' || entry.event === 'fallback_ok' ? 'text-green-500' : ''">
+                <span
+                  :class="entry.event === 'error' ? 'text-red-500' : entry.event === 'ok' || entry.event === 'fallback_ok' ? 'text-green-500' : ''"
+                >
                   {{ entry.event || '—' }}
                 </span>
                 <span class="ml-auto text-gray-400 text-[10px]">{{ formatTime(entry.ts) }}</span>
@@ -242,7 +252,9 @@ const stageIcon = (stage) => {
         </div>
       </div>
 
-      <div class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex justify-end gap-3">
+      <div
+        class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex justify-end gap-3"
+      >
         <button
           v-if="message?.blob_id"
           class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"

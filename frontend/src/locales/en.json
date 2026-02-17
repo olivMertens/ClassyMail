@@ -104,6 +104,8 @@
                 "title": "AI Assessment",
                 "quality": "Quality",
                 "suggestions": "Specific Suggestions:",
+                "apply": "Apply",
+                "applied": "Applied ✓",
                 "success": "assessment Complete!\n\nQuality: {score}\n\nReview the advice below the category.",
                 "error": "Assessment Failed: {error}"
             },

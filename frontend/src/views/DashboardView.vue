@@ -1109,7 +1109,8 @@ const emit = defineEmits(['open-email'])
                 :class="ocrProviderBadge(email.ocr_provider).color"
                 :title="t('dashboard.ocr_provider.' + email.ocr_provider)"
               >
-                {{ ocrProviderBadge(email.ocr_provider).icon }} {{ t('dashboard.ocr_provider.' + ocrProviderBadge(email.ocr_provider).key) }}
+                {{ ocrProviderBadge(email.ocr_provider).icon }} {{ t('dashboard.ocr_provider.' +
+                  ocrProviderBadge(email.ocr_provider).key) }}
               </span>
               <div
                 v-if="formatDuration(email)"
