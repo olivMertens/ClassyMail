@@ -48,18 +48,18 @@ locals {
 
 provider "azurerm" {
   features {}
-  subscription_id                = local.subscription_id != "" ? local.subscription_id : null
-  use_cli                        = true
-  use_msi                        = false
-  use_oidc                       = false
-  storage_use_azuread            = true
+  subscription_id                 = local.subscription_id != "" ? local.subscription_id : null
+  use_cli                         = true
+  use_msi                         = false
+  use_oidc                        = false
+  storage_use_azuread             = true
   resource_provider_registrations = "none" # Safe for users with Owner on RG only
 }
 
 provider "azapi" {
   subscription_id            = local.subscription_id != "" ? local.subscription_id : null
   use_cli                    = true
-  use_msi                    = false   # azapi defaults to true — must be explicit
+  use_msi                    = false # azapi defaults to true — must be explicit
   use_oidc                   = false
   skip_provider_registration = true
 }
