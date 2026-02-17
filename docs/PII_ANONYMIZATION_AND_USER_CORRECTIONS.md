@@ -13,7 +13,7 @@
 This document explains how the ClassyMail MVP protects personal information (PII) in fine-tuning datasets and how user corrections are tracked for quality improvement.
 
 **Key Points**:
-- ✅ **Two-level PII protection**: Regex scrubbing + GPT-4o contextual anonymization
+- ✅ **Two-level PII protection**: Regex scrubbing + GPT-4o-mini contextual anonymization
 - ✅ **Fail-safe design**: Skips examples if anonymization fails (never exports PII)
 - ✅ **Default behavior**: Anonymization always ON (requires explicit opt-out)
 - ✅ **User corrections tracked**: Complete history with AI-generated feedback
@@ -28,7 +28,7 @@ This document explains how the ClassyMail MVP protects personal information (PII
 The system uses **two-level protection** to ensure no personal information leaks into fine-tuning datasets:
 
 1. **Level 1: Basic Regex Scrubbing** - Fast removal of common PII patterns
-2. **Level 2: LLM Contextual Anonymization** - GPT-4o removes names, companies, contract IDs while preserving markdown structure
+2. **Level 2: LLM Contextual Anonymization** - GPT-4o-mini removes names, companies, contract IDs while preserving markdown structure
 
 ### Implementation Details
 
@@ -43,49 +43,54 @@ The system uses **two-level protection** to ensure no personal information leaks
    - Speed: <1ms per document
    - Applied to: Email body (markdown), subject field, sender field
 
-2. anonymize_markdown_for_finetune(markdown: str) -> str
+2. anonymize_markdown_for_finetune(markdown: str, clients) -> dict
    - Removes: Names, companies, addresses, contract IDs, sensitive context
-   - Uses: GPT-4o with 600+ char system prompt
-   - Preserves: Markdown structure, formatting, intent labels
+   - Uses: GPT-4o-mini with ~1800 char English system prompt
+   - Preserves: Markdown structure, formatting, links, tables
    - Speed: ~2-5s per document (async)
    - Applied to: Email body (markdown) only
+   - Returns: dict with anonymized_markdown, usage, model, prompt_version, hash
 
 CRITICAL: When anonymize=True, BOTH levels are applied to email body,
 and Level 1 (regex) is applied to subject/sender fields in assistant response
 to prevent PII leakage in model outputs.
 ```
 
-#### System Prompt (40 lines)
+#### System Prompt (English, ~1800 chars)
+
+The actual system prompt used in [anonymizer.py](../classymail/services/anonymizer.py) is in **English** and covers:
 
 ```markdown
-Tu es un assistant d'anonymisation pour données de fine-tuning.
-OBJECTIF : Supprimer toute information personnelle identifiable (PII)
-tout en préservant la structure markdown et le contexte métier.
+### ROLE ###
+You are an advanced Data Privacy and Anonymization Engine.
+Your purpose is to sanitize email content formatted in Markdown.
 
-RÈGLES :
-- Remplacer les noms de personnes par [NOM]
-- Remplacer les sociétés par [SOCIÉTÉ]
-- Remplacer les adresses email par [EMAIL]
-- Remplacer les numéros de contrat par [CONTRAT_ID]
-- Remplacer les adresses postales par [ADRESSE]
-- Remplacer les montants précis par [MONTANT]
-- PRÉSERVER tous les en-têtes markdown (##, ###, etc.)
-- PRÉSERVER toutes les listes (-, *, 1., 2., etc.)
-- PRÉSERVER le formatage (**gras**, *italique*, etc.)
-- PRÉSERVER les intent labels (MUST GO, MUST KEEP, etc.)
+### ANONYMIZATION RULES (PII) ###
+1. Direct PII: Replace names, phones, emails, IPs, addresses → [Name], [Phone], [Email], [Address]
+2. Contextual PII: Generalize company names → [Client], specific projects → [Project]
+3. Dates: Generalize to [Date] or month/quarter
+4. Numbers: Mask financial figures → [Amount]
 
-IMPORTANT : Ne jamais supprimer ou modifier la structure markdown.
+### MARKDOWN PRESERVATION RULES ###
+1. Structure: Do NOT alter headers, lists, blockquotes, code blocks
+2. Links: Preserve syntax, anonymize PII in text/URLs
+3. Tables: Keep structure intact, anonymize cell content
+
+### OUTPUT FORMAT ###
+Return ONLY the anonymized Markdown text.
 ```
+
+**Placeholders used**: `[Name]`, `[Phone]`, `[Email]`, `[Address]`, `[Client]`, `[Amount]`, `[Date]`, `[IP]`, `[IBAN]` (Level 1 regex adds `[IP]` and `[IBAN]`).
 
 ### Configuration
 
 Environment variables:
 
 ```bash
-ANONYMIZER_ENDPOINT=https://<your-aoai>.openai.azure.com/
-ANONYMIZER_DEPLOYMENT=gpt-4o              # Model name
-ANONYMIZER_API_VERSION=2024-02-15-preview
-ANONYMIZER_MAX_TOKENS=4096                # Output limit
+ANONYMIZER_ENDPOINT=https://<your-aoai>.openai.azure.com/  # Falls back to PHI_ENDPOINT
+ANONYMIZER_DEPLOYMENT=gpt-4o-mini         # Model name (default)
+ANONYMIZER_API_VERSION=2024-08-01-preview # Falls back to AZURE_AI_API_VERSION
+ANONYMIZER_MAX_TOKENS=6000                # Output limit
 ANONYMIZER_PROMPT_VERSION=v1              # Tracking
 ```
 
@@ -93,28 +98,38 @@ ANONYMIZER_PROMPT_VERSION=v1              # Tracking
 
 **Critical Design Decision**: If anonymization fails, the example is **skipped** (not exported with PII).
 
-#### Code Reference: `repository.py` (lines 197-206)
+#### Code Reference: `repository.py` (`export_finetune_jsonl_iter`)
 
 ```python
-try:
-    content_anon = await anonymize_markdown_for_finetune(content_raw)
-except Exception as e:
-    # Log error and SKIP this example
-    logger.warning(f"Anonymization failed for {email_id}: {e}")
-    continue  # ← SKIPS example, never exports with PII
+if anonymize:
+    try:
+        anon = await anonymize_markdown_for_finetune(raw_markdown, clients=clients)
+        user_markdown = anon.get("anonymized_markdown") or ""
+        anonymization_meta = {
+            "model": anon.get("model"),
+            "prompt_version": anon.get("prompt_version"),
+            "usage": anon.get("usage"),
+        }
+    except Exception:
+        continue  # ← SKIPS example, never exports with PII
 ```
 
 **Why this matters**: Even if the anonymization service is temporarily down, the system will never export personal information. The dataset will be smaller but 100% PII-free.
 
 ### Default Behavior
 
-**HTTP Endpoint**: `GET /api/v1/emails/export/finetune`
+**HTTP Endpoint**: `GET /api/emails/export-finetune-jsonl`
 
 ```python
-@router.get("/export/finetune")
-async def export_finetune(
-    anonymize: bool = True,  # ← DEFAULT: Always ON
-    split: str = "train",
+@router.get("/emails/export-finetune-jsonl")
+async def export_emails_finetune_jsonl(
+    anonymize: bool = Query(True),  # ← DEFAULT: Always ON
+    include_unreviewed: bool = Query(False),
+    max_examples: Optional[int] = Query(None, ge=1),
+    taxonomy_version: str = Query("v1"),
+    include_metadata: bool = Query(False),
+    split: str = Query("all", pattern="^(all|train|test)$"),
+    test_split_ratio: float = Query(0.2, ge=0.0, le=1.0),
     ...
 ):
     # User must explicitly pass ?anonymize=false to disable
@@ -126,7 +141,7 @@ To verify anonymization is working:
 
 ```bash
 # Export training dataset
-curl http://localhost:8000/api/v1/emails/export/finetune?split=train > train.jsonl
+curl http://localhost:8000/api/emails/export-finetune-jsonl?split=train > train.jsonl
 
 # Check for PII patterns (should return 0 matches)
 grep -E "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}" train.jsonl | wc -l
@@ -134,9 +149,10 @@ grep -E "\b[A-Z][a-z]+ [A-Z][a-z]+\b" train.jsonl | wc -l  # Names with capitals
 grep -E "\b\d{2}/\d{2}/\d{4}\b" train.jsonl | wc -l  # Dates
 
 # Should see placeholders instead:
-grep "\[NOM\]" train.jsonl | wc -l
-grep "\[SOCIÉTÉ\]" train.jsonl | wc -l
-grep "\[EMAIL\]" train.jsonl | wc -l
+grep "\[Name\]" train.jsonl | wc -l
+grep "\[Email\]" train.jsonl | wc -l
+grep "\[Phone\]" train.jsonl | wc -l
+grep "\[Address\]" train.jsonl | wc -l
 ```
 
 ---
@@ -154,13 +170,15 @@ When a user manually corrects a classification, the system:
 
 ### Data Model
 
-#### File: `classymail/models.py` (lines 39-48)
+#### File: `classymail/models.py`
 
 ```python
 class HistoryEntry(BaseModel):
-    timestamp: datetime
-    previous_intents: List[str]
-    correction_reason: Optional[str] = None  # User explanation (min 5 chars)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    previous_intents: List[ClassificationIntent] = []
+    previous_status: Optional[str] = None
+    updated_by: Optional[str] = "user"
+    correction_reason: Optional[str] = None  # User explanation
     llm_feedback: Optional[str] = None       # AI analysis of what was missed
 
 class EmailRecord(BaseModel):
@@ -187,74 +205,66 @@ if (correctionReason.value.length < 5) {
 
 ### Backend Processing
 
-#### File: `classymail/api/routers/emails.py` (lines 459-474)
+#### File: `classymail/api/routers/emails.py`
 
 ```python
-async def patch_email(email_id: str, updates: EmailUpdate):
+@router.patch("/emails/{item_id}", response_model=EmailRecord)
+async def patch_email(item_id: str, payload: dict, ...):
+    item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
+
     # 1. Create history entry
-    history_entry = HistoryEntry(
-        timestamp=datetime.now(timezone.utc),
-        previous_intents=current_record.intents,
-        correction_reason=updates.correction_reason,
-        llm_feedback=None  # Will be filled below
-    )
+    history_entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "previous_intents": current_classification.get("detected_intents", []),
+        "previous_status": item.get("status"),
+        "updated_by": "user",
+        "correction_reason": payload.get("reason"),
+        "llm_feedback": None  # Filled below
+    }
 
-    # 2. Generate AI feedback (Phi-4 analyzes WHY correction needed)
-    if updates.correction_reason:
-        feedback = await analyze_correction(
-            email_content=current_record.content,
-            old_intents=current_record.intents,
-            new_intents=updates.intents,
-            user_reason=updates.correction_reason
-        )
-        history_entry.llm_feedback = feedback
+    if intents := payload.get("intents"):
+        # 2. Generate AI feedback (analyze WHY correction needed)
+        if payload.get("reason") and item.get("markdown"):
+            insight = await analyze_correction(
+                text_markdown=item.get("markdown"),
+                old_intents=current_classification.get("detected_intents", []),
+                new_intents=intents,
+                reason=payload.get("reason"),
+                clients=clients
+            )
+            history_entry["llm_feedback"] = insight
 
-    # 3. Append to history and update record
-    current_record.classification_history.append(history_entry)
-    current_record.intents = updates.intents
-    current_record.reviewed = True
-    current_record.reviewed_at = datetime.now(timezone.utc)
+        # 3. Update classification and metadata
+        item["classification"] = {"detected_intents": intents, "needs_review": False}
+        item["status"] = new_status
+        item["reviewed"] = True
+        item["reviewed_at"] = datetime.now(timezone.utc).isoformat()
 
-    # 4. Save to Cosmos DB
-    await cosmos_container.upsert_item(current_record.model_dump())
+    # 4. Append history and save to Cosmos DB
+    item["classification_history"].append(history_entry)
+    await cosmos_container.upsert_item(item)
 ```
 
 ### AI Feedback Generation
 
-#### File: `classymail/services/llm_pipeline.py` (lines 910-930)
+#### File: `classymail/services/llm_pipeline.py`
 
 ```python
 async def analyze_correction(
-    email_content: str,
-    old_intents: List[str],
-    new_intents: List[str],
-    user_reason: str
+    text_markdown: str,
+    old_intents: list,
+    new_intents: list,
+    reason: str,
+    clients: Clients,
 ) -> str:
     """
-    Uses Phi-4 to analyze WHY the correction was needed.
+    Uses the classification model to analyze WHY the correction was needed.
     Generates a "lesson learned" for prompt improvement.
     """
-    system_prompt = "Tu es un expert en amélioration de classification."
-
-    user_prompt = f"""
-    Email : {email_content[:500]}
-    Classification initiale : {old_intents}
-    Nouvelle classification : {new_intents}
-    Raison de l'utilisateur : {user_reason}
-
-    Analyse ce cas et génère une leçon apprise concise (2-3 phrases).
-    Qu'est-ce que le modèle a raté ou mal compris ?
-    """
-
-    response = await phi4_client.chat.completions.create(
-        model="phi-4",
-        messages=[...],
-        max_tokens=150,
-        temperature=0.3,
-        timeout=10.0  # Fast response for UI
-    )
-
-    return response.choices[0].message.content
+    # Uses the configured AI model (PHI_DEPLOYMENT or fallback)
+    # Returns concise analysis: what the model missed or misunderstood
+    # Timeout: 15s (fast response for UI)
+    ...
 ```
 
 **Example AI Feedback**:
@@ -300,21 +310,22 @@ aurait dû déclencher l'intent ACTION_RESILIER."
 
 ### Metadata Structure in JSONL Export
 
-#### File: `classymail/services/repository.py` (lines 217-241)
+#### File: `classymail/services/repository.py`
 
 ```python
 metadata = {
-    "email_id": email_id,
-    "source": "human_corrected" if was_corrected else "auto_classified",
-    "confidence": 1.0 if was_corrected else confidence_score,
-    "taxonomy_version": TAXONOMY_VERSION,
-    "anonymized": anonymize,
+    "example_id": item.get("id"),
+    "taxonomy_version": taxonomy_version,
+    "source": "human_corrected" if is_corrected else "auto_classified",
+    "anonymized": bool(anonymize),
+    "anonymization": anonymization_meta,  # Model, prompt_version, usage
     "correction": {
-        "was_corrected": was_corrected,
+        "was_corrected": True,
         "correction_reason": correction_reason,
         "llm_feedback": llm_feedback,
         "correction_timestamp": correction_timestamp
-    } if was_corrected else None
+    } if is_corrected else None,
+    "hash": hashlib.sha256((user_markdown + assistant_content).encode("utf-8")).hexdigest(),
 }
 ```
 
@@ -560,8 +571,8 @@ if item.get("sender"):
 
 **Action Required**: If you exported JSONL before 2026-02-06, **regenerate datasets** with the fixed format:
 ```bash
-curl "http://localhost:8000/api/v1/emails/export/finetune?split=train" > train_fixed.jsonl
-curl "http://localhost:8000/api/v1/emails/export/finetune?split=test" > test_fixed.jsonl
+curl "http://localhost:8000/api/emails/export-finetune-jsonl?split=train" > train_fixed.jsonl
+curl "http://localhost:8000/api/emails/export-finetune-jsonl?split=test" > test_fixed.jsonl
 ```
 
 ### Azure AI Foundry Compatibility ✅
@@ -604,59 +615,66 @@ wc -l < train.jsonl
 
 ### Only High-Quality Examples Exported
 
-#### File: `classymail/services/repository.py` (lines 133-263)
+#### File: `classymail/services/repository.py`
 
 ```python
-async def export_finetune_jsonl_iter(split: str = "train", anonymize: bool = True):
-    """
-    Exports ONLY:
-    - status = 'PROCESSED' (not 'PENDING' or 'ERROR')
-    - needs_review = false (agent is confident OR user reviewed)
-    - reviewed = true (user explicitly validated)
+async def export_finetune_jsonl_iter(
+    *, clients, anonymize, include_unreviewed, max_examples,
+    taxonomy_version, include_metadata, split_mode="all", test_ratio=0.2
+):
+    # Emit UTF-8 BOM (required by Azure AI Foundry)
+    yield "\ufeff"
 
-    Skips:
-    - Emails with anonymization failures
-    - Emails with partial classifications
-    - Emails marked for review but not yet reviewed
-    """
+    where = ["c.status = 'PROCESSED'", "IS_DEFINED(c.classification)",
+             "c.classification.needs_review = false"]
+    if not include_unreviewed:
+        where.append("(IS_DEFINED(c.reviewed) AND c.reviewed = true)")
 
-    query = """
-        SELECT * FROM c
-        WHERE c.status = 'PROCESSED'
-          AND c.needs_review = false
-          AND c.reviewed = true
-    """
+    query = "SELECT c.id, c.markdown, c.classification, ... FROM c WHERE " + " AND ".join(where)
+    it = clients.cosmos_container.query_items(query)
 
-    items = await cosmos_container.query_items(query=query).by_page()
+    # Get production-grade system prompt with full categories
+    categories_text = await get_categories_prompt_text_async(clients=clients)
+    system_prompt = f"""Tu es un assistant expert en classification...
+    LISTE DES INTENTIONS POSSIBLES:
+    {categories_text}
+    ..."""
 
-    for item in items:
-        # Stable hash-based split (deterministic)
-        h = hashlib.sha256(item["id"].encode()).digest()[0]
-        is_train = (h % 10) < 8  # 80% train, 20% test
+    async for item in it:
+        # Deterministic train/test split via SHA-256 hash of ID
+        h = int(hashlib.sha256(item_id.encode("utf-8")).hexdigest(), 16)
+        normalized_hash = (h % 1000) / 1000.0
 
-        if split == "train" and not is_train:
-            continue
-        if split == "test" and is_train:
-            continue
+        if split_mode == "train" and normalized_hash < test_ratio:
+            continue  # Skip test items
+        elif split_mode == "test" and normalized_hash >= test_ratio:
+            continue  # Skip train items
 
         # Anonymize (with fail-safe)
-        try:
-            content_anon = await anonymize_markdown_for_finetune(item["content"])
-        except Exception:
-            continue  # SKIP on failure
+        if anonymize:
+            try:
+                anon = await anonymize_markdown_for_finetune(raw_markdown, clients=clients)
+                user_markdown = anon.get("anonymized_markdown") or ""
+            except Exception:
+                continue  # SKIP on failure
+
+        # Subject/sender scrubbed with basic_pii_scrub when anonymize=True
+        if item.get("subject"):
+            target["subject"] = basic_pii_scrub(subject) if anonymize else subject
+        if item.get("sender"):
+            target["sender"] = basic_pii_scrub(sender) if anonymize else sender
 
         # Build JSONL line
-        yield json.dumps({
-            "messages": [...],
-            "metadata": {...}
-        }, ensure_ascii=False) + "\n"
+        yield json.dumps({"messages": [...], "metadata": {...}}) + "\n"
 ```
 
 ### Train/Test Split
 
 - **Deterministic**: Uses SHA256 hash of email ID (stable across exports)
-- **Ratio**: 80% train, 20% test
+- **Method**: `h = int(SHA256(id).hexdigest(), 16); normalized = (h % 1000) / 1000.0`
+- **Default ratio**: 80% train, 20% test (configurable via `test_split_ratio` parameter)
 - **No leakage**: Same email ID always goes to same split
+- **Endpoint parameter**: `?split=train|test|all` (default: `all`)
 
 ---
 
@@ -664,13 +682,14 @@ async def export_finetune_jsonl_iter(split: str = "train", anonymize: bool = Tru
 
 ### Key Files
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| [classymail/services/anonymizer.py](../classymail/services/anonymizer.py) | 1-63 | PII anonymization implementation |
-| [classymail/services/repository.py](../classymail/services/repository.py#L133-L263) | 133-263 | JSONL export pipeline |
-| [classymail/api/routers/emails.py](../classymail/api/routers/emails.py#L425-L525) | 425-525 | User correction tracking |
-| [classymail/services/llm_pipeline.py](../classymail/services/llm_pipeline.py#L910-L930) | 910-930 | AI feedback generation |
-| [classymail/models.py](../classymail/models.py#L39-L48) | 39-48 | Data models |
+| File | Purpose |
+|------|---------|
+| [classymail/services/anonymizer.py](../classymail/services/anonymizer.py) | PII anonymization implementation (basic_pii_scrub + anonymize_markdown_for_finetune) |
+| [classymail/services/repository.py](../classymail/services/repository.py) | JSONL export pipeline (export_finetune_jsonl_iter) |
+| [classymail/services/pii_detection.py](../classymail/services/pii_detection.py) | PII detection (LLM, Azure Language, Hybrid) |
+| [classymail/api/routers/emails.py](../classymail/api/routers/emails.py) | User correction tracking (PATCH /emails/{id}) |
+| [classymail/services/llm_pipeline.py](../classymail/services/llm_pipeline.py) | AI feedback generation (analyze_correction) |
+| [classymail/models.py](../classymail/models.py) | Data models (EmailRecord, HistoryEntry, PIIDetectionResult) |
 
 ### Configuration Files
 
@@ -692,8 +711,8 @@ grep -E "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}" train.jsonl
 grep -E "\b[A-Z][a-z]+ [A-Z][a-z]+\b" train.jsonl
 
 # Should return many matches (placeholders)
-grep "\[NOM\]" train.jsonl
-grep "\[SOCIÉTÉ\]" train.jsonl
+grep "\[Name\]" train.jsonl
+grep "\[Email\]" train.jsonl
 ```
 
 ### Q2: What happens if anonymization fails?
@@ -717,7 +736,7 @@ cat train.jsonl | jq 'select(.metadata.source == "human_corrected")' > train_cor
 **A**: Yes, but **not recommended** for production:
 
 ```bash
-curl "http://localhost:8000/api/v1/emails/export/finetune?anonymize=false" > train_raw.jsonl
+curl "http://localhost:8000/api/emails/export-finetune-jsonl?anonymize=false" > train_raw.jsonl
 ```
 
 ⚠️ **Warning**: This will export real PII. Use only for debugging in secure environments.
@@ -742,10 +761,12 @@ curl "http://localhost:8000/api/v1/emails/export/finetune?anonymize=false" > tra
 **A**: Query Cosmos DB for the `classification_history` field:
 
 ```python
-from azure.cosmos import CosmosClient
+from azure.cosmos.aio import CosmosClient
+from azure.identity.aio import DefaultAzureCredential
 
-client = CosmosClient.from_connection_string(os.getenv("COSMOS_CONNECTION_STRING"))
-db = client.get_database_client("classymail")
+credential = DefaultAzureCredential()
+client = CosmosClient(os.getenv("AZURE_COSMOS_ENDPOINT"), credential=credential)
+db = client.get_database_client("emailsdb")
 container = db.get_container_client("emails")
 
 # Find emails with corrections

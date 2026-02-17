@@ -64,7 +64,7 @@ Flux de données :
   - `assistant` : label strict JSON (ground truth)
 
 Pourquoi anonymiser via un modèle ?
-Les regex seules ratent souvent des noms, organisations, adresses, numéros de sinistre/contrat, etc. L'anonymiseur utilise GPT‑4o avec un prompt strict “préserver le markdown”.
+Les regex seules ratent souvent des noms, organisations, adresses, numéros de sinistre/contrat, etc. L'anonymiseur utilise GPT‑4o-mini avec un prompt système en anglais qui préserve la structure markdown.
 
 ### Marquer un item comme "reviewed"
 
@@ -78,7 +78,7 @@ Quand vous faites un PATCH sur un email avec des `intents` corrigés, le backend
 
 Depuis la racine du repo :
 
-- `uv run python main.py --export-finetune-jsonl ./data/fine_tune.jsonl`
+- `uv run python -m classymail.cli --export-finetune-jsonl ./data/fine_tune.jsonl`
 
 ### Export HTTP (bouton UI)
 
@@ -91,7 +91,7 @@ Il émet un BOM UTF‑8 et, par défaut, anonymise le markdown et impose un mini
 
 Contrôles :
 
-- Minimum d'exemples : env `FINETUNE_MIN_EXAMPLES` (défaut `50`), configurable dans l'interface "Settings".
+- Minimum d'exemples : configurable dans l'interface "Settings" via `finetune_min_examples` (défaut : `5`).
 - Si le nombre d'exemples "reviewed" est inférieur à ce seuil, l'export HTTP renvoie une erreur 409 (ou désactive le bouton dans l'UI).
 - Paramètres optionnels : `anonymize=true|false`, `max_examples=<n>`, `taxonomy_version=v1`, `include_metadata=true|false`
 
@@ -107,9 +107,9 @@ Options utiles (CLI) :
 Définir ces variables d'environnement pour pointer vers un endpoint/déploiement Azure OpenAI compatible :
 
 - `ANONYMIZER_ENDPOINT`
-- `ANONYMIZER_DEPLOYMENT` (défaut : `gpt-4o`)
-- `ANONYMIZER_API_VERSION` (défaut : `2024-02-15-preview`)
-- `ANONYMIZER_MAX_TOKENS` (défaut : `4096`)
+- `ANONYMIZER_DEPLOYMENT` (défaut : `gpt-4o-mini`)
+- `ANONYMIZER_API_VERSION` (défaut : `2024-08-01-preview`)
+- `ANONYMIZER_MAX_TOKENS` (défaut : `6000`)
 - `ANONYMIZER_PROMPT_VERSION` (défaut : `v1`)
 
 Optionnel :
@@ -131,7 +131,7 @@ L'anonymisation utilise un système à **deux niveaux** pour garantir qu'aucune 
 
 #### Niveau 2 : Anonymisation contextuelle LLM (`anonymize_markdown_for_finetune`)
 - **Vitesse** : ~2-5s par document
-- **Modèle** : GPT-4o avec prompt système spécialisé (600+ caractères)
+- **Modèle** : GPT-4o-mini avec prompt système en anglais (~1800 caractères)
 - **Cible** : PII contextuelle (noms, sociétés, adresses, contrats, montants)
 - **Préservation** : Structure Markdown complète (headers, listes, tableaux, liens)
 - **Appliqué à** : Corps de l'email uniquement (après level 1)
@@ -142,51 +142,42 @@ L'anonymisation utilise un système à **deux niveaux** pour garantir qu'aucune 
 
 ## Génération de dataset MVP (PDFs synthétiques)
 
-Pour le MVP/demo (pas de données de prod), le repo inclut **deux scripts** pour générer des données de test :
+Pour le MVP/demo (pas de données de prod), utilisez le script de test E2E pour générer et uploader des données de test automatiquement :
 
-### Option 1 : PDFs synthétiques complets (recommandé)
+### Workflow recommandé : Test E2E automatique
 
-**Script** : [scripts/generate_realistic_emails.py](../scripts/generate_realistic_emails.py)
+**Script** : [scripts/test_e2e_flow.py](../scripts/test_e2e_flow.py)
 
-Génère des PDFs d'emails réalistes avec :
-- Templates par catégorie (personnalisables par domaine)
-- Variantes de formulation
-- Coordonnées fictives mais réalistes
-- Formatage email authentique (From:, Subject:, Date:)
+Génère, uploade et traite des PDFs de test automatiquement :
+
+```bash
+# Lancer l'API + Worker d'abord
+uv run uvicorn main:app --reload  # Terminal 1
+
+# Générer et uploader des emails en une commande
+uv run python scripts/test_e2e_flow.py --count 100 --wait 2
+
+# Les PDFs sont générés, uploadés et traités automatiquement
+# Suivre le progrès dans le dashboard: http://localhost:8000
+```
+
+### Upload manuel de PDFs existants
+
+Si vous avez des PDFs de test locaux :
+
+```bash
+# Via l'interface web
+# http://localhost:8000 → Upload button
+
+# Via l'API
+curl -X POST http://localhost:8000/api/upload -F "file=@dataset/pdf/email_001.pdf"
+```
 
 > **Catégories G2S** : Voir [G2S_CUSTOMIZATION.md](G2S_CUSTOMIZATION.md#insurance-category-taxonomy) pour la taxonomie complète (Attestation, Résiliation, Sinistre, etc.).
 
-```bash
-# Générer 50 emails aléatoires
-uv run python scripts/generate_realistic_emails.py --count 50
+### Workflow complet : Dataset de test → JSONL anonymisé
 
-# Générer pour catégories spécifiques (exemple G2S)
-uv run python scripts/generate_realistic_emails.py --count 20 --categories "Attestation habitation" "Résiliation"
-
-# Dossier de sortie personnalisé
-uv run python scripts/generate_realistic_emails.py --count 100 --out dataset/fake_emails
-```
-
-### Option 2 : PDFs bruités via LLM (legacy)
-
-**Script** : [scripts/generate_dummy_pdfs.py](../scripts/generate_dummy_pdfs.py)
-
-Génère des PDFs avec contenu étendu par Azure OpenAI (typos, argot, scans flous).
-Utile pour tester la robustesse du pipeline OCR.
-
-```bash
-# Génération simple
-uv run python scripts/generate_dummy_pdfs.py --count 50
-
-# Génération via LLM (nécessite AZURE_OPENAI_ENDPOINT)
-uv run python scripts/generate_dummy_pdfs.py --count 50 --use-aoai --require-aoai
-```
-
-### Workflow complet : Fake dataset → JSONL anonymisé
-
-Pour générer un dataset de fine-tuning entièrement synthétique et anonymisé :
-
-#### Option A : Génération et upload automatique (recommandé)
+Pour générer un dataset de fine-tuning à partir de données de test :
 
 ```bash
 # 1. Lancer l'API + Worker
@@ -200,20 +191,6 @@ uv run python scripts/test_e2e_flow.py --count 100 --wait 2
 # Vous pouvez suivre le progrès dans le dashboard: http://localhost:8000
 ```
 
-#### Option B : Génération puis upload manuel
-
-```bash
-# 1. Générer des PDFs réalistes (fake data) dans un dossier
-uv run python scripts/generate_realistic_emails.py --count 100 --out dataset/fake_emails
-
-# 2. Lancer l'API + Worker
-uv run uvicorn main:app --reload
-
-# 3. Uploader les PDFs via l'interface web ou l'API
-# Web: http://localhost:8000 → Upload button
-# API: curl -X POST http://localhost:8000/api/upload -F "file=@dataset/fake_emails/email_001.pdf"
-```
-
 #### Étapes communes (après upload et traitement)
 
 ```bash
@@ -222,8 +199,8 @@ uv run uvicorn main:app --reload
 # Marquez les emails comme "reviewed" après vérification
 
 # 5. Exporter le JSONL anonymisé (inclut dual-band PII protection)
-curl "http://localhost:8000/api/v1/emails/export-finetune-jsonl?split=train&anonymize=true" > train_fake.jsonl
-curl "http://localhost:8000/api/v1/emails/export-finetune-jsonl?split=test&anonymize=true" > test_fake.jsonl
+curl "http://localhost:8000/api/emails/export-finetune-jsonl?split=train&anonymize=true" > train_fake.jsonl
+curl "http://localhost:8000/api/emails/export-finetune-jsonl?split=test&anonymize=true" > test_fake.jsonl
 
 # 6. Vérifier l'anonymisation (ne doit trouver aucun email réel)
 grep -E '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' train_fake.jsonl | wc -l  # doit retourner 0
@@ -245,7 +222,7 @@ head -1 train_fake.jsonl | jq '.messages[2].content | fromjson | .sender'  # doi
 **Alternative rapide (sans review manuelle, NOT RECOMMENDED)** :
 ```bash
 # Exporter même les non-reviewed (peut contenir des erreurs de classification)
-curl "http://localhost:8000/api/v1/emails/export-finetune-jsonl?split=train&include_unreviewed=true" > train_auto.jsonl
+curl "http://localhost:8000/api/emails/export-finetune-jsonl?split=train&include_unreviewed=true" > train_auto.jsonl
 ```
 
 ### Génération optionnelle via LLM
@@ -320,13 +297,13 @@ La plupart des systèmes de fine-tuning attendent du **JSONL** : un objet JSON p
 
 ```json
 {"messages":[
-  {"role":"system","content":"<SYSTEM_PROMPT - ex: Tu classes des emails en intentions et tu renvoies uniquement du JSON strict.>"},
+  {"role":"system","content":"<SYSTEM_PROMPT - production prompt with category taxonomy, built dynamically from settings>"},
   {"role":"user","content":"<MARKDOWN OCR ANONYMISÉ ICI>"},
   {"role":"assistant","content":"{\"detected_intents\":[...],\"global_complexity\":\"Simple\"}"}
 ],"metadata":{"taxonomy_version":"v1","language":"fr"}}
 ```
 
-> **G2S system prompt**: `Tu classes des emails d'assurance en intentions et tu renvoies uniquement du JSON strict.` — See [G2S_CUSTOMIZATION.md](G2S_CUSTOMIZATION.md#fine-tuning-with-g2s-categories) for details.
+> **G2S system prompt**: The system prompt is built dynamically from the production category taxonomy stored in settings (see `get_categories_prompt_text_async()` in `settings_store.py`). It includes the full list of G2S categories with descriptions. — See [G2S_CUSTOMIZATION.md](G2S_CUSTOMIZATION.md#fine-tuning-with-g2s-categories) for details.
 >
 > **Custom deployments**: Override via `FINETUNE_SYSTEM_PROMPT` env var.
 
@@ -354,7 +331,7 @@ Recommandations :
 
 1) Exporter un fichier complet (anonymisé + reviewed uniquement) :
 
-- CLI : `uv run python main.py --export-finetune-jsonl ./data/fine_tune_all.jsonl`
+- CLI : `uv run python -m classymail.cli --export-finetune-jsonl ./data/fine_tune_all.jsonl`
 
 ou
 
