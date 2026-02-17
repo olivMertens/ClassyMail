@@ -13,9 +13,29 @@ from pybreaker import CircuitBreaker
 logger = logging.getLogger(__name__)
 
 
+class ManagedCircuitBreaker(CircuitBreaker):
+    """CircuitBreaker subclass with explicit ``success()``/``failure()`` helpers.
+
+    ``pybreaker.CircuitBreaker`` manages state internally via ``call()`` /
+    ``call_async()``.  When pipeline code performs the call *outside* the
+    breaker wrapper (e.g. inline ``await func(...)``), it needs a way to
+    manually notify the breaker of the outcome.  ``success()`` resets the
+    failure counter; ``failure()`` increments it so the breaker eventually
+    trips.
+    """
+
+    def success(self) -> None:
+        """Notify the breaker of a successful call (resets failure counter)."""
+        self._state_storage.reset_counter()
+
+    def failure(self) -> None:
+        """Notify the breaker of a failed call (increments failure counter)."""
+        self._inc_counter()
+
+
 # Circuit breaker for Mistral OCR endpoint
 # Fails after 5 consecutive errors, stays open for 60 seconds before retry
-mistral_ocr_breaker = CircuitBreaker(
+mistral_ocr_breaker = ManagedCircuitBreaker(
     fail_max=5,
     reset_timeout=60,
     name="mistral_ocr"
@@ -23,21 +43,21 @@ mistral_ocr_breaker = CircuitBreaker(
 
 # Circuit breaker for Azure OpenAI classification endpoint
 # More lenient since classification is less expensive than OCR
-classification_breaker = CircuitBreaker(
+classification_breaker = ManagedCircuitBreaker(
     fail_max=7,
     reset_timeout=45,
     name="classification"
 )
 
 # Circuit breaker for chat/RAG endpoint
-chat_breaker = CircuitBreaker(
+chat_breaker = ManagedCircuitBreaker(
     fail_max=5,
     reset_timeout=60,
     name="chat"
 )
 
 # Circuit breaker for Document Intelligence OCR fallback
-doc_intelligence_breaker = CircuitBreaker(
+doc_intelligence_breaker = ManagedCircuitBreaker(
     fail_max=5,
     reset_timeout=120,
     name="document_intelligence"
