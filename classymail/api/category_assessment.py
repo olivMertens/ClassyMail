@@ -23,9 +23,67 @@ from classymail.services.settings_store import load_settings
 # Override via Settings > ai_assessment_model or env ASSESSMENT_MODEL.
 DEFAULT_ASSESSMENT_MODEL = "gpt-4.1-nano"
 
+# UI language names for non-FR/EN prompt suffix
+LANGUAGE_NAMES: dict[str, str] = {
+    "fr": "français",
+    "en": "English",
+    "de": "Deutsch",
+    "es": "español",
+    "it": "italiano",
+}
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
+
+
+def _parse_suggestion(text: str) -> dict[str, str]:
+    """Parse a freeform suggestion string into structured {action, field, content}.
+
+    Handles all supported UI languages (FR, EN, DE, ES, IT) action keywords so
+    that the frontend Apply button works regardless of the model or language.
+
+    Returns a dict with:
+      - action: "rewrite" | "add"
+      - field:  "definition" | "exclusions"
+      - content: the text to apply to the category field
+    """
+    t = text.strip()
+
+    # Detect action: multilingual REWRITE or ADD
+    is_add = bool(re.match(
+        r"^(?:AJOUTER|ADD\b|HINZUF[UÜ]GEN|A[NÑ]ADIR|AGGIUNGERE)",
+        t, re.I,
+    ))
+    # Default to rewrite if not explicitly ADD
+    action = "add" if is_add else "rewrite"
+
+    # Detect field: Definition or Exclusions (multilingual field names)
+    is_exclusions = bool(re.search(
+        r"['\"]?(?:Exclusions?|Ausschl[uü]sse?|Esclusioni)['\"]?",
+        t, re.I,
+    ))
+    field = "exclusions" if is_exclusions else "definition"
+
+    # Extract content after "): " (preferred) or first ": "
+    content = ""
+    paren_match = re.search(r"\)\s*:\s*(.+)$", t, re.S)
+    if paren_match:
+        content = paren_match.group(1).strip()
+    else:
+        colon_match = re.search(r":\s*(.+)$", t, re.S)
+        if colon_match:
+            content = colon_match.group(1).strip()
+
+    # Strip leading DEFINITION/EXCLUSIONS labels (multilingual)
+    content = re.sub(r"^DEFINITION\s+", "", content, flags=re.I)
+    content = re.sub(r"^DEFINICI[OÓ]N\s+", "", content, flags=re.I)
+    content = re.sub(r"^DEFINIZIONE\s+", "", content, flags=re.I)
+    content = re.sub(r"^EXCLUSIONS?\s*[-–]\s*", "", content, flags=re.I)
+    content = re.sub(r"^AUSSCHL[UÜ]SSE?\s*[-–]\s*", "", content, flags=re.I)
+    content = re.sub(r"^ESCLUSIONI\s*[-–]\s*", "", content, flags=re.I)
+
+    return {"action": action, "field": field, "content": content}
 
 
 class CategoryAssessmentRequest(BaseModel):
@@ -38,11 +96,19 @@ class CategoryAssessmentRequest(BaseModel):
     model: str | None = Field(default=None, description="Override assessment model (e.g. 'gpt-5-nano', 'phi4')")
 
 
+class SuggestionParsed(BaseModel):
+    """Server-parsed suggestion with structured action/field/content."""
+    action: str = Field(..., description="Action: 'rewrite' or 'add'")
+    field: str = Field(..., description="Target field: 'definition' or 'exclusions'")
+    content: str = Field(..., description="Content to apply to the field")
+
+
 class CategoryAssessmentResponse(BaseModel):
     """Category assessment response."""
     advice: str = Field(..., description="AI-generated advice for improving the category")
     quality_score: str = Field(..., description="Quality assessment (Good/Needs Improvement/Poor)")
-    specific_suggestions: list[str] = Field(default_factory=list, description="Specific improvement suggestions")
+    specific_suggestions: list[str] = Field(default_factory=list, description="Specific improvement suggestions (display text)")
+    parsed_suggestions: list[SuggestionParsed] = Field(default_factory=list, description="Parsed suggestions with action/field/content for Apply button")
 
 
 @router.post("/api/admin/assess-category", response_model=CategoryAssessmentResponse)
@@ -96,8 +162,9 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
             url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
             logger.debug("[assessment] Request URL: %s", url)
 
-            # Bilingual prompt with WHERE/HOW guidance - Language-aware
-            is_french = request.language == "fr"
+            # Multilingual prompt with WHERE/HOW guidance
+            lang = request.language or "en"
+            is_french = lang == "fr"
 
             if is_french:
                 system_prompt = """Vous êtes un expert en taxonomies de classification d'emails d'assurance.
@@ -174,6 +241,18 @@ IMPORTANT:
 {exclusions or "(empty)"}
 
 Assess quality and provide rewrites."""
+
+            # For non-FR/EN locales, append language instruction so the
+            # model responds in the user's language while keeping the
+            # same suggestion format.
+            if lang not in ("fr", "en"):
+                lang_name = LANGUAGE_NAMES.get(lang, lang)
+                user_content += (
+                    f"\n\nIMPORTANT: Respond entirely in {lang_name}. "
+                    "Keep the same suggestion format (start each suggestion with "
+                    "the equivalent of REWRITE or ADD in the target language, "
+                    "followed by 'Definition' or 'Exclusions' field name)."
+                )
 
             # Prepare content based on model capabilities
             if is_reasoning_model(deployment):
@@ -256,10 +335,19 @@ Assess quality and provide rewrites."""
                 span.set_status(Status(StatusCode.OK))
                 logger.info(f"[assessment] Category '{request.name}' assessed with score: {result.get('quality_score', 'Unknown')}")
 
+                suggestions_raw = result.get("specific_suggestions", [])
+                # Ensure all suggestions are strings
+                suggestions = [str(s) if not isinstance(s, str) else s for s in suggestions_raw]
+                # Parse each suggestion server-side for robust multilingual Apply
+                parsed = [_parse_suggestion(s) for s in suggestions]
+
                 return CategoryAssessmentResponse(
                     advice=result.get("advice", "Assessment completed."),
                     quality_score=result.get("quality_score", "Unknown"),
-                    specific_suggestions=result.get("specific_suggestions", [])
+                    specific_suggestions=suggestions,
+                    parsed_suggestions=[
+                        SuggestionParsed(**p) for p in parsed
+                    ],
                 )
 
         except httpx.HTTPStatusError as e:

@@ -272,7 +272,8 @@ const assessCategory = async (index) => {
         progress: 100,
         advice: data.advice,
         quality_score: data.quality_score,
-        specific_suggestions: data.specific_suggestions || []
+        specific_suggestions: data.specific_suggestions || [],
+        parsed_suggestions: data.parsed_suggestions || []
       })
       // Results now shown inline - no alert dialog
     } else {
@@ -298,56 +299,74 @@ const assessCategory = async (index) => {
 
 /**
  * Parse an AI suggestion and apply it to the category's definition or exclusions field.
- * Detects REWRITE (replace all) vs ADD (append) and target field (Definition / Exclusions).
+ * Uses server-parsed structured data (parsed_suggestions) when available for robust
+ * multilingual support. Falls back to client-side regex parsing for legacy responses.
  */
-const applySuggestion = (catIndex, suggestion) => {
+const applySuggestion = (catIndex, suggestionIndex) => {
   const cat = settings.value.categories[catIndex]
   if (!cat) return
 
-  const text = suggestion.trim()
+  const assessment = categoryAssessments.value.get(catIndex)
+  if (!assessment) return
 
-  // Detect target field (case-insensitive, FR + EN)
-  const isExclusions = /champ\s*['"]?Exclusions['"]?|'Exclusions'\s*field|Exclusions\s*field/i.test(text)
+  const suggestion = assessment.specific_suggestions?.[suggestionIndex]
+  const parsed = assessment.parsed_suggestions?.[suggestionIndex]
 
-  // Detect action: REWRITE (replace) vs ADD (append)
-  const isRewrite = /^R[EÉ]{1,2}[CÉE]RIRE|^REWRITE/i.test(text)
-  const isAdd = /^AJOUTER|^ADD/i.test(text)
+  let action, field, content
 
-  // Extract content after "): " or the first ": " following the paren
-  let content = ''
-  const parenColonMatch = text.match(/\)\s*:\s*(.+)$/s)
-  if (parenColonMatch) {
-    content = parenColonMatch[1].trim()
+  if (parsed?.action && parsed?.field && parsed?.content) {
+    // Use server-parsed structured data (robust, multilingual)
+    action = parsed.action
+    field = parsed.field === 'definition' ? 'description' : parsed.field
+    content = parsed.content
+  } else if (suggestion) {
+    // Fallback: client-side parsing (legacy responses without parsed_suggestions)
+    const text = suggestion.trim()
+
+    // Detect target field (multilingual: FR, EN, DE, ES, IT)
+    const isExclusions = /champ\s*['"]?Exclusions['"]?|'Exclusions'\s*field|Exclusions\s*field|Ausschl[uü]sse|Esclusioni/i.test(text)
+
+    // Detect action: REWRITE (replace) vs ADD (append) - multilingual
+    const isAdd = /^(?:AJOUTER|ADD\b|HINZUF[UÜ]GEN|A[NÑ]ADIR|AGGIUNGERE)/i.test(text)
+
+    content = ''
+    const parenColonMatch = text.match(/\)\s*:\s*(.+)$/s)
+    if (parenColonMatch) {
+      content = parenColonMatch[1].trim()
+    } else {
+      const colonMatch = text.match(/:\s*(.+)$/s)
+      if (colonMatch) content = colonMatch[1].trim()
+    }
+
+    // Strip leading labels (multilingual)
+    content = content
+      .replace(/^DEFINITION\s+/i, '')
+      .replace(/^DEFINICI[OÓ]N\s+/i, '')
+      .replace(/^DEFINIZIONE\s+/i, '')
+      .replace(/^EXCLUSIONS?\s*[-–]\s*/i, '')
+      .replace(/^AUSSCHL[UÜ]SSE?\s*[-–]\s*/i, '')
+      .replace(/^ESCLUSIONI\s*[-–]\s*/i, '')
+
+    action = isAdd ? 'add' : 'rewrite'
+    field = isExclusions ? 'exclusions' : 'description'
   } else {
-    // Fallback: content after first ": "
-    const colonMatch = text.match(/:\s*(.+)$/s)
-    if (colonMatch) content = colonMatch[1].trim()
+    return
   }
-
-  // Strip leading "DEFINITION " or "EXCLUSIONS - " label from content if present
-  content = content.replace(/^DEFINITION\s+/i, '').replace(/^EXCLUSIONS\s*[-–]\s*/i, '')
 
   if (!content) return
 
-  const field = isExclusions ? 'exclusions' : 'description' // default to definition
-
-  if (isRewrite) {
+  if (action === 'rewrite') {
     cat[field] = content
-  } else if (isAdd) {
-    // Append: add to end of current value
+  } else if (action === 'add') {
     const current = (cat[field] || '').trimEnd()
     cat[field] = current ? current + content : content
   } else {
-    // Default: replace
     cat[field] = content
   }
 
   // Mark the suggestion as applied in the assessment data
-  const assessment = categoryAssessments.value.get(catIndex)
-  if (assessment) {
-    if (!assessment.appliedSuggestions) assessment.appliedSuggestions = new Set()
-    assessment.appliedSuggestions.add(suggestion)
-  }
+  if (!assessment.appliedSuggestions) assessment.appliedSuggestions = new Set()
+  assessment.appliedSuggestions.add(suggestion)
 }
 
 const isSuggestionApplied = (catIndex, suggestion) => {
@@ -2006,7 +2025,7 @@ onMounted(() => {
                                         ? 'bg-green-600 text-white cursor-default'
                                         : 'bg-purple-600 text-white hover:bg-purple-500 cursor-pointer'"
                                       :disabled="isSuggestionApplied(idx, suggestion)"
-                                      @click="applySuggestion(idx, suggestion)"
+                                      @click="applySuggestion(idx, sidx)"
                                     >
                                       <CheckCircleIcon
                                         v-if="isSuggestionApplied(idx, suggestion)"

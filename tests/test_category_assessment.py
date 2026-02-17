@@ -10,7 +10,11 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 import httpx
 
-from classymail.api.category_assessment import assess_category, CategoryAssessmentRequest
+from classymail.api.category_assessment import (
+    assess_category,
+    CategoryAssessmentRequest,
+    _parse_suggestion,
+)
 from classymail.services.settings_store import _build_categories_prompt
 
 
@@ -71,6 +75,127 @@ def test_build_categories_prompt_skips_nameless():
     assert result.count("DÉFINITION:") == 1
 
 
+# ---- _parse_suggestion unit tests (multilingual) ----
+
+
+def test_parse_suggestion_french_rewrite_definition():
+    """French RÉÉCRIRE for Definition field."""
+    text = "RÉÉCRIRE le champ 'Définition' (remplacer tout le contenu actuel par): DEFINITION Attestation habitation: document officiel. Mots-clés: bail, quittance"
+    result = _parse_suggestion(text)
+    assert result["action"] == "rewrite"
+    assert result["field"] == "definition"
+    assert result["content"].startswith("Attestation habitation")
+    assert "bail" in result["content"]
+
+
+def test_parse_suggestion_french_rewrite_exclusions():
+    """French RÉÉCRIRE for Exclusions field."""
+    text = "RÉÉCRIRE le champ 'Exclusions' (remplacer tout le contenu actuel par): EXCLUSIONS - Ne concerne pas les résidences secondaires."
+    result = _parse_suggestion(text)
+    assert result["action"] == "rewrite"
+    assert result["field"] == "exclusions"
+    assert result["content"].startswith("Ne concerne pas")
+
+
+def test_parse_suggestion_french_add_definition():
+    """French AJOUTER for Definition field."""
+    text = "AJOUTER à la FIN du champ 'Définition' (après le dernier mot existant): , bail, quittance, loyer"
+    result = _parse_suggestion(text)
+    assert result["action"] == "add"
+    assert result["field"] == "definition"
+    assert result["content"].startswith(", bail")
+
+
+def test_parse_suggestion_english_rewrite_definition():
+    """English REWRITE for Definition field."""
+    text = "REWRITE the 'Definition' field (replace entire current content with): DEFINITION Housing certificate: official document. Keywords: lease, receipt"
+    result = _parse_suggestion(text)
+    assert result["action"] == "rewrite"
+    assert result["field"] == "definition"
+    assert result["content"].startswith("Housing certificate")
+
+
+def test_parse_suggestion_english_add_exclusions():
+    """English ADD for Exclusions field."""
+    text = "ADD to the END of 'Exclusions' field (after last existing keyword): , secondary residences"
+    result = _parse_suggestion(text)
+    assert result["action"] == "add"
+    assert result["field"] == "exclusions"
+    assert ", secondary" in result["content"]
+
+
+def test_parse_suggestion_german_rewrite_definition():
+    """German UMSCHREIBEN for Definition field."""
+    text = "UMSCHREIBEN das Feld 'Definition' (gesamten aktuellen Inhalt ersetzen durch): DEFINITION Wohnbescheinigung: offizielles Dokument."
+    result = _parse_suggestion(text)
+    assert result["action"] == "rewrite"
+    assert result["field"] == "definition"
+    assert "Wohnbescheinigung" in result["content"]
+
+
+def test_parse_suggestion_german_add_exclusions():
+    """German HINZUFÜGEN for Ausschlüsse field."""
+    text = "HINZUFÜGEN am ENDE des Feldes 'Ausschlüsse' (nach dem letzten Stichwort): , Zweitwohnungen"
+    result = _parse_suggestion(text)
+    assert result["action"] == "add"
+    assert result["field"] == "exclusions"
+    assert "Zweitwohnungen" in result["content"]
+
+
+def test_parse_suggestion_spanish_rewrite_definition():
+    """Spanish REESCRIBIR for Definition field."""
+    text = "REESCRIBIR el campo 'Definición' (reemplazar todo el contenido actual por): DEFINICIÓN Certificado de vivienda: documento oficial."
+    result = _parse_suggestion(text)
+    assert result["action"] == "rewrite"
+    assert result["field"] == "definition"
+    assert "Certificado de vivienda" in result["content"]
+
+
+def test_parse_suggestion_spanish_add_exclusions():
+    """Spanish AÑADIR for Exclusiones field."""
+    text = "AÑADIR al FINAL del campo 'Exclusiones' (después de la última palabra): , residencias secundarias"
+    result = _parse_suggestion(text)
+    assert result["action"] == "add"
+    assert result["field"] == "exclusions"
+    assert "residencias" in result["content"]
+
+
+def test_parse_suggestion_italian_rewrite_definition():
+    """Italian RISCRIVERE for Definition field."""
+    text = "RISCRIVERE il campo 'Definizione' (sostituire tutto il contenuto attuale con): DEFINIZIONE Certificato di abitazione: documento ufficiale."
+    result = _parse_suggestion(text)
+    assert result["action"] == "rewrite"
+    assert result["field"] == "definition"
+    assert "Certificato di abitazione" in result["content"]
+
+
+def test_parse_suggestion_italian_add_exclusions():
+    """Italian AGGIUNGERE for Esclusioni field."""
+    text = "AGGIUNGERE alla fine del campo 'Esclusioni' (dopo l'ultima parola): , residenze secondarie"
+    result = _parse_suggestion(text)
+    assert result["action"] == "add"
+    assert result["field"] == "exclusions"
+    assert "residenze" in result["content"]
+
+
+def test_parse_suggestion_fallback_no_paren():
+    """Fallback: colon separator without parentheses."""
+    text = "REWRITE Definition: Documents de logement incluant bail, quittance de loyer"
+    result = _parse_suggestion(text)
+    assert result["action"] == "rewrite"
+    assert result["field"] == "definition"
+    assert "Documents de logement" in result["content"]
+
+
+def test_parse_suggestion_no_content():
+    """Edge case: suggestion with no extractable content."""
+    text = "ADD Exclusions"
+    result = _parse_suggestion(text)
+    assert result["action"] == "add"
+    assert result["field"] == "exclusions"
+    assert result["content"] == ""
+
+
 @pytest.mark.asyncio
 async def test_assess_category_success():
     """Test successful category assessment with valid response."""
@@ -121,6 +246,10 @@ async def test_assess_category_success():
             assert "specific keywords" in result.advice.lower()
             assert len(result.specific_suggestions) == 3
             assert any("REWRITE" in s for s in result.specific_suggestions)
+            # Verify parsed_suggestions are returned
+            assert len(result.parsed_suggestions) == 3
+            assert result.parsed_suggestions[0].action in ("rewrite", "add")
+            assert result.parsed_suggestions[0].field in ("definition", "exclusions")
 
 
 @pytest.mark.asyncio
@@ -165,6 +294,7 @@ async def test_assess_category_good_quality():
 
             assert result.quality_score == "Good"
             assert len(result.specific_suggestions) == 0
+            assert len(result.parsed_suggestions) == 0
 
 
 @pytest.mark.asyncio
