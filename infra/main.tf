@@ -53,6 +53,11 @@ provider "azurerm" {
   storage_use_azuread = true
 }
 
+provider "azapi" {
+  subscription_id = local.subscription_id != "" ? local.subscription_id : null
+  use_cli         = true
+}
+
 variable "subscription_id" {
   type        = string
   description = "Azure subscription ID (GUID). Optional: if omitted, Terraform uses the currently selected Azure CLI subscription (az account set)."

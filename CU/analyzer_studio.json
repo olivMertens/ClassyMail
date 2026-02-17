@@ -38,30 +38,6 @@
         "type": "string",
         "method": "generate",
         "description": "Brief summary of the document content"
-      },
-      "Entities": {
-        "type": "array",
-        "description": "Key business entities found in the document",
-        "items": {
-          "type": "object",
-          "properties": {
-            "Name": {
-              "type": "string",
-              "description": "Name of the entity"
-            },
-            "Type": {
-              "type": "string",
-              "method": "classify",
-              "enum": [
-                "Person",
-                "Organization",
-                "Date",
-                "Amount",
-                "Reference"
-              ]
-            }
-          }
-        }
       }
     }
   }

@@ -656,6 +656,7 @@ uv run pytest
 | Model not available in region | Regional model availability | Try `swedencentral`, `eastus`, or check [Azure AI model availability](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) |
 | `write_secrets_env.ps1` fails | Resources not found with prefix | Pass `-ResourceGroup` and `-Prefix` explicitly |
 | Docker build fails with `python:3.12-slim` | Docker Hub blocked in corporate network | Use an internal mirror or build via ACR (`.\scripts\build_acr.ps1`) |
+| `azapi_resource` 403 / IMDS error on `vector_cache` | `azapi` provider missing `use_cli = true` — falls back to Managed Identity (IMDS) which fails locally | Ensure `provider "azapi" { use_cli = true }` block exists in `main.tf` (already fixed) |
 
 ### Useful Commands
 
