@@ -306,7 +306,7 @@ Deploy these **three models** (strictly required):
 | Model | Deployment Name | Type | Data Zone | Regions (Hub/Project) | Purpose |
 |-------|----------------|------|:---------:|----------------------|---------|
 | **Phi-4** | `phi-4` | Serverless API | ✅ | eastus, eastus2, northcentralus, southcentralus, swedencentral, westus, westus3 | Email classification |
-| **Mistral Document AI 2505** | `mistral-document-ai-2505` | Serverless API | ❌ | eastus2, swedencentral | OCR / PDF extraction |
+| **Mistral Document AI 2505** | `mistral-document-ai-2505` | Global Standard | ✅ (US + EU) | All regions (Global Standard) ¹ | OCR / PDF extraction |
 | **text-embedding-3-small** | `text-embedding-3-small` | Standard (Global) | ✅ | All Global Standard regions ¹ | RAG embeddings |
 
 > ¹ [Full Global Standard region table](https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-models/concepts/models-sold-directly-by-azure?view=foundry-classic&tabs=global-standard-aoai,global-standard&pivots=azure-openai#global-standard-model-availability)
