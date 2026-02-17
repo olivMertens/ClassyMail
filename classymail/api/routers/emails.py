@@ -926,8 +926,8 @@ async def export_emails_csv(
                 blob_url = item.get("file_url", "")
                 pdf_filename = extract_filename(blob_url)
 
-                classification = item.get("classification", {})
-                intents = classification.get("detected_intents", [])
+                classification = item.get("classification") or {}
+                intents = classification.get("detected_intents") or []
 
                 # Convert category names to slugs for CSV stability
                 intent_slugs = []
@@ -972,12 +972,12 @@ async def export_emails_csv(
                 blob_url = item.get("file_url", "")
                 pdf_filename = extract_filename(blob_url)
 
-                classification = item.get("classification", {})
-                intents = classification.get("detected_intents", [])
+                classification = item.get("classification") or {}
+                intents = classification.get("detected_intents") or []
                 processing_time = item.get("processing_time_ms", "")
 
                 # Extract model info and detection mode
-                usage = item.get("usage", {})
+                usage = item.get("usage") or {}
                 model_name = usage.get("phi4_model") or usage.get("model") or "unknown"
                 detection_mode = usage.get("strategy", "standard")
 
@@ -1034,7 +1034,7 @@ async def export_emails_csv(
 
                 # PII data
                 pii_detected = "Oui" if item.get("pii_detected", False) else "Non"
-                pii_data = item.get("pii_data", {})
+                pii_data = item.get("pii_data") or {}
                 pii_types = []
 
                 if pii_data:
