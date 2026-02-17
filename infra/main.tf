@@ -50,12 +50,16 @@ provider "azurerm" {
   features {}
   subscription_id     = local.subscription_id != "" ? local.subscription_id : null
   use_cli             = true
+  use_msi             = false
+  use_oidc            = false
   storage_use_azuread = true
 }
 
 provider "azapi" {
   subscription_id = local.subscription_id != "" ? local.subscription_id : null
   use_cli         = true
+  use_msi         = false
+  use_oidc        = false
 }
 
 variable "subscription_id" {

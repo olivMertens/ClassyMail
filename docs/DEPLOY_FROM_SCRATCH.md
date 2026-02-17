@@ -80,16 +80,19 @@ foreach ($p in $providers) {
 }
 ```
 
-### 1.4 Accept Mistral MaaS Marketplace Terms
+### 1.4 Verify Mistral Document AI Availability
 
-> **This step cannot be scripted — it must be done in the Azure Portal.**
+> **Mistral Document AI** is deployed directly through **Azure AI Foundry** as a
+> Serverless API — no Azure Marketplace subscription is required.
 
-1. Go to [Azure Marketplace](https://portal.azure.com/#view/Microsoft_Azure_Marketplace/MarketplaceOffersBlade)
-2. Search for **"Mistral"**
-3. Find **Mistral Document AI** and click **"Get It Now"** / **"Subscribe"**
-4. Accept the terms and conditions
+1. Go to [Azure AI Foundry](https://ai.azure.com/)
+2. Select your project (created by Terraform in Step 3)
+3. Navigate to **Model catalog** and search for **"Mistral Document AI"**
+4. Verify the model is available in your region (recommended: `swedencentral`)
 
-If you skip this step, Mistral OCR model deployment will fail with a Marketplace terms error.
+If the model is not available in your region, check
+[Azure AI model availability](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models)
+and consider switching your `location` in `terraform.tfvars`.
 
 ---
 
@@ -294,7 +297,7 @@ Deploy these **three models** (strictly required):
 | Model | Deployment Name | Type | Purpose |
 |-------|----------------|------|---------|
 | **Phi-4** | `phi-4` | Standard (Global) | Email classification |
-| **Mistral Document AI 2505** | `mistral-document-ai-2505` | Serverless (MaaS) | OCR / PDF extraction |
+| **Mistral Document AI 2505** | `mistral-document-ai-2505` | Serverless API | OCR / PDF extraction |
 | **text-embedding-3-small** | `text-embedding-3-small` | Standard (Global) | RAG embeddings |
 
 ### 5.3 Recommended Optional Models
@@ -650,13 +653,13 @@ uv run pytest
 |---------|-------|-----|
 | `terraform apply` fails on policies | Tenant restricts custom policy creation | Set `tag_policy_enabled = false` and `security_cost_policy_enabled = false` in `terraform.tfvars` |
 | Cosmos DB 403 Forbidden | RBAC not propagated yet | Wait 5-10 min, then restart Container Apps: `az containerapp restart --name email-poc-test-api -g email-poc-test-rg` |
-| Mistral deployment fails | Marketplace terms not accepted | See [Section 1.4](#14-accept-mistral-maas-marketplace-terms) |
+| Mistral deployment fails | Model not available in region | Check model catalog in Azure AI Foundry; try `swedencentral` or `eastus`. See [Section 1.4](#14-verify-mistral-document-ai-availability) |
 | Container App stuck "Provisioning" | Placeholder image or ACR pull failure | Verify `acr_name` and `acr_resource_group` in tfvars, ensure AcrPull role is assigned |
 | Event Grid messages not arriving | Service Bus local auth disabled by tenant policy | Check `az servicebus namespace show --name <ns> -g <rg> --query disableLocalAuth` — must be `false` for Event Grid |
 | Model not available in region | Regional model availability | Try `swedencentral`, `eastus`, or check [Azure AI model availability](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) |
 | `write_secrets_env.ps1` fails | Resources not found with prefix | Pass `-ResourceGroup` and `-Prefix` explicitly |
 | Docker build fails with `python:3.12-slim` | Docker Hub blocked in corporate network | Use an internal mirror or build via ACR (`.\scripts\build_acr.ps1`) |
-| `azapi_resource` 403 / IMDS error on `vector_cache` | `azapi` provider missing `use_cli = true` — falls back to Managed Identity (IMDS) which fails locally | Ensure `provider "azapi" { use_cli = true }` block exists in `main.tf` (already fixed) |
+| `azapi_resource` 403 / IMDS error on `emails_container` or `vector_cache` | `azapi` (and/or `azurerm`) provider tries IMDS (Managed Identity) as fallback — blocked by corporate firewalls (FortiGuard) at `169.254.169.254` | Ensure both providers have `use_cli = true`, `use_msi = false`, `use_oidc = false` in `main.tf`. Then run `terraform init -upgrade` before `terraform plan/apply`. Already fixed in latest code |
 
 ### Useful Commands
 
