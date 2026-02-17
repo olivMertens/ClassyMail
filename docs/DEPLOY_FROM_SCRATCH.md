@@ -681,11 +681,11 @@ The system has **3 layers of automatic retry** before a message lands in the Dea
 
 | Layer | Mechanism | Config | Default |
 |-------|-----------|--------|---------|
-| 1. Application retry | Tenacity exponential backoff | `MISTRAL_OCR_MAX_ATTEMPTS` | 3 attempts (1-10s waits) |
+| 1. Application retry | Tenacity exponential backoff | `MISTRAL_OCR_MAX_ATTEMPTS` | 2 attempts (1-10s waits) |
 | 2. Circuit breaker | pybreaker | `fail_max=5`, `reset_timeout=60s` | Opens after 5 consecutive failures |
 | 3. Service Bus delivery | Auto-retry by Azure | `max_delivery_count` | 5 deliveries before DLQ |
 
-**Total**: up to 3 x 5 = 15 OCR attempts per message before DLQ.
+**Total**: up to 2 x 5 = 10 OCR attempts per message before DLQ.
 
 #### Common Mistral OCR Errors
 

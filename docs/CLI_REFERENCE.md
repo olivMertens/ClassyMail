@@ -61,7 +61,7 @@ terraform output app_identity_principal_id
 
 # Via Azure CLI (replace <prefix> with your deployment prefix)
 $RESOURCE_GROUP = "<prefix>-rg"
-$IDENTITY_NAME = "<prefix>-app-id"
+$IDENTITY_NAME = "<prefix>-id"
 
 # Client ID
 az identity show `

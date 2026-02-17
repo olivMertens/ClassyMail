@@ -54,20 +54,34 @@ The ClassyMail MVP requires the following model deployments in Azure AI Foundry:
 - **TPM**: 25,000+
 - **Environment Variable**: `PHI_FALLBACK_DEPLOYMENT`
 
-### 3. **Mistral Large (OCR & Document Understanding)**
-- **Model**: `Mistral-Large-2505` (serverless MaaS)
+### 3. **Mistral Document AI (OCR & Document Understanding)**
+- **Model**: `Mistral Document AI 2505` (serverless MaaS)
 - **Deployment Name** (required): `mistral-document-ai-2505`
 - **Purpose**: OCR extraction from PDFs and document structure analysis
 - **Mode**: Serverless (Models as a Service)
 - **Environment Variable**: `MISTRAL_DEPLOYMENT`
 - ⚠️ **CRITICAL**: Deployment name MUST be `mistral-document-ai-2505` exactly. Typos (e.g., `mistral-ocr-2505`) will cause **HTTP 500 errors** during OCR processing.
 
-### 4. **GPT Model (Advanced Classification)**
+### 4. **text-embedding-3-small (Vector Embeddings)**
+- **Model**: `text-embedding-3-small` (OpenAI)
+- **Deployment Name** (recommended): `text-embedding-3-small`
+- **Purpose**: Vector embeddings for RAG chatbot search
+- **TPM**: 30,000+
+- **Environment Variable**: `EMBEDDING_DEPLOYMENT`
+
+### 5. **GPT Model (Chat & Advanced Classification)**
 - **Model**: `gpt-5.2-chat` or `gpt-4o`
 - **Deployment Name** (recommended): `gpt-5.2-chat` or `gpt-4o`
 - **Purpose**: Advanced reasoning, RAG chat, adversarial testing
 - **TPM**: 30,000+
 - **Environment Variables**: `CHAT_DEPLOYMENT`, `GPT_DEPLOYMENT` (optional)
+
+### 6. **GPT-5-nano (Category Assessment)** — Optional
+- **Model**: `gpt-5-nano` (reasoning model)
+- **Deployment Name** (recommended): `gpt-5-nano`
+- **Purpose**: AI-powered category quality analysis and advice
+- **TPM**: 10,000+
+- **Environment Variable**: Used via `GPT_DEPLOYMENT` fallback
 
 ---
 
@@ -100,11 +114,11 @@ Repeat Step 2 with:
 - **Deployment name**: `phi-4-generic`
 - **TPM**: 25,000
 
-### Step 4: Deploy Mistral Large (MaaS)
+### Step 4: Deploy Mistral Document AI (MaaS)
 
 1. Click **+ Create new deployment**
 2. Select **Model Catalog** → **Mistral**
-3. Find **Mistral-Large-2505**
+3. Find **Mistral Document AI 2505**
 4. Choose **Serverless API (Models as a Service)**
 5. Configure:
    - **Deployment name**: `mistral-document-ai-2505`
@@ -129,8 +143,8 @@ Repeat Step 2 with:
 ### Step 6: Get AI Foundry Endpoint
 
 1. In Azure AI Foundry resource, go to **Overview**
-2. Copy the **Endpoint URL** (format: `https://<region>.api.cognitive.microsoft.com/`)
-3. Example: `https://swedencentral.api.cognitive.microsoft.com/`
+2. Copy the **Endpoint URL** (format: `https://<name>.cognitiveservices.azure.com/`)
+3. Example: `https://email-poc-aifoundry.cognitiveservices.azure.com/`
 
 ---
 
@@ -546,9 +560,11 @@ Run with:
 
 - [ ] Azure AI Foundry resource deployed
 - [ ] Phi-4 deployment created (`phi-4-document-classification`)
-- [ ] Phi-4 fallback created (`phi-4-generic`)
-- [ ] Mistral MaaS deployment created (`mistral-document-ai-2505`)
+- [ ] Phi-4 fallback created (`phi-4-generic`) or GPT-4o-mini fallback
+- [ ] Mistral Document AI MaaS deployment created (`mistral-document-ai-2505`)
+- [ ] text-embedding-3-small deployment created
 - [ ] GPT deployment created (optional, `gpt-5.2-chat`)
+- [ ] GPT-5-nano deployment created (optional, for category assessment)
 - [ ] `AI_ENDPOINT` configured in Container Apps
 - [ ] `PHI_DEPLOYMENT` configured in Container Apps
 - [ ] `MISTRAL_DEPLOYMENT` configured in Container Apps

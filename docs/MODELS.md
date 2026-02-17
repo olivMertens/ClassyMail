@@ -91,10 +91,13 @@ payload = {
 # Reasoning model → {"max_completion_tokens": 2000}  (temperature omitted)
 ```
 
-**Detected reasoning families:** `o1`, `o3`, `o4`, `gpt-5`, `gpt5`
+**Detected reasoning families:** `o1`, `o3`, `o4`, `gpt-5`, `gpt5`, `kimi`
+
+**Additional Helper — `extract_message_content()`:**
+Some reasoning models (e.g. Kimi-K2.5, certain o-series) return output in `reasoning_content` instead of `content`. The `extract_message_content(message)` helper checks both fields and returns whichever is non-empty.
 
 **Implementation References:**
-- [llm_compat.py](../classymail/core/llm_compat.py): Centralized helper (`is_reasoning_model`, `build_chat_params`)
+- [llm_compat.py](../classymail/core/llm_compat.py): Centralized helpers (`is_reasoning_model`, `build_chat_params`, `extract_message_content`)
 - [test_llm_compat.py](../tests/test_llm_compat.py): 29 tests covering model detection and parameter construction
 
 ---
@@ -159,9 +162,9 @@ Fallback/Audit (high quality):
 - `PHI_FALLBACK_DEPLOYMENT` (recommended: `gpt-5-mini` for adversarial comparison)
 
 Context sizing:
-- `PHI_PRIMARY_MAX_INPUT_TOKENS` (example: `8000` for Phi-4)
-- `PHI_FALLBACK_MAX_INPUT_TOKENS` (example: `200000` for gpt-5-mini)
-- `PHI_RESERVED_OUTPUT_TOKENS` (example: `1000`)
+- `PHI_PRIMARY_MAX_INPUT_TOKENS` (default: `8000` for Phi-4)
+- `PHI_FALLBACK_MAX_INPUT_TOKENS` (default: `120000` for gpt-4o-mini; set to `200000` when using gpt-5-mini)
+- `PHI_RESERVED_OUTPUT_TOKENS` (default: `1000`)
 
 ## Adversarial Comparison Strategy
 
@@ -235,7 +238,7 @@ The following models support fine-tuning for custom classification tasks:
 
 ## Future Models (Preview)
 
-The system is ready for next-gen models. You can configure `PHI_DEPLOYMENT` or `PHI_4` env vars to point to these deployments if available in your region:
+The system is ready for next-gen models. You can configure `PHI_DEPLOYMENT` or `PHI_FALLBACK_DEPLOYMENT` env vars to point to these deployments if available in your region:
 
 - **GPT-4.1** (`gpt-4.1-preview`): High intelligence, fast reasoning.
 - **GPT-5** (`gpt-5-preview`): Theoretical placeholder for next-gen reasoning capabilities.
@@ -247,6 +250,24 @@ Cost tracking (configurable):
 - `FALLBACK_COST_PER_1K_INPUT`, `FALLBACK_COST_PER_1K_OUTPUT`
 
 The code logs which model was used and stores usage + estimated cost in Cosmos.
+
+## OCR Fallback: Document Intelligence via AI Foundry
+
+When Mistral OCR fails (timeout, quota, circuit breaker open), the system can fall back to **Azure Document Intelligence** for OCR.
+
+**Configuration:**
+- `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` — Endpoint for DI (uses AI Foundry endpoint by default; set `deploy_document_intelligence=true` in Terraform for a dedicated resource)
+- `DOC_INTELLIGENCE_API_VERSION` — API version (default: `2024-11-30`)
+
+**Behavior:**
+- If `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` is set, Mistral OCR failures automatically trigger DI fallback
+- If not set, OCR failures raise `OCRFailed` without fallback
+- DI uses the `prebuilt-read` model (Layout API) and returns Markdown output
+- Authentication via managed identity (`Cognitive Services User` role on the AI Foundry account or dedicated DI resource)
+
+**Reference:** See [ADR_OCR_STRATEGY.md](ADR_OCR_STRATEGY.md) for the full architectural decision record.
+
+---
 
 ## Cost Analysis
 

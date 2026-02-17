@@ -99,15 +99,16 @@
 - **Commit**: 7fbd13f
 
 ### 7. **GPT-5 Reasoning Model Support** (Feb 2026) ✅
-- **Location**: [category_assessment.py](../classymail/api/category_assessment.py#L140-L163), [chat_agent.py](../classymail/services/chat_agent.py#L508-L515)
+- **Location**: [llm_compat.py](../classymail/core/llm_compat.py), [category_assessment.py](../classymail/api/category_assessment.py#L140-L163), [chat_agent.py](../classymail/services/chat_agent.py#L508-L515)
 - **API Parameter Handling**:
   - Standard models (GPT-4o, Phi-4): `max_tokens`, `temperature` supported
-  - Reasoning models (GPT-5.x, GPT-4.1+, o1, o3): `max_completion_tokens` only, NO `temperature`
-- **Detection Logic**:
+  - Reasoning models (GPT-5.x, o1, o3, o4, Kimi): `max_completion_tokens` only, NO `temperature`
+- **Detection Logic** (centralized in `llm_compat.py`):
   ```python
-  is_reasoning_model = any(x in deployment.lower() for x in ["gpt-5", "gpt-4.1", "o1", "o3"])
+  _REASONING_FAMILIES = ("o1", "o3", "o4", "gpt-5", "gpt5", "kimi")
   ```
-- **Implementation**: Both chat_agent.py and category_assessment.py correctly handle reasoning models
+- **Helpers**: `is_reasoning_model()`, `build_chat_params()`, `extract_message_content()`
+- **Implementation**: All LLM calls use `build_chat_params()` from `llm_compat.py`
 - **Commit**: ca11109
 
 ---

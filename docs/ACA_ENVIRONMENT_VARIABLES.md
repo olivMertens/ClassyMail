@@ -53,7 +53,7 @@ These variables **must** be configured for the application to function correctly
 ### Azure AI Foundry
 
 - **`AZURE_AI_ENDPOINT`** - The endpoint URL for Azure AI Foundry (OpenAI models)
-  - Example: `https://swedencentral.api.cognitive.microsoft.com/`
+  - Example: `https://email-poc-aifoundry.cognitiveservices.azure.com/`
   - Used for: Accessing GPT, Phi-4, and Mistral models
   - Note: `PHI_ENDPOINT` and `MISTRAL_ENDPOINT` fall back to this value if not set
 

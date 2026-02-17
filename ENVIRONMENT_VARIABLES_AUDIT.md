@@ -110,7 +110,7 @@ This audit compares environment variables across:
 | `MISTRAL_OCR_COST_PER_1K_PAGES` | 1.0 | Cost tracking | ✅ In example |
 | `FALLBACK_COST_PER_1K_INPUT` | 0 | Fallback costs | ❌ Missing |
 | `FALLBACK_COST_PER_1K_OUTPUT` | 0 | Fallback costs | ❌ Missing |
-| `MISTRAL_OCR_MAX_ATTEMPTS` | 3 | Retry logic | ❌ Missing |
+| `MISTRAL_OCR_MAX_ATTEMPTS` | 2 | Retry logic | ❌ Missing |
 | `REVIEW_CONFIDENCE_THRESHOLD` | 0.85 | Quality gate | ❌ Missing |
 
 ### 👷 **Worker Configuration** (OPTIONAL with defaults)
