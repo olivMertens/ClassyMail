@@ -659,7 +659,41 @@ uv run pytest
 | Model not available in region | Regional model availability | Try `swedencentral`, `eastus`, or check [Azure AI model availability](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models) |
 | `write_secrets_env.ps1` fails | Resources not found with prefix | Pass `-ResourceGroup` and `-Prefix` explicitly |
 | Docker build fails with `python:3.12-slim` | Docker Hub blocked in corporate network | Use an internal mirror or build via ACR (`.\scripts\build_acr.ps1`) |
-| `azapi_resource` 403 / IMDS error on `emails_container` or `vector_cache` | `azapi` (and/or `azurerm`) provider tries IMDS (Managed Identity) as fallback — blocked by corporate firewalls (FortiGuard) at `169.254.169.254` | Ensure both providers have `use_cli = true`, `use_msi = false`, `use_oidc = false` in `main.tf`. Then run `terraform init -upgrade` before `terraform plan/apply`. Already fixed in latest code |
+| `azapi_resource` 403 / IMDS error on `vector_cache` | See detailed fix below | **Pull latest code** then follow checklist below |
+
+#### Fix: `ChainedTokenCredential` / IMDS 403 on azapi resources
+
+The `azapi` provider v1.13 defaults `use_msi = true` (unlike `azurerm` which defaults to `false`).
+On corporate networks where firewalls (FortiGuard, Zscaler) block the IMDS endpoint (`169.254.169.254`), this causes a 403 HTML response that crashes the credential chain.
+
+**Checklist for The deployer:**
+
+```powershell
+# 1. Pull the latest code (the fix is already committed)
+git pull origin main
+
+# 2. Verify main.tf providers have these flags:
+#    provider "azurerm" { use_cli = true; use_msi = false; use_oidc = false }
+#    provider "azapi"   { use_cli = true; use_msi = false; use_oidc = false }
+
+# 3. Re-initialize Terraform providers
+terraform -chdir=infra init -upgrade
+
+# 4. (Belt-and-suspenders) Set environment variable:
+$env:ARM_USE_MSI = "false"
+
+# 5. Verify Azure CLI login is active:
+az account show
+
+# 6. Re-run plan/apply
+terraform -chdir=infra plan -out=tfplan
+terraform -chdir=infra apply tfplan
+```
+
+**Required RBAC**: Owner (or Contributor) on the **resource group** is sufficient.
+Subscription-level Owner is NOT required.
+`skip_provider_registration = true` is set in both providers so no subscription-level
+resource-provider registration is attempted.
 
 ### Useful Commands
 
