@@ -39,6 +39,7 @@
 - [G2S_CUSTOMIZATION](G2S_CUSTOMIZATION.md) - **Configuration G2S** : tags, catégories assurance, branding, policy Azure
 - [ADR_OCR_STRATEGY](ADR_OCR_STRATEGY.md) - Architecture Decision Record: OCR Strategy
 - [VISION_STRATEGY_PERFORMANCE_ANALYSIS](VISION_STRATEGY_PERFORMANCE_ANALYSIS.md) - Analyse de performance de la stratégie Vision (PDF-to-JPEG, latence)
+- [COMPARISON_CONTENT_UNDERSTANDING](COMPARISON_CONTENT_UNDERSTANDING.md) - ClassyMail vs Azure Content Understanding : features, limites, pricing, verdict
 - [RBAC_AUDIT](RBAC_AUDIT.md) - Audit et troubleshooting RBAC détaillé
 - [TROUBLESHOOTING_MAP](TROUBLESHOOTING_MAP.md) - Architecture & troubleshooting map (connexions ACA/SB/Storage/Identity)
 

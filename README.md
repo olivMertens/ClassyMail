@@ -693,6 +693,7 @@ L'index complet est disponible ici : **[docs/INDEX.md](docs/INDEX.md)**.
 | **Analyse** | [ADR_OCR_STRATEGY](docs/ADR_OCR_STRATEGY.md) | ADR: Stratégie OCR |
 | | [VISION_STRATEGY](docs/VISION_STRATEGY_PERFORMANCE_ANALYSIS.md) | Performance Vision |
 | | [TROUBLESHOOTING_MAP](docs/TROUBLESHOOTING_MAP.md) | Troubleshooting architecture |
+| | [COMPARISON_CONTENT_UNDERSTANDING](docs/COMPARISON_CONTENT_UNDERSTANDING.md) | ClassyMail vs Azure Content Understanding |
 | **G2S** | [G2S_CUSTOMIZATION](docs/G2S_CUSTOMIZATION.md) | Tags, catégories, policy |
 | | [INTEGRATION_CLIENT_G2S](docs/INTEGRATION_CLIENT_G2S.md) | Preprocessing, slugs, CSV |
 | **Config** | [ENVIRONMENT_VARIABLES_AUDIT](ENVIRONMENT_VARIABLES_AUDIT.md) | Variables d'env complètes |

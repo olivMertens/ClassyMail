@@ -15,6 +15,7 @@
 4. [Build and Push Container Image](#4-build-and-push-container-image)
 5. [Deploy AI Models](#5-deploy-ai-models)
 6. [Local Development Setup](#6-local-development-setup)
+   - 6.5 [Upload PDFs to Blob Storage](#65-upload-pdfs-to-blob-storage)
 7. [Verify and Smoke Test](#7-verify-and-smoke-test)
 8. [Troubleshooting](#8-troubleshooting)
 9. [Cleanup / Teardown](#9-cleanup--teardown)
@@ -353,6 +354,260 @@ uv run uvicorn classymail.app:app --reload --port 8000
 ```
 
 Open [http://localhost:8000](http://localhost:8000) in your browser.
+
+---
+
+## 6.5 Upload PDFs to Blob Storage
+
+After infrastructure is deployed and RBAC is assigned, you can populate the
+`pdf-inputs` container with PDF files. **Every `.pdf` uploaded triggers the
+full classification pipeline automatically** (Event Grid → Service Bus →
+Worker → OCR → Classification → Cosmos DB).
+
+> **Important constraints:**
+>
+> - Only **`.pdf` files** are processed. ZIP, DOCX, images, etc. are **ignored** by Event Grid.
+> - **Shared-key / SAS token access is disabled** on the storage account. All methods must use **Entra ID (Azure AD) authentication**.
+> - You need the **Storage Blob Data Contributor** role on the storage account (assigned in [Step 6.2](#62-assign-rbac-roles-for-local-development)).
+> - Each PDF triggers one pipeline run. Uploading 10 000 files = 10 000 pipeline runs. The Service Bus queue buffers messages and the Worker auto-scales via KEDA.
+
+### Path structure
+
+The API stores uploads under a dated prefix:
+
+```
+pdf-inputs/
+  uploads/
+    2026/
+      02/
+        17/
+          a1b2c3d4-my-document.pdf
+          e5f6a7b8-another-file.pdf
+```
+
+When uploading directly (bypassing the API), you can use any structure — the
+only requirement is that each blob path **ends with `.pdf`** and is **unique**
+(uploading to the same path overwrites the file and re-triggers the pipeline).
+
+**Recommended convention for bulk uploads:**
+
+```
+pdf-inputs/uploads/{filename}.pdf
+```
+
+Or mirror the API date-based structure:
+
+```
+pdf-inputs/uploads/2026/02/17/{filename}.pdf
+```
+
+---
+
+### Method 1: Web UI (small batches)
+
+**Best for**: Quick tests with a few files.
+
+1. Open the application URL (local: `http://localhost:8000`, or the Container App URL)
+2. Navigate to **Upload**
+3. Drag-and-drop or select PDF files
+4. Click **Upload**
+
+**Limits**: 10 files per upload, 10 MB per file.
+
+---
+
+### Method 2: Azure Portal — Storage Browser (moderate batches)
+
+**Best for**: GUI upload of tens to hundreds of files without installing anything.
+
+1. Go to [Azure Portal](https://portal.azure.com/)
+2. Navigate to your **Storage Account** (e.g. `emailpoctestst`)
+3. In the left menu, click **Storage browser** → **Blob containers** → **pdf-inputs**
+4. Click **Upload** (top toolbar)
+5. Click **Browse for files** and select your PDFs (multi-select supported)
+6. Set **Upload to folder** to `uploads` (or `uploads/2026/02/17`)
+7. Click **Upload**
+
+> **Note**: The portal supports selecting hundreds of files at once. For 10K+
+> files, use AzCopy ([Method 4](#method-4-azcopy-10k-files--fastest)) instead — the portal may time out.
+
+---
+
+### Method 3: Azure CLI — `az storage blob upload-batch` (scripted bulk)
+
+**Best for**: Scripted, repeatable uploads of thousands of files from a local folder.
+
+**PowerShell:**
+
+```powershell
+# Upload all PDFs from a local folder into the "uploads" path
+az storage blob upload-batch `
+  --account-name emailpoctestst `
+  --destination pdf-inputs `
+  --destination-path uploads `
+  --source "C:\MyPDFs" `
+  --pattern "*.pdf" `
+  --auth-mode login `
+  --overwrite false
+
+# Upload from a subdirectory tree (preserves folder hierarchy)
+az storage blob upload-batch `
+  --account-name emailpoctestst `
+  --destination pdf-inputs `
+  --destination-path uploads `
+  --source "C:\MyPDFs\batch-2026-02" `
+  --pattern "**/*.pdf" `
+  --auth-mode login `
+  --overwrite false
+```
+
+**Bash (Linux / macOS):**
+
+```bash
+az storage blob upload-batch \
+  --account-name emailpoctestst \
+  --destination pdf-inputs \
+  --destination-path uploads \
+  --source ./my-pdfs \
+  --pattern "*.pdf" \
+  --auth-mode login \
+  --overwrite false
+```
+
+> `--auth-mode login` is **required** (shared keys are disabled).
+> `--overwrite false` prevents accidental re-processing of already-uploaded files.
+
+---
+
+### Method 4: AzCopy (10K+ files — fastest)
+
+**Best for**: Very large datasets. AzCopy uses parallel transfers and is
+significantly faster than the Azure CLI for thousands of files.
+
+**Install**: [AzCopy download](https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azcopy-v10#download-azcopy)
+
+**PowerShell:**
+
+```powershell
+# 1. Authenticate with Entra ID (required — SAS/shared keys are disabled)
+azcopy login --tenant-id <YOUR_TENANT_ID>
+
+# 2a. Copy all PDFs from a local folder
+azcopy copy "C:\MyPDFs\*.pdf" `
+  "https://emailpoctestst.blob.core.windows.net/pdf-inputs/uploads/" `
+  --recursive
+
+# 2b. Copy a directory tree (only PDFs, preserves subfolders)
+azcopy copy "C:\MyPDFs\*" `
+  "https://emailpoctestst.blob.core.windows.net/pdf-inputs/uploads/" `
+  --recursive `
+  --include-pattern "*.pdf"
+
+# 2c. Server-side copy from another Azure storage account (no local download)
+azcopy copy `
+  "https://sourceaccount.blob.core.windows.net/source-container/*" `
+  "https://emailpoctestst.blob.core.windows.net/pdf-inputs/uploads/" `
+  --recursive `
+  --include-pattern "*.pdf"
+```
+
+**Bash (Linux / macOS):**
+
+```bash
+azcopy login --tenant-id <YOUR_TENANT_ID>
+
+azcopy copy "./my-pdfs/*.pdf" \
+  "https://emailpoctestst.blob.core.windows.net/pdf-inputs/uploads/" \
+  --recursive
+```
+
+> **Server-side copy**: If your PDFs are already in another Azure storage
+> account, use AzCopy account-to-account copy — data moves within Azure
+> without downloading locally. You need **Storage Blob Data Reader** on the
+> source and **Storage Blob Data Contributor** on the destination.
+
+---
+
+### Method 5: VS Code — Azure Storage Extension (IDE)
+
+**Best for**: Developers who prefer working inside their editor.
+
+1. Install the [Azure Storage extension](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-azurestorage) for VS Code
+2. Sign in to Azure in the sidebar (**Azure** icon → **Sign in**)
+3. Expand **Storage Accounts** → your account (e.g. `emailpoctestst`)
+4. Expand **Blob Containers** → **pdf-inputs**
+5. Right-click **pdf-inputs** → **Create Virtual Directory** → name it `uploads`
+6. Right-click **uploads** → **Upload Files...**
+7. Select your PDF files or an entire folder
+8. Files are uploaded with your Entra ID credentials automatically
+
+---
+
+### Method 6: Azure Storage Explorer (desktop GUI)
+
+**Best for**: Moderate batches with drag-and-drop from a desktop application.
+
+**Install**: [Azure Storage Explorer](https://azure.microsoft.com/en-us/products/storage/storage-explorer/)
+
+1. Open Storage Explorer and sign in with your Azure account
+2. Navigate to **Storage Accounts** → your account → **Blob Containers** → **pdf-inputs**
+3. Click **New Folder** to create `uploads` (or the date-based path)
+4. Navigate into the folder
+5. Click **Upload** → **Upload Files** or **Upload Folder**
+6. Select your PDFs and confirm
+
+> Storage Explorer uses your Entra ID session automatically — no SAS tokens needed.
+
+---
+
+### Upload methods comparison
+
+| Method | Best for | Volume | Auth | Requires install? |
+|--------|----------|--------|------|--------------------|
+| Web UI | Quick test | ≤ 10 files, 10 MB each | App session | No |
+| Azure Portal | Moderate GUI upload | Hundreds | Entra ID | No |
+| `az storage blob upload-batch` | Scripted bulk | Thousands | `--auth-mode login` | Azure CLI |
+| **AzCopy** | **Large datasets** | **10K – millions** | `azcopy login` | AzCopy binary |
+| VS Code extension | IDE workflow | Hundreds | Entra ID | VS Code extension |
+| Storage Explorer | Desktop drag-and-drop | Hundreds | Entra ID | Desktop app |
+
+---
+
+### What happens after upload
+
+Every `.pdf` uploaded to `pdf-inputs` triggers this automated flow:
+
+1. **Event Grid** fires a `BlobCreated` event (filtered to `.pdf` / `.PDF`)
+2. **Service Bus** receives the event in the `pdf-processing-queue`
+3. **Worker** picks up the message and creates a `PROCESSING` record in Cosmos DB
+4. **Pipeline** runs: PDF download → Mistral OCR → Phi-4 classification → embedding
+5. **Cosmos DB** receives the final `PROCESSED` (or `REVIEW_REQUIRED`) record
+6. **Result** appears in the UI
+
+### Monitor progress
+
+```powershell
+# Check Service Bus queue depth (messages waiting to be processed)
+az servicebus queue show `
+  --namespace-name email-poc-test-sbus `
+  --resource-group email-poc-test-rg `
+  --name pdf-processing-queue `
+  --query "countDetails.activeMessageCount"
+
+# Count blobs in the container
+az storage blob list `
+  --account-name emailpoctestst `
+  --container-name pdf-inputs `
+  --auth-mode login `
+  --query "length(@)"
+
+# Check processed records via the API
+curl https://<your-api-url>/api/emails?limit=1 | jq '.total'
+```
+
+> **Tip**: After a large bulk upload, monitor the queue depth. When it reaches
+> **0** and all Cosmos records show `PROCESSED` or `REVIEW_REQUIRED`, the
+> batch is complete.
 
 ---
 

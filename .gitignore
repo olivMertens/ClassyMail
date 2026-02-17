@@ -5,6 +5,7 @@ __pycache__/
 *.pyd
 *.so
 *.egg-info/
+docs/COMPARISON_CONTENT_UNDERSTANDING.md
 .eggs/
 .dist-info/
 .env
@@ -57,3 +58,6 @@ secrets.env
 **/*.tfstate.*
 **/terraform.tfvars
 **/tfplan
+
+# CU test output
+CU/last_result.json

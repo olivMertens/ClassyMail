@@ -1,0 +1,70 @@
+{
+  "description": "Insurance email/PDF classifier for G2S (REST API version -- uses extract for verbatim fields)",
+  "baseAnalyzerId": "prebuilt-document",
+  "models": {
+    "completion": "gpt-4.1-mini",
+    "embedding": "text-embedding-3-small"
+  },
+  "config": {
+    "enableSegment": false,
+    "estimateFieldSourceAndConfidence": true,
+    "returnDetails": true
+  },
+  "fieldSchema": {
+    "fields": {
+      "Category": {
+        "type": "string",
+        "method": "classify",
+        "description": "Insurance document category",
+        "enum": [
+          "Attestation habitation",
+          "Releve de compte",
+          "Attestation scolaire",
+          "Dommages electriques",
+          "Evenements naturels"
+        ]
+      },
+      "Subject": {
+        "type": "string",
+        "method": "extract",
+        "description": "Subject of the email or document"
+      },
+      "Sender": {
+        "type": "string",
+        "method": "extract",
+        "description": "Name or organization of the sender"
+      },
+      "Summary": {
+        "type": "string",
+        "method": "generate",
+        "description": "Brief summary of the document content"
+      },
+      "Entities": {
+        "type": "array",
+        "method": "extract",
+        "description": "Key business entities found in the document",
+        "items": {
+          "type": "object",
+          "properties": {
+            "Name": {
+              "type": "string",
+              "method": "extract",
+              "description": "Name of the entity"
+            },
+            "Type": {
+              "type": "string",
+              "method": "classify",
+              "enum": [
+                "Person",
+                "Organization",
+                "Date",
+                "Amount",
+                "Reference"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
