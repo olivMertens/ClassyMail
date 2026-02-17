@@ -190,23 +190,31 @@ async def list_emails(
             # Let's fallback to _ts for confidence for now to avoid breaking query
             pass
 
-        query += f" ORDER BY {sort_field} {order.upper()}"
+        # Count filtered results for accurate pagination
+        count_query = "SELECT VALUE COUNT(1) FROM c"
+        if where:
+            count_query += f" WHERE {where}"
+        filtered_total = 0
+        async for item in cosmos_container.query_items(
+            count_query,
+            parameters=[{"name": k, "value": v} for k, v in params.items()],
+        ):
+            filtered_total = item
+            break
 
-        items_iter = cosmos_container.query_items(
+        # Use OFFSET/LIMIT for page-based pagination
+        offset = (page - 1) * page_size
+        query += f" ORDER BY {sort_field} {order.upper()}"
+        query += f" OFFSET {offset} LIMIT {page_size}"
+
+        items: list[EmailRecord] = []
+        async for item in cosmos_container.query_items(
             query,
             parameters=[{"name": k, "value": v} for k, v in params.items()],
-            max_item_count=page_size,
-        )
-        pages = items_iter.by_page(continuation_token=continuation_token)
-        items: list[EmailRecord] = []
-        next_token: str | None = None
-        async for page_items in pages:
-            async for item in page_items:
-                # Add proxy URL for secure blob access via Managed Identity
-                item["file_url_proxy"] = f"/api/emails/{item['id']}/file"
-                items.append(EmailRecord(**item))
-            next_token = pages.continuation_token
-            break
+        ):
+            # Add proxy URL for secure blob access via Managed Identity
+            item["file_url_proxy"] = f"/api/emails/{item['id']}/file"
+            items.append(EmailRecord(**item))
 
         processed_count = await count_by_status("PROCESSED", clients=clients)
         review_count = await count_by_status("REVIEW_REQUIRED", clients=clients)
@@ -224,12 +232,13 @@ async def list_emails(
         return EmailListResponse(
             items=items,
             total=total,
+            filtered_total=filtered_total,
             review_required=review_count,
             processed=processed_count,
             finetune_reviewed_ready=finetune_reviewed_ready,
             finetune_min_required=finetune_min_required,
             finetune_ready=finetune_reviewed_ready >= finetune_min_required,
-            continuation_token=next_token,
+            continuation_token=None,  # Using OFFSET/LIMIT, not continuation tokens
             average_confidence=avg_conf,
         )
     except Exception as e:

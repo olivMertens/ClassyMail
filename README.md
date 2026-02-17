@@ -25,7 +25,7 @@ Il valide une architecture moderne sur Azure :
 
 1.  **Ingestion** : Upload PDF vers Blob Storage (API ou Portail).
 2.  **Queue** : Event Grid détecte le fichier et notifie Service Bus.
-3.  **Worker** : Consomme le message, valide le PDF, lance l'OCR (Mistral) puis la classification (Phi-4).
+3.  **Worker** : Consomme le message, valide le PDF, lance l'OCR (Mistral, avec fallback Document Intelligence) puis la classification (Phi-4).
 4.  **Stockage** : Résultats sauvegardés dans Cosmos DB.
 
 ```mermaid
@@ -37,6 +37,7 @@ flowchart TD
     mi -.->|RBAC| cosmos
     mi -.->|RBAC| ai
     mi -.->|RBAC| lang
+    mi -.->|RBAC| di
 
     api -->|GET| blob[(Blob Storage)]
     blob -->|Event Grid| sbq["Service Bus Queue"]
@@ -45,6 +46,8 @@ flowchart TD
     worker -->|Download| blob
     api -->|OCR| ocr["🔷 Mistral OCR"]
     ocr -->|Markdown| api
+    ocr -.->|Fallback| di["📋 Document Intelligence"]
+    di -.->|Markdown| api
 
     api -->|Estimate tokens| tokencheck{"Content tokens < 8K?"}
     tokencheck -->|YES| phi4["🔶 Phi-4 - Primary, 8K"]
@@ -73,6 +76,7 @@ flowchart TD
 
     style mi fill:#fff9c4,stroke:#f57f17,stroke-width:2px
     style lang fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    style di fill:#fff3e0,stroke:#e65100,stroke-width:2px
 ```
 
 ---
@@ -126,6 +130,15 @@ curl http://localhost:8000/api/admin/diagnostics
 Le pipeline utilise une approche à deux temps pour maximiser la précision des petits modèles (SLM) :
 1.  **OCR Enrichi** : Mistral extrait le texte mais aussi la structure et décrit les images (Alt-Text).
 2.  **Pré-Extraction** : Les entités clés (Noms, Dates, Montants) sont extraites en amont, permettant au modèle de classification de se concentrer uniquement sur l'intention.
+
+### 🔄 OCR Fallback — Document Intelligence (NEW)
+Résilience OCR avec basculement automatique vers Azure Document Intelligence :
+*   **Fallback Transparent** : Si Mistral OCR échoue (timeout, quota, erreur), le pipeline bascule automatiquement vers Azure Document Intelligence
+*   **Circuit Breaker** : Chaque provider a son propre circuit breaker (Mistral: 5 échecs / 60s reset, DI: 3 échecs / 30s reset)
+*   **ConnectTimeout Fast-Fail** : Les erreurs de connexion ne sont pas réessayées, déclenchant immédiatement le fallback
+*   **Tracking Provider** : Le dashboard affiche un badge ambre "Doc Intelligence" quand le fallback est utilisé
+*   **Déploiement Optionnel** : Activé via `deploy_document_intelligence=true` dans Terraform (désactivé par défaut)
+*   **Coût Minime** : S0 tier, facturé à l'usage (~$1.50/1K pages)
 
 ### 🎯 Category Assessment AI Advice (NEW)
 Optimisez vos catégories avec l'aide de l'IA :

@@ -89,6 +89,18 @@ variable "deploy_language_service" {
   default     = false
 }
 
+variable "deploy_document_intelligence" {
+  type        = bool
+  description = "Deploy Azure Document Intelligence (FormRecognizer) as OCR fallback when Mistral OCR is unavailable. Uses S0 SKU."
+  default     = false
+}
+
+variable "doc_intelligence_sku" {
+  type        = string
+  description = "SKU for Document Intelligence service (S0 for production, F0 for free tier)."
+  default     = "S0"
+}
+
 variable "g2s_tags_enabled" {
   type        = bool
   description = "Enable G2S mandatory corporate tags (cp-code-sa, cp-proprietaire, etc.) on all resources. Set to false for non-G2S deployments."
@@ -287,6 +299,35 @@ resource "azurerm_role_assignment" "aca_language_reader" {
   count                = var.deploy_language_service ? 1 : 0
   scope                = azurerm_cognitive_account.language[0].id
   role_definition_name = "Cognitive Services Language Reader"
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
+}
+
+# --- Optional: Azure Document Intelligence (OCR Fallback) ---
+# Provides Document Intelligence API as OCR fallback when Mistral is unavailable
+# Enable via: deploy_document_intelligence = true
+resource "azurerm_cognitive_account" "doc_intelligence" {
+  count               = var.deploy_document_intelligence ? 1 : 0
+  name                = "${var.prefix}-doc-intel"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  kind                = "FormRecognizer"
+  sku_name            = var.doc_intelligence_sku
+
+  tags = local.common_tags
+
+  public_network_access_enabled = true
+  local_auth_enabled            = false # Force Managed Identity (RBAC-only)
+
+  identity {
+    type = "SystemAssigned"
+  }
+}
+
+# Grant Managed Identity access to Document Intelligence (Cognitive Services User)
+resource "azurerm_role_assignment" "aca_doc_intelligence_user" {
+  count                = var.deploy_document_intelligence ? 1 : 0
+  scope                = azurerm_cognitive_account.doc_intelligence[0].id
+  role_definition_name = "Cognitive Services User"
   principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
@@ -533,6 +574,8 @@ output "SERVICEBUS_NAMESPACE" { value = azurerm_servicebus_namespace.sb.name }
 output "AI_ENDPOINT" { value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, null) }
 output "LANGUAGE_ENDPOINT" { value = var.deploy_language_service ? azurerm_cognitive_account.language[0].endpoint : null }
 output "LANGUAGE_SERVICE_NAME" { value = var.deploy_language_service ? azurerm_cognitive_account.language[0].name : null }
+output "DOCUMENT_INTELLIGENCE_ENDPOINT" { value = var.deploy_document_intelligence ? azurerm_cognitive_account.doc_intelligence[0].endpoint : null }
+output "DOCUMENT_INTELLIGENCE_NAME" { value = var.deploy_document_intelligence ? azurerm_cognitive_account.doc_intelligence[0].name : null }
 output "APP_ID_CLIENT_ID" { value = azurerm_user_assigned_identity.app_id.client_id }
 
 output "AZURE_SERVICE_BUS_FQDN" { value = "${azurerm_servicebus_namespace.sb.name}.servicebus.windows.net" }
@@ -713,6 +756,10 @@ resource "azurerm_container_app" "api" {
         name  = "AZURE_LANGUAGE_ENDPOINT"
         value = var.deploy_language_service ? azurerm_cognitive_account.language[0].endpoint : ""
       }
+      env {
+        name  = "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
+        value = var.deploy_document_intelligence ? azurerm_cognitive_account.doc_intelligence[0].endpoint : ""
+      }
 
       # --- Telemetry: Application Map + Agents View ---
       # service.name  → cloud role name on Application Map
@@ -840,6 +887,13 @@ resource "azurerm_container_app" "worker" {
 
   tags = local.common_tags
 
+  # KEDA azure-servicebus scaler requires a connection string secret
+  # to authenticate and poll queue depth for autoscaling decisions.
+  secret {
+    name  = "sb-connection-string"
+    value = azurerm_servicebus_namespace.sb.default_primary_connection_string
+  }
+
   dynamic "registry" {
     for_each = var.acr_name != "" ? [1] : []
     content {
@@ -931,6 +985,10 @@ resource "azurerm_container_app" "worker" {
         name  = "AZURE_LANGUAGE_ENDPOINT"
         value = var.deploy_language_service ? azurerm_cognitive_account.language[0].endpoint : ""
       }
+      env {
+        name  = "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
+        value = var.deploy_document_intelligence ? azurerm_cognitive_account.doc_intelligence[0].endpoint : ""
+      }
 
       # --- Telemetry: Application Map + Agents View ---
       env {
@@ -992,6 +1050,10 @@ resource "azurerm_container_app" "worker" {
         queueName    = azurerm_servicebus_queue.q.name
         namespace    = "${azurerm_servicebus_namespace.sb.name}.servicebus.windows.net"
         messageCount = "5"
+      }
+      authentication {
+        secret_name       = "sb-connection-string"
+        trigger_parameter = "connection"
       }
     }
   }

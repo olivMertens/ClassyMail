@@ -18,6 +18,7 @@
    - 6.5 [Upload PDFs to Blob Storage](#65-upload-pdfs-to-blob-storage)
 7. [Verify and Smoke Test](#7-verify-and-smoke-test)
 8. [Troubleshooting](#8-troubleshooting)
+   - 8.1 [Mistral OCR Failures and DLQ Recovery](#81-mistral-ocr-failures-and-dlq-recovery)
 9. [Cleanup / Teardown](#9-cleanup--teardown)
 
 ---
@@ -144,6 +145,7 @@ location = "swedencentral"
 cosmos_use_rbac                = true
 enable_model_deployments       = false    # Deploy models manually (Step 5)
 deploy_language_service        = false    # Optional, enable later
+deploy_document_intelligence   = false    # Optional, OCR fallback for Mistral failures
 tag_policy_enabled             = true
 security_cost_policy_enabled   = true
 
@@ -671,6 +673,78 @@ uv run pytest
 ---
 
 ## 8. Troubleshooting
+
+### 8.1 Mistral OCR Failures and DLQ Recovery
+
+Mistral Document AI can be temporarily unavailable (outage, throttling, regional issues).
+The system has **3 layers of automatic retry** before a message lands in the Dead Letter Queue (DLQ):
+
+| Layer | Mechanism | Config | Default |
+|-------|-----------|--------|---------|
+| 1. Application retry | Tenacity exponential backoff | `MISTRAL_OCR_MAX_ATTEMPTS` | 3 attempts (1-10s waits) |
+| 2. Circuit breaker | pybreaker | `fail_max=5`, `reset_timeout=60s` | Opens after 5 consecutive failures |
+| 3. Service Bus delivery | Auto-retry by Azure | `max_delivery_count` | 5 deliveries before DLQ |
+
+**Total**: up to 3 x 5 = 15 OCR attempts per message before DLQ.
+
+#### Common Mistral OCR Errors
+
+| HTTP Code | Meaning | Retried? | Action |
+|-----------|---------|----------|--------|
+| 429 | Rate limited (throttled) | Yes | Wait - auto-recovers. Increase `MISTRAL_OCR_MAX_ATTEMPTS` if needed |
+| 500, 502, 503, 504 | Mistral backend issue | Yes | Transient - replay DLQ after service recovers |
+| 422 | Unprocessable PDF (corrupt) | **No** | Check PDF file; re-upload a valid version |
+| 401, 403 | Auth / RBAC error | **No** | Verify `Cognitive Services User` role on the managed identity |
+| Timeout | Network or server slow | Yes | May need `httpx` timeout increase in env |
+
+#### Recovery: Replay DLQ Messages
+
+After the root cause is resolved (e.g. Mistral OCR is back online), replay the failed
+messages back into the active queue:
+
+**Option A: Via the UI (recommended)**
+
+1. Open the dashboard → **Failures** tab
+2. Review the DLQ messages (click "View" for details)
+3. Click **"Replay All"** to re-enqueue all messages for reprocessing
+4. The worker will pick them up and retry OCR automatically
+
+**Option B: Via the API**
+
+```bash
+# Replay all DLQ messages back to the active queue
+curl -X POST https://<your-api-url>/api/admin/replay-dlq
+
+# Response:
+# {"status": "success", "replayed": 42, "errors": []}
+```
+
+**Option C: Via Azure CLI**
+
+```powershell
+# List DLQ message count
+az servicebus queue show --name pdf-processing-queue \
+  --namespace-name <sb-namespace> -g <resource-group> \
+  --query "countDetails.deadLetterMessageCount"
+
+# For manual replay of individual messages, use Service Bus Explorer
+# in the Azure Portal: Service Bus > Queues > pdf-processing-queue > Dead-letter
+```
+
+> **Tip**: If you only want to delete failed messages without retrying, use the
+> **"Purge All"** button instead. This permanently removes them from the DLQ.
+
+#### Tuning Retry Behavior
+
+Set these environment variables on the **Worker** Container App:
+
+```bash
+# Increase OCR retry attempts (default: 3)
+MISTRAL_OCR_MAX_ATTEMPTS=5
+
+# Increase Service Bus delivery attempts (requires Terraform change)
+# In infra/main.tf: max_delivery_count = 10
+```
 
 ### Common Issues
 

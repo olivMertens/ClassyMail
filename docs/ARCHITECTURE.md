@@ -14,7 +14,7 @@ Pattern : Event-Driven + Container Apps + AI Foundry (Mistral OCR & Phi‑4)
 2. **Trigger :**
    *   **Cas 1 (Upload API)** : Le fichier est blobé par l'API, qui crée immédiatement une entrée "PENDING" dans la DB et pousse un message direct dans le Service Bus (Visibilité immédiate).
    *   **Cas 2 (Depôt Portal/FTP)** : Azure Event Grid détecte le fichier (`BlobCreated`) et publie un message dans Service Bus (Visibilité après traitement par le worker).
-3. **OCR (Extraction) :** Le worker (FastAPI) télécharge le PDF et l'envoie au modèle OCR (Mistral) pour obtenir du Markdown.
+3. **OCR (Extraction) :** Le worker (FastAPI) télécharge le PDF et l'envoie au modèle OCR (Mistral) pour obtenir du Markdown. En cas d'échec (timeout, quota, circuit breaker ouvert), le pipeline bascule automatiquement vers **Azure Document Intelligence** (prebuilt-layout, texte uniquement).
 4. **Intelligence (Classification) :**
    *   **Standard Mode**: Markdown sent to Primary LLM (Phi-4). Fallback to GPT-4o-mini if token budget exceeded.
    *   **Adversarial Mode**: Markdown sent to BOTH Phi-4 and GPT-4o-mini in parallel. Both results are stored for "Blue/Orange" comparison in UI.
@@ -29,6 +29,8 @@ flowchart TD
     EG --> SB[(Service Bus)]
     SB --> W[Worker]
     W --> OCR[Mistral OCR]
+    OCR -.->|Fallback| DI[Document Intelligence]
+    DI -.->|Markdown| Check
     OCR --> Check{"Token Budget Decision"}
     Check -->|"less than 8K"| Phi["Phi-4 Primary"]
     Check -->|"8K or more"| GPT["gpt-4o-mini Fallback"]
@@ -58,6 +60,7 @@ flowchart TD
     style GPT_PII fill:#e8f5e9
     style Hybrid fill:#fff3e0
     style Nano fill:#fff9c4
+    style DI fill:#fff3e0
 ```
 
 ## 2. Séquence de traitement
@@ -113,6 +116,7 @@ L'identité managée assignée aux Container Apps (`api` et `worker`) doit dispo
 | **Cosmos DB (SQL)** | Custom App Role (`readMetadata` + CRUD) | Terraform-managed (`app_role`) | **Data Plane RBAC** au scope **Account**. Lecture/Écriture des documents JSON. *Note: Ce n'est pas un rôle IAM Azure classique, mais un rôle SQL natif Cosmos. Voir [RBAC_AUDIT.md](RBAC_AUDIT.md).* |
 | **AI Foundry Project** | `Cognitive Services User` | `a97b65f3-2400-443d-9d23-a1288a8760ba` | **Modèles Déployés**: Phi-4 (Classification primaire), Mistral Document AI 2505 (OCR + Vision), GPT-5-nano (Category Assessment, reasoning), GPT-5.2-chat (Conversational AI), GPT-4o-mini (Fallback + PII), text-embedding-3-small (Embeddings) |
 | **Azure AI Language** ⚙️ | `Cognitive Services Language Reader` | `36e80216-4058-40c5-bf25-3b30a0199a10` | **PII Detection Native API** (optionnel, `deploy_language_service=true`). Service TextAnalytics avec 43+ catégories PII prédéfinies. |
+| **Document Intelligence** ⚙️ | `Cognitive Services User` | `a97b65f3-2400-443d-9d23-a1288a8760ba` | **OCR Fallback** (optionnel, `deploy_document_intelligence=true`). FormRecognizer prebuilt-layout pour extraction texte Markdown quand Mistral OCR échoue. |
 | **Container Registry**| `AcrPull` | `7f951dda-4ed3-4680-a7ca-43fe172d538d` | Pull de l'image Docker par l'environnement Container Apps. |
 | **Application Insights** | `Monitoring Metrics Publisher` | `3913510d-42f4-4e42-8a64-420c390055eb` | Télémétrie OpenTelemetry (traces distribuées, métriques). |
 | **Event Grid System Topic** | `EventGrid EventSubscription Contributor` | `428e0ff0-5e57-4d9c-a221-2c70d0e0a443` | Abonnement aux événements Blob Storage → Service Bus. |
@@ -160,6 +164,35 @@ Trois méthodes de détection PII configurables (Settings > Processing):
 3. **Hybrid**: Combine LLM + Azure Language, déduplique résultats.
 
 **Architecture**: `pii_detection.py` dispatcher → `pii_detection_azure.py` (TextAnalyticsClient + MI). Résultats: `EmailRecord.pii_detected` + `pii_data`.
+
+## 4.2. OCR Fallback — Document Intelligence
+
+Le pipeline OCR implémente un mécanisme de fallback résilient :
+
+1. **Mistral OCR (Primary)** : OCR spécialisé via Azure AI Foundry. `MISTRAL_OCR_MAX_ATTEMPTS=2` tentatives avec retry exponentiel.
+2. **Document Intelligence (Fallback)** : Si Mistral échoue (timeout, quota 429, circuit breaker ouvert), le pipeline bascule vers Azure Document Intelligence (prebuilt-layout).
+
+**Circuit Breakers** :
+- `mistral_breaker` : fail_max=5, reset_timeout=60s
+- `doc_intelligence_breaker` : fail_max=3, reset_timeout=30s (plus agressif car c'est le fallback)
+
+**ConnectTimeout** : Les erreurs `httpx.ConnectTimeout` ne sont pas réessayées (fast-fail vers le fallback) pour éviter l'expiration des locks Service Bus.
+
+**Tracking** : Le champ `ocr_provider` dans `EmailRecord` enregistre le provider utilisé (`mistral_ocr` ou `document_intelligence`). Le dashboard affiche un badge ambre quand Document Intelligence est utilisé.
+
+**Déploiement** : Optionnel via `deploy_document_intelligence=true` dans Terraform. Sans cette variable, le pipeline fonctionne uniquement avec Mistral OCR.
+
+```mermaid
+flowchart TD
+    PDF[PDF Base64] --> Mistral{"Mistral OCR"}
+    Mistral -->|Success| MD[Markdown Output]
+    Mistral -->|Fail / CB Open| DI{"Document Intelligence?"}
+    DI -->|Configured| DIAPI["DI REST API - prebuilt-layout"]
+    DI -->|Not Configured| Error[OCRFailed Exception]
+    DIAPI -->|Success| MD
+    DIAPI -->|Fail| Error
+    MD --> Provider["ocr_provider: mistral_ocr or document_intelligence"]
+```
 
 ## 5. Observabilité & Monitoring
 

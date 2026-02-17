@@ -50,6 +50,12 @@ EMBEDDING_API_VERSION = os.getenv("EMBEDDING_API_VERSION", AI_API_VERSION)
 LANGUAGE_ENDPOINT = os.getenv("AZURE_LANGUAGE_ENDPOINT")  # https://xxx.cognitiveservices.azure.com/
 LANGUAGE_KEY = os.getenv("AZURE_LANGUAGE_KEY")  # Optional key-based auth (prefer MI)
 
+# Azure Document Intelligence (OCR fallback when Mistral is unavailable)
+# Requires terraform var deploy_document_intelligence=true
+DOC_INTELLIGENCE_ENDPOINT = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")  # https://xxx.cognitiveservices.azure.com/
+DOC_INTELLIGENCE_API_VERSION = os.getenv("DOC_INTELLIGENCE_API_VERSION", "2024-11-30")
+DOC_INTELLIGENCE_KEY = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY")  # Optional key-based auth (prefer MI)
+
 
 # Vision model for image description (parallel flow with OCR)
 VISION_ENDPOINT = os.getenv("VISION_ENDPOINT") or PHI_ENDPOINT
@@ -77,7 +83,7 @@ PHI_RESERVED_OUTPUT_TOKENS = int(os.getenv("PHI_RESERVED_OUTPUT_TOKENS", "1000")
 PHI4_COST_PER_1K_INPUT = float(os.getenv("PHI4_COST_PER_1K_INPUT", "0.000107"))
 PHI4_COST_PER_1K_OUTPUT = float(os.getenv("PHI4_COST_PER_1K_OUTPUT", "0.00043"))
 MISTRAL_OCR_COST_PER_1K_PAGES = float(os.getenv("MISTRAL_OCR_COST_PER_1K_PAGES", "1.0"))
-MISTRAL_OCR_MAX_ATTEMPTS = int(os.getenv("MISTRAL_OCR_MAX_ATTEMPTS", "3"))
+MISTRAL_OCR_MAX_ATTEMPTS = int(os.getenv("MISTRAL_OCR_MAX_ATTEMPTS", "2"))
 REVIEW_CONFIDENCE_THRESHOLD = float(os.getenv("REVIEW_CONFIDENCE_THRESHOLD", "0.85"))
 
 # Pricing for fallback model is tenant/region specific. Keep as config (default 0).

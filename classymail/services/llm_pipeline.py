@@ -168,7 +168,10 @@ def pydantic_to_mistral_schema(model: type[BaseModel]) -> dict:
 def retryable_httpx(exc: Exception) -> bool:
     if isinstance(exc, OCRFailed):
         return bool(getattr(exc, "retryable", False))
-    # Retry on network-level timeouts (ReadTimeout, ConnectTimeout, etc.)
+    # ConnectTimeout = service unreachable, fail fast to trigger fallback
+    if isinstance(exc, httpx.ConnectTimeout):
+        return False
+    # Retry on other timeouts (ReadTimeout, WriteTimeout, PoolTimeout)
     if isinstance(exc, httpx.TimeoutException):
         return True
     return (
@@ -695,6 +698,118 @@ async def ocr_with_mistral(
             span.set_attribute("app.vision.images_filename_only", len(annotated_images) - described)
 
     return {"markdown": content, "usage": usage_info, "images": annotated_images}
+
+
+async def ocr_with_document_intelligence(
+    base64_pdf: str,
+    clients: Clients | None = None,
+) -> dict:
+    """
+    Fallback OCR using Azure Document Intelligence (prebuilt-layout model).
+    Returns text-only output (no images) in the same format as ocr_with_mistral.
+
+    Used when Mistral OCR is unavailable (circuit breaker open or retries exhausted).
+    Requires AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT to be configured.
+    """
+    if not config.DOC_INTELLIGENCE_ENDPOINT:
+        raise RuntimeError("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT not configured — cannot use Document Intelligence fallback.")
+
+    import base64
+
+    # Auth: prefer Managed Identity, fall back to key
+    if config.DOC_INTELLIGENCE_KEY:
+        headers = {
+            "Content-Type": "application/pdf",
+            "Ocp-Apim-Subscription-Key": config.DOC_INTELLIGENCE_KEY,
+        }
+    else:
+        clients_ref = clients or __import__("classymail.services.azure_clients", fromlist=["get_default_clients"]).get_default_clients()
+        token = await clients_ref.credential.get_token("https://cognitiveservices.azure.com/.default")
+        headers = {
+            "Content-Type": "application/pdf",
+            "Authorization": f"Bearer {token.token}",
+        }
+
+    base_url = config.DOC_INTELLIGENCE_ENDPOINT.rstrip("/")
+    api_version = config.DOC_INTELLIGENCE_API_VERSION
+    url = f"{base_url}/documentintelligence/documentModels/prebuilt-layout:analyze?api-version={api_version}&outputContentFormat=markdown"
+
+    pdf_bytes = base64.b64decode(base64_pdf)
+
+    with tracer.start_as_current_span("document_intelligence_ocr") as span:
+        span.set_attribute("gen_ai.system", "azure_document_intelligence")
+        span.set_attribute("gen_ai.operation", "document.analyze")
+        span.set_attribute("app.pdf_size_bytes", len(pdf_bytes))
+
+        async with httpx.AsyncClient(timeout=180) as client:
+            # Step 1: Submit the analysis request
+            logger.info(f"[metrics] Document Intelligence OCR: submitting {len(pdf_bytes)} bytes to {url}")
+            resp = await client.post(url, content=pdf_bytes, headers=headers)
+
+            if resp.status_code not in (200, 202):
+                error_text = resp.text[:500]
+                logger.error(f"[metrics] Document Intelligence OCR submit failed: {resp.status_code} - {error_text}")
+                raise OCRFailed(
+                    f"Document Intelligence submit failed: {resp.status_code} - {error_text}",
+                    retryable=resp.status_code in (429, 500, 502, 503, 504),
+                )
+
+            # Step 2: Poll for results (202 = async operation)
+            if resp.status_code == 202:
+                operation_url = resp.headers.get("Operation-Location")
+                if not operation_url:
+                    raise OCRFailed("Document Intelligence: missing Operation-Location header")
+
+                # Remove Content-Type for GET polling
+                poll_headers = {k: v for k, v in headers.items() if k != "Content-Type"}
+
+                max_polls = 60  # 60 * 3s = 3 minutes max
+                for poll_idx in range(max_polls):
+                    await asyncio.sleep(3)
+                    poll_resp = await client.get(operation_url, headers=poll_headers)
+                    poll_resp.raise_for_status()
+                    poll_data = poll_resp.json()
+                    status = poll_data.get("status", "")
+
+                    if status == "succeeded":
+                        result = poll_data.get("analyzeResult", {})
+                        break
+                    elif status == "failed":
+                        error_detail = poll_data.get("error", {}).get("message", "Unknown error")
+                        raise OCRFailed(f"Document Intelligence analysis failed: {error_detail}")
+                    elif status in ("running", "notStarted"):
+                        logger.debug(f"[metrics] Document Intelligence polling ({poll_idx + 1}/{max_polls}): {status}")
+                        continue
+                    else:
+                        raise OCRFailed(f"Document Intelligence unexpected status: {status}")
+                else:
+                    raise OCRFailed("Document Intelligence analysis timed out after polling")
+            else:
+                # Synchronous response (200)
+                result = resp.json().get("analyzeResult", {})
+
+        # Step 3: Extract markdown content
+        content = result.get("content", "")
+        pages = result.get("pages", [])
+        page_count = len(pages)
+
+        if not content.strip():
+            raise OCRFailed("Document Intelligence returned empty content")
+
+        logger.info(
+            f"[metrics] Document Intelligence OCR Success: {page_count} pages, "
+            f"{len(content)} chars"
+        )
+
+        span.set_attribute("app.pages_processed", page_count)
+        span.set_attribute("app.content_length", len(content))
+
+        usage_info = {
+            "pages_processed": page_count,
+            "provider": "document_intelligence",
+        }
+
+        return {"markdown": content, "usage": usage_info, "images": []}
 
 
 async def _classify_with_single_model(

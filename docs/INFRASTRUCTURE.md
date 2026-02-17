@@ -95,6 +95,36 @@ deploy_language_service = true  # Default: false
 
 ---
 
+### Optional: Azure Document Intelligence (OCR Fallback)
+
+**Purpose:** Fallback OCR provider when Mistral OCR is unavailable (timeout, quota exceeded, circuit breaker open).
+
+**Deployment:**
+```terraform
+# In terraform.tfvars
+deploy_document_intelligence = true  # Default: false
+doc_intelligence_sku         = "S0"  # Default: S0 (F0 for free tier)
+```
+
+**Configuration:**
+- **Kind:** `FormRecognizer` (Cognitive Services)
+- **SKU:** `S0` (Standard) or `F0` (Free — 500 pages/month)
+- **Model:** `prebuilt-layout` (text-only Markdown extraction)
+- **Authentication:** Managed Identity (RBAC) - `Cognitive Services User` role
+- **API Version:** `2024-11-30` (configurable via `DOC_INTELLIGENCE_API_VERSION`)
+
+**Usage:** Automatic — pipeline falls back to Document Intelligence when Mistral OCR fails. No UI configuration needed.
+
+**Cost:** ~$1.50 per 1,000 pages (S0 tier). Only used when Mistral OCR is unavailable.
+
+**When to Use:**
+- ✅ Production environments requiring high OCR availability
+- ✅ Mistral OCR experiencing frequent quota limits (429 errors)
+- ✅ Need for graceful degradation without manual intervention
+- ❌ Development/testing (Mistral OCR alone is sufficient)
+
+---
+
 ## Required AI Model Deployments (continued)
 
 **Deployment Instructions:**
@@ -347,6 +377,7 @@ The Container Apps use a **User-Assigned Managed Identity** with the following r
 | **AI Foundry** | Cognitive Services User | `rbac_ai` | AI Foundry Account | Always |
 | **Container Registry** | AcrPull | `acr_pull` | ACR | `acr_name != ""` |
 | **Language Service** | Cognitive Services Language Reader | `aca_language_reader` | Language Account | `deploy_language_service` |
+| **Document Intelligence** | Cognitive Services User | `aca_doc_intelligence_user` | DI Account | `deploy_document_intelligence` |
 
 > ⚠️ **Cosmos DB uses a Custom Role** (not the built-in `Cosmos DB Built-in Data Contributor`). The custom role grants `readMetadata` + specific CRUD actions at **Account scope**. See [RBAC_AUDIT.md](RBAC_AUDIT.md) §9 for why.
 

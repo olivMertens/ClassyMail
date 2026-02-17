@@ -8,7 +8,8 @@ from opentelemetry.trace import Status, StatusCode
 
 from classymail.models import EmailRecord, ClassificationResult
 from classymail.services.azure_clients import download_blob_as_base64, blob_id_from_url, Clients
-from classymail.services.llm_pipeline import ocr_with_mistral, classify_with_phi4, process_agent_response, generate_embedding, extract_business_entities, classify_comparison
+from classymail.services.llm_pipeline import ocr_with_mistral, ocr_with_document_intelligence, classify_with_phi4, process_agent_response, generate_embedding, extract_business_entities, classify_comparison
+from classymail.services.circuit_breaker import mistral_ocr_breaker, doc_intelligence_breaker
 from classymail.services.costing import compute_cost_llm, compute_cost_mistral
 from classymail.core import config
 import logging
@@ -120,6 +121,7 @@ async def run_classification_pipeline(
 
     processing_log: list[dict] = []
     stage_timings = {}  # Track timing for each stage
+    ocr_detail = {}  # Extra OCR diagnostic metadata
 
     logger.info(f"[pipeline] -> Starting pipeline for: {blob_url}")
 
@@ -161,22 +163,90 @@ async def run_classification_pipeline(
         span.end()
         raise err from ex
 
+    ocr_provider = "mistral_ocr"  # Track which OCR provider was used
+
     try:
         log("ocr", "start")
         stage_start = time.perf_counter()
         # Enable image extraction only if strategy is 'vision' to save costs/latency
         include_img = (strategy == "vision")
-        # Vision uses OCR-rendered page images only (no attachments). Enrichment annotates those page images.
-        # Use new enrichment capability for vision strategy
-        ocr_result = await ocr_with_mistral(
-            pdf_b64,
-            clients=clients,
-            include_images=include_img,
-            enable_vision_enrichment=include_img
-        )
+
+        mistral_failed = False
+        mistral_error = None
+
+        # Check circuit breaker state before attempting Mistral
+        if mistral_ocr_breaker.current_state == "open":
+            log("ocr", "circuit_breaker", "Mistral OCR circuit breaker is OPEN — skipping to fallback")
+            mistral_failed = True
+            mistral_error = "Circuit breaker open"
+            ocr_detail["mistral_skip_reason"] = "circuit_breaker_open"
+        else:
+            try:
+                ocr_result = await ocr_with_mistral(
+                    pdf_b64,
+                    clients=clients,
+                    include_images=include_img,
+                    enable_vision_enrichment=include_img
+                )
+                # Record success on circuit breaker
+                mistral_ocr_breaker.success()
+            except Exception as mistral_ex:
+                mistral_failed = True
+                mistral_error = f"{type(mistral_ex).__name__}: {mistral_ex}"
+                ocr_detail["mistral_error_type"] = type(mistral_ex).__name__
+                log("ocr", "mistral_failed", mistral_error)
+                # Record failure on circuit breaker
+                from classymail.services.circuit_breaker import should_trip_on_exception
+                if should_trip_on_exception(mistral_ex):
+                    mistral_ocr_breaker.failure()
+
+        # Fallback to Document Intelligence if Mistral failed and DI is configured
+        if mistral_failed:
+            if config.DOC_INTELLIGENCE_ENDPOINT:
+                log("ocr", "fallback", "Attempting Document Intelligence OCR fallback")
+                ocr_provider = "document_intelligence"
+
+                if doc_intelligence_breaker.current_state == "open":
+                    from classymail.models import OCRFailed as _OCRFailed
+                    log("ocr", "error", "Both OCR providers unavailable (circuit breakers open)")
+                    err = _OCRFailed(f"stage=ocr: All OCR providers failed. Mistral: {mistral_error}. Document Intelligence circuit breaker open.")
+                    setattr(err, "processing_log", processing_log)
+                    span.set_status(Status(StatusCode.ERROR, "All OCR providers failed"))
+                    span.end()
+                    raise err
+
+                try:
+                    ocr_result = await ocr_with_document_intelligence(pdf_b64, clients=clients)
+                    doc_intelligence_breaker.success()
+                    log("ocr", "fallback_ok", "Document Intelligence OCR succeeded")
+                except Exception as di_ex:
+                    from classymail.models import OCRFailed as _OCRFailed
+                    from classymail.services.circuit_breaker import should_trip_on_exception
+                    if should_trip_on_exception(di_ex):
+                        doc_intelligence_breaker.failure()
+                    log("ocr", "error", f"Document Intelligence also failed: {di_ex}")
+                    err = _OCRFailed(f"stage=ocr: All OCR providers failed. Mistral: {mistral_error}. DocIntel: {di_ex}")
+                    setattr(err, "processing_log", processing_log)
+                    span.set_status(Status(StatusCode.ERROR, str(di_ex)))
+                    span.end()
+                    raise err from di_ex
+            else:
+                from classymail.models import OCRFailed as _OCRFailed
+                log("ocr", "error", f"Mistral OCR failed and no fallback configured: {mistral_error}")
+                err = _OCRFailed(f"stage=ocr: {mistral_error}")
+                setattr(err, "processing_log", processing_log)
+                span.set_status(Status(StatusCode.ERROR, mistral_error))
+                span.end()
+                raise err
+
         stage_timings["ocr"] = (time.perf_counter() - stage_start) * 1000
-        log("ocr", "ok")
+        if ocr_detail:
+            stage_timings["ocr_detail"] = ocr_detail
+        log("ocr", "ok", f"provider={ocr_provider} ({stage_timings['ocr']:.0f}ms)")
     except Exception as ex:
+        # Only re-raise if not already handled above
+        if "stage=ocr" in str(ex):
+            raise
         from classymail.models import OCRFailed
 
         log("ocr", "error", f"{type(ex).__name__}: {ex}")
@@ -256,10 +326,13 @@ async def run_classification_pipeline(
 
     mistral_usage = ocr_result.get("usage") or {}
     pages = mistral_usage.get("pages_processed") or mistral_usage.get("pages") or estimate_pdf_pages(pdf_bytes)
+    stage_timings["pages"] = pages
 
     llm_usage = classification_raw.get("usage") if isinstance(classification_raw, dict) else None
     fallback_used = bool(classification_raw.get("fallback_used")) if isinstance(classification_raw, dict) else False
     model_name = classification_raw.get("model") if isinstance(classification_raw, dict) else None
+    if fallback_used:
+        stage_timings["classify_detail"] = {"fallback_model": model_name or "gpt-4o-mini"}
 
     # Calculate costs with model-aware pricing
     llm_cost = compute_cost_llm(llm_usage, fallback_used=fallback_used, model_name=model_name, overrides=final_overrides)
@@ -300,6 +373,8 @@ async def run_classification_pipeline(
         sender=response_data.get("sender"),
         vector=vector,
         processing_strategy=strategy,
+        ocr_provider=ocr_provider,
+        stage_timings=stage_timings,
         classification=ClassificationResult(
             **{
                 "detected_intents": processed.get("intents", []),

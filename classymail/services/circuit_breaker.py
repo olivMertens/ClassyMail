@@ -36,6 +36,13 @@ chat_breaker = CircuitBreaker(
     name="chat"
 )
 
+# Circuit breaker for Document Intelligence OCR fallback
+doc_intelligence_breaker = CircuitBreaker(
+    fail_max=5,
+    reset_timeout=120,
+    name="document_intelligence"
+)
+
 
 def should_trip_on_exception(exc: Exception) -> bool:
     """

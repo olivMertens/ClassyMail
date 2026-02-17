@@ -103,6 +103,15 @@ These variables provide additional functionality but are not required for core o
   - Used for: Optional Azure AI Language PII detection (alternative to LLM-based PII)
   - Note: If not configured, PII detection falls back to LLM-based methods
 
+### Azure Document Intelligence (OCR Fallback)
+
+- **`AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT`** - The endpoint URL for Azure Document Intelligence
+  - Example: `https://email-poc-doc-intelligence.cognitiveservices.azure.com/`
+  - Used for: OCR fallback when Mistral OCR fails (timeout, quota, circuit breaker)
+  - Note: If not configured, OCR failures raise `OCRFailed` without fallback. Requires `deploy_document_intelligence=true` in Terraform.
+- **`DOC_INTELLIGENCE_API_VERSION`** - API version for Document Intelligence REST API
+  - Default: `2024-11-30`
+
 ### Chat & RAG
 
 - **`CHAT_DEPLOYMENT`** - The deployment name for the chat model

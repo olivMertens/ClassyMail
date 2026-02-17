@@ -88,15 +88,18 @@ class EmailRecord(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     processing_strategy: Optional[str] = None  # standard | reasoning | vision
+    ocr_provider: Optional[str] = None  # mistral_ocr | document_intelligence
     error: Optional[str] = None
     error_stage: Optional[str] = None
     processing_log: Optional[list[dict]] = None
+    stage_timings: Optional[dict] = None  # Per-stage ms: {download, ocr, extraction, classify, embedding}
     usage: Optional[dict] = None
 
 
 class EmailListResponse(BaseModel):
     items: List[EmailRecord]
     total: int
+    filtered_total: Optional[int] = None  # Count matching current filter (for pagination)
     review_required: int
     processed: int
     finetune_reviewed_ready: int = 0

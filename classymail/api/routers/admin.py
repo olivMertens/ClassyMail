@@ -461,6 +461,73 @@ async def purge_dlq(clients: Clients = Depends(get_clients)):
     }
 
 
+@router.post("/replay-dlq", status_code=status.HTTP_200_OK)
+async def replay_dlq(clients: Clients = Depends(get_clients)):
+    """
+    Replay all Dead Letter Queue messages back into the active queue.
+
+    For each DLQ message:
+    1. Receive (lock) the message from DLQ
+    2. Extract the blob_url payload
+    3. Send a new message with the same payload to the active queue
+    4. Complete (remove) the original DLQ message
+
+    This is the recommended recovery path after transient failures
+    (e.g. Mistral OCR outage, throttling, network issues).
+    """
+    if not clients.sb_client:
+        raise HTTPException(status_code=503, detail="Service Bus client not initialized")
+
+    replayed = 0
+    errors = []
+
+    try:
+        receiver = clients.sb_client.get_queue_receiver(
+            queue_name=config.SERVICE_BUS_QUEUE,
+            sub_queue=ServiceBusSubQueue.DEAD_LETTER,
+            prefetch_count=50,
+        )
+        sender = clients.sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
+
+        async with receiver, sender:
+            while True:
+                messages = await receiver.receive_messages(max_message_count=50, max_wait_time=5)
+                if not messages:
+                    break
+                for msg in messages:
+                    try:
+                        body_bytes = b"".join([b for b in msg.body])
+                        payload = json.loads(body_bytes.decode())
+                        blob_url = extract_blob_url(payload)
+                        if not blob_url:
+                            errors.append(f"Message {msg.message_id}: no blob_url found")
+                            await receiver.complete_message(msg)
+                            continue
+
+                        # Re-enqueue into the active queue
+                        new_message = ServiceBusMessage(
+                            json.dumps({"blob_url": blob_url})
+                        )
+                        await sender.send_messages(new_message)
+                        await receiver.complete_message(msg)
+                        replayed += 1
+                    except Exception as e:
+                        errors.append(f"Message {getattr(msg, 'message_id', '?')}: {e}")
+                        try:
+                            await receiver.abandon_message(msg)
+                        except Exception:
+                            pass
+    except Exception as e:
+        logger.error(f"Failed to replay DLQ: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to replay DLQ: {str(e)}")
+
+    return {
+        "status": "success" if not errors else "partial",
+        "replayed": replayed,
+        "errors": errors,
+    }
+
+
 @router.get("/deadletter", response_model=DeadLetterSummary)
 async def deadletter_summary(clients: Clients = Depends(get_clients)):
     """Peek the dead-letter queue and return a summary for admin UI."""

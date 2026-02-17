@@ -224,6 +224,24 @@
             "experimental": "Experimentell",
             "unknown": "Standard"
         },
+        "ocr_provider": {
+            "mistral_ocr": "Mistral OCR",
+            "document_intelligence": "Doc Intelligence"
+        },
+        "time": {
+            "total_only": "Gesamtverarbeitungszeit (keine Aufschlüsselung verfügbar)",
+            "download": "Download",
+            "ocr": "OCR",
+            "extraction": "Entitätsextraktion",
+            "classify": "Klassifikation",
+            "embedding": "Embeddings",
+            "slow_reasons": "Mögliche Ursachen für Langsamkeit",
+            "reason_large_pdf": "Großes PDF ({pages} Seiten)",
+            "reason_ocr_fallback": "OCR-Fallback auf {provider}",
+            "reason_circuit_breaker": "Primärer OCR-Circuit-Breaker war offen",
+            "reason_mistral_error": "Mistral-OCR fehlgeschlagen ({error})",
+            "reason_llm_fallback": "LLM-Fallback verwendet ({model})"
+        },
         "dlq": {
             "banner_title": "Dead-Letter-Warteschlange hat {count} Nachricht(en)",
             "banner_button": "Details anzeigen",
@@ -236,6 +254,9 @@
             "close": "Ansicht schließen",
             "purge": "Alle bereinigen",
             "purging": "Bereinigung...",
+            "replay_all": "Alle wiederholen",
+            "replaying": "Wiederholung...",
+            "replay_confirm": "Alle DLQ-Nachrichten zur Wiederverarbeitung in die aktive Warteschlange zurückstellen?",
             "item_id": "Element-ID / ID",
             "reason": "Grund",
             "description": "Beschreibung",

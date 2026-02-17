@@ -1,3 +1,14 @@
+# ── Stage 1: Build Vue frontend ──────────────────────────────────────
+FROM node:22-alpine AS frontend-build
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+# Output: /frontend/../static/dist  →  relative to vite outDir '../static/dist'
+# Vite writes to /static/dist because outDir is '../static/dist' relative to /frontend
+
+# ── Stage 2: Python application ─────────────────────────────────────
 FROM python:3.12-slim
 
 ENV UV_PROJECT_ENV=.venv \
@@ -27,6 +38,9 @@ RUN addgroup --system app && adduser --system --ingroup app app \
     && chown -R app:app /app
 
 COPY . .
+
+# Copy built frontend from stage 1 into static/dist
+COPY --from=frontend-build /static/dist ./static/dist/
 
 # Install the project itself (source is now present).
 RUN uv sync --frozen --no-dev

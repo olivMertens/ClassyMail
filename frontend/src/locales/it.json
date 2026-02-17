@@ -224,6 +224,24 @@
             "experimental": "Sperimentale",
             "unknown": "Predefinito"
         },
+        "ocr_provider": {
+            "mistral_ocr": "Mistral OCR",
+            "document_intelligence": "Doc Intelligence"
+        },
+        "time": {
+            "total_only": "Tempo totale di elaborazione (nessun dettaglio per fase)",
+            "download": "Download",
+            "ocr": "OCR",
+            "extraction": "Estrazione entità",
+            "classify": "Classificazione",
+            "embedding": "Embeddings",
+            "slow_reasons": "Possibili cause di lentezza",
+            "reason_large_pdf": "PDF grande ({pages} pagine)",
+            "reason_ocr_fallback": "OCR con fallback a {provider}",
+            "reason_circuit_breaker": "Il circuit breaker OCR primario era aperto",
+            "reason_mistral_error": "OCR Mistral fallito ({error})",
+            "reason_llm_fallback": "LLM di fallback utilizzato ({model})"
+        },
         "dlq": {
             "banner_title": "La coda Dead-letter contiene {count} messaggio/i",
             "banner_button": "Vedi Dettagli",
@@ -236,6 +254,9 @@
             "close": "Chiudi Vista",
             "purge": "Purga Tutto",
             "purging": "Purga in corso...",
+            "replay_all": "Ripeti Tutto",
+            "replaying": "Ripetizione in corso...",
+            "replay_confirm": "Rimettere tutti i messaggi DLQ nella coda attiva per la rielaborazione?",
             "item_id": "ID Elemento / ID",
             "reason": "Motivo",
             "description": "Descrizione",

@@ -224,6 +224,24 @@
             "experimental": "Expérimental",
             "unknown": "Défaut"
         },
+        "ocr_provider": {
+            "mistral_ocr": "Mistral OCR",
+            "document_intelligence": "Doc Intelligence"
+        },
+        "time": {
+            "total_only": "Temps total de traitement (pas de détail par étape)",
+            "download": "Téléchargement",
+            "ocr": "OCR",
+            "extraction": "Extraction des entités",
+            "classify": "Classification",
+            "embedding": "Embeddings",
+            "slow_reasons": "Causes possibles de lenteur",
+            "reason_large_pdf": "PDF volumineux ({pages} pages)",
+            "reason_ocr_fallback": "OCR basculé vers {provider}",
+            "reason_circuit_breaker": "Le circuit-breaker OCR primaire était ouvert",
+            "reason_mistral_error": "Échec OCR Mistral ({error})",
+            "reason_llm_fallback": "LLM de repli utilisé ({model})"
+        },
         "dlq": {
             "banner_title": "La file d'attente Dead-letter contient {count} message(s)",
             "banner_button": "Voir Détails",
@@ -236,6 +254,9 @@
             "close": "Fermer la Vue",
             "purge": "Purger Tout",
             "purging": "Purge en cours...",
+            "replay_all": "Rejouer Tout",
+            "replaying": "Rejeu en cours...",
+            "replay_confirm": "Remettre tous les messages DLQ dans la file active pour retraitement ?",
             "item_id": "ID d'Élément / ID",
             "reason": "Raison",
             "description": "Description",

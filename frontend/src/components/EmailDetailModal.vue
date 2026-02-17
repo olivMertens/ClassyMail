@@ -261,6 +261,60 @@ const strategyBadge = (strategy) => {
   return map[strategy] || map.standard
 }
 
+const ocrProviderBadge = (provider) => {
+  if (!provider || provider === 'mistral_ocr') return null
+  const map = {
+    document_intelligence: { icon: '📄', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-200 dark:border-amber-700', key: 'document_intelligence' },
+  }
+  return map[provider] || null
+}
+
+const formatDuration = (email) => {
+  const ms = email?.processing_time_ms
+  if (!ms) return null
+  if (ms < 1000) return `${ms}ms`
+  const s = ms / 1000
+  if (s < 60) return `${s.toFixed(1)}s`
+  return `${(s / 60).toFixed(1)}min`
+}
+
+const durationTooltip = (email) => {
+  const st = email?.stage_timings
+  if (!st) return formatDuration(email) ? t('dashboard.time.total_only') : ''
+  const fmtMs = (ms) => {
+    if (!ms && ms !== 0) return '—'
+    if (ms < 1000) return `${ms.toFixed(0)}ms`
+    const s = ms / 1000
+    if (s < 60) return `${s.toFixed(1)}s`
+    return `${(s / 60).toFixed(1)}min`
+  }
+  const lines = []
+  const stages = [
+    { key: 'download', icon: '📥', label: t('dashboard.time.download') },
+    { key: 'ocr', icon: '🔍', label: t('dashboard.time.ocr') },
+    { key: 'extraction', icon: '📋', label: t('dashboard.time.extraction') },
+    { key: 'classify', icon: '🧠', label: t('dashboard.time.classify') },
+    { key: 'embedding', icon: '📐', label: t('dashboard.time.embedding') },
+  ]
+  for (const s of stages) {
+    if (st[s.key] !== undefined) {
+      lines.push(`${s.icon} ${s.label}: ${fmtMs(st[s.key])}`)
+    }
+  }
+  const reasons = []
+  if (st.pages && st.pages > 10) reasons.push(t('dashboard.time.reason_large_pdf', { pages: st.pages }))
+  if (st.ocr_detail?.fallback_provider) reasons.push(t('dashboard.time.reason_ocr_fallback', { provider: st.ocr_detail.fallback_provider }))
+  if (st.ocr_detail?.mistral_skip_reason === 'circuit_breaker_open') reasons.push(t('dashboard.time.reason_circuit_breaker'))
+  if (st.ocr_detail?.mistral_error_type) reasons.push(t('dashboard.time.reason_mistral_error', { error: st.ocr_detail.mistral_error_type }))
+  if (st.classify_detail?.fallback_used) reasons.push(t('dashboard.time.reason_llm_fallback', { model: st.classify_detail.model || 'gpt-4o-mini' }))
+  if (reasons.length) {
+    lines.push('')
+    lines.push(`⚠️ ${t('dashboard.time.slow_reasons')}:`)
+    reasons.forEach(r => lines.push(`  • ${r}`))
+  }
+  return lines.join('\n')
+}
+
 const markAsInvalid = async () => {
   if (!await confirm("Are you sure you want to mark this email as Invalid/Garbage?")) return;
 
@@ -439,6 +493,21 @@ watch(() => email.value, (val) => {
               >
                 {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' +
                   email.processing_strategy) }}
+              </span>
+              <span
+                v-if="ocrProviderBadge(email.ocr_provider)"
+                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border"
+                :class="ocrProviderBadge(email.ocr_provider).color"
+                :title="t('dashboard.ocr_provider.' + email.ocr_provider)"
+              >
+                {{ ocrProviderBadge(email.ocr_provider).icon }} {{ t('dashboard.ocr_provider.' + ocrProviderBadge(email.ocr_provider).key) }}
+              </span>
+              <span
+                v-if="formatDuration(email)"
+                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border cursor-help bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-700"
+                :title="durationTooltip(email)"
+              >
+                ⏱ {{ formatDuration(email) }}
               </span>
               <button
                 type="button"

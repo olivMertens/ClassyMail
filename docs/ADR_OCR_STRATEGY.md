@@ -31,3 +31,23 @@ We have implemented a **"Processing Strategy"** setting in the UI to allow flexi
 - **Standard (Text/Markdown)**: Best balance of speed and cost. Relies on text and layout.
 - **Deep Reasoning (CoT)**: Adds a "Chain of Thought" requirement to the LLM prompt. It asks the AI to "Think step-by-step" before deciding. This improves accuracy for complex/ambiguous emails but increases output token costs.
 - **Vision (Future)**: Placeholder for full VLM integration.
+
+## OCR Fallback — Document Intelligence (June 2026)
+
+To improve resilience, a **fallback OCR provider** has been added using **Azure Document Intelligence** (FormRecognizer, prebuilt-layout model).
+
+### How it works
+1. Pipeline attempts Mistral OCR first (2 attempts with exponential retry).
+2. If Mistral fails (timeout, 429 quota, circuit breaker open, ConnectTimeout), the pipeline automatically falls back to Document Intelligence REST API.
+3. Document Intelligence extracts text-only Markdown (no images) using the `prebuilt-layout` model.
+4. The `ocr_provider` field on `EmailRecord` tracks which provider was used.
+
+### Trade-offs
+- **Mistral OCR** produces richer Markdown (image descriptions, alt-text, layout hints). Best for classification accuracy.
+- **Document Intelligence** produces clean text Markdown. Sufficient for classification but loses image context.
+- Fallback is transparent to the classification stage — both providers output Markdown.
+
+### Configuration
+- Terraform: `deploy_document_intelligence = true` (default: false)
+- Environment: `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` (auto-set by Terraform)
+- Circuit breaker: `doc_intelligence_breaker` (fail_max=3, reset_timeout=30s)

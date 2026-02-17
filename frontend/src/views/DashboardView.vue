@@ -38,6 +38,7 @@ defineProps({
 const emails = ref([])
 const stats = ref({
   total: 0,
+  filtered_total: 0,
   review_required: 0,
   processed: 0,
   pending: 0,
@@ -73,6 +74,7 @@ watch(chatSessionId, (val) => localStorage.setItem('chatSessionId', val))
 const md = new MarkdownIt({ linkify: true, breaks: false }) // breaks: false to avoid excessive <br>
 const viewMode = ref('cards') // 'cards' or 'table'
 const purging = ref(false)
+const replaying = ref(false)
 const sortBy = ref('timestamp')
 const sortOrder = ref('desc')
 const selectedIds = ref(new Set())
@@ -207,6 +209,7 @@ const fetchEmails = async () => {
     // Update stats from API response - these are global counts, not filtered
     stats.value = {
       total: data.total || 0,
+      filtered_total: data.filtered_total ?? data.total ?? 0,
       review_required: data.review_required || 0,
       processed: data.processed || 0,
       pending: data.pending || 0,
@@ -331,9 +334,41 @@ const purgeDlq = async () => {
   }
 }
 
+const replayAllDlq = async () => {
+  if (!await confirm(t('dashboard.dlq.replay_confirm'))) return
+  replaying.value = true
+  try {
+    const res = await fetch('/api/admin/replay-dlq', { method: 'POST' })
+    if (!res.ok) throw new Error('Failed to replay DLQ')
+    const data = await res.json()
+    const msg = data.errors?.length
+      ? `${data.replayed} replayed, ${data.errors.length} errors`
+      : `${data.replayed} messages replayed successfully`
+    await showAlert(msg)
+    await fetchDeadletters()
+    if (dlq.value.count === 0) {
+      currentTab.value = 'dashboard'
+      dlqDismissed.value = false
+    }
+  } catch (e) {
+    await showAlert(e.message)
+  } finally {
+    replaying.value = false
+  }
+}
+
 // Watchers
 watch([filter, pageSize, confidenceFilter], () => {
-  page.value = 1
+  if (page.value === 1) {
+    // Page didn't change, so page watcher won't fire — fetch manually
+    fetchEmails()
+  } else {
+    // Setting page to 1 will trigger page watcher which calls fetchEmails
+    page.value = 1
+  }
+})
+
+watch(page, () => {
   fetchEmails()
 })
 
@@ -362,7 +397,10 @@ onMounted(() => {
   }
 })
 
-const totalPages = computed(() => Math.max(1, Math.ceil(stats.value.total / pageSize.value)))
+const totalPages = computed(() => {
+  const filteredTotal = stats.value.filtered_total ?? stats.value.total
+  return Math.max(1, Math.ceil(filteredTotal / pageSize.value))
+})
 
 const progressPercentage = computed(() => {
   if (!stats.value.total) return 0
@@ -389,6 +427,14 @@ const strategyBadge = (strategy) => {
   return map[strategy] || null // null = standard (no badge, it's the default)
 }
 
+const ocrProviderBadge = (provider) => {
+  if (!provider || provider === 'mistral_ocr') return null // default, no badge
+  const map = {
+    document_intelligence: { icon: '📄', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-200 dark:border-amber-700', key: 'document_intelligence' },
+  }
+  return map[provider] || null
+}
+
 const getScore = (email) => {
   const intents = email.classification?.detected_intents || []
   if (!intents.length) return 'N/A'
@@ -403,6 +449,49 @@ const formatDuration = (email) => {
   if (s < 60) return `${s.toFixed(1)} s`
   const m = s / 60
   return `${m.toFixed(1)} min`
+}
+
+const fmtMs = (ms) => {
+  if (!ms && ms !== 0) return '?'
+  if (ms < 1000) return `${ms.toFixed(0)}ms`
+  const s = ms / 1000
+  return s < 60 ? `${s.toFixed(1)}s` : `${(s / 60).toFixed(1)}min`
+}
+
+const durationTooltip = (email) => {
+  const st = email?.stage_timings
+  const total = email?.processing_time_ms
+  if (!total) return ''
+
+  const lines = [t('dashboard.timing.total') + ': ' + fmtMs(total)]
+
+  if (st) {
+    // Stage breakdown
+    const stages = ['download', 'ocr', 'extraction', 'classify', 'embedding']
+    for (const s of stages) {
+      if (st[s] != null) {
+        lines.push(`  ${t('dashboard.timing.' + s)}: ${fmtMs(st[s])}`)
+      }
+    }
+
+    // Slowness explanations
+    const reasons = []
+    if (st.pages && st.pages > 10) reasons.push(t('dashboard.timing.reason_large_pdf', { pages: st.pages }))
+    if (email.ocr_provider === 'document_intelligence') reasons.push(t('dashboard.timing.reason_ocr_fallback'))
+    if (st.ocr_detail?.mistral_skip_reason === 'circuit_breaker_open') reasons.push(t('dashboard.timing.reason_cb_open'))
+    if (st.ocr_detail?.mistral_error_type) reasons.push(t('dashboard.timing.reason_mistral_error', { error: st.ocr_detail.mistral_error_type }))
+    if (st.classify_detail?.fallback_model) reasons.push(t('dashboard.timing.reason_llm_fallback', { model: st.classify_detail.fallback_model }))
+    if (st.ocr > 30000) reasons.push(t('dashboard.timing.reason_ocr_slow'))
+    if (st.classify > 15000) reasons.push(t('dashboard.timing.reason_classify_slow'))
+
+    if (reasons.length) {
+      lines.push('')
+      lines.push(t('dashboard.timing.slow_reasons') + ':')
+      for (const r of reasons) lines.push(`  ⚠ ${r}`)
+    }
+  }
+
+  return lines.join('\n')
 }
 
 const formatMetric = (num) => {
@@ -1014,10 +1103,18 @@ const emit = defineEmits(['open-email'])
                 {{ strategyBadge(email.processing_strategy).icon }} {{ t('dashboard.strategy.' +
                   strategyBadge(email.processing_strategy).key) }}
               </span>
+              <span
+                v-if="ocrProviderBadge(email.ocr_provider)"
+                class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium border cursor-help"
+                :class="ocrProviderBadge(email.ocr_provider).color"
+                :title="t('dashboard.ocr_provider.' + email.ocr_provider)"
+              >
+                {{ ocrProviderBadge(email.ocr_provider).icon }} {{ t('dashboard.ocr_provider.' + ocrProviderBadge(email.ocr_provider).key) }}
+              </span>
               <div
                 v-if="formatDuration(email)"
-                class="text-[10px] text-gray-500 dark:text-gray-400 inline-flex items-center gap-0.5"
-                title="Processing time"
+                class="text-[10px] text-gray-500 dark:text-gray-400 inline-flex items-center gap-0.5 cursor-help"
+                :title="durationTooltip(email)"
               >
                 ⏱ {{ formatDuration(email) }}
               </div>
@@ -1050,6 +1147,14 @@ const emit = defineEmits(['open-email'])
           >
             <XMarkIcon class="h-4 w-4" />
             {{ t('common.close') }}
+          </button>
+          <button
+            class="flex items-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+            :disabled="replaying || dlq.count === 0"
+            @click="replayAllDlq"
+          >
+            <ArrowPathIcon class="h-4 w-4" />
+            {{ replaying ? t('dashboard.dlq.replaying') : t('dashboard.dlq.replay_all') }}
           </button>
           <button
             class="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50"
@@ -1382,7 +1487,10 @@ const emit = defineEmits(['open-email'])
           </td>
           <td class="hidden md:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
             <div class="flex items-center gap-1.5">
-              <span>{{ formatDuration(email) || '—' }}</span>
+              <span
+                class="cursor-help"
+                :title="durationTooltip(email)"
+              >{{ formatDuration(email) || '—' }}</span>
               <span
                 v-if="strategyBadge(email.processing_strategy)"
                 class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium border cursor-help"
@@ -1454,23 +1562,172 @@ const emit = defineEmits(['open-email'])
         <ChevronRightIcon class="h-5 w-5" />
       </button>
     </div>
-    <!-- Floating Chat Assistant -->
-    <div class="fixed bottom-4 right-4 z-50 flex flex-col items-end pointer-events-none">
-      <div
-        v-if="chatOpen"
-        class="mb-4 w-[32rem] bg-white dark:bg-gray-900 shadow-xl rounded-lg border border-gray-200 dark:border-gray-700 pointer-events-auto flex flex-col overflow-hidden"
-        style="max-height: 85vh;"
-      >
-        <!-- Header -->
-        <div class="bg-primary-600 px-4 py-3 flex justify-between items-center text-white">
-          <div class="flex items-center gap-2">
-            <ChatBubbleLeftRightIcon class="h-5 w-5" />
-            <span class="font-medium text-sm">{{ t('dashboard.chat.title') }}</span>
-          </div>
-          <button
-            class="text-primary-100 hover:text-white"
-            @click="chatOpen = false"
+  </div>
+
+  <!-- Floating Chat Assistant (outside pagination to avoid overlap) -->
+  <div
+    class="fixed bottom-4 right-4 z-50 flex flex-col items-end pointer-events-none"
+    style="margin-bottom: 0;"
+  >
+    <div
+      v-if="chatOpen"
+      class="mb-4 w-[32rem] bg-white dark:bg-gray-900 shadow-xl rounded-lg border border-gray-200 dark:border-gray-700 pointer-events-auto flex flex-col overflow-hidden"
+      style="max-height: 85vh;"
+    >
+      <!-- Header -->
+      <div class="bg-primary-600 px-4 py-3 flex justify-between items-center text-white">
+        <div class="flex items-center gap-2">
+          <ChatBubbleLeftRightIcon class="h-5 w-5" />
+          <span class="font-medium text-sm">{{ t('dashboard.chat.title') }}</span>
+        </div>
+        <button
+          class="text-primary-100 hover:text-white"
+          @click="chatOpen = false"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            class="w-5 h-5"
           >
+            <path
+              d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Content -->
+      <div class="p-4 flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800/50 min-h-[200px]">
+        <div
+          v-if="chatMessages.length === 0 && !chatLoading"
+          class="space-y-4"
+        >
+          <div
+            class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200"
+          >
+            <span class="font-bold block mb-1">{{ t('dashboard.chat.how_it_works') }}</span>
+            {{ t('dashboard.chat.how_it_works_desc') }}
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">
+              {{ t('dashboard.chat.try_asking') }}
+            </p>
+            <div class="grid gap-2">
+              <button
+                v-for="ex in [t('dashboard.chat.example_invoices'), t('dashboard.chat.example_errors'), t('dashboard.chat.example_intents'), t('dashboard.chat.example_urgent')]"
+                :key="ex"
+                class="text-left text-xs bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 transition-colors shadow-sm"
+                @click="useExample(ex)"
+              >
+                {{ ex }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="chatLoading"
+          class="flex justify-start mt-2"
+        >
+          <div
+            class="bg-white dark:bg-gray-800 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-2"
+          >
+            <div class="animate-spin h-3 w-3 border-2 border-primary-600 border-t-transparent rounded-full" />
+            <span class="text-xs text-gray-500">{{ t('dashboard.chat.searching') }}</span>
+          </div>
+        </div>
+
+        <!-- Conversation history -->
+        <div
+          v-for="(msg, idx) in chatMessages"
+          :key="idx"
+          class="flex mt-3"
+          :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
+        >
+          <div
+            class="px-4 py-2.5 rounded-lg border shadow-sm max-w-[85%]"
+            :class="msg.role === 'user'
+              ? 'bg-primary-600 text-white border-primary-600'
+              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+            "
+          >
+            <div
+              v-if="msg.role === 'user'"
+              class="text-sm leading-relaxed whitespace-pre-wrap"
+            >
+              {{ msg.content }}
+            </div>
+            <!-- eslint-disable-next-line vue/no-v-html -->
+            <div
+              v-else
+              class="text-sm text-gray-800 dark:text-gray-200 leading-relaxed prose prose-sm dark:prose-invert max-w-none"
+              v-html="md.render(msg.content || '')"
+            />
+            <!-- Show sources only for last assistant message -->
+            <div
+              v-if="msg.role === 'assistant' && idx === chatMessages.length - 1 && chatSources.length"
+              class="mt-2 text-[10px] text-gray-500 dark:text-gray-400"
+            >
+              <div class="uppercase tracking-wider font-semibold">
+                {{ t('dashboard.chat.sources') }}
+              </div>
+              <ul class="list-disc ml-4">
+                <li
+                  v-for="s in chatSources"
+                  :key="(s.parent_id || '') + ':' + (s.chunk_index || 0)"
+                >
+                  {{ s.subject || s.parent_id }} <span v-if="s.chunk_index !== undefined">({{
+                    t('dashboard.chat.chunk') }} {{ s.chunk_index
+                  }})</span>
+                </li>
+              </ul>
+            </div>
+            <div
+              v-if="msg.role === 'assistant'"
+              class="mt-2 text-[10px] text-gray-400 border-t dark:border-gray-700 pt-1 flex items-center gap-1"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                class="w-3 h-3"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              {{ t('dashboard.chat.generated_by') }}
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="chatError"
+          class="mt-2 text-xs text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-100 dark:border-red-800"
+        >
+          {{ t('dashboard.chat.error') }} {{ chatError }}
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+        <div class="relative">
+          <textarea
+            v-model="chatQuery"
+            rows="1"
+            class="block w-full rounded-md border-0 py-2.5 pr-10 pl-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white resize-none"
+            :placeholder="t('dashboard.chat.placeholder')"
+            @keydown.enter.exact.prevent="runChatSearch"
+          />
+          <button
+            :disabled="!chatQuery.trim() || chatLoading"
+            class="absolute bottom-1.5 right-1.5 p-1.5 rounded-md text-primary-600 hover:text-primary-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+            @click="runChatSearch"
+          >
+            <span class="sr-only">{{ t('dashboard.chat.send') }}</span>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"
@@ -1478,180 +1735,35 @@ const emit = defineEmits(['open-email'])
               class="w-5 h-5"
             >
               <path
-                d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"
+                d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"
               />
             </svg>
           </button>
         </div>
-
-        <!-- Content -->
-        <div class="p-4 flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800/50 min-h-[200px]">
-          <div
-            v-if="chatMessages.length === 0 && !chatLoading"
-            class="space-y-4"
-          >
-            <div
-              class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200"
-            >
-              <span class="font-bold block mb-1">{{ t('dashboard.chat.how_it_works') }}</span>
-              {{ t('dashboard.chat.how_it_works_desc') }}
-            </div>
-            <div>
-              <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">
-                {{ t('dashboard.chat.try_asking') }}
-              </p>
-              <div class="grid gap-2">
-                <button
-                  v-for="ex in [t('dashboard.chat.example_invoices'), t('dashboard.chat.example_errors'), t('dashboard.chat.example_intents'), t('dashboard.chat.example_urgent')]"
-                  :key="ex"
-                  class="text-left text-xs bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 transition-colors shadow-sm"
-                  @click="useExample(ex)"
-                >
-                  {{ ex }}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div
-            v-if="chatLoading"
-            class="flex justify-start mt-2"
-          >
-            <div
-              class="bg-white dark:bg-gray-800 px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-2"
-            >
-              <div class="animate-spin h-3 w-3 border-2 border-primary-600 border-t-transparent rounded-full" />
-              <span class="text-xs text-gray-500">{{ t('dashboard.chat.searching') }}</span>
-            </div>
-          </div>
-
-          <!-- Conversation history -->
-          <div
-            v-for="(msg, idx) in chatMessages"
-            :key="idx"
-            class="flex mt-3"
-            :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
-          >
-            <div
-              class="px-4 py-2.5 rounded-lg border shadow-sm max-w-[85%]"
-              :class="msg.role === 'user'
-                ? 'bg-primary-600 text-white border-primary-600'
-                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-              "
-            >
-              <div
-                v-if="msg.role === 'user'"
-                class="text-sm leading-relaxed whitespace-pre-wrap"
-              >
-                {{ msg.content }}
-              </div>
-              <!-- eslint-disable-next-line vue/no-v-html -->
-              <div
-                v-else
-                class="text-sm text-gray-800 dark:text-gray-200 leading-relaxed prose prose-sm dark:prose-invert max-w-none"
-                v-html="md.render(msg.content || '')"
-              />
-              <!-- Show sources only for last assistant message -->
-              <div
-                v-if="msg.role === 'assistant' && idx === chatMessages.length - 1 && chatSources.length"
-                class="mt-2 text-[10px] text-gray-500 dark:text-gray-400"
-              >
-                <div class="uppercase tracking-wider font-semibold">
-                  {{ t('dashboard.chat.sources') }}
-                </div>
-                <ul class="list-disc ml-4">
-                  <li
-                    v-for="s in chatSources"
-                    :key="(s.parent_id || '') + ':' + (s.chunk_index || 0)"
-                  >
-                    {{ s.subject || s.parent_id }} <span v-if="s.chunk_index !== undefined">({{
-                      t('dashboard.chat.chunk') }} {{ s.chunk_index
-                    }})</span>
-                  </li>
-                </ul>
-              </div>
-              <div
-                v-if="msg.role === 'assistant'"
-                class="mt-2 text-[10px] text-gray-400 border-t dark:border-gray-700 pt-1 flex items-center gap-1"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  class="w-3 h-3"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
-                {{ t('dashboard.chat.generated_by') }}
-              </div>
-            </div>
-          </div>
-
-          <div
-            v-if="chatError"
-            class="mt-2 text-xs text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-100 dark:border-red-800"
-          >
-            {{ t('dashboard.chat.error') }} {{ chatError }}
-          </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-          <div class="relative">
-            <textarea
-              v-model="chatQuery"
-              rows="1"
-              class="block w-full rounded-md border-0 py-2.5 pr-10 pl-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-800 dark:ring-gray-700 dark:text-white resize-none"
-              :placeholder="t('dashboard.chat.placeholder')"
-              @keydown.enter.exact.prevent="runChatSearch"
-            />
-            <button
-              :disabled="!chatQuery.trim() || chatLoading"
-              class="absolute bottom-1.5 right-1.5 p-1.5 rounded-md text-primary-600 hover:text-primary-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-              @click="runChatSearch"
-            >
-              <span class="sr-only">{{ t('dashboard.chat.send') }}</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                class="w-5 h-5"
-              >
-                <path
-                  d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
       </div>
-
-      <button
-        class="pointer-events-auto shadow-lg rounded-full w-14 h-14 bg-primary-600 hover:bg-primary-500 text-white flex items-center justify-center transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600"
-        :class="{ 'rotate-90': chatOpen }"
-        @click="chatOpen = !chatOpen"
-      >
-        <ChatBubbleLeftRightIcon
-          v-if="!chatOpen"
-          class="h-7 w-7"
-        />
-        <svg
-          v-else
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          class="w-6 h-6"
-        >
-          <path
-            d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"
-          />
-        </svg>
-      </button>
     </div>
+
+    <button
+      class="pointer-events-auto shadow-lg rounded-full w-14 h-14 bg-primary-600 hover:bg-primary-500 text-white flex items-center justify-center transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600"
+      :class="{ 'rotate-90': chatOpen }"
+      @click="chatOpen = !chatOpen"
+    >
+      <ChatBubbleLeftRightIcon
+        v-if="!chatOpen"
+        class="h-7 w-7"
+      />
+      <svg
+        v-else
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        class="w-6 h-6"
+      >
+        <path
+          d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"
+        />
+      </svg>
+    </button>
   </div>
 
   <DlqDetailModal

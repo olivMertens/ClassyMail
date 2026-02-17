@@ -224,6 +224,24 @@
             "experimental": "Experimental",
             "unknown": "Default"
         },
+        "ocr_provider": {
+            "mistral_ocr": "Mistral OCR",
+            "document_intelligence": "Doc Intelligence"
+        },
+        "time": {
+            "total_only": "Total processing time (no stage breakdown available)",
+            "download": "Download",
+            "ocr": "OCR",
+            "extraction": "Entity extraction",
+            "classify": "Classification",
+            "embedding": "Embeddings",
+            "slow_reasons": "Possible causes of slowness",
+            "reason_large_pdf": "Large PDF ({pages} pages)",
+            "reason_ocr_fallback": "OCR fell back to {provider}",
+            "reason_circuit_breaker": "Primary OCR circuit breaker was open",
+            "reason_mistral_error": "Mistral OCR failed ({error})",
+            "reason_llm_fallback": "LLM fallback used ({model})"
+        },
         "dlq": {
             "banner_title": "Dead-letter queue has {count} message(s)",
             "banner_button": "View Details",
@@ -236,6 +254,9 @@
             "close": "Close View",
             "purge": "Purge All",
             "purging": "Purging...",
+            "replay_all": "Replay All",
+            "replaying": "Replaying...",
+            "replay_confirm": "Re-enqueue all DLQ messages back to the active queue for reprocessing?",
             "item_id": "Item ID / ID",
             "reason": "Reason",
             "description": "Description",
