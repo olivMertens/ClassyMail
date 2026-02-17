@@ -32,47 +32,53 @@ Il valide une architecture moderne sur Azure :
 flowchart TD
     user[User] -->|Upload PDF| ui["SPA Vue 3 + Tailwind"]
     ui -->|API| api["FastAPI API"]
-    mi["Managed Identity - email-poc-id"] -.->|RBAC| blob
-    mi -.->|RBAC| sbq
-    mi -.->|RBAC| cosmos
-    mi -.->|RBAC| ai
-    mi -.->|RBAC| lang
-    mi -.->|RBAC| di
 
-    api -->|GET| blob[(Blob Storage)]
+    api -->|Store| blob[(Blob Storage)]
     blob -->|Event Grid| sbq["Service Bus Queue"]
-    sbq -->|Worker| worker["Worker - async processor"]
+    sbq --> worker["Worker - async processor"]
 
     worker -->|Download| blob
-    api -->|OCR| ocr["🔷 Mistral OCR"]
-    ocr -->|Markdown| api
-    ocr -.->|Fallback| di["📋 Document Intelligence via AI Foundry"]
-    di -.->|Markdown| api
+    worker -->|OCR| ocr["Mistral OCR"]
+    ocr -.->|Fallback| di["Doc Intelligence via AI Foundry"]
 
-    api -->|Estimate tokens| tokencheck{"Content tokens < 8K?"}
-    tokencheck -->|YES| phi4["🔶 Phi-4 - Primary, 8K"]
-    tokencheck -->|NO| gpt["🟢 gpt-4o-mini - Fallback, 120K"]
+    worker -->|Token budget| tokencheck{"Tokens under 8K?"}
+    tokencheck -->|YES| phi4["Phi-4 Primary"]
+    tokencheck -->|NO| gpt["gpt-4o-mini Fallback"]
 
-    api -->|PII Detection?| piicheck{"Method?"}
+    worker -->|PII Detection| piicheck{"Method?"}
     piicheck -->|LLM| gpt_pii["GPT-4o-mini PII"]
-    piicheck -->|Azure| lang["🔷 Azure AI Language"]
+    piicheck -->|Azure| lang["Azure AI Language"]
     piicheck -->|Hybrid| both["Both + Merge"]
 
-    api -->|Mode Comparaison?| compcheck{"Adversarial mode ON?"}
-    compcheck -->|YES| dual["🔶 Phi-4 ∥ 🟢 gpt4o-mini - Parallel Execution"]
-    compcheck -->|NO| primary["Primary Model Only"]
+    worker -->|Comparison?| compcheck{"Adversarial?"}
+    compcheck -->|YES| dual["Phi-4 + gpt-4o-mini Parallel"]
+    compcheck -->|NO| primary["Single Model"]
 
-    phi4 -->|JSON| api
-    gpt -->|JSON| api
-    gpt_pii -->|PII Data| api
-    lang -->|PII Data| api
-    both -->|Merged PII| api
-    dual -->|Dual results| api
-    primary -->|Classification| api
+    phi4 --> cosmos
+    gpt --> cosmos
+    gpt_pii --> cosmos
+    lang --> cosmos
+    both --> cosmos
+    dual --> cosmos
+    primary --> cosmos
+    worker -->|Results| cosmos["Cosmos DB"]
 
-    api --> cosmos["📊 Cosmos DB"]
-    api --> ai["AI Foundry Project"]
-    cosmos --> ui
+    cosmos --> api
+    api --> ui
+
+    subgraph AIFoundry ["Azure AI Foundry"]
+        ocr
+        di
+        phi4
+        gpt
+        gpt_pii
+        dual
+    end
+
+    mi["Managed Identity"] -.->|RBAC| blob
+    mi -.->|RBAC| sbq
+    mi -.->|RBAC| cosmos
+    mi -.->|RBAC| AIFoundry
 
     style mi fill:#fff9c4,stroke:#f57f17,stroke-width:2px
     style lang fill:#e1f5fe,stroke:#01579b,stroke-width:2px
