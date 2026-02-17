@@ -99,19 +99,26 @@ deploy_language_service = true  # Default: false
 
 **Purpose:** Fallback OCR provider when Mistral OCR is unavailable (timeout, quota exceeded, circuit breaker open).
 
-**Deployment:**
+**Default Behavior (AI Foundry endpoint):**
+
+By default, Document Intelligence is accessed **through the AI Foundry endpoint** (`https://<prefix>-aifoundry.cognitiveservices.azure.com/`). The `Cognitive Services User` role already assigned on AI Foundry covers DI access — **no separate resource or Terraform flag needed**.
+
+- **Model:** `prebuilt-layout` (text-only Markdown extraction)
+- **API Version:** `2024-11-30` (configurable via `DOC_INTELLIGENCE_API_VERSION`)
+- **Authentication:** Managed Identity (RBAC) - `Cognitive Services User` role on AI Foundry
+- **Environment Variable:** `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` (auto-set by Terraform to AI Foundry endpoint)
+
+**Standalone Deployment (optional — separate quotas/isolation):**
 ```terraform
 # In terraform.tfvars
 deploy_document_intelligence = true  # Default: false
 doc_intelligence_sku         = "S0"  # Default: S0 (F0 for free tier)
 ```
 
-**Configuration:**
+When standalone is deployed:
 - **Kind:** `FormRecognizer` (Cognitive Services)
 - **SKU:** `S0` (Standard) or `F0` (Free — 500 pages/month)
-- **Model:** `prebuilt-layout` (text-only Markdown extraction)
-- **Authentication:** Managed Identity (RBAC) - `Cognitive Services User` role
-- **API Version:** `2024-11-30` (configurable via `DOC_INTELLIGENCE_API_VERSION`)
+- **RBAC:** Separate `Cognitive Services User` role assignment on the DI resource
 
 **Usage:** Automatic — pipeline falls back to Document Intelligence when Mistral OCR fails. No UI configuration needed.
 
@@ -121,6 +128,7 @@ doc_intelligence_sku         = "S0"  # Default: S0 (F0 for free tier)
 - ✅ Production environments requiring high OCR availability
 - ✅ Mistral OCR experiencing frequent quota limits (429 errors)
 - ✅ Need for graceful degradation without manual intervention
+- ✅ AI Foundry endpoint (default) — zero additional cost, no extra resource
 - ❌ Development/testing (Mistral OCR alone is sufficient)
 
 ---
@@ -377,7 +385,7 @@ The Container Apps use a **User-Assigned Managed Identity** with the following r
 | **AI Foundry** | Cognitive Services User | `rbac_ai` | AI Foundry Account | Always |
 | **Container Registry** | AcrPull | `acr_pull` | ACR | `acr_name != ""` |
 | **Language Service** | Cognitive Services Language Reader | `aca_language_reader` | Language Account | `deploy_language_service` |
-| **Document Intelligence** | Cognitive Services User | `aca_doc_intelligence_user` | DI Account | `deploy_document_intelligence` |
+| **Document Intelligence** | Cognitive Services User | `aca_doc_intelligence_user` | DI Account | `deploy_document_intelligence` (standalone only; AI Foundry RBAC covers default) |
 
 > ⚠️ **Cosmos DB uses a Custom Role** (not the built-in `Cosmos DB Built-in Data Contributor`). The custom role grants `readMetadata` + specific CRUD actions at **Account scope**. See [RBAC_AUDIT.md](RBAC_AUDIT.md) §9 for why.
 

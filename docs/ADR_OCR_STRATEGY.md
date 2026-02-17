@@ -32,9 +32,9 @@ We have implemented a **"Processing Strategy"** setting in the UI to allow flexi
 - **Deep Reasoning (CoT)**: Adds a "Chain of Thought" requirement to the LLM prompt. It asks the AI to "Think step-by-step" before deciding. This improves accuracy for complex/ambiguous emails but increases output token costs.
 - **Vision (Future)**: Placeholder for full VLM integration.
 
-## OCR Fallback — Document Intelligence (June 2026)
+## OCR Fallback — Document Intelligence via AI Foundry (June 2026)
 
-To improve resilience, a **fallback OCR provider** has been added using **Azure Document Intelligence** (FormRecognizer, prebuilt-layout model).
+To improve resilience, a **fallback OCR provider** has been added using **Azure Document Intelligence** (FormRecognizer, prebuilt-layout model), accessed **via the AI Foundry endpoint**.
 
 ### How it works
 1. Pipeline attempts Mistral OCR first (2 attempts with exponential retry).
@@ -42,12 +42,18 @@ To improve resilience, a **fallback OCR provider** has been added using **Azure 
 3. Document Intelligence extracts text-only Markdown (no images) using the `prebuilt-layout` model.
 4. The `ocr_provider` field on `EmailRecord` tracks which provider was used.
 
+### AI Foundry Integration
+- **Default**: `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` points to the AI Foundry endpoint (`https://<prefix>-aifoundry.cognitiveservices.azure.com/`).
+- **RBAC**: The `Cognitive Services User` role already assigned to the Managed Identity on AI Foundry covers Document Intelligence access — **no separate DI resource needed**.
+- **Standalone option**: Set `deploy_document_intelligence = true` in Terraform to deploy a dedicated FormRecognizer resource (separate quotas, isolation).
+
 ### Trade-offs
 - **Mistral OCR** produces richer Markdown (image descriptions, alt-text, layout hints). Best for classification accuracy.
 - **Document Intelligence** produces clean text Markdown. Sufficient for classification but loses image context.
 - Fallback is transparent to the classification stage — both providers output Markdown.
 
 ### Configuration
-- Terraform: `deploy_document_intelligence = true` (default: false)
-- Environment: `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` (auto-set by Terraform)
+- Terraform: AI Foundry endpoint used by default (no extra config needed)
+- Terraform (standalone): `deploy_document_intelligence = true` (default: false)
+- Environment: `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` (auto-set by Terraform to AI Foundry endpoint)
 - Circuit breaker: `doc_intelligence_breaker` (fail_max=3, reset_timeout=30s)

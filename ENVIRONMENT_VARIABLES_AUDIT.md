@@ -76,7 +76,7 @@ This audit compares environment variables across:
 |----------|--------|---------|--------|
 | `AZURE_LANGUAGE_ENDPOINT` | Terraform optional | Azure AI Language PII | ⚠️ Missing from example |
 | `AZURE_LANGUAGE_KEY` | Optional | Key-based auth | ⚠️ Missing from example |
-| `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` | Terraform optional | OCR Fallback (Document Intelligence) | ✅ In secrets.env.example |
+| `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` | Terraform (AI Foundry) | OCR Fallback (Document Intelligence via AI Foundry) | ✅ In secrets.env.example |
 | `DOC_INTELLIGENCE_API_VERSION` | Config default `2024-11-30` | DI REST API version | ✅ In secrets.env.example |
 | `ANONYMIZER_ENDPOINT` | Config fallback | PII scrubbing | ❌ Missing everywhere |
 | `ANONYMIZER_DEPLOYMENT` | Config default | Anonymization model | ❌ Missing everywhere |

@@ -556,7 +556,10 @@
             "mistral": "Mistral AI OCR",
             "classify": "Classifier",
             "openai": "Azure OpenAI",
-            "update": "Mise à jour"
+            "update": "Mise à jour",
+            "fallback": "Fallback OCR",
+            "doc_intelligence": "Document Intelligence via AI Foundry",
+            "ai_foundry": "Azure AI Foundry"
         }
     },
     "email_detail": {

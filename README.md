@@ -46,7 +46,7 @@ flowchart TD
     worker -->|Download| blob
     api -->|OCR| ocr["🔷 Mistral OCR"]
     ocr -->|Markdown| api
-    ocr -.->|Fallback| di["📋 Document Intelligence"]
+    ocr -.->|Fallback| di["📋 Document Intelligence via AI Foundry"]
     di -.->|Markdown| api
 
     api -->|Estimate tokens| tokencheck{"Content tokens < 8K?"}
@@ -131,13 +131,14 @@ Le pipeline utilise une approche à deux temps pour maximiser la précision des 
 1.  **OCR Enrichi** : Mistral extrait le texte mais aussi la structure et décrit les images (Alt-Text).
 2.  **Pré-Extraction** : Les entités clés (Noms, Dates, Montants) sont extraites en amont, permettant au modèle de classification de se concentrer uniquement sur l'intention.
 
-### 🔄 OCR Fallback — Document Intelligence (NEW)
-Résilience OCR avec basculement automatique vers Azure Document Intelligence :
+### 🔄 OCR Fallback — Document Intelligence via AI Foundry (NEW)
+Résilience OCR avec basculement automatique vers Azure Document Intelligence via l'endpoint AI Foundry :
 *   **Fallback Transparent** : Si Mistral OCR échoue (timeout, quota, erreur), le pipeline bascule automatiquement vers Azure Document Intelligence
+*   **Via AI Foundry** : Document Intelligence est accessible via l'endpoint AI Foundry (`Cognitive Services User` RBAC) — aucune ressource DI séparée nécessaire
 *   **Circuit Breaker** : Chaque provider a son propre circuit breaker (Mistral: 5 échecs / 60s reset, DI: 3 échecs / 30s reset)
 *   **ConnectTimeout Fast-Fail** : Les erreurs de connexion ne sont pas réessayées, déclenchant immédiatement le fallback
 *   **Tracking Provider** : Le dashboard affiche un badge ambre "Doc Intelligence" quand le fallback est utilisé
-*   **Déploiement Optionnel** : Activé via `deploy_document_intelligence=true` dans Terraform (désactivé par défaut)
+*   **Option Standalone** : Activable via `deploy_document_intelligence=true` dans Terraform pour une ressource DI dédiée (quotas séparés)
 *   **Coût Minime** : S0 tier, facturé à l'usage (~$1.50/1K pages)
 
 ### 🎯 Category Assessment AI Advice (NEW)

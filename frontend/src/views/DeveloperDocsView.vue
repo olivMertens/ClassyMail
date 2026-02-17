@@ -68,6 +68,7 @@ graph TD
     classDef app fill:#50e6ff,stroke:#333,stroke-width:2px,color:#000
     classDef db fill:#59b4d9,stroke:#333,stroke-width:2px
     classDef ai fill:#ff9900,stroke:#333,stroke-width:2px,color:#000
+    classDef fallback fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000
 
     Client([${t('developer_docs.diagram.client')}]) -->|HTTPS| FE[${t('developer_docs.diagram.frontend')}]
     FE -->|API Calls| API[${t('developer_docs.diagram.backend')}]
@@ -84,15 +85,24 @@ graph TD
     SB -->|${t('developer_docs.diagram.trigger')}| Worker
     Worker -->|${t('developer_docs.diagram.read_file')}| Blob
     Worker -->|${t('developer_docs.diagram.ocr')}| Mistral[${t('developer_docs.diagram.mistral')}]
+    Mistral -.->|${t('developer_docs.diagram.fallback')}| DI[${t('developer_docs.diagram.doc_intelligence')}]
     Worker -->|${t('developer_docs.diagram.classify')}| OPENAI[${t('developer_docs.diagram.openai')}]
 
+    subgraph AIFoundry [${t('developer_docs.diagram.ai_foundry')}]
+        Mistral
+        OPENAI
+        DI
+    end
+
     Mistral -->|Markdown| Worker
+    DI -.->|Markdown| Worker
     OPENAI -->|JSON Intent| Worker
     Worker -->|${t('developer_docs.diagram.update')}| Cosmos
 
     class Blob,Cosmos,SB azure
     class FE,API,Worker app
     class Mistral,OPENAI ai
+    class DI fallback
 `)
 </script>
 
