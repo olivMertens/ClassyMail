@@ -405,40 +405,74 @@
     },
     "guide": {
         "title": "Documentazione dell'Applicazione",
-        "subtitle": "Guida all'uso di ClassyMail, comprensione delle capacità IA e gestione della privacy.",
+        "subtitle": "Guida completa a ClassyMail: classificazione email con IA, controlli sulla privacy ed esportazione dati.",
+        "highlights": {
+            "ai_models": "Modelli IA Ibridi",
+            "ai_models_desc": "Phi-4 primario, GPT-4o-mini di riserva",
+            "pii": "Privacy GDPR",
+            "pii_desc": "Rilevamento e anonimizzazione automatica PII",
+            "vision": "Vision OCR Intelligente",
+            "vision_desc": "Mistral Document AI con descrizione immagini",
+            "exports": "Esportazioni Dati",
+            "exports_desc": "Reporting CSV e Fine-Tuning JSONL"
+        },
+        "flow_title": "Flusso di Elaborazione End-to-End",
+        "flow_desc": "Ogni PDF caricato percorre questa pipeline: acquisizione tramite Blob Storage, accodamento tramite Service Bus, estrazione OCR con Mistral (o Document Intelligence di riserva), rilevamento PII, classificazione IA e archiviazione in Cosmos DB.",
+        "legend": {
+            "upload": "Caricamento e Acquisizione",
+            "ocr": "OCR ed Estrazione",
+            "classification": "Classificazione IA",
+            "storage": "Archiviazione e Risultati"
+        },
         "usage": {
-            "title": "Come utilizzare",
+            "title": "Come usare ClassyMail",
             "step1_title": "1. Dashboard e Monitoraggio",
-            "step1_desc": "Il dashboard principale offre una vista in tempo reale delle email in arrivo.",
-            "step1_li1": "Codici di Stato: Verde (Elaborata), Ambra (Da verificare), Rosso (Errore).",
-            "step1_li2": "Punteggio: Punteggi di confidenza (0-100%) indicano la certezza dell'IA.",
-            "step1_li3": "Indicatori: Cercare i badge Dati Sensibili o Immagini.",
-            "step2_title": "2. Processo di Validazione",
-            "step2_desc": "Cliccare su 'Apri Dettagli' su qualsiasi email per entrare in modalità revisione.",
-            "step2_li1": "Vedere il PDF originale e il Markdown estratto affiancati.",
-            "step2_li2": "Vedere la sezione Analisi IA per il ragionamento.",
-            "step2_li3": "Correggere le categorie se l'IA sbaglia. Fornire un motivo per aiutare il futuro Fine-Tuning.",
-            "step3_title": "3. Importazione",
-            "step3_desc": "Usare la scheda Carica per importare manualmente file PDF per i test. In produzione, i file arrivano automaticamente via Email/Blob Storage.",
+            "step1_desc": "Il dashboard principale offre una vista in tempo reale di tutte le email in arrivo ed elaborate con statistiche live.",
+            "step1_li1": "Codici di Stato: Verde (Elaborata), Ambra (Da verificare), Rosso (Errore), Blu (In corso).",
+            "step1_li2": "Punteggi di Confidenza: 0-100% mostrano la certezza dell'IA. Valori sotto 85% attivano la revisione manuale.",
+            "step1_li3": "Badge: Cercare indicatori di dati sensibili rilevati, immagini trovate o confronto avversariale attivato.",
+            "step1_li4": "Tempo di Elaborazione: Passare il mouse sull'icona dell'orologio per la ripartizione dettagliata (OCR, classificazione, PII) per email.",
+            "step2_title": "2. Revisione e Correzioni",
+            "step2_desc": "Cliccare su 'Apri Dettagli' su qualsiasi email per entrare in modalità revisione completa con confronto affiancato.",
+            "step2_li1": "Vedere il PDF originale accanto al contenuto Markdown estratto dall'IA.",
+            "step2_li2": "Esaminare l'analisi IA: intenti rilevati, punteggi di confidenza e catena di ragionamento.",
+            "step2_li3": "Correggere le categorie se l'IA sbaglia. Fornire un motivo per alimentare il ciclo di Fine-Tuning.",
+            "step2_li4": "Confrontare i risultati avversariali quando l'elaborazione duale è attiva (Phi-4 vs GPT-4o-mini).",
+            "step3_title": "3. Caricare Documenti",
+            "step3_desc": "Usare la scheda Carica per importare manualmente file PDF per test o elaborazione batch.",
+            "step3_li1": "Trascinare e rilasciare o sfogliare per selezionare uno o più file PDF (max 20 MB per file).",
+            "step3_li2": "In produzione, i file arrivano automaticamente tramite integrazione email o caricamento diretto su Blob Storage.",
             "step4_title": "4. Impostazioni e Configurazione",
-            "step4_desc": "Personalizzare il comportamento del motore nella scheda Impostazioni.",
-            "step4_li1": "Categorie: Definire i nomi esatti degli intenti. Le modifiche si applicano immediatamente.",
-            "step4_li2": "Strategia di Elaborazione: Alternare tra le modalità Standard, Ragionamento o Vision."
+            "step4_desc": "Regolare il comportamento del motore nella scheda Impostazioni in base al proprio caso d'uso.",
+            "step4_li1": "Categorie: Definire nomi di intento precisi e descrizioni. Le modifiche si applicano immediatamente alle nuove classificazioni.",
+            "step4_li2": "Strategia di Elaborazione: Alternare tra Standard (veloce), Ragionamento (preciso) o Vision (basata su immagini).",
+            "step4_li3": "Impostazioni PII: Attivare/disattivare il rilevamento PII, scegliere il metodo (LLM, Azure AI Language o Ibrido) e il modello."
+        },
+        "strategies": {
+            "title": "Strategie di Elaborazione",
+            "desc": "Scegliere la strategia più adatta ai propri tipi di documento. Ogni strategia ottimizza diversi compromessi tra velocità, precisione e costo.",
+            "standard_title": "Standard",
+            "standard_desc": "Classificazione rapida con Phi-4 (sotto 8K token) o GPT-4o-mini (documenti più grandi). Ideale per email con testo chiaro. Costo minimo per documento.",
+            "reasoning_title": "Ragionamento",
+            "reasoning_desc": "Forza l'IA a produrre un ragionamento passo-passo prima di classificare. Migliora la precisione su email ambigue o con intenti multipli. Latenza leggermente superiore.",
+            "vision_title": "Vision",
+            "vision_desc": "Attiva l'analisi completa delle immagini con le capacità Vision di GPT-4o-mini. Ideale per documenti con foto, diagrammi o scrittura scansionata che influenzano la classificazione."
         },
         "ai": {
-            "title": "Complessità Globale e Ragionamento",
-            "desc": "Il sistema determina la complessità basandosi su:",
-            "li1": "Multi-Intento: Email che richiedono più azioni distinte (es: 'Cambiare indirizzo E inviare estratto conto').",
-            "li2": "Ambiguità: Formulazione vaga che richiede inferenza o contesto dagli allegati.",
-            "li3": "Strategia: Usare la strategia 'Ragionamento' (Impostazioni) forza l'IA a produrre una giustificazione prima di classificare, migliorando la precisione nei casi complessi."
+            "title": "Complessità IA e Ragionamento",
+            "desc": "Il sistema valuta la complessità di ogni email e adatta il proprio approccio:",
+            "li1": "Rilevamento Multi-Intento: Identifica email con più azioni distinte (es: 'Cambiare indirizzo E inviare estratto conto') e classifica ogni intento separatamente.",
+            "li2": "Gestione dell'Ambiguità: Risolve formulazioni vaghe usando contesto da allegati, intestazioni e struttura del documento.",
+            "li3": "Modalità Ragionamento: Quando attiva, l'IA produce un ragionamento a catena prima di classificare, migliorando notevolmente la precisione nei casi complessi.",
+            "li4": "Routing per Token: Documenti sotto 8K token vengono elaborati da Phi-4 (più veloce, più economico); documenti più grandi vengono automaticamente indirizzati a GPT-4o-mini."
         },
         "exports": {
             "title": "Esportazioni Dati e Fine-Tuning",
             "desc": "Esportare i dati elaborati per il reporting o per addestrare modelli IA migliori.",
             "csv_title": "Esportazione CSV (Reporting)",
             "csv_desc": "Scaricare un elenco completo di tutte le email elaborate con stato, costi e metadati.",
-            "csv_streaming": "Supporto Streaming: Questa esportazione genera dati al volo, consentendo il download di grandi set di dati (10k+ righe) senza timeout del server.",
-            "csv_columns": "Incluso: ID, Stato, Intenti Rilevati, Punteggi di Confidenza, Costi Uso IA (USD) e Tempo di Elaborazione.",
+            "csv_streaming": "Supporto Streaming: Genera dati al volo, consentendo il download di grandi set di dati (10k+ righe) senza timeout del server.",
+            "csv_columns": "Colonne: ID, Stato, Intenti Rilevati, Punteggi di Confidenza, Costi IA (USD), Tempo di Elaborazione, Metodo OCR e Modello utilizzato.",
             "jsonl_title": "Esportazione JSONL (Fine-Tuning)",
             "jsonl_desc": "Esportare un dataset 'Reinforcement Learning' progettato per il fine-tuning Azure OpenAI / Phi-4.",
             "jsonl_format": "Formato: JSON Lines (JSONL), compatibile con Azure AI Foundry."
@@ -462,13 +496,14 @@
         },
         "vision": {
             "title": "Smart Vision (Mistral Document AI)",
-            "desc": "Il sistema sfrutta l'analisi avanzata del layout di Mistral per gestire intelligentemente il contenuto visivo.",
+            "desc": "Il sistema sfrutta l'analisi avanzata del layout di Mistral per gestire intelligentemente il contenuto visivo nei documenti.",
             "standard_title": "Elaborazione Ibrida",
-            "standard_desc": "La pipeline è 'consapevole del contenuto': i documenti di testo vengono elaborati con OCR normale. Tuttavia, se vengono rilevati elementi visivi (foto, diagrammi) *all'interno* del documento, vengono automaticamente descritti dal modello Vision.",
+            "standard_desc": "La pipeline è 'consapevole del contenuto': i documenti di testo vengono elaborati con OCR normale. Tuttavia, se vengono rilevati elementi visivi (foto, diagrammi) all'interno del documento, vengono automaticamente descritti dal modello Vision.",
             "vision_title": "Scansioni vs Immagini Utili",
-            "vision_desc": "Il sistema distingue intelligentemente tra una 'pagina scansionata' (fonte di testo) e 'immagini significative' (es: foto di incidente). Le descrizioni ridondanti della pagina stessa vengono soppresse. Nota: le annotazioni Mistral sono limitate a 8 pagine; oltre, GPT-4o-mini fornisce descrizioni di fallback."
-        },
-        "flow_title": "Flusso di Elaborazione"
+            "vision_desc": "Il sistema distingue intelligentemente tra una 'pagina scansionata' (fonte di testo) e 'immagini significative' (es: foto di incidente). Le descrizioni ridondanti della pagina stessa vengono soppresse.",
+            "fallback_title": "Catena di Fallback OCR",
+            "fallback_desc": "L'OCR primario usa Mistral Document AI. Se Mistral non è disponibile o il Circuit Breaker si attiva, il sistema passa ad Azure Document Intelligence tramite AI Foundry. Mistral elabora fino a 8 pagine; oltre, GPT-4o-mini fornisce descrizioni complementari delle immagini."
+        }
     },
     "dialog": {
         "ok": "OK",

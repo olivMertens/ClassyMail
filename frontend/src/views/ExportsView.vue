@@ -15,7 +15,8 @@ const { confirm: confirmDialog, alert: showAlert } = useDialog()
 const stats = ref({
   total: 0,
   finetune_ready: false,
-  finetune_min_required: 50
+  finetune_min_required: 50,
+  finetune_reviewed_ready: 0
 })
 const loading = ref(false)
 const generating = ref(false) // Added generating state
@@ -85,8 +86,8 @@ const generateSyntheticData = async () => {
 
   generating.value = true
   try {
-    // Calculate how many we successfully need, cap at 10 per batch for performance
-    const needed = Math.max(stats.value.finetune_min_required - stats.value.total, 5)
+    // Calculate how many we need based on reviewed-ready items vs minimum required
+    const needed = Math.max(stats.value.finetune_min_required - stats.value.finetune_reviewed_ready, 5)
 
     const res = await fetch('/api/admin/generate-synthetic', {
       method: 'POST',
@@ -112,26 +113,26 @@ const generateSyntheticData = async () => {
 const fetchStats = async () => {
   loading.value = true
   try {
-    // Use admin summary endpoint for lightweight stats
-    let data = {}
-    const res2 = await fetch('/api/admin/stats/summary')
-    if (res2.ok) {
-      data = await res2.json()
-      // Map backend stats to frontend expectations
+    // Use /api/emails/stats which returns proper finetune fields
+    const res = await fetch('/api/emails/stats')
+    if (res.ok) {
+      const data = await res.json()
       stats.value = {
         total: data.total || 0,
-        finetune_ready: (data.processed || 0) >= 50, // rough check, ideally backend provides this flag
-        finetune_min_required: 50
+        finetune_ready: data.finetune_ready || false,
+        finetune_min_required: data.finetune_min_required || 50,
+        finetune_reviewed_ready: data.finetune_reviewed_ready || 0
       }
     } else {
-      // Fallback to searching emails if admin endpoint fails or is different
+      // Fallback to email list endpoint
       const resFull = await fetch('/api/emails?page_size=1')
       if (resFull.ok) {
         const d = await resFull.json()
         stats.value = {
           total: d.total || 0,
           finetune_ready: d.finetune_ready || false,
-          finetune_min_required: d.finetune_min_required || 50
+          finetune_min_required: d.finetune_min_required || 50,
+          finetune_reviewed_ready: d.finetune_reviewed_ready || 0
         }
       }
     }

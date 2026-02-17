@@ -56,10 +56,20 @@ class DeadLetterMessage(BaseModel):
     delivery_count: int | None = None
     dead_letter_reason: str | None = None
     dead_letter_error_description: str | None = None
+    dead_letter_source: str | None = None
     blob_url: str | None = None
     blob_id: str | None = None
     enqueued_time_utc: datetime | None = None
     sequence_number: int | None = None
+    content_type: str | None = None
+    subject: str | None = None
+    correlation_id: str | None = None
+    application_properties: dict | None = None
+    body_preview: str | None = None
+    # Cosmos DB error record data (if the worker saved one before DLQ)
+    cosmos_status: str | None = None
+    cosmos_error: str | None = None
+    cosmos_error_stage: str | None = None
     processing_log: list[dict] | None = None
 
 
@@ -550,14 +560,37 @@ async def deadletter_summary(clients: Clients = Depends(get_clients)):
                     payload = {"raw": body_bytes.decode(errors="ignore")}
                 blob_url = extract_blob_url(payload)
                 blob_id = blob_id_from_url(blob_url) if blob_url else None
+                # --- Cosmos DB error record ---
                 processing_log = None
+                cosmos_status = None
+                cosmos_error = None
+                cosmos_error_stage = None
                 if blob_id:
                     try:
                         await clients.ensure_cosmos_container()
                         doc = await clients.cosmos_container.read_item(item=blob_id, partition_key=blob_id)
                         processing_log = doc.get("processing_log")
+                        cosmos_status = doc.get("status")
+                        cosmos_error = doc.get("error")
+                        cosmos_error_stage = doc.get("error_stage")
                     except Exception:
-                        processing_log = None
+                        pass
+
+                # --- Service Bus message metadata ---
+                app_props = getattr(m, "application_properties", None)
+                # Normalise bytes keys/values to str for JSON serialisation
+                if app_props:
+                    app_props = {
+                        (k.decode() if isinstance(k, bytes) else str(k)):
+                        (v.decode() if isinstance(v, bytes) else v)
+                        for k, v in app_props.items()
+                    }
+
+                # Body preview (first 500 chars)
+                try:
+                    body_preview = body_bytes.decode(errors="replace")[:500]
+                except Exception:
+                    body_preview = None
 
                 messages.append(
                     DeadLetterMessage(
@@ -565,10 +598,19 @@ async def deadletter_summary(clients: Clients = Depends(get_clients)):
                         delivery_count=getattr(m, "delivery_count", None),
                         dead_letter_reason=getattr(m, "dead_letter_reason", None),
                         dead_letter_error_description=getattr(m, "dead_letter_error_description", None),
+                        dead_letter_source=getattr(m, "dead_letter_source", None),
                         blob_url=blob_url,
                         blob_id=blob_id,
                         enqueued_time_utc=getattr(m, "enqueued_time_utc", None),
                         sequence_number=getattr(m, "sequence_number", None),
+                        content_type=getattr(m, "content_type", None),
+                        subject=getattr(m, "subject", None),
+                        correlation_id=getattr(m, "correlation_id", None),
+                        application_properties=app_props,
+                        body_preview=body_preview,
+                        cosmos_status=cosmos_status,
+                        cosmos_error=cosmos_error,
+                        cosmos_error_stage=cosmos_error_stage,
                         processing_log=processing_log,
                     )
                 )

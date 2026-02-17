@@ -80,9 +80,26 @@ flowchart TD
     mi -.->|RBAC| cosmos
     mi -.->|RBAC| AIFoundry
 
-    style mi fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style lang fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    style di fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style user fill:#2563eb,stroke:#1e40af,color:#fff
+    style ui fill:#6366f1,stroke:#4f46e5,color:#fff
+    style api fill:#7c3aed,stroke:#6d28d9,color:#fff
+    style blob fill:#f59e0b,stroke:#d97706,color:#000
+    style sbq fill:#10b981,stroke:#059669,color:#fff
+    style worker fill:#0891b2,stroke:#0e7490,color:#fff
+    style ocr fill:#f97316,stroke:#ea580c,color:#000
+    style di fill:#ea580c,stroke:#c2410c,color:#fff
+    style tokencheck fill:#64748b,stroke:#475569,color:#fff
+    style phi4 fill:#818cf8,stroke:#6366f1,color:#000
+    style gpt fill:#a78bfa,stroke:#7c3aed,color:#000
+    style piicheck fill:#64748b,stroke:#475569,color:#fff
+    style gpt_pii fill:#c084fc,stroke:#a855f7,color:#000
+    style lang fill:#22d3ee,stroke:#0891b2,color:#000
+    style both fill:#f472b6,stroke:#ec4899,color:#000
+    style compcheck fill:#64748b,stroke:#475569,color:#fff
+    style dual fill:#d946ef,stroke:#c026d3,color:#fff
+    style primary fill:#34d399,stroke:#10b981,color:#000
+    style cosmos fill:#059669,stroke:#047857,color:#fff
+    style mi fill:#eab308,stroke:#ca8a04,color:#000
 ```
 
 ---
