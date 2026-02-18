@@ -432,7 +432,7 @@ async def run_classification_pipeline(
 
     span.set_attribute("app.result_status", status)
     span.set_attribute("app.result_id", record.id)
-    span.set_attribute("app.stage_timings", {k: f"{v:.0f}ms" for k, v in stage_timings.items()})
+    span.set_attribute("app.stage_timings", {k: (f"{v:.0f}ms" if isinstance(v, (int, float)) else str(v)) for k, v in stage_timings.items()})
     span.set_status(Status(StatusCode.OK))
     span.end()
     return record
