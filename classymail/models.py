@@ -89,6 +89,7 @@ class EmailRecord(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     processing_strategy: Optional[str] = None  # standard | reasoning | vision
     ocr_provider: Optional[str] = None  # mistral_ocr | document_intelligence
+    content_filter_result: Optional[dict] = None  # Azure OpenAI content safety filter details
     error: Optional[str] = None
     error_stage: Optional[str] = None
     processing_log: Optional[list[dict]] = None
@@ -114,3 +115,11 @@ class OCRFailed(Exception):
         super().__init__(message)
         self.processing_log = processing_log
         self.retryable = retryable
+
+
+class ContentFilterError(Exception):
+    """Raised when Azure OpenAI content safety filter blocks the request."""
+    def __init__(self, message: str, *, filter_result: dict, deployment: str):
+        super().__init__(message)
+        self.filter_result = filter_result
+        self.deployment = deployment

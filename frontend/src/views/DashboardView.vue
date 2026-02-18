@@ -91,6 +91,7 @@ const filters = computed(() => [
   { id: 'all', label: t('dashboard.filters.all'), color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
   { id: 'REVIEW_REQUIRED', label: t('dashboard.filters.review'), color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
   { id: 'PROCESSED', label: t('dashboard.filters.processed'), color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
+  { id: 'CONTENT_FILTERED', label: t('dashboard.filters.content_filtered', 'Content Filtered'), color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' },
   { id: 'ERROR', label: t('dashboard.filters.errors'), color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
 ])
 
@@ -970,6 +971,13 @@ const emit = defineEmits(['open-email'])
               :title="t('dashboard.status.review')"
             >
               <ClockIcon class="h-4 w-4" />
+            </span>
+            <span
+              v-else-if="email.status === 'CONTENT_FILTERED'"
+              class="text-purple-500"
+              :title="t('dashboard.status.content_filtered', 'Content Filtered')"
+            >
+              <ShieldExclamationIcon class="h-4 w-4" />
             </span>
 
             <span

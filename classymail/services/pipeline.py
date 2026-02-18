@@ -11,6 +11,7 @@ from classymail.services.azure_clients import download_blob_as_base64, blob_id_f
 from classymail.services.llm_pipeline import ocr_with_mistral, ocr_with_document_intelligence, classify_with_phi4, process_agent_response, generate_embedding, extract_business_entities, classify_comparison
 from classymail.services.circuit_breaker import mistral_ocr_breaker, doc_intelligence_breaker
 from classymail.services.costing import compute_cost_di, compute_cost_llm, compute_cost_mistral
+from classymail.models import ContentFilterError
 from classymail.core import config
 import logging
 
@@ -282,6 +283,32 @@ async def run_classification_pipeline(
         classification_raw = await classify_with_phi4(markdown, strategy=strategy, clients=clients)
         stage_timings["classify"] = (time.perf_counter() - stage_start) * 1000
         log("classify", "ok", f"({stage_timings['classify']:.0f}ms)")
+    except ContentFilterError as cf_ex:
+        stage_timings["classify"] = (time.perf_counter() - stage_start) * 1000
+        log("classify", "content_filtered", f"Content filter triggered on {cf_ex.deployment}")
+        logger.warning(f"[pipeline] Content filter triggered: {cf_ex}")
+
+        span.set_attribute("app.content_filter.triggered", True)
+        span.set_attribute("app.result_status", "CONTENT_FILTERED")
+
+        record = EmailRecord(
+            id=blob_id_from_url(blob_url),
+            file_url=blob_url,
+            markdown=markdown[:30000] if markdown else None,
+            processing_strategy=strategy,
+            ocr_provider=ocr_provider,
+            stage_timings=stage_timings,
+            status="CONTENT_FILTERED",
+            content_filter_result=cf_ex.filter_result,
+            error=str(cf_ex),
+            error_stage="classify",
+            updated_at=datetime.now(timezone.utc),
+            processing_log=processing_log,
+        )
+        span.set_attribute("app.result_id", record.id)
+        span.set_status(Status(StatusCode.ERROR, "Content filter triggered"))
+        span.end()
+        return record
     except Exception as ex:
         from classymail.models import OCRFailed
 

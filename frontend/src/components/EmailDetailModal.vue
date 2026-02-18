@@ -658,6 +658,47 @@ watch(() => email.value, (val) => {
                     </div>
                   </div>
 
+                  <!-- Content Filter Alert -->
+                  <div
+                    v-if="email.status === 'CONTENT_FILTERED' && email.content_filter_result"
+                    class="rounded-md bg-purple-50 dark:bg-purple-900/20 p-3 border border-purple-200 dark:border-purple-800"
+                  >
+                    <div class="flex items-center gap-2 mb-2">
+                      <ShieldExclamationIcon class="h-5 w-5 text-purple-500" />
+                      <span class="text-sm font-semibold text-purple-800 dark:text-purple-200">Content Safety Filter</span>
+                    </div>
+                    <p class="text-xs text-purple-700 dark:text-purple-300 mb-2">
+                      Azure OpenAI content safety blocked classification of this document.
+                    </p>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                      <div
+                        v-for="category in ['hate', 'jailbreak', 'self_harm', 'sexual', 'violence']"
+                        :key="category"
+                      >
+                        <span
+                          class="font-semibold capitalize"
+                          :class="email.content_filter_result[category]?.filtered ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'"
+                        >
+                          {{ category.replace('_', ' ') }}:
+                        </span>
+                        <span
+                          class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+                          :class="email.content_filter_result[category]?.filtered
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                            : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'"
+                        >
+                          {{ email.content_filter_result[category]?.filtered ? 'FILTERED' : 'safe' }}
+                        </span>
+                        <span
+                          v-if="email.content_filter_result[category]?.severity"
+                          class="ml-1 text-gray-500 dark:text-gray-400"
+                        >
+                          ({{ email.content_filter_result[category].severity }})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
                   <!-- Error Box -->
                   <div
                     v-if="email.error"

@@ -785,6 +785,10 @@ resource "azurerm_container_app" "api" {
         value = azurerm_application_insights.appi.connection_string
       }
       env {
+        name  = "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED"
+        value = "true"
+      }
+      env {
         name  = "LOG_ANALYTICS_WORKSPACE_ID"
         value = azurerm_log_analytics_workspace.log.workspace_id
       }
@@ -1008,6 +1012,10 @@ resource "azurerm_container_app" "worker" {
       env {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         value = azurerm_application_insights.appi.connection_string
+      }
+      env {
+        name  = "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED"
+        value = "true"
       }
       env {
         name  = "LOG_ANALYTICS_WORKSPACE_ID"

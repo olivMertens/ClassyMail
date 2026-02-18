@@ -13,7 +13,7 @@ from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential, retry_
 
 from classymail.core import config
 from classymail.core.llm_compat import build_chat_params, extract_message_content, supports_response_format
-from classymail.models import OCRFailed, BusinessEntities
+from classymail.models import OCRFailed, BusinessEntities, ContentFilterError
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.settings_store import get_categories_prompt_text, load_settings
 from classymail.services.annotations import ImageDescription
@@ -166,6 +166,8 @@ def pydantic_to_mistral_schema(model: type[BaseModel]) -> dict:
 
 
 def retryable_httpx(exc: Exception) -> bool:
+    if isinstance(exc, ContentFilterError):
+        return False
     if isinstance(exc, OCRFailed):
         return bool(getattr(exc, "retryable", False))
     # ConnectTimeout = service unreachable, fail fast to trigger fallback
@@ -983,6 +985,32 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
                 status = ex.response.status_code if ex.response is not None else None
                 body = ex.response.text if ex.response is not None else ""
                 logger.error(f"[metrics] Classify Failed ({deployment}): {status} - {body}")
+
+                # Detect Azure OpenAI content safety filter (400 with content_filter code)
+                if status == 400:
+                    try:
+                        err_json = json.loads(body)
+                        err_code = err_json.get("error", {}).get("code", "")
+                        inner_err = err_json.get("error", {}).get("innererror", {})
+                        inner_code = inner_err.get("code", "")
+                        if err_code == "content_filter" or inner_code == "ResponsibleAIPolicyViolation":
+                            filter_result = inner_err.get("content_filter_result", {})
+                            span.set_attribute("app.content_filter.triggered", True)
+                            span.set_attribute("app.content_filter.code", inner_code or err_code)
+                            # Record which categories triggered
+                            for category in ("hate", "jailbreak", "self_harm", "sexual", "violence"):
+                                cat_data = filter_result.get(category, {})
+                                if cat_data.get("filtered", False):
+                                    span.set_attribute(f"app.content_filter.{category}_filtered", True)
+                            span.set_status(Status(StatusCode.ERROR, f"Content filter: {inner_code}"))
+                            raise ContentFilterError(
+                                f"Content filter triggered on {deployment}: {inner_code}",
+                                filter_result=filter_result,
+                                deployment=deployment,
+                            ) from ex
+                    except (json.JSONDecodeError, KeyError, TypeError):
+                        pass  # Not a content filter error, fall through to generic raise
+
                 raise
 
             data = resp.json()
@@ -1111,6 +1139,9 @@ async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False
             result["pii_detected"] = pii_result.has_pii
 
         return result
+    except ContentFilterError:
+        # Content filter errors must not be retried — propagate immediately
+        raise
     except httpx.HTTPStatusError as ex:
         status = ex.response.status_code if ex.response is not None else None
         body = ex.response.text if ex.response is not None else ""

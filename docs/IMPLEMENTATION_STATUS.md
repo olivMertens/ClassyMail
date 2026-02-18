@@ -7,7 +7,17 @@
 
 ## Recently Completed Features ✅
 
-### 1. **Category Assessment AI Advice** (Feb 2026) ✅
+### 1. **Content Filter Handling & App Insights Fix** (Feb 2026) ✅
+- **Location**: [telemetry.py](../classymail/core/telemetry.py), [llm_pipeline.py](../classymail/services/llm_pipeline.py), [pipeline.py](../classymail/services/pipeline.py), [models.py](../classymail/models.py), [DashboardView.vue](../frontend/src/views/DashboardView.vue), [EmailDetailModal.vue](../frontend/src/components/EmailDetailModal.vue), [main.tf](../infra/main.tf)
+- **Features**:
+  - **App Insights Logging Fix**: Removed `resource=` conflict and widened `logger_name` from `"classymail"` to `""` (root) in distro config; added `LoggerProvider` + `AzureMonitorLogExporter` to Tier 2 fallback; added `OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true` env var to both API and Worker ACAs
+  - **Content Filter Detection**: New `ContentFilterError` exception in models.py; `_classify_with_single_model()` parses Azure OpenAI 400 responses for `content_filter` / `ResponsibleAIPolicyViolation` codes and raises `ContentFilterError` with structured filter result
+  - **OTel Spans**: Content filter spans include `app.content_filter.triggered`, `app.content_filter.code`, and per-category `app.content_filter.{category}_filtered` attributes
+  - **Pipeline Handling**: `ContentFilterError` caught before generic `Exception` in pipeline; returns `CONTENT_FILTERED` status record with `content_filter_result` dict instead of dead-lettering
+  - **Frontend**: Purple `CONTENT_FILTERED` filter tab in dashboard; purple `ShieldExclamationIcon` status icon; detailed content filter panel in EmailDetailModal showing category grid (hate/jailbreak/self_harm/sexual/violence) with FILTERED/safe badges
+  - **No Retry**: `retryable_httpx()` returns False for `ContentFilterError`; `classify_with_phi4()` re-raises immediately
+
+### 2. **Category Assessment AI Advice** (Feb 2026) ✅
 - **Location**: [category_assessment.py](../classymail/api/category_assessment.py), [SettingsView.vue](../frontend/src/views/SettingsView.vue)
 - **Endpoint**: `POST /api/settings/categories/assess`
 - **Model**: GPT-5 Nano (reasoning model)
@@ -25,7 +35,7 @@
   - JSON response format with fields: quality_rating, strengths, weaknesses, suggestions, examples
 - **Commit**: ca11109 (GPT-5 API parameters fix)
 
-### 2. **Per-Email Reprocessing Modal** (Feb 2026) ✅
+### 3. **Per-Email Reprocessing Modal** (Feb 2026) ✅
 - **Location**: [emails.py](../classymail/api/routers/emails.py#L298), [DashboardView.vue](../frontend/src/views/DashboardView.vue)
 - **Endpoint**: `POST /api/emails/{id}/reclassify`
 - **Parameters**:
@@ -49,7 +59,7 @@
   - A/B testing for fine-tuning data selection
 - **Commits**: 1fd6861, 53f1d80
 
-### 3. **PII Detection & Dashboard Indicators** (Feb 2026) ✅
+### 4. **PII Detection & Dashboard Indicators** (Feb 2026) ✅
 - **Location**: [DashboardView.vue](../frontend/src/views/DashboardView.vue), [llm_pipeline.py](../classymail/services/llm_pipeline.py#L642)
 - **Database**: `EmailRecord.pii_detected`, `EmailRecord.pii_data`
 - **Features**:
@@ -66,7 +76,7 @@
   - English: "Personal Identifiable Information (PII)"
 - **Commit**: c2c9763
 
-### 4. **Dynamic Model-Aware Cost Tracking** (Feb 2026) ✅
+### 5. **Dynamic Model-Aware Cost Tracking** (Feb 2026) ✅
 - **Location**: [costing.py](../classymail/services/costing.py), [CostsView.vue](../frontend/src/views/CostsView.vue)
 - **Features**:
   - MODEL_PRICING map with 12+ models (Phi-4, GPT-4o/4o-mini, GPT-5-mini/nano, GPT-4.1-nano, Mistral)
@@ -80,7 +90,7 @@
 - **Documentation**: [COSTS_LOGIC.md](../docs/COSTS_LOGIC.md)
 - **Commit**: 7b99c7d
 
-### 5. **French Translation Improvements** (Feb 2026) ✅
+### 6. **French Translation Improvements** (Feb 2026) ✅
 - **Location**: [fr.json](../frontend/src/locales/fr.json), [SettingsView.vue](../frontend/src/views/SettingsView.vue)
 - **Changes**:
   - Category form fields fully translated (14 new keys: settings.categories.form.*)
@@ -91,28 +101,28 @@
   - Synchronization verified: `check_i18n.py` passes (500+ keys EN/FR)
 - **Commits**: 16e85a4, c2c9763
 
-### 6. **CSV Export Bug Fix** (Feb 2026) ✅
+### 7. **CSV Export Bug Fix** (Feb 2026) ✅
 - **Location**: [emails.py](../classymail/api/routers/emails.py#L820), [repository.py](../classymail/services/repository.py#L558)
 - **Issue**: `enable_cross_partition_query=True` caused error (deprecated parameter in azure-cosmos 4.7.0+)
 - **Fix**: Removed deprecated parameter (cross-partition queries enabled by default in SDK 4.7.0+)
 - **Impact**: Both CSV export and RAG vector queries now work correctly
 - **Commit**: 7fbd13f
 
-### 7. **CSV Export Streaming (Performance Fix)** (Feb 2026) ✅
+### 8. **CSV Export Streaming (Performance Fix)** (Feb 2026) ✅
 - **Location**: [emails.py](../classymail/api/routers/emails.py#L863)
 - **Issue**: `/emails/export/csv` buffered ALL Cosmos DB items into memory before building CSV, causing 502 gateway timeouts on large datasets
 - **Root Cause**: `items = []; async for item: items.append(item)` + `iter([csv_bytes])` = no streaming
 - **Fix**: Converted to true async streaming with `async def _stream_csv()` generator — rows are yielded as they arrive from Cosmos DB, no full-dataset buffering
 - **Impact**: Eliminates 502 timeouts for large exports (1000+ emails), constant memory usage regardless of dataset size
 
-### 8. **OCR Provider Source in CSV Export** (Feb 2026) ✅
+### 9. **OCR Provider Source in CSV Export** (Feb 2026) ✅
 - **Location**: [emails.py](../classymail/api/routers/emails.py), [settings_store.py](../classymail/services/settings_store.py), [SettingsView.vue](../frontend/src/views/SettingsView.vue)
 - **Feature**: New `SOURCE_OCR` column in enriched CSV export showing which OCR provider processed each document
 - **Values**: `mistral_ocr` (primary, default) or `document_intelligence` (DI fallback)
 - **Toggle**: Controlled by `g2s_export.show_ocr_provider` setting with UI checkbox
 - **Backward Compatible**: Older records without `ocr_provider` field default to `mistral_ocr`
 
-### 9. **Batch Reprocess All Emails** (Feb 2026) ✅
+### 10. **Batch Reprocess All Emails** (Feb 2026) ✅
 - **Location**: [admin.py](../classymail/api/routers/admin.py), [SettingsView.vue](../frontend/src/views/SettingsView.vue)
 - **Endpoint**: `POST /api/admin/reprocess-all`
 - **Features**:
@@ -123,7 +133,7 @@
   - Optional `processing_strategy` parameter (standard/reasoning/vision)
 - **Frontend**: Amber-styled button in Settings → Processing tab with spinning icon during execution
 
-### 10. **GPT-5 Reasoning Model Support** (Feb 2026) ✅
+### 11. **GPT-5 Reasoning Model Support** (Feb 2026) ✅
 - **Location**: [llm_compat.py](../classymail/core/llm_compat.py), [category_assessment.py](../classymail/api/category_assessment.py#L140-L163), [chat_agent.py](../classymail/services/chat_agent.py#L508-L515)
 - **API Parameter Handling**:
   - Standard models (GPT-4o, Phi-4): `max_tokens`, `temperature` supported

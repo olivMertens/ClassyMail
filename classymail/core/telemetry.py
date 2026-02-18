@@ -83,9 +83,8 @@ def _try_configure_distro(conn_str: str, resource: Resource) -> bool:
 
         configure_azure_monitor(
             connection_string=conn_str,
-            resource=resource,
             enable_live_metrics=True,
-            logger_name="classymail",
+            logger_name="",
         )
         logger.info(
             "Azure Monitor OpenTelemetry distro enabled "
@@ -104,7 +103,7 @@ def _try_configure_distro(conn_str: str, resource: Resource) -> bool:
 # ---------------------------------------------------------------------------
 
 def _fallback_exporter(conn_str: str, resource: Resource) -> None:
-    """Manual TracerProvider + Azure Monitor exporter (lighter, trace-only)."""
+    """Manual TracerProvider + LoggerProvider + Azure Monitor exporters (fallback)."""
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
@@ -124,6 +123,27 @@ def _fallback_exporter(conn_str: str, resource: Resource) -> None:
         )
     except Exception as exc:
         logger.error("AzureMonitorTraceExporter init failed: %s", exc)
+
+    # Log exporter so Python logs appear in App Insights → Traces
+    try:
+        from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+        from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+        from azure.monitor.opentelemetry.exporter import AzureMonitorLogExporter
+        from opentelemetry._logs import set_logger_provider
+
+        log_provider = LoggerProvider(resource=resource)
+        log_provider.add_log_record_processor(
+            BatchLogRecordProcessor(AzureMonitorLogExporter(connection_string=conn_str))
+        )
+        set_logger_provider(log_provider)
+
+        otel_handler = LoggingHandler(level=logging.INFO, logger_provider=log_provider)
+        logging.getLogger().addHandler(otel_handler)
+        logger.info("Azure Monitor Log Exporter enabled (fallback mode)")
+    except ImportError:
+        logger.warning("AzureMonitorLogExporter not available — logs will not be sent to App Insights")
+    except Exception as exc:
+        logger.error("AzureMonitorLogExporter init failed: %s", exc)
 
     otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
     if otlp_endpoint:
