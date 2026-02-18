@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential, retry_if_exception, retry
 
 from classymail.core import config
-from classymail.core.llm_compat import build_chat_params, extract_message_content
+from classymail.core.llm_compat import build_chat_params, extract_message_content, supports_response_format
 from classymail.models import OCRFailed, BusinessEntities
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.settings_store import get_categories_prompt_text, load_settings
@@ -946,17 +946,18 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
 
     payload = {
         "model": deployment,
-        "response_format": {"type": "json_object"},
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
         **build_chat_params(deployment, temperature=0.1, max_output_tokens=config.PHI_RESERVED_OUTPUT_TOKENS),
     }
+    if supports_response_format(deployment):
+        payload["response_format"] = {"type": "json_object"}
 
     url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={api_version or config.AI_API_VERSION}"
 
-    logger.info(f"[metrics] Classify Request: {deployment} strategy={strategy}")
+    logger.info(f"[metrics] Classify Request: {deployment} strategy={strategy} reasoning={not supports_response_format(deployment)}")
     logger.info(f"[metrics] Token Estimate: system={system_tokens} user={user_tokens_est} truncated={truncated}")
 
     limiter = get_limiter("phi")
@@ -989,13 +990,28 @@ IMPORTANT: Si detected_intents est vide, TOUJOURS remplir classification_reason 
             usage = data.get("usage", {})
 
             logger.info(f"[metrics] Classify Success ({deployment}): {usage.get('total_tokens', 0)} tokens used")
-            logger.info(f"[metrics] Response preview: {content[:100]}...")
+            logger.info(f"[metrics] Response preview: {content[:200]}...")
 
             span.set_attribute("gen_ai.usage.input_tokens", usage.get("prompt_tokens", 0))
             span.set_attribute("gen_ai.usage.output_tokens", usage.get("completion_tokens", 0))
             span.set_attribute("gen_ai.usage.total_tokens", usage.get("total_tokens", 0))
 
-            payload_dict = json.loads(content)
+            # Parse JSON – reasoning models may wrap JSON in markdown fences
+            try:
+                payload_dict = json.loads(content)
+            except json.JSONDecodeError:
+                # Try to extract JSON from markdown code fences or mixed text
+                import re
+                json_match = re.search(r'```(?:json)?\s*\n?(\{.*?\})\s*```', content, re.DOTALL)
+                if not json_match:
+                    json_match = re.search(r'(\{[^{}]*"detected_intents"[^{}]*\})', content, re.DOTALL)
+                if json_match:
+                    logger.warning(f"[metrics] Classify ({deployment}): Extracted JSON from non-JSON response")
+                    payload_dict = json.loads(json_match.group(1))
+                else:
+                    logger.error(f"[metrics] Classify ({deployment}): Failed to parse response as JSON: {content[:300]}")
+                    raise
+
             payload_dict["usage"] = usage
             payload_dict["model"] = deployment
             payload_dict["context_truncated"] = bool(truncated)
@@ -1219,8 +1235,18 @@ async def classify_comparison(
     agreement = False
     if valid_intents:
         agreement = all(i == valid_intents[0] for i in valid_intents)
-        # Verify confidence delta if exactly 2 models (legacy support)
-        # Note: Delta is less meaningful for n > 2, but we could calc max-min
+
+    # Calculate confidence_delta: max - min of top-intent confidences
+    confidence_delta = None
+    top_confidences = []
+    for res in model_results.values():
+        intents = res.get("detected_intents") or []
+        if intents:
+            top_confidences.append(intents[0].get("confidence", 0.0))
+        elif not res.get("error"):
+            top_confidences.append(0.0)
+    if len(top_confidences) >= 2:
+        confidence_delta = max(top_confidences) - min(top_confidences)
 
     elapsed_ms = int((time.time() - start_time) * 1000)
 
@@ -1234,6 +1260,7 @@ async def classify_comparison(
         "comparison_meta": {
             "executed_at": datetime.utcnow().isoformat(),
             "agreement": agreement,
+            "confidence_delta": confidence_delta,
             "models_executed": resolved_names,
             "elapsed_ms": elapsed_ms,
             "error": None,

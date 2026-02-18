@@ -80,3 +80,13 @@ def extract_message_content(message: dict) -> str | None:
     checks both fields and returns whichever is non-empty.
     """
     return message.get("content") or message.get("reasoning_content")
+
+
+def supports_response_format(deployment: str) -> bool:
+    """Return *True* if the model supports ``response_format: json_object``.
+
+    Reasoning models (o1, o3, o4, GPT-5.x, Kimi) do **not** support
+    the ``response_format`` API parameter.  They must be instructed via
+    the system prompt to return JSON instead.
+    """
+    return not is_reasoning_model(deployment)

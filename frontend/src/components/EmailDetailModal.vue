@@ -1012,10 +1012,10 @@ watch(() => email.value, (val) => {
                               </span>
                             </div>
                             <span class="text-xs text-gray-500 dark:text-gray-400">
-                              Δ {{ comparison.meta?.confidence_delta?.toFixed(2) || 'N/A' }}
+                              Δ {{ comparison.meta?.confidence_delta != null ? comparison.meta.confidence_delta.toFixed(2) : 'N/A' }}
                             </span>
                             <span class="text-xs text-gray-500 dark:text-gray-400">
-                              {{ comparison.meta?.elapsed_ms || 'N/A' }}ms
+                              {{ comparison.meta?.elapsed_ms != null ? comparison.meta.elapsed_ms + 'ms' : 'N/A' }}
                             </span>
                           </div>
                           <div class="text-xs text-gray-500 dark:text-gray-400">
@@ -1087,7 +1087,13 @@ watch(() => email.value, (val) => {
                                 </p>
                               </div>
                               <div
-                                v-if="!result.detected_intents?.length"
+                                v-if="result.error"
+                                class="text-xs text-red-500 dark:text-red-400 italic"
+                              >
+                                ⚠ Model error: {{ result.error }}
+                              </div>
+                              <div
+                                v-else-if="!result.detected_intents?.length"
                                 class="text-xs text-gray-500 italic"
                               >
                                 No intents detected.
