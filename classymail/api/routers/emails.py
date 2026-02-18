@@ -867,7 +867,10 @@ async def export_emails_csv(
     cosmos_container=Depends(get_cosmos_container),
 ):
     """
-    Export emails to CSV format.
+    Export emails to CSV format with true async streaming.
+
+    Rows are streamed as they arrive from Cosmos DB — no full-dataset buffering.
+    This prevents 502 gateway timeouts on large exports.
 
     Two formats supported:
     - minimal: ID;INTENTIONS;CONFIDENCE_MOYENNE (client G2S compatible)
@@ -878,58 +881,54 @@ async def export_emails_csv(
         format: Output format (minimal or enriched)
 
     Returns:
-        CSV file with UTF-8 BOM encoding and semicolon delimiter
+        CSV file with UTF-8 BOM encoding and semicolon delimiter (streamed)
     """
     import csv
     import io
 
     logger.info(f"CSV Export request: status={status}, format={format}")
 
-    try:
-        # Build query - Use list format for parameters (Cosmos SDK requirement)
-        filters = ["IS_DEFINED(c.file_url)", "IS_DEFINED(c.status)"]
-        params = []
+    # Load settings once before streaming starts
+    settings = load_settings()
+    categories = settings.get("categories") or []
+    slug_map = {cat.get("name", ""): cat.get("slug", cat.get("name", "")) for cat in categories}
+    g2s_export = settings.get("g2s_export") or {}
+    unclassified_label = g2s_export.get("unclassified_label", "autre")
 
-        if status != "all":
-            filters.append("c.status = @status")
-            params.append({"name": "@status", "value": status})
+    # Build query
+    filters = ["IS_DEFINED(c.file_url)", "IS_DEFINED(c.status)"]
+    params = []
+    if status != "all":
+        filters.append("c.status = @status")
+        params.append({"name": "@status", "value": status})
+    where_clause = " AND ".join(filters)
+    query_sql = f"SELECT * FROM c WHERE {where_clause} ORDER BY c.created_at DESC"
 
-        where_clause = " AND ".join(filters)
-        query_sql = f"SELECT * FROM c WHERE {where_clause} ORDER BY c.created_at DESC"
+    def _write_row(writer, buf, row):
+        """Write one CSV row and drain the buffer."""
+        writer.writerow(row)
+        data = buf.getvalue()
+        buf.seek(0)
+        buf.truncate(0)
+        return data
 
-        # Fetch items
-        items = []
-        async for item in cosmos_container.query_items(query=query_sql, parameters=params):
-            items.append(item)
+    async def _stream_csv():
+        buf = io.StringIO()
+        writer = csv.writer(buf, delimiter=';', quoting=csv.QUOTE_MINIMAL)
 
-        logger.info(f"Found {len(items)} emails for export")
-
-        # Load settings for slug mapping
-        settings = load_settings()
-        categories = settings.get("categories") or []
-        slug_map = {cat.get("name", ""): cat.get("slug", cat.get("name", "")) for cat in categories}
-
-        # G2S export settings
-        g2s_export = settings.get("g2s_export") or {}
-        unclassified_label = g2s_export.get("unclassified_label", "autre")
-
-        # Generate CSV in memory
-        output = io.StringIO()
+        # UTF-8 BOM for Excel compatibility
+        yield '\ufeff'
 
         if format == "minimal":
-            #  compatible format: ID;INTENTIONS;CONFIDENCE_MOYENNE
-            writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
-            writer.writerow(['ID', 'INTENTIONS', 'CONFIDENCE_MOYENNE'])
+            yield _write_row(writer, buf, ['ID', 'INTENTIONS', 'CONFIDENCE_MOYENNE'])
 
-            for item in items:
-                # Extract PDF filename from blob URL
+            async for item in cosmos_container.query_items(query=query_sql, parameters=params):
                 blob_url = item.get("file_url", "")
                 pdf_filename = extract_filename(blob_url)
 
                 classification = item.get("classification") or {}
                 intents = classification.get("detected_intents") or []
 
-                # Convert category names to slugs for CSV stability
                 intent_slugs = []
                 confidences = []
                 for intent_obj in intents:
@@ -940,17 +939,12 @@ async def export_emails_csv(
                     confidences.append(confidence)
 
                 intentions_str = ",".join(intent_slugs) if intent_slugs else unclassified_label
-
-                # Calculate average confidence (stored as 0.0-1.0, display as percentage)
                 avg_confidence = round(sum(confidences) / len(confidences), 2) if confidences else 0.0
                 confidence_pct = f"{round(avg_confidence * 100)}%" if confidences else "N/A"
 
-                writer.writerow([pdf_filename, intentions_str, confidence_pct])
+                yield _write_row(writer, buf, [pdf_filename, intentions_str, confidence_pct])
 
         else:  # enriched format
-            # Full audit format with dynamic columns based on g2s_export settings
-            writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
-
             # Build dynamic header based on settings
             header = ['ID', 'INTENTIONS', 'CONFIDENCE_MOYENNE', 'DETAILS_CONFIDENCES', 'MODE_DETECTION']
             if g2s_export.get("show_quality", True):
@@ -965,10 +959,11 @@ async def export_emails_csv(
                 header.append('TEMPS_S')
             if g2s_export.get("show_pii", True):
                 header.extend(['PII_DETECTE', 'PII_TYPES'])
-            writer.writerow(header)
+            if g2s_export.get("show_ocr_provider", True):
+                header.append('SOURCE_OCR')
+            yield _write_row(writer, buf, header)
 
-            for item in items:
-                # Extract PDF filename from blob URL
+            async for item in cosmos_container.query_items(query=query_sql, parameters=params):
                 blob_url = item.get("file_url", "")
                 pdf_filename = extract_filename(blob_url)
 
@@ -976,12 +971,10 @@ async def export_emails_csv(
                 intents = classification.get("detected_intents") or []
                 processing_time = item.get("processing_time_ms", "")
 
-                # Extract model info and detection mode
                 usage = item.get("usage") or {}
                 model_name = usage.get("phi4_model") or usage.get("model") or "unknown"
                 detection_mode = usage.get("strategy", "standard")
 
-                # Intentions and confidences
                 intent_slugs = []
                 confidences = []
                 confidence_details = []
@@ -993,20 +986,14 @@ async def export_emails_csv(
                     slug = slug_map.get(intent_name, intent_name.lower().replace(" ", "_"))
                     intent_slugs.append(slug)
                     confidences.append(confidence)
-                    # Format: "CategoryName: 95%" (confidence stored as 0.0-1.0)
                     confidence_details.append(f"{intent_name}: {round(confidence * 100)}%")
                     justifications.append(intent_obj.get("justification", ""))
 
                 intentions_str = ",".join(intent_slugs) if intent_slugs else unclassified_label
-
-                # Calculate average confidence (stored as 0.0-1.0, display as percentage)
                 avg_confidence = round(sum(confidences) / len(confidences), 2) if confidences else 0.0
                 confidence_pct = f"{round(avg_confidence * 100)}%" if confidences else "N/A"
-
-                # Details confidences
                 details_str = ", ".join(confidence_details) if confidence_details else ""
 
-                # Quality indicator (avg_confidence is 0.0-1.0 scale)
                 if not confidences:
                     quality = "Non classifié"
                 elif avg_confidence >= 0.90:
@@ -1016,12 +1003,10 @@ async def export_emails_csv(
                 else:
                     quality = "À revoir"
 
-                # Justification: per-intent justifications or fallback to classification_reason
                 justification_str = " | ".join(j for j in justifications if j) if justifications else ""
                 if not justification_str:
                     justification_str = classification.get("classification_reason", "") or ""
 
-                # Convert processing time from ms to seconds with 2 decimal places
                 processing_time_s = ""
                 if processing_time:
                     try:
@@ -1029,23 +1014,18 @@ async def export_emails_csv(
                     except (ValueError, TypeError):
                         processing_time_s = processing_time
 
-                # Extract visual proofs from chunks (only when vision mode)
                 visual_proofs = extract_visual_proofs(item) if detection_mode == "vision" else ""
 
-                # PII data
                 pii_detected = "Oui" if item.get("pii_detected", False) else "Non"
                 pii_data = item.get("pii_data") or {}
                 pii_types = []
-
                 if pii_data:
                     for key in ['names', 'emails', 'phones', 'addresses', 'contract_ids', 'dates', 'other']:
                         items_list = pii_data.get(key, [])
                         if items_list:
                             pii_types.append(key)
-
                 pii_types_str = ",".join(pii_types) if pii_types else ""
 
-                # Build dynamic row based on settings
                 row = [pdf_filename, intentions_str, confidence_pct, details_str, detection_mode]
                 if g2s_export.get("show_quality", True):
                     row.append(quality)
@@ -1059,21 +1039,15 @@ async def export_emails_csv(
                     row.append(processing_time_s)
                 if g2s_export.get("show_pii", True):
                     row.extend([pii_detected, pii_types_str])
-                writer.writerow(row)
+                if g2s_export.get("show_ocr_provider", True):
+                    row.append(item.get("ocr_provider", "mistral_ocr"))
 
-        # Get CSV content with UTF-8 BOM
-        csv_content = output.getvalue()
-        csv_bytes = ('\ufeff' + csv_content).encode('utf-8')  # Add BOM for Excel compatibility
+                yield _write_row(writer, buf, row)
 
-        # Return as downloadable file
-        filename = f"emails_export_{format}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
+    filename = f"emails_export_{format}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
 
-        return StreamingResponse(
-            iter([csv_bytes]),
-            media_type="text/csv; charset=utf-8",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-
-    except Exception as e:
-        logger.exception(f"CSV export failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    return StreamingResponse(
+        _stream_csv(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )

@@ -538,6 +538,101 @@ async def replay_dlq(clients: Clients = Depends(get_clients)):
     }
 
 
+class ReprocessAllRequest(BaseModel):
+    processing_strategy: str | None = None
+
+
+@router.post("/reprocess-all", status_code=status.HTTP_200_OK)
+async def reprocess_all(
+    payload: ReprocessAllRequest,
+    clients: Clients = Depends(get_clients),
+):
+    """
+    Re-enqueue ALL processed emails (PROCESSED + REVIEW_REQUIRED) for
+    full pipeline reprocessing, then replay DLQ messages.
+
+    Use this after changing LLM settings to run a new comparison batch.
+    """
+    if not clients.sb_client:
+        raise HTTPException(status_code=503, detail="Service Bus client not initialized")
+
+    await clients.ensure_cosmos_container()
+
+    # Query all emails with PROCESSED or REVIEW_REQUIRED status that have a file_url
+    query = (
+        "SELECT c.id, c.file_url FROM c "
+        "WHERE c.status IN ('PROCESSED', 'REVIEW_REQUIRED') "
+        "AND IS_DEFINED(c.file_url) AND c.file_url != null"
+    )
+
+    enqueued = 0
+    errors = []
+    dlq_replayed = 0
+
+    try:
+        sender = clients.sb_client.get_queue_sender(queue_name=config.SERVICE_BUS_QUEUE)
+        async with sender:
+            # 1. Re-enqueue all PROCESSED / REVIEW_REQUIRED emails
+            async for item in clients.cosmos_container.query_items(query):
+                try:
+                    message_data: dict = {"blob_url": item["file_url"]}
+                    if payload.processing_strategy in ("standard", "reasoning", "vision"):
+                        message_data["processing_strategy"] = payload.processing_strategy
+                    await sender.send_messages(
+                        ServiceBusMessage(json.dumps(message_data))
+                    )
+                    enqueued += 1
+                except Exception as e:
+                    errors.append({"id": item.get("id", "?"), "error": str(e)})
+
+            # 2. Replay DLQ messages in the same operation
+            try:
+                receiver = clients.sb_client.get_queue_receiver(
+                    queue_name=config.SERVICE_BUS_QUEUE,
+                    sub_queue=ServiceBusSubQueue.DEAD_LETTER,
+                    prefetch_count=50,
+                )
+                async with receiver:
+                    while True:
+                        messages = await receiver.receive_messages(
+                            max_message_count=50, max_wait_time=5
+                        )
+                        if not messages:
+                            break
+                        for msg in messages:
+                            try:
+                                body_bytes = b"".join([b for b in msg.body])
+                                msg_payload = json.loads(body_bytes.decode())
+                                blob_url = extract_blob_url(msg_payload)
+                                if not blob_url:
+                                    await receiver.complete_message(msg)
+                                    continue
+                                new_msg = ServiceBusMessage(
+                                    json.dumps({"blob_url": blob_url})
+                                )
+                                await sender.send_messages(new_msg)
+                                await receiver.complete_message(msg)
+                                dlq_replayed += 1
+                            except Exception:
+                                try:
+                                    await receiver.abandon_message(msg)
+                                except Exception:
+                                    pass
+            except Exception as dlq_err:
+                logger.warning(f"DLQ replay during reprocess-all failed: {dlq_err}")
+
+    except Exception as e:
+        logger.error(f"Failed to reprocess-all: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to reprocess-all: {str(e)}")
+
+    return {
+        "status": "success" if not errors else "partial",
+        "enqueued": enqueued,
+        "dlq_replayed": dlq_replayed,
+        "errors": errors,
+    }
+
+
 @router.get("/deadletter", response_model=DeadLetterSummary)
 async def deadletter_summary(clients: Clients = Depends(get_clients)):
     """Peek the dead-letter queue and return a summary for admin UI."""

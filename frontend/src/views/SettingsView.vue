@@ -57,7 +57,8 @@ const settings = ref({
     show_justification: true,
     show_visual_proofs: true,
     show_quality: true,
-    show_time: true
+    show_time: true,
+    show_ocr_provider: true
   },
   ai_assessment_model: 'gpt-4.1-nano'
 })
@@ -76,6 +77,7 @@ const resetConfirm1 = ref(false)
 const resetConfirm2 = ref(false)
 const resetting = ref(false)
 const purgingDlq = ref(false)
+const reprocessingAll = ref(false)
 
 // Connectivity Test State
 const connTestLoading = ref(false)
@@ -467,7 +469,8 @@ const loadSettings = async () => {
           show_justification: true,
           show_visual_proofs: true,
           show_quality: true,
-          show_time: true
+          show_time: true,
+          show_ocr_provider: true
         }
       }
     }
@@ -576,6 +579,57 @@ const performDlqPurge = async () => {
     showAlert(`Purge Error: ${e.message}`)
   } finally {
     purgingDlq.value = false
+  }
+}
+
+const performReprocessAll = async () => {
+  // Step 1: First confirmation with details about what will happen
+  const model = settings.value?.ai_model || 'default'
+  const strategy = settings.value?.processing_strategy || 'standard'
+  const ok1 = await confirm(
+    `This will save your current settings and reprocess ALL emails (PROCESSED + REVIEW_REQUIRED) with:\n\n` +
+    `• Model: ${model}\n• Strategy: ${strategy}\n\n` +
+    `Existing classifications will be overwritten.\nDead Letter Queue messages will also be replayed.\n\nDo you want to continue?`,
+    'Reprocess All Emails'
+  )
+  if (!ok1) return
+
+  // Step 2: Second confirmation — final warning
+  const ok2 = await confirm(
+    'FINAL CONFIRMATION\n\nAll processed emails will be re-queued for classification. This cannot be undone.\n\nProceed?',
+    'Confirm Reprocess All'
+  )
+  if (!ok2) return
+
+  reprocessingAll.value = true
+  try {
+    // Auto-save settings first so the worker uses the new configuration
+    await saveSettings()
+
+    const res = await fetch('/api/admin/reprocess-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        processing_strategy: settings.value?.processing_strategy || null,
+      }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      await showAlert(
+        `Reprocess All Complete\n\n` +
+        `• Emails enqueued: ${data.enqueued}\n` +
+        `• DLQ replayed: ${data.dlq_replayed}\n` +
+        `• Errors: ${data.errors?.length || 0}`
+      )
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
+      await showAlert(`Reprocess All Failed: ${err.detail || 'Unknown error'}`)
+    }
+  } catch (e) {
+    trackException(e)
+    await showAlert(`Reprocess All Error: ${e.message}`)
+  } finally {
+    reprocessingAll.value = false
   }
 }
 
@@ -1460,6 +1514,18 @@ onMounted(() => {
                   >PII_DETECTE +
                     PII_TYPES</label>
                 </div>
+                <div class="flex items-center">
+                  <input
+                    id="export-ocr-provider"
+                    v-model="settings.g2s_export.show_ocr_provider"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600"
+                  >
+                  <label
+                    for="export-ocr-provider"
+                    class="ml-2 text-sm text-gray-700 dark:text-gray-300"
+                  >SOURCE_OCR</label>
+                </div>
               </div>
             </div>
           </div>
@@ -1490,6 +1556,29 @@ onMounted(() => {
               {{ t('settings.saved') }}
             </div>
           </transition>
+        </div>
+
+        <!-- Reprocess All Emails -->
+        <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6">
+          <h4 class="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-2">
+            Batch Reprocessing
+          </h4>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            Re-enqueue all processed emails with the current settings for a new classification run.
+            DLQ messages will also be replayed. Existing results will be overwritten.
+          </p>
+          <button
+            type="button"
+            :disabled="reprocessingAll"
+            class="inline-flex items-center gap-2 rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 disabled:opacity-50"
+            @click="performReprocessAll"
+          >
+            <ArrowPathIcon
+              class="h-4 w-4"
+              :class="{ 'animate-spin': reprocessingAll }"
+            />
+            {{ reprocessingAll ? 'Reprocessing...' : 'Reprocess All Emails' }}
+          </button>
         </div>
       </div>
     </div>

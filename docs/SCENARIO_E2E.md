@@ -387,7 +387,20 @@ $id = $items.items[0].id
 Invoke-RestMethod -Method Post "http://127.0.0.1:8000/api/emails/$id/reprocess"
 ```
 
-### 7.2 Enqueue via le webhook (format Event Grid)
+### 7.2 Reprocess All (batch avec nouveaux settings)
+
+Relance le traitement de **tous** les emails PROCESSED + REVIEW_REQUIRED avec les settings courants, et rejoue les messages DLQ :
+
+```powershell
+# Via l'API directement
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/admin/reprocess-all" `
+  -ContentType "application/json" `
+  -Body '{"processing_strategy": "reasoning"}'
+```
+
+> **Via l'UI** : Settings → Processing tab → "Reprocess All Emails" (double confirmation requise, auto-save des settings).
+
+### 7.3 Enqueue via le webhook (format Event Grid)
 
 ```bash
 curl -X POST http://127.0.0.1:8000/webhook/ingest \

@@ -181,6 +181,15 @@ Retraitez des emails individuels avec des stratégies personnalisées :
 *   **Comparaison A/B** : Testez plusieurs configurations sur le même email
 *   👉 **Accès :** Dashboard → Email Details → "Reprocess" button
 
+### 🔁 Batch Reprocess All Emails (NEW)
+Relancez le traitement complet de tous les emails avec de nouveaux paramètres LLM pour comparaison A/B à grande échelle :
+*   **Auto-save** : Sauvegarde automatique des settings avant relancement
+*   **Scope** : Tous les emails PROCESSED + REVIEW_REQUIRED (les ERROR sont exclus)
+*   **DLQ Replay** : Rejoue aussi les messages Dead Letter Queue dans la même opération
+*   **Double confirmation** : Deux dialogues de vérification avant exécution
+*   **Stratégie configurable** : Standard / Reasoning / Vision appliquée à tous les emails
+*   👉 **Accès :** Settings → Processing tab → "Reprocess All Emails" button
+
 ### ⚖️ Adversarial Model Comparison
 Comparez en temps réel les performances de deux modèles (ex: Phi-4 vs GPT-4o-mini).
 *   **Mode Parallèle** : Exécute les deux modèles simultanément.
@@ -218,6 +227,8 @@ Configuration avancée pour le traitement professionnel des emails :
 *   **Slugs Techniques** : Identifiants stables pour export CSV
 *   **Détection PII** : Extraction GDPR-compliant des données personnelles
 *   **Export CSV Dual** : Format minimal (client) et enrichi (audit)
+*   **Streaming CSV** : Export progressif row-by-row depuis Cosmos DB — supporte des milliers d'emails sans timeout 502
+*   **Source OCR** : Colonne `SOURCE_OCR` dans l'export enrichi indiquant le provider OCR utilisé (`mistral_ocr` ou `document_intelligence`)
 *   👉 **Guide Complet :** [docs/INTEGRATION_CLIENT_G2S.md](docs/INTEGRATION_CLIENT_G2S.md)
 
 ### 🔒 PII Anonymization & Fine-Tuning Export (NEW)

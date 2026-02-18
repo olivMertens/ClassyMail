@@ -61,6 +61,7 @@ DEFAULT_SETTINGS = {
         "show_visual_proofs": True,       # Include PREUVES_VISUELLES column
         "show_quality": True,             # Include QUALITE column
         "show_time": True,               # Include TEMPS_S column
+        "show_ocr_provider": True,       # Include SOURCE_OCR column (mistral_ocr | document_intelligence)
     },
     "ai_assessment_model": "gpt-4.1-nano",  # Model for category assessment (fast non-reasoning preferred)
 }
@@ -235,6 +236,7 @@ def save_settings(settings: dict):
             ge.setdefault("show_visual_proofs", True)
             ge.setdefault("show_quality", True)
             ge.setdefault("show_time", True)
+            ge.setdefault("show_ocr_provider", True)
 
     DATA_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
 

@@ -98,7 +98,32 @@
 - **Impact**: Both CSV export and RAG vector queries now work correctly
 - **Commit**: 7fbd13f
 
-### 7. **GPT-5 Reasoning Model Support** (Feb 2026) ✅
+### 7. **CSV Export Streaming (Performance Fix)** (Feb 2026) ✅
+- **Location**: [emails.py](../classymail/api/routers/emails.py#L863)
+- **Issue**: `/emails/export/csv` buffered ALL Cosmos DB items into memory before building CSV, causing 502 gateway timeouts on large datasets
+- **Root Cause**: `items = []; async for item: items.append(item)` + `iter([csv_bytes])` = no streaming
+- **Fix**: Converted to true async streaming with `async def _stream_csv()` generator — rows are yielded as they arrive from Cosmos DB, no full-dataset buffering
+- **Impact**: Eliminates 502 timeouts for large exports (1000+ emails), constant memory usage regardless of dataset size
+
+### 8. **OCR Provider Source in CSV Export** (Feb 2026) ✅
+- **Location**: [emails.py](../classymail/api/routers/emails.py), [settings_store.py](../classymail/services/settings_store.py), [SettingsView.vue](../frontend/src/views/SettingsView.vue)
+- **Feature**: New `SOURCE_OCR` column in enriched CSV export showing which OCR provider processed each document
+- **Values**: `mistral_ocr` (primary, default) or `document_intelligence` (DI fallback)
+- **Toggle**: Controlled by `g2s_export.show_ocr_provider` setting with UI checkbox
+- **Backward Compatible**: Older records without `ocr_provider` field default to `mistral_ocr`
+
+### 9. **Batch Reprocess All Emails** (Feb 2026) ✅
+- **Location**: [admin.py](../classymail/api/routers/admin.py), [SettingsView.vue](../frontend/src/views/SettingsView.vue)
+- **Endpoint**: `POST /api/admin/reprocess-all`
+- **Features**:
+  - Re-enqueue all PROCESSED + REVIEW_REQUIRED emails for classification with new LLM settings
+  - Auto-saves settings before reprocessing so workers use updated configuration
+  - Replays DLQ messages in the same operation
+  - Double-dialog confirmation in UI (model/strategy details + final warning)
+  - Optional `processing_strategy` parameter (standard/reasoning/vision)
+- **Frontend**: Amber-styled button in Settings → Processing tab with spinning icon during execution
+
+### 10. **GPT-5 Reasoning Model Support** (Feb 2026) ✅
 - **Location**: [llm_compat.py](../classymail/core/llm_compat.py), [category_assessment.py](../classymail/api/category_assessment.py#L140-L163), [chat_agent.py](../classymail/services/chat_agent.py#L508-L515)
 - **API Parameter Handling**:
   - Standard models (GPT-4o, Phi-4): `max_tokens`, `temperature` supported
