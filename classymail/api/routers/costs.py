@@ -10,6 +10,7 @@ from classymail.services.azure_retail_prices import get_retail_unit_prices
 from classymail.services.costing import MODEL_PRICING
 from classymail.services.repository import (
     count_by_status,
+    sum_di_cost_usd,
     sum_mistral_cost_usd,
     sum_phi4_cost_usd,
     sum_llm_tokens,
@@ -44,6 +45,7 @@ async def costs_summary(
 
         phi4_usd = await sum_phi4_cost_usd(clients=clients)
         mistral_usd = await sum_mistral_cost_usd(clients=clients)
+        di_usd = await sum_di_cost_usd(clients=clients)
         llm_tokens = await sum_llm_tokens(clients=clients)
 
         emails_with_usage = await count_items_with_any_usage_cost(clients=clients)
@@ -54,7 +56,7 @@ async def costs_summary(
             detail=f"Database unavailable: {str(e)}. Ensure Cosmos DB is provisioned and identity has permissions.",
         )
 
-    ai_total_usd = (phi4_usd or 0.0) + (mistral_usd or 0.0)
+    ai_total_usd = (phi4_usd or 0.0) + (mistral_usd or 0.0) + (di_usd or 0.0)
 
     avg_ai_usd_per_email = (ai_total_usd / emails_with_usage) if emails_with_usage else 0.0
     projected_ai_usd = avg_ai_usd_per_email * float(emails_per_month)
@@ -185,6 +187,7 @@ async def costs_summary(
             "llm": float(phi4_usd or 0.0),
             "phi4": float(phi4_usd or 0.0),
             "mistral_ocr": float(mistral_usd or 0.0),
+            "doc_intelligence_ocr": float(di_usd or 0.0),
             "ai_total": float(ai_total_usd),
         },
         "llm_tokens": {
@@ -225,6 +228,7 @@ async def costs_summary(
             "total": float(projected_ai_usd + fixed_total),
             "breakdown": [
                 {"resource": "Mistral OCR (variable)", "usd": float((mistral_usd or 0.0) / emails_with_usage * emails_per_month) if emails_with_usage else 0.0},
+                {"resource": "Doc Intelligence OCR (variable)", "usd": float((di_usd or 0.0) / emails_with_usage * emails_per_month) if emails_with_usage else 0.0},
                 {"resource": "Phi-4 / LLM (variable)", "usd": float((phi4_usd or 0.0) / emails_with_usage * emails_per_month) if emails_with_usage else 0.0},
                 {"resource": "Service Bus (fixe)", "usd": float(fixed_service_bus)},
                 {"resource": "Storage (fixe)", "usd": float(fixed_storage)},

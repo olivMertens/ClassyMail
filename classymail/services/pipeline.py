@@ -10,7 +10,7 @@ from classymail.models import EmailRecord, ClassificationResult
 from classymail.services.azure_clients import download_blob_as_base64, blob_id_from_url, Clients
 from classymail.services.llm_pipeline import ocr_with_mistral, ocr_with_document_intelligence, classify_with_phi4, process_agent_response, generate_embedding, extract_business_entities, classify_comparison
 from classymail.services.circuit_breaker import mistral_ocr_breaker, doc_intelligence_breaker
-from classymail.services.costing import compute_cost_llm, compute_cost_mistral
+from classymail.services.costing import compute_cost_di, compute_cost_llm, compute_cost_mistral
 from classymail.core import config
 import logging
 
@@ -339,7 +339,23 @@ async def run_classification_pipeline(
     # Add extraction cost (uses same model/pricing approx)
     extraction_cost = compute_cost_llm(entities_usage, fallback_used=False, model_name=model_name, overrides=final_overrides) if entities_usage else 0.0
 
-    total_phi4_cost = llm_cost + extraction_cost
+    total_phi4_cost = (llm_cost or 0.0) + (extraction_cost or 0.0)
+
+    # Build OCR cost block based on actual provider
+    if ocr_provider == "document_intelligence":
+        ocr_cost_block = {
+            "estimated_pages": pages,
+            "cost_usd": compute_cost_di(pages, overrides=final_overrides),
+            "annotations_count": len(mistral_images),
+        }
+        mistral_block = {"estimated_pages": 0, "cost_usd": 0.0, "annotations_count": 0}
+    else:
+        ocr_cost_block = {
+            "estimated_pages": pages,
+            "cost_usd": compute_cost_mistral(pages, overrides=final_overrides),
+            "annotations_count": len(mistral_images),
+        }
+        mistral_block = ocr_cost_block
 
     usage = {
         "phi4": llm_usage,
@@ -348,11 +364,8 @@ async def run_classification_pipeline(
         "phi4_fallback_used": fallback_used,
         "phi4_context_truncated": bool(classification_raw.get("context_truncated")) if isinstance(classification_raw, dict) else False,
         "extraction_usage": entities_usage, # detailed usage for extraction
-        "mistral": {
-            "estimated_pages": pages,
-            "cost_usd": compute_cost_mistral(pages, overrides=final_overrides),
-            "annotations_count": len(mistral_images)
-        },
+        "mistral": mistral_block,
+        "doc_intelligence": ocr_cost_block if ocr_provider == "document_intelligence" else None,
     }
 
     # Extract metadata from JSON response if present
@@ -400,8 +413,8 @@ async def run_classification_pipeline(
         setattr(record, "chunks", chunk_docs)
 
     # Log stage timing summary for performance diagnostics
-    total_ms = sum(stage_timings.values())
-    timing_summary = " | ".join([f"{stage}={ms:.0f}ms" for stage, ms in sorted(stage_timings.items())])
+    total_ms = sum(v for v in stage_timings.values() if isinstance(v, (int, float)))
+    timing_summary = " | ".join([f"{stage}={ms:.0f}ms" for stage, ms in sorted(stage_timings.items()) if isinstance(ms, (int, float))])
     logger.info(f"[pipeline] STAGE_TIMINGS: {timing_summary} | TOTAL={total_ms:.0f}ms")
 
     # Vision analysis telemetry

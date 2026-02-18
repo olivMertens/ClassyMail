@@ -87,3 +87,10 @@ def compute_cost_mistral(pages: int, overrides: Optional[dict] = None) -> float:
     overrides = overrides or {}
     cost_per_1k_pages = overrides.get("mistral_per_1k_pages", config.MISTRAL_OCR_COST_PER_1K_PAGES)
     return (pages / 1000.0) * cost_per_1k_pages
+
+
+def compute_cost_di(pages: int, overrides: Optional[dict] = None) -> float:
+    """Calculate Document Intelligence OCR cost based on pages processed."""
+    overrides = overrides or {}
+    cost_per_1k_pages = overrides.get("di_per_1k_pages", config.DI_OCR_COST_PER_1K_PAGES)
+    return (pages / 1000.0) * cost_per_1k_pages

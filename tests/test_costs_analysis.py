@@ -27,6 +27,7 @@ async def test_costs_summary_fixed_mode(mock_clients):
     with patch("classymail.api.routers.costs.count_by_status") as mock_count, \
          patch("classymail.api.routers.costs.sum_phi4_cost_usd") as mock_phi4, \
          patch("classymail.api.routers.costs.sum_mistral_cost_usd") as mock_mistral, \
+         patch("classymail.api.routers.costs.sum_di_cost_usd") as mock_di, \
          patch("classymail.api.routers.costs.sum_llm_tokens") as mock_tokens, \
          patch("classymail.api.routers.costs.count_items_with_any_usage_cost") as mock_usage:
 
@@ -40,6 +41,7 @@ async def test_costs_summary_fixed_mode(mock_clients):
         # Coûts réels observés pour 100 emails
         mock_phi4.return_value = 0.50  # 0.005 USD par email
         mock_mistral.return_value = 1.00  # 0.01 USD par email
+        mock_di.return_value = 0.0
         mock_tokens.return_value = {"prompt_tokens": 50000, "completion_tokens": 10000}
         mock_usage.return_value = 100
 
@@ -87,6 +89,7 @@ async def test_costs_summary_retail_mode(mock_clients):
     with patch("classymail.api.routers.costs.count_by_status") as mock_count, \
          patch("classymail.api.routers.costs.sum_phi4_cost_usd") as mock_phi4, \
          patch("classymail.api.routers.costs.sum_mistral_cost_usd") as mock_mistral, \
+         patch("classymail.api.routers.costs.sum_di_cost_usd") as mock_di, \
          patch("classymail.api.routers.costs.sum_llm_tokens") as mock_tokens, \
          patch("classymail.api.routers.costs.count_items_with_any_usage_cost") as mock_usage, \
          patch("classymail.api.routers.costs.get_retail_unit_prices") as mock_retail:
@@ -99,6 +102,7 @@ async def test_costs_summary_retail_mode(mock_clients):
         }[status]
         mock_phi4.return_value = 0.25
         mock_mistral.return_value = 0.50
+        mock_di.return_value = 0.0
         mock_tokens.return_value = {"prompt_tokens": 25000, "completion_tokens": 5000}
         mock_usage.return_value = 55
 
@@ -157,12 +161,14 @@ async def test_costs_summary_zero_emails(mock_clients):
     with patch("classymail.api.routers.costs.count_by_status") as mock_count, \
          patch("classymail.api.routers.costs.sum_phi4_cost_usd") as mock_phi4, \
          patch("classymail.api.routers.costs.sum_mistral_cost_usd") as mock_mistral, \
+         patch("classymail.api.routers.costs.sum_di_cost_usd") as mock_di, \
          patch("classymail.api.routers.costs.sum_llm_tokens") as mock_tokens, \
          patch("classymail.api.routers.costs.count_items_with_any_usage_cost") as mock_usage:
 
         mock_count.return_value = 0
         mock_phi4.return_value = 0.0
         mock_mistral.return_value = 0.0
+        mock_di.return_value = 0.0
         mock_tokens.return_value = {"prompt_tokens": 0, "completion_tokens": 0}
         mock_usage.return_value = 0
 
@@ -190,12 +196,14 @@ async def test_costs_breakdown_consistency(mock_clients):
     with patch("classymail.api.routers.costs.count_by_status") as mock_count, \
          patch("classymail.api.routers.costs.sum_phi4_cost_usd") as mock_phi4, \
          patch("classymail.api.routers.costs.sum_mistral_cost_usd") as mock_mistral, \
+         patch("classymail.api.routers.costs.sum_di_cost_usd") as mock_di, \
          patch("classymail.api.routers.costs.sum_llm_tokens") as mock_tokens, \
          patch("classymail.api.routers.costs.count_items_with_any_usage_cost") as mock_usage:
 
         mock_count.return_value = 100
         mock_phi4.return_value = 1.0
         mock_mistral.return_value = 2.0
+        mock_di.return_value = 0.0
         mock_tokens.return_value = {"prompt_tokens": 100000, "completion_tokens": 20000}
         mock_usage.return_value = 100
 

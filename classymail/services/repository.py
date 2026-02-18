@@ -137,9 +137,17 @@ async def sum_mistral_cost_usd(*, clients: Clients | None = None) -> float:
     return float(v or 0.0)
 
 
+async def sum_di_cost_usd(*, clients: Clients | None = None) -> float:
+    v = await _scalar_query(
+        "SELECT VALUE SUM(c.usage.doc_intelligence.cost_usd) FROM c WHERE IS_DEFINED(c.usage) AND IS_DEFINED(c.usage.doc_intelligence) AND IS_DEFINED(c.usage.doc_intelligence.cost_usd)",
+        clients=clients,
+    )
+    return float(v or 0.0)
+
+
 async def count_items_with_any_usage_cost(*, clients: Clients | None = None) -> int:
     v = await _scalar_query(
-        "SELECT VALUE COUNT(1) FROM c WHERE (IS_DEFINED(c.usage.phi4_cost_usd) OR IS_DEFINED(c.usage.mistral.cost_usd))",
+        "SELECT VALUE COUNT(1) FROM c WHERE (IS_DEFINED(c.usage.phi4_cost_usd) OR IS_DEFINED(c.usage.mistral.cost_usd) OR IS_DEFINED(c.usage.doc_intelligence.cost_usd))",
         clients=clients,
     )
     return int(v or 0)
