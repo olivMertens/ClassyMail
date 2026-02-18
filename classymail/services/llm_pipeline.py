@@ -326,8 +326,29 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
                 # Debug: Log raw image data to understand Mistral response structure
                 logger.debug(f"[metrics] Raw image from Mistral: {json.dumps(img, default=str)[:500]}")
 
-                # Try multiple sources for image description
+                # Try multiple sources for image description.
+                # Mistral bbox_annotation_format may return annotations:
+                #   - as flat fields (summary, description)
+                #   - nested under 'annotation' dict
+                #   - as JSON string in 'content'
                 summary = img.get("summary") or img.get("description") or ""
+                nested = img.get("annotation") or {}
+                if isinstance(nested, str):
+                    try:
+                        nested = json.loads(nested)
+                    except (json.JSONDecodeError, TypeError):
+                        nested = {}
+                if not summary and isinstance(nested, dict):
+                    summary = nested.get("summary") or nested.get("description") or ""
+                # Also try 'content' field (JSON string from structured output)
+                content_str = img.get("content")
+                if not summary and content_str and isinstance(content_str, str):
+                    try:
+                        content_parsed = json.loads(content_str)
+                        if isinstance(content_parsed, dict):
+                            summary = content_parsed.get("summary") or content_parsed.get("description") or ""
+                    except (json.JSONDecodeError, TypeError):
+                        pass
 
                 # If no API description, try to get from markdown
                 if not summary:
@@ -354,14 +375,23 @@ def _combine_ocr_pages(ocr_pages: list[dict], enable_vision_enrichment: bool = F
                         "y_max": img.get("bottom_right_y", 0)
                     }
 
+                # Also pull details/is_relevant/image_type from nested annotation
+                details_val = img.get("details") or (nested.get("details") if isinstance(nested, dict) else None)
+                is_relevant_val = img.get("is_relevant")
+                if is_relevant_val is None and isinstance(nested, dict):
+                    is_relevant_val = nested.get("is_relevant")
+                img_type_val = img.get("type") or img.get("image_type")
+                if not img_type_val and isinstance(nested, dict):
+                    img_type_val = nested.get("image_type") or nested.get("type")
+
                 vision_item = {
                     "id": img.get("id"),
                     "page_index": page_idx,
-                    "image_type": img.get("type") or img.get("image_type"),
+                    "image_type": img_type_val,
                     "summary": summary,
                     "bbox": bbox,
-                    "details": img.get("details"),
-                    "is_relevant": img.get("is_relevant"),
+                    "details": details_val,
+                    "is_relevant": is_relevant_val,
                 }
                 # Preserve base64 temporarily for GPT-4o-mini fallback (stripped later)
                 raw_b64 = img.get("image_base64") or img.get("base64") or ""
@@ -448,8 +478,24 @@ async def ocr_with_mistral(
                 if enable_vision_enrichment:
                     p["bbox_annotation_format"] = pydantic_to_mistral_schema(ImageDescription)
                 payloads.append(p)
+        elif enable_vision_enrichment:
+            # Vision enrichment: send as document_url (PDF) so Mistral can extract
+            # embedded images and return image_base64. Per-page JPEG (image_url) only
+            # returns bbox for detected sub-images but NOT their base64, which prevents
+            # the GPT-4o-mini fallback from working.
+            logger.info(f"[metrics] Vision strategy: sending {page_count}-page PDF as document_url for image extraction")
+            p = {
+                "model": config.MISTRAL_DEPLOYMENT,
+                "document": {
+                    "type": "document_url",
+                    "document_url": f"data:application/pdf;base64,{base64_pdf}"
+                },
+                "include_image_base64": include_images
+            }
+            p["bbox_annotation_format"] = pydantic_to_mistral_schema(ImageDescription)
+            payloads.append(p)
         else:
-            # Per-page image conversion (OPTIMIZED for vision strategy)
+            # Per-page image conversion (standard/reasoning strategy)
             # Note: Reduced resolution (1x instead of 2x) and quality (75 instead of 85)
             # to improve performance. Mistral Document AI performs rescaling internally.
             image_conversion_start = time.perf_counter()
@@ -469,8 +515,6 @@ async def ocr_with_mistral(
                     },
                     "include_image_base64": include_images
                 }
-                if enable_vision_enrichment:
-                    p["bbox_annotation_format"] = pydantic_to_mistral_schema(ImageDescription)
                 payloads.append(p)
             image_conversion_total_ms = (time.perf_counter() - image_conversion_start) * 1000
         doc.close()
