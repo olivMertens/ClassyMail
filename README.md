@@ -39,7 +39,7 @@ flowchart TD
 
     worker -->|Download| blob
     worker -->|OCR| ocr["Mistral OCR"]
-    ocr -.->|Fallback| di["Doc Intelligence via AI Foundry"]
+    ocr -.->|Fallback| di["Doc Intelligence - Standalone"]
 
     worker -->|Token budget| tokencheck{"Tokens under 8K?"}
     tokencheck -->|YES| phi4["Phi-4 Primary"]
@@ -154,14 +154,14 @@ Le pipeline utilise une approche à deux temps pour maximiser la précision des 
 1.  **OCR Enrichi** : Mistral extrait le texte mais aussi la structure et décrit les images (Alt-Text).
 2.  **Pré-Extraction** : Les entités clés (Noms, Dates, Montants) sont extraites en amont, permettant au modèle de classification de se concentrer uniquement sur l'intention.
 
-### 🔄 OCR Fallback — Document Intelligence via AI Foundry (NEW)
-Résilience OCR avec basculement automatique vers Azure Document Intelligence via l'endpoint AI Foundry :
+### 🔄 OCR Fallback — Document Intelligence Standalone
+Résilience OCR avec basculement automatique vers Azure Document Intelligence via une ressource dédiée :
 *   **Fallback Transparent** : Si Mistral OCR échoue (timeout, quota, erreur), le pipeline bascule automatiquement vers Azure Document Intelligence
-*   **Via AI Foundry** : Document Intelligence est accessible via l'endpoint AI Foundry (`Cognitive Services User` RBAC) — aucune ressource DI séparée nécessaire
+*   **Ressource Dédiée** : Document Intelligence est déployé comme ressource standalone `FormRecognizer` (l'endpoint AI Foundry v2 ne supporte pas le chemin REST `/documentintelligence/`)
 *   **Circuit Breaker** : Chaque provider a son propre circuit breaker (Mistral: 5 échecs / 60s reset, DI: 5 échecs / 120s reset, Classification: 7 échecs / 45s reset)
 *   **ConnectTimeout Fast-Fail** : Les erreurs de connexion ne sont pas réessayées, déclenchant immédiatement le fallback
 *   **Tracking Provider** : Le dashboard affiche un badge ambre "Doc Intelligence" quand le fallback est utilisé
-*   **Option Standalone** : Activable via `deploy_document_intelligence=true` dans Terraform pour une ressource DI dédiée (quotas séparés)
+*   **Activation** : `deploy_document_intelligence=true` dans Terraform (recommandé pour la production)
 *   **Coût Minime** : S0 tier, facturé à l'usage (~$1.50/1K pages)
 
 ### 🎯 Category Assessment AI Advice (NEW)

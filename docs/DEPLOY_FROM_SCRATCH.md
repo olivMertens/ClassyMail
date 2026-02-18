@@ -145,7 +145,7 @@ location = "swedencentral"
 cosmos_use_rbac                = true
 enable_model_deployments       = false    # Deploy models manually (Step 5)
 deploy_language_service        = false    # Optional, enable later
-deploy_document_intelligence   = false    # Optional, OCR fallback for Mistral failures
+deploy_document_intelligence   = true     # Recommended: standalone DI for OCR fallback
 tag_policy_enabled             = true
 security_cost_policy_enabled   = true
 

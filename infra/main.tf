@@ -313,6 +313,8 @@ resource "azurerm_cognitive_account" "doc_intelligence" {
   kind                = "FormRecognizer"
   sku_name            = var.doc_intelligence_sku
 
+  custom_subdomain_name = "${var.prefix}-doc-intel" # Required for Entra ID / RBAC auth
+
   tags = local.common_tags
 
   public_network_access_enabled = true
@@ -758,7 +760,7 @@ resource "azurerm_container_app" "api" {
       }
       env {
         name  = "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
-        value = var.deploy_document_intelligence ? azurerm_cognitive_account.doc_intelligence[0].endpoint : try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+        value = var.deploy_document_intelligence ? azurerm_cognitive_account.doc_intelligence[0].endpoint : ""
       }
 
       # --- Telemetry: Application Map + Agents View ---
@@ -987,7 +989,7 @@ resource "azurerm_container_app" "worker" {
       }
       env {
         name  = "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
-        value = var.deploy_document_intelligence ? azurerm_cognitive_account.doc_intelligence[0].endpoint : try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+        value = var.deploy_document_intelligence ? azurerm_cognitive_account.doc_intelligence[0].endpoint : ""
       }
 
       # --- Telemetry: Application Map + Agents View ---

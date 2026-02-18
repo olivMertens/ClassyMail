@@ -51,7 +51,7 @@ LANGUAGE_ENDPOINT = os.getenv("AZURE_LANGUAGE_ENDPOINT")  # https://xxx.cognitiv
 LANGUAGE_KEY = os.getenv("AZURE_LANGUAGE_KEY")  # Optional key-based auth (prefer MI)
 
 # Azure Document Intelligence (OCR fallback when Mistral is unavailable)
-# Uses AI Foundry endpoint by default; set deploy_document_intelligence=true for dedicated resource
+# Requires standalone FormRecognizer resource (deploy_document_intelligence=true in Terraform)
 DOC_INTELLIGENCE_ENDPOINT = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")  # https://xxx.cognitiveservices.azure.com/
 DOC_INTELLIGENCE_API_VERSION = os.getenv("DOC_INTELLIGENCE_API_VERSION", "2024-11-30")
 DOC_INTELLIGENCE_KEY = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY")  # Optional key-based auth (prefer MI)
