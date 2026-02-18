@@ -42,10 +42,11 @@ To improve resilience, a **fallback OCR provider** has been added using **Azure 
 3. Document Intelligence extracts text-only Markdown (no images) using the `prebuilt-layout` model.
 4. The `ocr_provider` field on `EmailRecord` tracks which provider was used.
 
-### AI Foundry Integration
-- **Default**: `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` points to the AI Foundry endpoint (`https://<prefix>-aifoundry.cognitiveservices.azure.com/`).
-- **RBAC**: The `Cognitive Services User` role already assigned to the Managed Identity on AI Foundry covers Document Intelligence access — **no separate DI resource needed**.
-- **Standalone option**: Set `deploy_document_intelligence = true` in Terraform to deploy a dedicated FormRecognizer resource (separate quotas, isolation).
+### Standalone Document Intelligence Resource (Recommended)
+- **Default (current)**: `deploy_document_intelligence = true` in `#infra/terraform.tfvars` deploys a dedicated `FormRecognizer` resource (`<prefix>-doc-intel`).
+- **Why standalone**: The AI Foundry v2 generic endpoint (`https://<prefix>-aifoundry.cognitiveservices.azure.com/`) does **not** reliably serve the `/documentintelligence/documentModels/...` REST path, returning `400 Bad Request`. A dedicated FormRecognizer resource exposes the correct REST API natively.
+- **RBAC**: Terraform automatically assigns `Cognitive Services User` to the User-Assigned Managed Identity on the standalone DI resource.
+- **Endpoint**: `https://<prefix>-doc-intel.cognitiveservices.azure.com/` — auto-injected into both ACA containers by Terraform.
 
 ### Trade-offs
 - **Mistral OCR** produces richer Markdown (image descriptions, alt-text, layout hints). Best for classification accuracy.
@@ -53,7 +54,7 @@ To improve resilience, a **fallback OCR provider** has been added using **Azure 
 - Fallback is transparent to the classification stage — both providers output Markdown.
 
 ### Configuration
-- Terraform: AI Foundry endpoint used by default (no extra config needed)
-- Terraform (standalone): `deploy_document_intelligence = true` (default: false)
-- Environment: `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` (auto-set by Terraform to AI Foundry endpoint)
+- Terraform: `deploy_document_intelligence = true` in `terraform.tfvars` (recommended)
+- Environment: `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` (auto-set by Terraform to standalone DI endpoint)
+- API version: `DOC_INTELLIGENCE_API_VERSION=2024-11-30` (v4.0 GA, default)
 - Circuit breaker: `doc_intelligence_breaker` (fail_max=3, reset_timeout=30s)
