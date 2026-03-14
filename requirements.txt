@@ -297,7 +297,7 @@ pydantic==2.6.0
     #   fastapi
 pydantic-core==2.16.1
     # via pydantic
-pyjwt==2.10.1
+pyjwt==2.12.0
     # via msal
 pymupdf==1.26.7
     # via classymail
