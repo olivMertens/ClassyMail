@@ -1,0 +1,44 @@
+{
+  "description": "Email/PDF classifier (Studio-safe version)",
+  "baseAnalyzerId": "prebuilt-document",
+  "models": {
+    "completion": "gpt-4.1-mini",
+    "embedding": "text-embedding-3-small"
+  },
+  "config": {
+    "enableSegment": false,
+    "estimateFieldSourceAndConfidence": true,
+    "returnDetails": true
+  },
+  "fieldSchema": {
+    "fields": {
+      "Category": {
+        "type": "string",
+        "method": "classify",
+        "description": "Insurance document category",
+        "enum": [
+          "Attestation habitation",
+          "Releve de compte",
+          "Attestation scolaire",
+          "Dommages electriques",
+          "Evenements naturels"
+        ]
+      },
+      "Subject": {
+        "type": "string",
+        "method": "generate",
+        "description": "Subject of the email or document"
+      },
+      "Sender": {
+        "type": "string",
+        "method": "generate",
+        "description": "Name or organization of the sender"
+      },
+      "Summary": {
+        "type": "string",
+        "method": "generate",
+        "description": "Brief summary of the document content"
+      }
+    }
+  }
+}

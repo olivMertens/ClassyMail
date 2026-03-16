@@ -1,0 +1,25 @@
+.git
+.gitignore
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+*.log
+.env
+.env.*
+.venv/
+.vscode/
+.idea/
+node_modules/
+data/
+dataset/pdf/
+infra/.terraform/
+infra/tfplan
+infra/terraform.tfstate*
+secrets.env
+
+# GitHub Actions artifacts
+*.sarif
+
+# Cache
+.cache/
+pytest_cache/

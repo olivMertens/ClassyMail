@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mermaid Diagram Exporter</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-primary {
+            background: #0066cc;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0052a3;
+        }
+        .btn-secondary {
+            background: #28a745;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #218838;
+        }
+        #preview {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 4px;
+            background: white;
+            min-height: 200px;
+            text-align: center;
+        }
+        .error {
+            color: #dc3545;
+            padding: 15px;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Mermaid Diagram Exporter</h1>
+        <p class="subtitle">Paste your Mermaid code below to render and download as PNG/SVG</p>
+
+        <textarea id="mermaidInput" placeholder="Paste your Mermaid diagram code here...
+Example:
+graph TD
+    A[Start] --> B[Process]
+    B --> C[End]"></textarea>
+
+        <div class="actions">
+            <button class="btn-primary" onclick="renderDiagram()">🔄 Render Diagram</button>
+            <button class="btn-secondary" onclick="downloadPNG()">⬇️ Download PNG</button>
+            <button class="btn-secondary" onclick="downloadSVG()">⬇️ Download SVG</button>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <h2>Preview:</h2>
+        <div id="preview"></div>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'default',
+            securityLevel: 'loose'
+        });
+
+        let currentSVG = null;
+
+        async function renderDiagram() {
+            const input = document.getElementById('mermaidInput').value.trim();
+            const preview = document.getElementById('preview');
+            const error = document.getElementById('error');
+
+            error.style.display = 'none';
+            preview.innerHTML = '';
+
+            if (!input) {
+                error.textContent = 'Please paste Mermaid diagram code first';
+                error.style.display = 'block';
+                return;
+            }
+
+            try {
+                const { svg } = await mermaid.render('mermaid-preview', input);
+                preview.innerHTML = svg;
+                currentSVG = svg;
+            } catch (e) {
+                error.textContent = `Error rendering diagram: ${e.message}`;
+                error.style.display = 'block';
+            }
+        }
+
+        function downloadSVG() {
+            if (!currentSVG) {
+                alert('Please render a diagram first');
+                return;
+            }
+
+            const blob = new Blob([currentSVG], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'diagram.svg';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function downloadPNG() {
+            if (!currentSVG) {
+                alert('Please render a diagram first');
+                return;
+            }
+
+            const svgElement = document.querySelector('#preview svg');
+            if (!svgElement) {
+                alert('SVG not found');
+                return;
+            }
+
+            const canvas = document.createElement('canvas');
+            const bbox = svgElement.getBBox();
+            canvas.width = bbox.width * 2; // 2x for retina
+            canvas.height = bbox.height * 2;
+
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const img = new Image();
+            const svgBlob = new Blob([currentSVG], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(svgBlob);
+
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob(function(blob) {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'diagram.png';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+                URL.revokeObjectURL(url);
+            };
+
+            img.src = url;
+        }
+    </script>
+</body>
+</html>

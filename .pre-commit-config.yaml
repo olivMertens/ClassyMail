@@ -1,0 +1,32 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+  - repo: local
+    hooks:
+      - id: frontend-lint
+        name: frontend-lint (eslint)
+        entry: npm run lint --prefix frontend
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+      - id: validate-mermaid
+        name: validate-mermaid
+        entry: python scripts/validate_mermaid.py
+        language: system
+        files: \.md$
+        pass_filenames: true
+  # Terraform hooks disabled on Windows (requires bash/WSL)
+  # - repo: https://github.com/antonbabenko/pre-commit-terraform
+  #   rev: v1.83.6
+  #   hooks:
+  #     - id: terraform_fmt
+  #     - id: terraform_validate
+  #       args: ["--hook-config=--tf-init-args=-backend=false"]

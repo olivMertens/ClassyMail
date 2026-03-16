@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Lightweight guard: ensure uv is available
+if ! command -v uv >/dev/null 2>&1; then
+  echo "[pre-push] uv not found; please install or run 'pip install uv'" >&2
+  exit 1
+fi
+
+# Sync dev deps if missing .venv
+if [ ! -d .venv ]; then
+  echo "[pre-push] Syncing dependencies (dev)..."
+  uv sync --frozen --dev
+fi
+
+echo "[pre-push] Running ruff..."
+uv run ruff check .
+
+echo "[pre-push] Running pytest..."
+uv run pytest
+
+if [ -d infra ]; then
+  echo "[pre-push] Validating Terraform..."
+  (cd infra && terraform init -backend=false >/dev/null 2>&1 && terraform validate)
+fi
+
+echo "[pre-push] OK"
