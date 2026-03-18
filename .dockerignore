@@ -1,0 +1,44 @@
+# VCS & IDE
+.git
+.gitignore
+.github/
+.vscode/
+.idea/
+
+# Python artifacts
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+.venv/
+.cache/
+pytest_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Environment & secrets
+.env
+.env.*
+secrets.env
+secrets.env.example
+
+# Node (frontend rebuilt in Docker)
+**/node_modules/
+
+# Data & test assets (not needed at runtime)
+data/
+dataset/
+CU/
+examples/
+docs/
+tests/
+scripts/
+
+# Infrastructure (Terraform)
+infra/
+*.tfstate*
+tfplan
+
+# Build artifacts & logs
+*.log
+*.sarif
+static/dist/

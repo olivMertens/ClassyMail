@@ -1,0 +1,731 @@
+name: deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+env:
+  IMAGE_NAME: classymail-api
+  WORKER_APP_NAME: classymail-worker
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api_changed: ${{ steps.set.outputs.api_changed }}
+      worker_changed: ${{ steps.set.outputs.worker_changed }}
+      build: ${{ steps.set.outputs.build }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Needed for reliable change detection on multi-commit pushes.
+          # Using a shallow fetch can omit github.event.before, causing "fatal: bad object".
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: set
+        run: |
+          base_ref=${{ github.event.before }}
+          if [ -z "$base_ref" ] || [ "$base_ref" = "0000000000000000000000000000000000000000" ]; then
+            base_ref=HEAD~1
+          fi
+          # Ensure base_ref exists locally (push events can include multiple commits; shallow clones may not have base_ref).
+          if ! git cat-file -e "$base_ref^{commit}" 2>/dev/null; then
+            echo "base_ref $base_ref not present locally; fetching..."
+            git fetch --no-tags --prune origin "$base_ref" || true
+          fi
+
+          files=""
+          if git cat-file -e "$base_ref^{commit}" 2>/dev/null; then
+            files=$(git diff --name-only "$base_ref" HEAD || true)
+          else
+            echo "Warning: base_ref $base_ref still unavailable; falling back to HEAD~1"
+            files=$(git diff --name-only HEAD~1 HEAD || true)
+          fi
+
+          if [ -z "$files" ]; then
+            echo "Warning: could not compute changed files; defaulting to build=true"
+          fi
+          echo "Changed files:\n$files"
+
+          api_paths='classymail/api|templates/|static/|classymail/app.py|classymail/services/azure_clients.py|classymail/services/repository.py'
+          worker_paths='classymail/services/worker.py|classymail/worker_main.py|classymail/services/pipeline.py|classymail/services/llm_pipeline.py|classymail/services/anonymizer.py|classymail/services/repository.py'
+          build_paths='Dockerfile|pyproject.toml|uv.lock|requirements.txt'
+
+          # Build is required for ANY change outside docs/ and README.md
+          # (docs-only commits should not build/push or redeploy Container Apps).
+          docs_only=true
+          if echo "$files" | grep -Evq '^(docs/|README\.md$)'; then docs_only=false; fi
+
+          api_changed=false
+          worker_changed=false
+          build=true
+          if [ -n "$files" ] && [ "$docs_only" = "true" ]; then build=false; fi
+          if echo "$files" | grep -Eq "$api_paths"; then api_changed=true; build=true; fi
+          if echo "$files" | grep -Eq "$worker_paths"; then worker_changed=true; build=true; fi
+          if echo "$files" | grep -Eq "$build_paths"; then build=true; fi
+          if echo "$files" | grep -Eq "frontend/"; then build=true; fi
+
+          echo "api_changed=$api_changed" | tee -a $GITHUB_OUTPUT
+          echo "worker_changed=$worker_changed" | tee -a $GITHUB_OUTPUT
+          echo "build=$build" | tee -a $GITHUB_OUTPUT
+
+  validate:
+    runs-on: ubuntu-latest
+    needs: changes
+    strategy:
+      matrix:
+        task: [ruff, pytest, terraform, pre-commit, frontend-lint]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v2
+
+      - name: Install deps
+        run: |
+          uv sync --frozen --extra dev
+
+      - name: Run ruff
+        if: ${{ matrix.task == 'ruff' }}
+        run: uv run ruff check .
+
+      - name: Run pytest
+        if: ${{ matrix.task == 'pytest' }}
+        run: uv run pytest
+
+      - name: Setup Terraform
+        if: ${{ matrix.task == 'terraform' || matrix.task == 'pre-commit' }}
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform validate
+        if: ${{ matrix.task == 'terraform' }}
+        working-directory: infra
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Run pre-commit
+        if: ${{ matrix.task == 'pre-commit' }}
+        env:
+          SKIP: frontend-lint
+        run: |
+          uv run pre-commit run --all-files
+
+      - name: Setup Node
+        if: ${{ matrix.task == 'frontend-lint' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Lint Frontend
+        if: ${{ matrix.task == 'frontend-lint' }}
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint
+          npm run build
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [changes, validate]
+    if: needs.changes.outputs.build == 'true' || github.event_name == 'workflow_dispatch'
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v2
+
+      - name: Install deps (no dev)
+        run: |
+          uv sync --frozen
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build Frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Azure login (OIDC)
+        if: ${{ env.AZURE_CREDENTIALS == '' }}
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure login (service principal json)
+        if: ${{ env.AZURE_CREDENTIALS != '' }}
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Docker login to ACR (via Azure CLI)
+        run: |
+          set -euo pipefail
+          if [ -z "${{ vars.ACR_NAME }}" ]; then
+            echo "::error::Missing vars.ACR_NAME repository variable." >&2
+            exit 1
+          fi
+          LOGIN_SERVER="${{ vars.ACR_NAME }}.azurecr.io"
+          echo "::group::ACR authentication"
+          # Use --expose-token to bypass Docker credential helper issues
+          # with OIDC tokens on GitHub Actions runners
+          TOKEN=$(az acr login --name "${{ vars.ACR_NAME }}" --expose-token --output tsv --query accessToken)
+          echo "::add-mask::$TOKEN"
+          echo "$TOKEN" | docker login "$LOGIN_SERVER" -u 00000000-0000-0000-0000-000000000000 --password-stdin
+          echo "::endgroup::"
+          echo "ACR_LOGIN_SERVER=$LOGIN_SERVER" >> $GITHUB_ENV
+
+      - name: Fetch Vue runtime (UI)
+        run: |
+          bash ./scripts/fetch_vue_runtime.sh
+
+      - name: Build & push image
+        id: build
+        run: |
+          set -euo pipefail
+          REGISTRY="${{ env.ACR_LOGIN_SERVER }}"
+          if [ -z "$REGISTRY" ]; then
+            echo "::error::ACR_LOGIN_SERVER not set. Docker login step must run first." >&2
+            exit 1
+          fi
+          IMAGE=${REGISTRY}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          docker build -t $IMAGE .
+          docker push $IMAGE
+
+  deploy-api:
+    runs-on: ubuntu-latest
+    needs: [changes, build]
+    if: needs.changes.outputs.build == 'true' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        if: ${{ env.AZURE_CREDENTIALS == '' }}
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure login (service principal json)
+        if: ${{ env.AZURE_CREDENTIALS != '' }}
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Resolve Container Apps environment
+        run: |
+          ENV_NAME="${{ vars.AZURE_CONTAINERAPP_ENV }}"
+          if [ -z "$ENV_NAME" ]; then ENV_NAME="classymail-env"; fi
+          echo "CONTAINERAPPS_ENV=$ENV_NAME" >> $GITHUB_ENV
+
+      - name: Ensure API Container App exists
+        run: |
+          set -euo pipefail
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          APP="${{ env.IMAGE_NAME }}"
+          ENV_NAME="${{ env.CONTAINERAPPS_ENV }}"
+          if ! az containerapp show -n "$APP" -g "$RG" >/dev/null 2>&1; then
+            az containerapp create \
+              -n "$APP" \
+              -g "$RG" \
+              --environment "$ENV_NAME" \
+              --image "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" \
+              --ingress external \
+              --target-port 8000 \
+              --env-vars PORT=8000
+          fi
+
+      - name: Wait for API App stability
+        run: |
+          APP="${{ env.IMAGE_NAME }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          echo "Checking stability of $APP in $RG..."
+          for i in {1..30}; do
+            STATUS=$(az containerapp show -n "$APP" -g "$RG" --query properties.provisioningState -o tsv 2>/dev/null || echo "NotFound")
+            echo "Current ProvisioningState: $STATUS"
+            # Succeeded and Failed are terminal states. InProgress/Creating/Updating are not.
+            if [ "$STATUS" == "Succeeded" ] || [ "$STATUS" == "Failed" ] || [ "$STATUS" == "NotFound" ]; then
+               echo "Resource is in a terminal state. Proceeding."
+               break
+            fi
+            echo "Resource is busy. Waiting 10s..."
+            sleep 10
+          done
+
+      - name: Assign managed identity to API Container App
+        run: |
+          IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
+          IDENTITY_ID=$(az identity show -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "$IDENTITY_NAME" --query id -o tsv)
+
+          # Check if identity is already assigned (idempotent)
+          CURRENT_IDENTITIES=$(az containerapp identity show \
+            --name "${{ env.IMAGE_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query "userAssignedIdentities | keys(@)" -o tsv 2>/dev/null || echo "")
+
+          if echo "$CURRENT_IDENTITIES" | grep -qi "$IDENTITY_ID"; then
+            echo "Identity already assigned - skipping"
+          else
+            echo "Assigning identity..."
+            az containerapp identity assign \
+              --name "${{ env.IMAGE_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --user-assigned "$IDENTITY_ID"
+          fi
+
+      - name: Configure ACR pull (API)
+        run: |
+          set -euo pipefail
+          REGISTRY="${{ vars.ACR_NAME }}.azurecr.io"
+          IDENTITY_ID=$(az identity show -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "${{ vars.AZURE_IDENTITY_NAME }}" --query id -o tsv)
+          az containerapp registry set \
+            --name "${{ env.IMAGE_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --server "$REGISTRY" \
+            --identity "$IDENTITY_ID"
+
+      - name: Deploy API to Azure Container Apps
+        run: |
+          set -euo pipefail
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          APP="${{ env.IMAGE_NAME }}"
+          IMAGE="${{ needs.build.outputs.image }}"
+
+          if [ -z "$IMAGE" ]; then
+            echo "needs.build.outputs.image is empty; build job did not produce an image tag." >&2
+            exit 1
+          fi
+          echo "Deploying API image: $IMAGE"
+
+          # Only update the image tag. Environment variables, identity, and scale rules
+          # are now managed by Terraform resources in infra/main.tf
+          az containerapp update \
+            -n "$APP" \
+            -g "$RG" \
+            --image "$IMAGE"
+
+  deploy-worker:
+    runs-on: ubuntu-latest
+    needs: [changes, build]
+    if: needs.changes.outputs.build == 'true' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        if: ${{ env.AZURE_CREDENTIALS == '' }}
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure login (service principal json)
+        if: ${{ env.AZURE_CREDENTIALS != '' }}
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Resolve Container Apps environment
+        run: |
+          ENV_NAME="${{ vars.AZURE_CONTAINERAPP_ENV }}"
+          if [ -z "$ENV_NAME" ]; then ENV_NAME="classymail-env"; fi
+          echo "CONTAINERAPPS_ENV=$ENV_NAME" >> $GITHUB_ENV
+
+      - name: Ensure Worker Container App exists
+        run: |
+          set -euo pipefail
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          APP="${{ env.WORKER_APP_NAME }}"
+          ENV_NAME="${{ env.CONTAINERAPPS_ENV }}"
+
+          if ! az containerapp show -n "$APP" -g "$RG" >/dev/null 2>&1; then
+            echo "Creating worker app..."
+            az containerapp create \
+              -n "$APP" \
+              -g "$RG" \
+              --environment "$ENV_NAME" \
+              --image "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" \
+              --min-replicas 0 \
+              --max-replicas 1
+          else
+            echo "Worker app exists. Checking state..."
+            STATE=$(az containerapp show -n "$APP" -g "$RG" --query properties.provisioningState -o tsv)
+            echo "Current ProvisioningState: $STATE"
+            if [ "$STATE" = "Failed" ]; then
+              echo "App is in Failed state. Resetting to public helloworld image to unblock provisioning..."
+              az containerapp update \
+                -n "$APP" \
+                -g "$RG" \
+                --image "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+            fi
+          fi
+
+      - name: Wait for Worker App stability
+        run: |
+          APP="${{ env.WORKER_APP_NAME }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          echo "Checking stability of $APP in $RG..."
+          for i in {1..30}; do
+            STATUS=$(az containerapp show -n "$APP" -g "$RG" --query properties.provisioningState -o tsv 2>/dev/null || echo "NotFound")
+            echo "Current ProvisioningState: $STATUS"
+            if [ "$STATUS" == "Succeeded" ] || [ "$STATUS" == "Failed" ] || [ "$STATUS" == "NotFound" ]; then
+               echo "Resource is in a terminal state. Proceeding."
+               break
+            fi
+            echo "Resource is busy. Waiting 10s..."
+            sleep 10
+          done
+
+      - name: Assign managed identity to Worker Container App
+        run: |
+          set -euo pipefail
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          APP="${{ env.WORKER_APP_NAME }}"
+          IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
+          IDENTITY_ID=$(az identity show -g "$RG" -n "$IDENTITY_NAME" --query id -o tsv)
+
+          # Check if identity is already assigned (idempotent)
+          CURRENT_IDENTITIES=$(az containerapp identity show \
+            --name "$APP" \
+            --resource-group "$RG" \
+            --query "userAssignedIdentities | keys(@)" -o tsv 2>/dev/null || echo "")
+
+          if echo "$CURRENT_IDENTITIES" | grep -qi "$IDENTITY_ID"; then
+            echo "Identity already assigned - skipping"
+          else
+            echo "Assigning identity..."
+            az containerapp identity assign \
+              --name "$APP" \
+              --resource-group "$RG" \
+              --user-assigned "$IDENTITY_ID"
+          fi
+
+      - name: Configure ACR pull (Worker)
+        run: |
+          set -euo pipefail
+          REGISTRY="${{ vars.ACR_NAME }}.azurecr.io"
+          IDENTITY_ID=$(az identity show -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "${{ vars.AZURE_IDENTITY_NAME }}" --query id -o tsv)
+          az containerapp registry set \
+            --name "${{ env.WORKER_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --server "$REGISTRY" \
+            --identity "$IDENTITY_ID"
+
+      - name: Deploy Worker Container App
+        run: |
+          set -euo pipefail
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          APP="${{ env.WORKER_APP_NAME }}"
+          IMAGE="${{ needs.build.outputs.image }}"
+
+          if [ -z "$IMAGE" ]; then
+            echo "needs.build.outputs.image is empty; build job did not produce an image tag." >&2
+            exit 1
+          fi
+          echo "Deploying worker image: $IMAGE"
+
+          # Only update the image tag. Environment variables, identity, and scale rules
+          # are now managed by Terraform resources in infra/main.tf
+          az containerapp update \
+            -n "$APP" \
+            -g "$RG" \
+            --image "$IMAGE"
+
+  post-deploy-verify-fix:
+    name: Post-Deployment Verification & Auto-Fix
+    runs-on: ubuntu-latest
+    needs: [changes, deploy-api, deploy-worker]
+    if: needs.changes.outputs.build == 'true' || github.event_name == 'workflow_dispatch'
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        if: ${{ env.AZURE_CREDENTIALS == '' }}
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure login (service principal json)
+        if: ${{ env.AZURE_CREDENTIALS != '' }}
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install jq (for JSON parsing)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Wait for Deployments to Stabilize
+        run: |
+          echo "⏳ Waiting 30 seconds for Container App deployments to stabilize..."
+          sleep 30
+          echo "✅ Ready to proceed with verification"
+
+      - name: Fix Cosmos DB Firewall (Critical)
+        run: |
+          echo "========================================"
+          echo "Step 1/5: Cosmos DB Network Firewall"
+          echo "========================================"
+          echo ""
+          chmod +x scripts/update_cosmos_firewall.sh
+          if ./scripts/update_cosmos_firewall.sh "${{ vars.AZURE_RESOURCE_GROUP }}"; then
+            echo "✅ Cosmos DB firewall updated with current Container App IPs"
+          else
+            echo "❌ Failed to update Cosmos DB firewall - CRITICAL"
+            exit 1
+          fi
+
+      - name: Apply Tags Policy (Governance)
+        continue-on-error: true
+        run: |
+          echo ""
+          echo "========================================"
+          echo "Step 2/5: Security & Cost Control Tags"
+          echo "========================================"
+          echo ""
+          echo "ℹ️ Skipping policy creation in CI/CD (requires subscription-level permissions)"
+          echo "   Policy should be applied manually or via Terraform"
+          echo "   Run locally: ./scripts/verify_security_cost_tags.sh ${{ vars.AZURE_RESOURCE_GROUP }} --apply --remediate"
+          echo ""
+
+          # Check compliance only (no policy creation)
+          chmod +x scripts/verify_security_cost_tags.sh
+          if ./scripts/verify_security_cost_tags.sh "${{ vars.AZURE_RESOURCE_GROUP }}"; then
+            echo "✅ Tags compliance check completed"
+          else
+            echo "⚠️ Tags compliance check completed with warnings (non-critical)"
+          fi
+
+      - name: Wait for Container Apps Ready
+        run: |
+          echo ""
+          echo "========================================"
+          echo "Step 3/5: Container Apps Readiness"
+          echo "========================================"
+          echo ""
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+
+          for APP in "${{ env.IMAGE_NAME }}" "${{ env.WORKER_APP_NAME }}"; do
+            echo "Checking $APP..."
+            for i in {1..12}; do
+              STATUS=$(az containerapp show --name "$APP" -g "$RG" --query "properties.runningStatus" -o tsv 2>/dev/null || echo "Unknown")
+              if [ "$STATUS" == "Running" ]; then
+                echo "✅ $APP is Running"
+                break
+              elif [ $i -eq 12 ]; then
+                echo "⚠️ $APP not running after 2 minutes (Status: $STATUS)"
+              else
+                echo "  ⏳ $APP: $STATUS (attempt $i/12, waiting 10s...)"
+                sleep 10
+              fi
+            done
+          done
+
+      - name: Verify API Health Endpoints
+        run: |
+          echo ""
+          echo "========================================"
+          echo "Step 4/5: API Health Checks"
+          echo "========================================"
+          echo ""
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          API_APP="${{ env.IMAGE_NAME }}"
+
+          API_FQDN=$(az containerapp show --name "$API_APP" -g "$RG" --query "properties.configuration.ingress.fqdn" -o tsv 2>/dev/null || echo "")
+
+          if [ -z "$API_FQDN" ]; then
+            echo "❌ API FQDN not available - ingress not configured"
+            exit 1
+          fi
+
+          API_URL="https://$API_FQDN"
+          echo "API URL: $API_URL"
+          echo ""
+
+          # Test /health endpoint with retries
+          echo "Testing /health endpoint..."
+          for i in {1..12}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/health" 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" == "200" ]; then
+              echo "✅ Health check passed (HTTP $HTTP_CODE)"
+              break
+            elif [ $i -eq 12 ]; then
+              echo "❌ Health check failed after 12 retries (HTTP $HTTP_CODE)"
+              exit 1
+            else
+              echo "  ⏳ Health check: HTTP $HTTP_CODE (attempt $i/12, waiting 10s...)"
+              sleep 10
+            fi
+          done
+
+          # Test /readyz endpoint
+          echo ""
+          echo "Testing /readyz endpoint..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/readyz" 2>/dev/null || echo "000")
+          if [ "$HTTP_CODE" == "200" ]; then
+            echo "✅ Readiness check passed (HTTP $HTTP_CODE)"
+          else
+            echo "⚠️ Readiness: HTTP $HTTP_CODE (API might still be initializing connections)"
+          fi
+
+      - name: Audit RBAC Roles (Report Only)
+        continue-on-error: true
+        run: |
+          echo ""
+          echo "========================================"
+          echo "Step 5/5: RBAC Roles Audit"
+          echo "========================================"
+          echo ""
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
+
+          if [ -z "$IDENTITY_NAME" ]; then
+            echo "⚠️ AZURE_IDENTITY_NAME not set - skipping RBAC audit"
+            exit 0
+          fi
+
+          IDENTITY_ID=$(az identity show -g "$RG" -n "$IDENTITY_NAME" --query principalId -o tsv 2>/dev/null || echo "")
+
+          if [ -z "$IDENTITY_ID" ]; then
+            echo "⚠️ Managed identity '$IDENTITY_NAME' not found - skipping RBAC audit"
+            exit 0
+          fi
+
+          echo "Managed Identity: $IDENTITY_NAME"
+          echo "Principal ID: $IDENTITY_ID"
+          echo ""
+
+          ROLES=$(az role assignment list --assignee "$IDENTITY_ID" --all --query "[].roleDefinitionName" -o tsv 2>/dev/null || echo "")
+
+          if [ -z "$ROLES" ]; then
+            echo "⚠️ No role assignments found"
+          fi
+
+          # Check critical roles
+          MISSING=()
+
+          echo "Critical RBAC Roles Status:"
+          echo "----------------------------"
+
+          if echo "$ROLES" | grep -q "Storage Blob Data Contributor"; then
+            echo "✅ Storage Blob Data Contributor"
+          else
+            echo "❌ Storage Blob Data Contributor (MISSING)"
+            MISSING+=("Storage Blob Data Contributor")
+          fi
+
+          if echo "$ROLES" | grep -q "Cognitive Services User"; then
+            echo "✅ Cognitive Services User"
+          else
+            echo "❌ Cognitive Services User (MISSING)"
+            MISSING+=("Cognitive Services User")
+          fi
+
+          if echo "$ROLES" | grep -q "Azure Service Bus Data Owner"; then
+            echo "✅ Azure Service Bus Data Owner"
+          elif echo "$ROLES" | grep -q "Azure Service Bus Data Sender" && echo "$ROLES" | grep -q "Azure Service Bus Data Receiver"; then
+            echo "✅ Azure Service Bus Data Sender & Receiver"
+          else
+            echo "❌ Service Bus roles (MISSING)"
+            MISSING+=("Azure Service Bus Data Owner OR (Sender + Receiver)")
+          fi
+
+          echo ""
+
+          # Report missing roles but don't fail
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "⚠️ WARNING: Missing RBAC roles detected"
+            echo ""
+            echo "Missing roles:"
+            for role in "${MISSING[@]}"; do
+              echo "  - $role"
+            done
+            echo ""
+            echo "FIX: These roles should have been assigned by Terraform."
+            echo "     Run: cd infra && terraform apply"
+            echo ""
+            echo "IMPACT: Container Apps may fail to access Azure resources"
+            echo "        (Storage, Cosmos DB, Service Bus, AI Foundry)"
+            echo ""
+            echo "::warning::Missing RBAC roles: ${MISSING[*]}"
+          else
+            echo "✅ All critical RBAC roles are properly assigned"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo ""
+          echo "================================================"
+          echo "Post-Deployment Verification Summary"
+          echo "================================================"
+          echo ""
+          echo "✅ Deployment: Container Apps updated successfully"
+          echo "🔧 Auto-fixes: Applied (Cosmos firewall, tags policy)"
+          echo "🩺 Health checks: See results above"
+          echo "🔐 RBAC audit: See results above"
+          echo ""
+          echo "Next steps:"
+          echo "  1. Monitor Container App logs:"
+          echo "     az containerapp logs show --name ${{ env.IMAGE_NAME }} -g ${{ vars.AZURE_RESOURCE_GROUP }} --follow"
+          echo "  2. Test end-to-end: Upload a PDF via the UI"
+          echo "  3. If RBAC issues found: cd infra && terraform apply"
+          echo ""

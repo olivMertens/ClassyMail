@@ -1,0 +1,65 @@
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+docs/COMPARISON_CONTENT_UNDERSTANDING.md
+.eggs/
+.dist-info/
+.env
+.env.*
+.venv-*/
+.venv/
+venv/
+env/
+.python-version
+pytest_cache/
+.coverage
+htmlcov/
+.cache/
+/data/*
+# FastAPI / Uvicorn
+*.log
+
+# VSCode / IDE
+.vscode/
+.idea/
+
+# Data & outputs
+data/
+data/*
+logs/
+outputs/
+
+# Generated dummy PDFs (keep dataset/pdf/.gitkeep tracked)
+dataset/*
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Builds
+build/
+dist/
+.build-context/
+build-context.tar.gz
+
+# Notebooks
+*.ipynb_checkpoints/
+
+# Secrets
+secrets.env
+
+# Terraform (never commit local state/plans)
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/terraform.tfvars
+**/tfplan
+
+# CU test output
+CU/last_result.json

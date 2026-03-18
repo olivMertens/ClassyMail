@@ -1,0 +1,77 @@
+# =============================================================================
+# ClassyMail Terraform Variables — Copy to terraform.tfvars and fill in values
+# =============================================================================
+# Full deployment guide: docs/DEPLOY_FROM_SCRATCH.md
+#
+# PREREQUISITES (new tenant):
+#   1. az login --tenant <YOUR_TENANT_ID>
+#   2. az account set --subscription <YOUR_SUBSCRIPTION_ID>
+#   3. Register required resource providers:
+#      az provider register --namespace Microsoft.Storage
+#      az provider register --namespace Microsoft.ServiceBus
+#      az provider register --namespace Microsoft.DocumentDB
+#      az provider register --namespace Microsoft.CognitiveServices
+#      az provider register --namespace Microsoft.App
+#      az provider register --namespace Microsoft.EventGrid
+#      az provider register --namespace Microsoft.Insights
+#      az provider register --namespace Microsoft.OperationalInsights
+#      az provider register --namespace Microsoft.ManagedIdentity
+#   4. Accept Mistral MaaS Marketplace terms (Azure Portal > Marketplace)
+# =============================================================================
+
+# --- SUBSCRIPTION ---
+# Optional: if omitted, Terraform uses the current Azure CLI subscription.
+# subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# --- PREFIX & LOCATION ---
+# All resource names derive from this prefix (e.g. email-poc-rg, email-poc-cosmos...)
+# Change this to avoid naming collisions across tenants.
+# prefix = "classymail"
+# location = "swedencentral"  # Must support AI Foundry, Phi-4, Container Apps
+
+# --- CONTAINER IMAGE (REQUIRED) ---
+# First deploy: use a placeholder, then re-apply after building your real image.
+# container_image = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+# After ACR push:
+# container_image = "myregistry.azurecr.io/classymail-agent:local"
+
+# --- CONTAINER REGISTRY (Optional) ---
+# If using a private ACR, set these so Terraform grants AcrPull to the managed identity.
+# acr_name = "myregistry"
+# acr_resource_group = "my-acr-rg"
+
+# --- AI MODELS (Optional) ---
+# Model availability is tenant/region-dependent.
+# Default false — deploy models manually via Microsoft AI Foundry portal.
+# enable_model_deployments = false
+
+# --- PII DETECTION (Optional) ---
+# Deploy Azure AI Language service for native PII detection.
+# Uses Standard (S) tier. Adds ~$2.50/month base + $1/1K text records.
+# deploy_language_service = false
+
+# --- COSMOS DB AUTH ---
+# Recommended: RBAC-only (disables local keys). Set to false only if troubleshooting.
+# cosmos_use_rbac = true
+
+# --- ORGANIZATION NAME (Optional) ---
+# Displayed in the UI header.
+# organization_name = "MyOrg"
+
+# --- NETWORK (Optional) ---
+# Add your developer IP(s) to allow Cosmos DB data-plane access from localhost.
+# allowed_ip_ranges = ["YOUR.PUBLIC.IP.ADDRESS"]
+
+# --- POLICIES (Optional) ---
+# Disable if your tenant restricts custom Azure Policy creation.
+# tag_policy_enabled = true
+# security_cost_policy_enabled = true
+
+# --- CI/CD: GitHub Actions OIDC (Optional) ---
+# Creates a dedicated managed identity + federated credential for passwordless
+# GitHub Actions deployments (Workload Identity Federation).
+# Set to "" to skip (no CI/CD identity created).
+# github_repo = "owner/repo"
+#
+# Optional: constrain OIDC token to a specific GitHub environment.
+# github_environment = "production"

@@ -1,0 +1,1234 @@
+# ──────────────────────────────────────────────────────────────────────
+# API-version audit (last checked: 2025-07-16)
+#
+# Resource                                          API version   Source
+# ─────────────────────────────────────────────────  ────────────  ─────────────
+# Microsoft.CognitiveServices/accounts               2025-06-01   AVM Bicep / Learn docs
+# Microsoft.CognitiveServices/accounts/projects      2025-06-01   AVM Bicep / Learn docs
+# Microsoft.CognitiveServices/accounts/deployments   2025-06-01   AVM Bicep (GA)
+# Microsoft.DocumentDB/.../containers                2025-04-15   AVM Bicep / Learn docs
+#
+# AVM modules available (future migration path):
+#   - Azure/avm-res-cognitiveservices-account/azurerm v0.11.0  (requires azapi ~> 2.5)
+#   - Azure/avm-res-documentdb-databaseaccount/azurerm
+#   - Azure/avm-ptn-aiml-ai-foundry/azurerm  (pattern module)
+#
+# azapi provider note: AVM v0.11.0 requires azapi ~> 2.5 (body uses native HCL
+# instead of jsonencode). Current config uses azapi ~> 1.13 with jsonencode().
+# Upgrade to azapi v2.x is a breaking syntax change; plan and test thoroughly.
+#
+# Agent Service / Capability Hosts:
+#   capabilityHosts requires preview API (2025-07-01-preview) via AzAPI only.
+#   Not needed unless deploying Agent Service standard setup with BYO storage.
+# ──────────────────────────────────────────────────────────────────────
+
+terraform {
+  required_providers {
+    azurerm = { source = "hashicorp/azurerm", version = "~> 4.0" }
+    azapi   = { source = "azure/azapi", version = "~> 1.13" }
+    random  = { source = "hashicorp/random", version = "~> 3.6" }
+  }
+}
+
+locals {
+  # If not provided, rely on the active Azure CLI subscription.
+  subscription_id = try(trimspace(var.subscription_id), "")
+
+  # Optional corporate tags for all deployed resources.
+  # Set custom_tags_enabled = false in terraform.tfvars to disable.
+  common_tags = var.custom_tags_enabled ? {
+    "cost-center" = "classymail"
+    "deployment"  = "terraform"
+    "environment" = "d"
+    "owner"       = "classymail"
+    "managed-by"  = "classymail"
+    "monitoring"  = "enabled"
+  } : {}
+}
+
+provider "azurerm" {
+  features {}
+  subscription_id                 = local.subscription_id != "" ? local.subscription_id : null
+  use_cli                         = true
+  use_msi                         = false
+  use_oidc                        = false
+  storage_use_azuread             = true
+  resource_provider_registrations = "none" # Safe for users with Owner on RG only
+}
+
+provider "azapi" {
+  subscription_id            = local.subscription_id != "" ? local.subscription_id : null
+  use_cli                    = true
+  use_msi                    = false # azapi defaults to true — must be explicit
+  use_oidc                   = false
+  skip_provider_registration = true
+}
+
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID (GUID). Optional: if omitted, Terraform uses the currently selected Azure CLI subscription (az account set)."
+  default     = null
+  nullable    = true
+}
+
+variable "enable_model_deployments" {
+  type        = bool
+  description = "Deploy core AI models (phi-4, mistral-ocr) via Terraform. Disabled by default — availability depends on region, tenant, and Foundry offers."
+  default     = false
+}
+
+variable "deploy_optional_models" {
+  type        = bool
+  description = "Deploy optional models (gpt-4o-mini fallback, text-embedding-3-small, gpt-5.2-chat). Requires enable_model_deployments = true. These models are NOT required — the pipeline works with just Phi-4 + Mistral OCR."
+  default     = false
+}
+
+variable "cosmos_use_rbac" {
+  type        = bool
+  description = "Utiliser Entra ID / RBAC pour l'accès data-plane Cosmos (désactive l'auth locale). Recommandé (et souvent requis) dans les tenants avec policy qui désactive l'auth locale."
+  default     = true
+}
+
+variable "deploy_language_service" {
+  type        = bool
+  description = "Deploy Azure AI Language service for native PII detection (optional). Uses Standard SKU (S tier). Free tier (F0) can be used manually if preferred."
+  default     = false
+}
+
+variable "deploy_document_intelligence" {
+  type        = bool
+  description = "Deploy Azure Document Intelligence (FormRecognizer) as OCR fallback when Mistral OCR is unavailable. Uses S0 SKU."
+  default     = false
+}
+
+variable "doc_intelligence_sku" {
+  type        = string
+  description = "SKU for Document Intelligence service (S0 for production, F0 for free tier)."
+  default     = "S0"
+}
+
+variable "custom_tags_enabled" {
+  type        = bool
+  description = "Enable corporate tags (cost-center, owner, etc.) on all resources. Set to false to disable."
+  default     = true
+}
+
+variable "organization_name" {
+  type        = string
+  description = "Organization name displayed in the UI footer"
+  default     = "ClassyMail"
+}
+
+variable "location" { default = "swedencentral" } # Région recommandée pour disponibilité Mistral/Phi
+variable "prefix" { default = "classymail" }
+
+resource "azurerm_resource_group" "rg" {
+  name     = "${var.prefix}-rg"
+  location = var.location
+
+  tags = local.common_tags
+}
+
+# --- 1. Stockage & Ingestion ---
+resource "azurerm_storage_account" "st" {
+  name                     = replace("${var.prefix}st", "-", "")
+  resource_group_name      = azurerm_resource_group.rg.name
+  location                 = var.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+
+  tags = local.common_tags
+
+  # Avoid unintended drift vs existing secured deployments.
+  # NOTE: If you need Container Apps to access Storage over the public internet,
+  # set this to true and ensure your org policies allow it.
+  public_network_access_enabled = true
+
+  # Beaucoup d'environnements (policies) interdisent l'accès via clés (Shared Key).
+  # On force un mode compatible: OAuth/Entra-only, pas de Shared Key.
+  shared_access_key_enabled       = false
+  default_to_oauth_authentication = true
+
+  allow_nested_items_to_be_public = false
+  local_user_enabled              = false
+}
+
+resource "azurerm_storage_container" "pdf_inputs" {
+  name                  = "pdf-inputs"
+  storage_account_id    = azurerm_storage_account.st.id
+  container_access_type = "private"
+}
+
+resource "azurerm_servicebus_namespace" "sb" {
+  # Contrainte Azure: un namespace Service Bus ne peut pas se terminer par "-sb".
+  name                = "${var.prefix}-sbus"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+  sku                 = "Standard"
+
+  tags = local.common_tags
+
+  # Event Grid → Service Bus delivery requires local auth (connection string).
+  # KEDA scaler also requires it since azurerm provider doesn't yet support managed identity for KEDA.
+  local_auth_enabled = true
+}
+
+resource "azurerm_servicebus_queue" "q" {
+  name               = "pdf-processing-queue"
+  namespace_id       = azurerm_servicebus_namespace.sb.id
+  max_delivery_count = 5 # Dead-letter après 5 échecs (ex: PDF corrompu)
+}
+
+# --- 2. Event Grid (La colle entre Blob et Queue) ---
+resource "azurerm_eventgrid_system_topic" "blob_topic" {
+  name                = "${var.prefix}-blob-events"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  source_resource_id  = azurerm_storage_account.st.id
+  topic_type          = "Microsoft.Storage.StorageAccounts"
+
+  tags = local.common_tags
+}
+
+resource "azurerm_eventgrid_system_topic_event_subscription" "sub" {
+  name                = "to-servicebus"
+  system_topic        = azurerm_eventgrid_system_topic.blob_topic.name
+  resource_group_name = azurerm_resource_group.rg.name
+
+  # Le type de destination est Service Bus Queue
+  service_bus_queue_endpoint_id = azurerm_servicebus_queue.q.id
+
+  included_event_types = ["Microsoft.Storage.BlobCreated"]
+  advanced_filter {
+    string_ends_with {
+      key    = "data.url"
+      values = [".pdf", ".PDF"]
+    }
+  }
+}
+
+# --- 3. Intelligence (AI Foundry) ---
+resource "azapi_resource" "ai_foundry" {
+  type                      = "Microsoft.CognitiveServices/accounts@2025-06-01"
+  name                      = "${var.prefix}-aifoundry"
+  parent_id                 = azurerm_resource_group.rg.id
+  location                  = var.location
+  schema_validation_enabled = false
+  response_export_values    = ["properties.endpoint"]
+
+  tags = local.common_tags
+  body = jsonencode({
+    kind     = "AIServices"
+    sku      = { name = "S0" }
+    identity = { type = "SystemAssigned" }
+    properties = {
+      publicNetworkAccess    = "Enabled"
+      disableLocalAuth       = true
+      allowProjectManagement = true
+      customSubDomainName    = "${var.prefix}-aifoundry"
+    }
+  })
+}
+
+# Note: Le déploiement des modèles (Mistral/Phi) se fait souvent manuellement
+# ou via azapi_resource car les offres Marketplace changent vite.
+# Ici, nous créons le Hub pour accueillir les modèles.
+
+resource "azapi_resource" "ai_project" {
+  type                      = "Microsoft.CognitiveServices/accounts/projects@2025-06-01"
+  name                      = "${var.prefix}-project"
+  parent_id                 = azapi_resource.ai_foundry.id
+  location                  = var.location
+  schema_validation_enabled = false
+
+  tags = local.common_tags
+  body = jsonencode({
+    sku      = { name = "S0" }
+    identity = { type = "SystemAssigned" }
+    properties = {
+      displayName = "Email Classification Project"
+      description = "Email intents classification"
+    }
+  })
+}
+
+# Deployments (MaaS models)
+resource "azapi_resource" "deployment_phi4" {
+  count     = var.enable_model_deployments ? 1 : 0
+  type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
+  name      = "phi-4"
+  parent_id = azapi_resource.ai_foundry.id
+  body = jsonencode({
+    sku = { name = "GlobalStandard", capacity = 1 }
+    properties = {
+      model = { format = "OpenAI", name = "phi-4", version = "2024-10-01" }
+    }
+  })
+}
+
+resource "azapi_resource" "deployment_mistral_ocr" {
+  count     = var.enable_model_deployments ? 1 : 0
+  type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
+  name      = "mistral-document-ai-2512"
+  parent_id = azapi_resource.ai_foundry.id
+  body = jsonencode({
+    sku = { name = "GlobalStandard", capacity = 1 }
+    properties = {
+      model = { format = "Mistral", name = "mistral-document-ai-2512", version = "25.12" }
+    }
+  })
+}
+
+# --- Optional models (fallback, embeddings, chat) ---
+# These are NOT required for the core pipeline (Phi-4 + Mistral OCR is sufficient).
+# Enable via: deploy_optional_models = true (also requires enable_model_deployments = true)
+
+resource "azapi_resource" "deployment_gpt4o_mini" {
+  count     = var.enable_model_deployments && var.deploy_optional_models ? 1 : 0
+  type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
+  name      = "gpt-4o-mini"
+  parent_id = azapi_resource.ai_foundry.id
+  body = jsonencode({
+    sku = { name = "GlobalStandard", capacity = 1 }
+    properties = {
+      model = { format = "OpenAI", name = "gpt-4o-mini", version = "2024-07-18" }
+    }
+  })
+  depends_on = [azapi_resource.deployment_phi4]
+}
+
+resource "azapi_resource" "deployment_embedding" {
+  count     = var.enable_model_deployments && var.deploy_optional_models ? 1 : 0
+  type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
+  name      = "text-embedding-3-small"
+  parent_id = azapi_resource.ai_foundry.id
+  body = jsonencode({
+    sku = { name = "GlobalStandard", capacity = 1 }
+    properties = {
+      model = { format = "OpenAI", name = "text-embedding-3-small", version = "1" }
+    }
+  })
+  depends_on = [azapi_resource.deployment_gpt4o_mini]
+}
+
+resource "azapi_resource" "deployment_gpt52_chat" {
+  count     = var.enable_model_deployments && var.deploy_optional_models ? 1 : 0
+  type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
+  name      = "gpt-5.2-chat"
+  parent_id = azapi_resource.ai_foundry.id
+  body = jsonencode({
+    sku = { name = "GlobalStandard", capacity = 1 }
+    properties = {
+      model = { format = "OpenAI", name = "gpt-5.2-chat", version = "2025-03-01" }
+    }
+  })
+  depends_on = [azapi_resource.deployment_embedding]
+}
+
+# --- Optional: Azure AI Language Service for PII Detection ---
+# Provides native PII detection API as alternative to LLM-based detection
+# Enable via: deploy_language_service = true
+resource "azurerm_cognitive_account" "language" {
+  count               = var.deploy_language_service ? 1 : 0
+  name                = "${var.prefix}-language"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  kind                = "TextAnalytics"
+  sku_name            = "S" # Standard tier for production (F0 free tier available but with limits)
+
+  tags = local.common_tags
+
+  public_network_access_enabled = true
+  local_auth_enabled            = false # Force Managed Identity (RBAC-only)
+
+  identity {
+    type = "SystemAssigned"
+  }
+}
+
+# Grant Managed Identity access to Language service (Cognitive Services Language Reader)
+resource "azurerm_role_assignment" "aca_language_reader" {
+  count                = var.deploy_language_service ? 1 : 0
+  scope                = azurerm_cognitive_account.language[0].id
+  role_definition_name = "Cognitive Services Language Reader"
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
+}
+
+# --- Optional: Azure Document Intelligence (OCR Fallback) ---
+# Provides Document Intelligence API as OCR fallback when Mistral is unavailable
+# Enable via: deploy_document_intelligence = true
+resource "azurerm_cognitive_account" "doc_intelligence" {
+  count               = var.deploy_document_intelligence ? 1 : 0
+  name                = "${var.prefix}-doc-intel"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  kind                = "FormRecognizer"
+  sku_name            = var.doc_intelligence_sku
+
+  custom_subdomain_name = "${var.prefix}-doc-intel" # Required for Entra ID / RBAC auth
+
+  tags = local.common_tags
+
+  public_network_access_enabled = true
+  local_auth_enabled            = false # Force Managed Identity (RBAC-only)
+
+  identity {
+    type = "SystemAssigned"
+  }
+}
+
+# Grant Managed Identity access to Document Intelligence (Cognitive Services User)
+resource "azurerm_role_assignment" "aca_doc_intelligence_user" {
+  count                = var.deploy_document_intelligence ? 1 : 0
+  scope                = azurerm_cognitive_account.doc_intelligence[0].id
+  role_definition_name = "Cognitive Services User"
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
+}
+
+# RBAC Assignments
+resource "azurerm_role_assignment" "aca_storage_contrib" {
+  scope                = azurerm_storage_account.st.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
+}
+
+resource "azurerm_role_assignment" "aca_sb_receiver" {
+  scope                = azurerm_servicebus_namespace.sb.id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
+}
+
+resource "azurerm_role_assignment" "aca_sb_sender" {
+  scope                = azurerm_servicebus_namespace.sb.id
+  role_definition_name = "Azure Service Bus Data Sender"
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
+}
+
+resource "azurerm_role_assignment" "acr_pull" {
+  count                = var.acr_name != "" ? 1 : 0
+  scope                = data.azurerm_container_registry.acr[0].id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
+}
+
+resource "random_uuid" "cosmos_sql_contrib_assignment" {}
+
+
+
+# --- 4. Base de données (Resultats) ---
+resource "azurerm_cosmosdb_account" "db" {
+  name                = "${var.prefix}-cosmos"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  offer_type          = "Standard"
+  kind                = "GlobalDocumentDB"
+
+  tags = local.common_tags
+
+  # Enable public access but restrict via firewall/RBAC
+  public_network_access_enabled = true
+
+  # "0.0.0.0" is the magic IP to "Allow access from Azure Datacenters"
+  # This serves as the firewall exception for Container Apps without VNet injection.
+  # We also append any client IPs provided via variables.
+  # CRITICAL: If running local scripts/debug, your IP must be in `allowed_ip_ranges`.
+  # Otherwise you will get a 403 Forbidden with "Request originated from IP ... through public internet".
+  ip_range_filter = concat(["0.0.0.0"], var.allowed_ip_ranges)
+
+  # Beaucoup de tenants désactivent l'auth locale (clé) par policy.
+  # On aligne le comportement Terraform avec ce mode; vous pouvez forcer cosmos_use_rbac=false uniquement si vous avez le droit d'activer l'auth locale.
+  local_authentication_disabled = var.cosmos_use_rbac
+  capabilities { name = "EnableServerless" }        # Mode économique pour POC
+  capabilities { name = "EnableNoSQLVectorSearch" } # Nécessaire pour vector_cache (quantizedFlat / cosine embeddings)
+  geo_location {
+    location          = var.location
+    failover_priority = 0
+  }
+  consistency_policy { consistency_level = "Session" }
+}
+
+# Strict Custom Role Definition
+# Required for SDK metadata operations + data access without account-wide admin permissions
+resource "azurerm_cosmosdb_sql_role_definition" "app_role" {
+  name                = "${var.prefix}-app-role"
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.db.name
+  type                = "CustomRole"
+  assignable_scopes   = [azurerm_cosmosdb_account.db.id]
+
+  permissions {
+    data_actions = [
+      "Microsoft.DocumentDB/databaseAccounts/readMetadata",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/executeQuery",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/readChangeFeed",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/read",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/upsert",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/create",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/replace",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/delete"
+    ]
+  }
+}
+
+# Assign Custom Role at Account Scope
+resource "azurerm_cosmosdb_sql_role_assignment" "aca_cosmos_sql_contrib" {
+  count               = var.cosmos_use_rbac ? 1 : 0
+  name                = random_uuid.cosmos_sql_contrib_assignment.result
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.db.name
+  principal_id        = azurerm_user_assigned_identity.app_id.principal_id
+  role_definition_id  = azurerm_cosmosdb_sql_role_definition.app_role.id
+  scope               = azurerm_cosmosdb_account.db.id
+}
+
+resource "azurerm_cosmosdb_sql_database" "sql" {
+  # Aligner avec les valeurs par défaut de l'app (main.py)
+  name                = "emailsdb"
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.db.name
+}
+
+# Use AzApi for the emails container to support vectorEmbeddingPolicy + vectorIndexes
+# (azurerm_cosmosdb_sql_container does not expose these properties)
+resource "azapi_resource" "emails_container" {
+  schema_validation_enabled = false
+
+  type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-04-15"
+  name      = "emails"
+  parent_id = azurerm_cosmosdb_sql_database.sql.id
+
+  body = jsonencode({
+    properties = {
+      resource = {
+        id = "emails"
+        partitionKey = {
+          paths = ["/id"]
+          kind  = "Hash"
+        }
+        vectorEmbeddingPolicy = {
+          vectorEmbeddings = [
+            {
+              path             = "/vector"
+              dataType         = "float32"
+              distanceFunction = "cosine"
+              dimensions       = 1536
+            }
+          ]
+        }
+        indexingPolicy = {
+          indexingMode = "consistent"
+          automatic    = true
+          includedPaths = [
+            { path = "/*" }
+          ]
+          excludedPaths = [
+            { path = "/_etag/?" },
+            { path = "/vector/*" },
+            { path = "/markdown/?" },
+            { path = "/processing_log/?" },
+            { path = "/usage/?" },
+            { path = "/classification/raw_response/?" },
+            { path = "/entities/*" },
+            { path = "/vision_analysis/*" },
+            { path = "/comparison_results/*" },
+            { path = "/classification_history/*" },
+            { path = "/preprocessing_metadata/*" },
+            { path = "/search_text/?" },
+            { path = "/chunks/*" }
+          ]
+          compositeIndexes = [
+            [
+              { path = "/status", order = "ascending" },
+              { path = "/_ts", order = "descending" }
+            ],
+            [
+              { path = "/type", order = "ascending" },
+              { path = "/_ts", order = "descending" }
+            ]
+          ]
+          vectorIndexes = [
+            { path = "/vector", type = "quantizedFlat" }
+          ]
+        }
+      }
+    }
+  })
+}
+
+# --- RAG Containers (Chatbot & Cache) ---
+
+resource "azurerm_cosmosdb_sql_container" "chat_history" {
+  name                = "chat_history"
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.db.name
+  database_name       = azurerm_cosmosdb_sql_database.sql.name
+  partition_key_paths = ["/id"]
+  default_ttl         = -1 # Enable TTL but no expiration by default
+
+  indexing_policy {
+    indexing_mode = "consistent"
+
+    included_path {
+      path = "/*"
+    }
+  }
+}
+
+# Use AzApi for Vector Search (Preview feature support)
+resource "azapi_resource" "vector_cache" {
+  # Schema validation disabled: vectorIndexes / vectorEmbeddingPolicy not fully GA yet
+  schema_validation_enabled = false
+
+  type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-04-15"
+  name      = "vector_cache"
+  parent_id = azurerm_cosmosdb_sql_database.sql.id
+
+  body = jsonencode({
+    properties = {
+      resource = {
+        id = "vector_cache"
+        partitionKey = {
+          paths = ["/id"]
+          kind  = "Hash"
+        }
+        vectorEmbeddingPolicy = {
+          vectorEmbeddings = [
+            {
+              path             = "/vector"
+              dataType         = "float32"
+              distanceFunction = "cosine"
+              dimensions       = 1536
+            }
+          ]
+        }
+        indexingPolicy = {
+          indexingMode = "consistent"
+          automatic    = true
+          includedPaths = [
+            { path = "/*" }
+          ]
+          excludedPaths = [
+            { path = "/vector/*" },
+            { path = "/_etag/?" }
+          ]
+          vectorIndexes = [
+            { path = "/vector", type = "quantizedFlat" }
+          ]
+        }
+        defaultTtl = -1
+      }
+    }
+  })
+}
+
+# --- 5. Compute (Container App) ---
+# (Container App Environment defined below with Log Analytics)
+
+# Identité Managée pour l'application
+resource "azurerm_user_assigned_identity" "app_id" {
+  location            = var.location
+  name                = "${var.prefix}-id"
+  resource_group_name = azurerm_resource_group.rg.name
+
+  tags = local.common_tags
+}
+
+# RBAC: Cognitive Services User for app identity
+resource "azurerm_role_assignment" "rbac_ai" {
+  scope                = azapi_resource.ai_foundry.id
+  role_definition_name = "Cognitive Services User"
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
+}
+
+# Output pour la config de l'app
+output "SERVICEBUS_NAMESPACE" { value = azurerm_servicebus_namespace.sb.name }
+output "AI_ENDPOINT" { value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, null) }
+output "LANGUAGE_ENDPOINT" { value = var.deploy_language_service ? azurerm_cognitive_account.language[0].endpoint : null }
+output "LANGUAGE_SERVICE_NAME" { value = var.deploy_language_service ? azurerm_cognitive_account.language[0].name : null }
+output "DOCUMENT_INTELLIGENCE_ENDPOINT" { value = var.deploy_document_intelligence ? azurerm_cognitive_account.doc_intelligence[0].endpoint : null }
+output "DOCUMENT_INTELLIGENCE_NAME" { value = var.deploy_document_intelligence ? azurerm_cognitive_account.doc_intelligence[0].name : null }
+output "APP_ID_CLIENT_ID" { value = azurerm_user_assigned_identity.app_id.client_id }
+
+output "AZURE_SERVICE_BUS_FQDN" { value = "${azurerm_servicebus_namespace.sb.name}.servicebus.windows.net" }
+output "AZURE_SERVICE_BUS_QUEUE" { value = azurerm_servicebus_queue.q.name }
+
+output "AZURE_STORAGE_ACCOUNT_NAME" { value = azurerm_storage_account.st.name }
+output "AZURE_STORAGE_ACCOUNT_URL" { value = azurerm_storage_account.st.primary_blob_endpoint }
+output "AZURE_STORAGE_CONTAINER" { value = azurerm_storage_container.pdf_inputs.name }
+
+output "AZURE_COSMOS_ENDPOINT" { value = azurerm_cosmosdb_account.db.endpoint }
+output "AZURE_COSMOS_DB" { value = azurerm_cosmosdb_sql_database.sql.name }
+output "AZURE_COSMOS_CONTAINER" { value = azapi_resource.emails_container.name }
+
+output "AZURE_COSMOS_KEY" {
+  value     = var.cosmos_use_rbac ? null : azurerm_cosmosdb_account.db.primary_key
+  sensitive = true
+}
+variable "container_image" {
+  type        = string
+  description = "Container image (registry/repo:tag) to deploy to Container Apps (API & worker)."
+  default     = ""
+  validation {
+    condition     = var.container_image != ""
+    error_message = "container_image must be set (e.g., via terraform.tfvars)."
+  }
+}
+
+variable "acr_name" {
+  type        = string
+  description = "Optional: ACR name to grant AcrPull to the managed identity."
+  default     = ""
+}
+
+variable "acr_resource_group" {
+  type        = string
+  description = "Optional: ACR resource group (required if acr_name is set)."
+  default     = ""
+}
+
+variable "allowed_ip_ranges" {
+  type        = list(string)
+  description = "List of public IPs or CIDRs to allow access to Cosmos DB (e.g. your local IP)."
+  default     = []
+}
+
+data "azurerm_container_registry" "acr" {
+  count               = var.acr_name != "" ? 1 : 0
+  name                = var.acr_name
+  resource_group_name = var.acr_resource_group
+}
+
+# --- Container Apps env and apps ---
+resource "azurerm_log_analytics_workspace" "log" {
+  name                = "${var.prefix}-logs"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+
+  tags = local.common_tags
+}
+
+# Workspace-based Application Insights (recommended)
+resource "azurerm_application_insights" "appi" {
+  name                = "${var.prefix}-appi"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.rg.name
+  application_type    = "web"
+  workspace_id        = azurerm_log_analytics_workspace.log.id
+
+  tags = local.common_tags
+}
+
+resource "azurerm_container_app_environment" "env" {
+  name                       = "${var.prefix}-env"
+  location                   = var.location
+  resource_group_name        = azurerm_resource_group.rg.name
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.log.id
+
+  tags = local.common_tags
+}
+
+resource "azurerm_container_app" "api" {
+  name                         = "${var.prefix}-api"
+  resource_group_name          = azurerm_resource_group.rg.name
+  container_app_environment_id = azurerm_container_app_environment.env.id
+  revision_mode                = "Single"
+
+  tags = local.common_tags
+
+  dynamic "registry" {
+    for_each = var.acr_name != "" ? [1] : []
+    content {
+      server   = data.azurerm_container_registry.acr[0].login_server
+      identity = azurerm_user_assigned_identity.app_id.id
+    }
+  }
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.app_id.id]
+  }
+
+  template {
+    container {
+      name   = "api"
+      image  = var.container_image
+      cpu    = 0.5
+      memory = "1Gi"
+
+      env {
+        name  = "PORT"
+        value = "8000"
+      }
+      env {
+        name  = "AZURE_CLIENT_ID"
+        value = azurerm_user_assigned_identity.app_id.client_id
+      }
+      env {
+        name  = "AZURE_SERVICE_BUS_FQDN"
+        value = "${azurerm_servicebus_namespace.sb.name}.servicebus.windows.net"
+      }
+      env {
+        name  = "AZURE_SERVICE_BUS_QUEUE"
+        value = azurerm_servicebus_queue.q.name
+      }
+      env {
+        name  = "AZURE_STORAGE_ACCOUNT_URL"
+        value = azurerm_storage_account.st.primary_blob_endpoint
+      }
+      env {
+        name  = "AZURE_STORAGE_CONTAINER"
+        value = azurerm_storage_container.pdf_inputs.name
+      }
+      env {
+        name  = "AZURE_COSMOS_ENDPOINT"
+        value = azurerm_cosmosdb_account.db.endpoint
+      }
+      env {
+        name  = "AZURE_COSMOS_DB"
+        value = azurerm_cosmosdb_sql_database.sql.name
+      }
+      env {
+        name  = "AZURE_COSMOS_CONTAINER"
+        value = azapi_resource.emails_container.name
+      }
+
+      # AI endpoints (Phi uses AZURE_AI_ENDPOINT fallback if PHI_ENDPOINT isn't set)
+      env {
+        name  = "AZURE_AI_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "PHI_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "PHI_DEPLOYMENT"
+        value = "Phi-4"
+      }
+      env {
+        name  = "MISTRAL_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "MISTRAL_DEPLOYMENT"
+        value = "mistral-document-ai-2512"
+      }
+      env {
+        name  = "MISTRAL_MODE"
+        value = "maas"
+      }
+      env {
+        name  = "AZURE_AI_API_VERSION"
+        value = "2024-08-01-preview"
+      }
+      env {
+        name  = "AZURE_LANGUAGE_ENDPOINT"
+        value = var.deploy_language_service ? azurerm_cognitive_account.language[0].endpoint : ""
+      }
+      env {
+        name  = "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
+        value = var.deploy_document_intelligence ? azurerm_cognitive_account.doc_intelligence[0].endpoint : ""
+      }
+
+      # --- Telemetry: Application Map + Agents View ---
+      # service.name  → cloud role name on Application Map
+      # service.namespace → groups API + Worker under one logical app
+      # AZURE_MONITOR_ENABLE_GENAI_TRACES → enables GenAI tracing
+      #   (Agents View in Application Insights → "Agents (Preview)")
+      env {
+        name  = "OTEL_SERVICE_NAME"
+        value = "classymail-api"
+      }
+      env {
+        name  = "OTEL_RESOURCE_ATTRIBUTES"
+        value = "service.namespace=classymail"
+      }
+      env {
+        name  = "AZURE_MONITOR_ENABLE_GENAI_TRACES"
+        value = "true"
+      }
+      env {
+        name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        value = azurerm_application_insights.appi.connection_string
+      }
+      env {
+        name  = "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED"
+        value = "true"
+      }
+      env {
+        name  = "LOG_ANALYTICS_WORKSPACE_ID"
+        value = azurerm_log_analytics_workspace.log.workspace_id
+      }
+
+      # UI Features (optional overrides)
+      env {
+        name  = "UI_SHOW_INFO_MODAL"
+        value = "true"
+      }
+      env {
+        name  = "UI_SHOW_DEVELOPER_TAB"
+        value = "true"
+      }
+      env {
+        name  = "ORGANIZATION_NAME"
+        value = var.organization_name
+      }
+      env {
+        name  = "MAX_UPLOAD_SIZE"
+        value = "10"
+      }
+
+      # Secondary models (explicitly defined)
+      env {
+        name  = "CHAT_DEPLOYMENT"
+        value = "gpt-5.2-chat"
+      }
+      env {
+        name  = "EMBEDDING_DEPLOYMENT"
+        value = "text-embedding-3-small"
+      }
+      env {
+        name  = "PHI_FALLBACK_DEPLOYMENT"
+        value = "gpt-4o-mini"
+      }
+      env {
+        name  = "ANONYMIZER_DEPLOYMENT"
+        value = "gpt-4o-mini"
+      }
+      env {
+        name  = "VISION_DEPLOYMENT"
+        value = "gpt-4o-mini"
+      }
+
+      liveness_probe {
+        transport     = "HTTP"
+        port          = 8000
+        path          = "/healthz"
+        initial_delay = 3
+      }
+
+      readiness_probe {
+        transport     = "HTTP"
+        port          = 8000
+        path          = "/readyz"
+        initial_delay = 3
+      }
+
+    }
+
+    min_replicas = 1
+    max_replicas = 5
+
+    http_scale_rule {
+      name                = "http"
+      concurrent_requests = 100
+    }
+  }
+
+  ingress {
+    external_enabled = true
+    target_port      = 8000
+    transport        = "auto"
+    traffic_weight {
+      percentage      = 100
+      latest_revision = true
+    }
+  }
+
+  # Ensure RBAC roles are provisioned before first boot; without this the ACA may
+  # start before Azure AD propagates the role assignments, causing 403 errors.
+  depends_on = [
+    azurerm_role_assignment.aca_storage_contrib,
+    azurerm_role_assignment.aca_sb_receiver,
+    azurerm_role_assignment.aca_sb_sender,
+    azurerm_role_assignment.rbac_ai,
+    azurerm_cosmosdb_sql_role_assignment.aca_cosmos_sql_contrib,
+  ]
+
+  lifecycle {
+    ignore_changes = [
+      template[0].container[0].image
+    ]
+  }
+}
+
+resource "azurerm_container_app" "worker" {
+  name                         = "${var.prefix}-worker"
+  resource_group_name          = azurerm_resource_group.rg.name
+  container_app_environment_id = azurerm_container_app_environment.env.id
+  revision_mode                = "Single"
+
+  tags = local.common_tags
+
+  # KEDA azure-servicebus scaler requires a connection string secret
+  # to authenticate and poll queue depth for autoscaling decisions.
+  secret {
+    name  = "sb-connection-string"
+    value = azurerm_servicebus_namespace.sb.default_primary_connection_string
+  }
+
+  dynamic "registry" {
+    for_each = var.acr_name != "" ? [1] : []
+    content {
+      server   = data.azurerm_container_registry.acr[0].login_server
+      identity = azurerm_user_assigned_identity.app_id.id
+    }
+  }
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.app_id.id]
+  }
+
+  template {
+    container {
+      name    = "worker"
+      image   = var.container_image
+      cpu     = 0.5
+      memory  = "1Gi"
+      command = ["python"]
+      args    = ["-m", "classymail.worker_main"]
+
+      env {
+        name  = "ENABLE_WORKER"
+        value = "true"
+      }
+      env {
+        name  = "AZURE_CLIENT_ID"
+        value = azurerm_user_assigned_identity.app_id.client_id
+      }
+      env {
+        name  = "AZURE_SERVICE_BUS_FQDN"
+        value = "${azurerm_servicebus_namespace.sb.name}.servicebus.windows.net"
+      }
+      env {
+        name  = "AZURE_SERVICE_BUS_QUEUE"
+        value = azurerm_servicebus_queue.q.name
+      }
+      env {
+        name  = "AZURE_STORAGE_ACCOUNT_URL"
+        value = azurerm_storage_account.st.primary_blob_endpoint
+      }
+      env {
+        name  = "AZURE_STORAGE_CONTAINER"
+        value = azurerm_storage_container.pdf_inputs.name
+      }
+      env {
+        name  = "AZURE_COSMOS_ENDPOINT"
+        value = azurerm_cosmosdb_account.db.endpoint
+      }
+      env {
+        name  = "AZURE_COSMOS_DB"
+        value = azurerm_cosmosdb_sql_database.sql.name
+      }
+      env {
+        name  = "AZURE_COSMOS_CONTAINER"
+        value = azapi_resource.emails_container.name
+      }
+
+      env {
+        name  = "AZURE_AI_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "PHI_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "PHI_DEPLOYMENT"
+        value = "Phi-4"
+      }
+      env {
+        name  = "MISTRAL_ENDPOINT"
+        value = try(jsondecode(azapi_resource.ai_foundry.output).properties.endpoint, "")
+      }
+      env {
+        name  = "MISTRAL_DEPLOYMENT"
+        value = "mistral-document-ai-2512"
+      }
+      env {
+        name  = "MISTRAL_MODE"
+        value = "maas"
+      }
+      env {
+        name  = "AZURE_AI_API_VERSION"
+        value = "2024-08-01-preview"
+      }
+      env {
+        name  = "AZURE_LANGUAGE_ENDPOINT"
+        value = var.deploy_language_service ? azurerm_cognitive_account.language[0].endpoint : ""
+      }
+      env {
+        name  = "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
+        value = var.deploy_document_intelligence ? azurerm_cognitive_account.doc_intelligence[0].endpoint : ""
+      }
+
+      # --- Telemetry: Application Map + Agents View ---
+      env {
+        name  = "OTEL_SERVICE_NAME"
+        value = "classymail-worker"
+      }
+      env {
+        name  = "OTEL_RESOURCE_ATTRIBUTES"
+        value = "service.namespace=classymail"
+      }
+      env {
+        name  = "AZURE_MONITOR_ENABLE_GENAI_TRACES"
+        value = "true"
+      }
+      env {
+        name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        value = azurerm_application_insights.appi.connection_string
+      }
+      env {
+        name  = "OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED"
+        value = "true"
+      }
+      env {
+        name  = "LOG_ANALYTICS_WORKSPACE_ID"
+        value = azurerm_log_analytics_workspace.log.workspace_id
+      }
+
+      # Secondary models (explicitly defined)
+      env {
+        name  = "CHAT_DEPLOYMENT"
+        value = "gpt-5.2-chat"
+      }
+      env {
+        name  = "EMBEDDING_DEPLOYMENT"
+        value = "text-embedding-3-small"
+      }
+      env {
+        name  = "PHI_FALLBACK_DEPLOYMENT"
+        value = "gpt-4o-mini"
+      }
+      env {
+        name  = "ANONYMIZER_DEPLOYMENT"
+        value = "gpt-4o-mini"
+      }
+      env {
+        name  = "VISION_DEPLOYMENT"
+        value = "gpt-4o-mini"
+      }
+    }
+
+    # min_replicas = 1 (not 0): the KEDA azure-servicebus scaler cannot
+    # authenticate to a Service Bus namespace that has local_auth_enabled=false
+    # because the azurerm provider does not yet support identity-based auth on
+    # custom_scale_rule.  With min_replicas = 0 the worker would never scale up.
+    # TODO: switch back to 0 once azurerm supports `identity` on custom_scale_rule.
+    min_replicas = 1
+    max_replicas = 10
+
+    custom_scale_rule {
+      name             = "sb-queue"
+      custom_rule_type = "azure-servicebus"
+      metadata = {
+        queueName    = azurerm_servicebus_queue.q.name
+        namespace    = "${azurerm_servicebus_namespace.sb.name}.servicebus.windows.net"
+        messageCount = "5"
+      }
+      authentication {
+        secret_name       = "sb-connection-string"
+        trigger_parameter = "connection"
+      }
+    }
+  }
+
+  # Ensure RBAC roles are provisioned before first boot.
+  depends_on = [
+    azurerm_role_assignment.aca_storage_contrib,
+    azurerm_role_assignment.aca_sb_receiver,
+    azurerm_role_assignment.aca_sb_sender,
+    azurerm_role_assignment.rbac_ai,
+    azurerm_cosmosdb_sql_role_assignment.aca_cosmos_sql_contrib,
+  ]
+
+  lifecycle {
+    ignore_changes = [
+      template[0].container[0].image
+    ]
+  }
+}
+
+# ──────────────────────────────────────────────────────────────────────
+# 6. CI/CD Identity — GitHub Actions OIDC (Workload Identity Federation)
+#
+# Uses a User Assigned Managed Identity + Federated Credential instead
+# of an App Registration.  This keeps everything in the azurerm provider
+# (no azuread provider needed) and avoids long-lived secrets.
+#
+# Enable by setting  github_repo = "owner/repo"  in terraform.tfvars.
+# ──────────────────────────────────────────────────────────────────────
+
+variable "github_repo" {
+  type        = string
+  description = "GitHub repository in 'owner/repo' format for OIDC Workload Identity Federation. Leave empty to skip CI/CD identity creation."
+  default     = ""
+}
+
+variable "github_environment" {
+  type        = string
+  description = "GitHub environment name for OIDC subject claim (e.g. 'production'). Leave empty to use branch-based federation only."
+  default     = ""
+}
+
+# CI/CD Managed Identity (separate from the app runtime identity)
+resource "azurerm_user_assigned_identity" "cicd_id" {
+  count               = var.github_repo != "" ? 1 : 0
+  location            = var.location
+  name                = "${var.prefix}-cicd-id"
+  resource_group_name = azurerm_resource_group.rg.name
+
+  tags = local.common_tags
+}
+
+# Federated credential: main branch pushes
+resource "azurerm_federated_identity_credential" "github_main" {
+  count               = var.github_repo != "" ? 1 : 0
+  name                = "github-main"
+  resource_group_name = azurerm_resource_group.rg.name
+  parent_id           = azurerm_user_assigned_identity.cicd_id[0].id
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = "https://token.actions.githubusercontent.com"
+  subject             = "repo:${var.github_repo}:ref:refs/heads/main"
+}
+
+# Federated credential: GitHub environment (optional, for environment-gated deployments)
+resource "azurerm_federated_identity_credential" "github_environment" {
+  count               = var.github_repo != "" && var.github_environment != "" ? 1 : 0
+  name                = "github-env-${var.github_environment}"
+  resource_group_name = azurerm_resource_group.rg.name
+  parent_id           = azurerm_user_assigned_identity.cicd_id[0].id
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = "https://token.actions.githubusercontent.com"
+  subject             = "repo:${var.github_repo}:environment:${var.github_environment}"
+}
+
+# RBAC: Contributor on RG (manage Container Apps, read identities, Cosmos firewall, etc.)
+resource "azurerm_role_assignment" "cicd_rg_contributor" {
+  count                = var.github_repo != "" ? 1 : 0
+  scope                = azurerm_resource_group.rg.id
+  role_definition_name = "Contributor"
+  principal_id         = azurerm_user_assigned_identity.cicd_id[0].principal_id
+}
+
+# RBAC: AcrPush on ACR (push + pull images)
+resource "azurerm_role_assignment" "cicd_acr_push" {
+  count                = var.github_repo != "" && var.acr_name != "" ? 1 : 0
+  scope                = data.azurerm_container_registry.acr[0].id
+  role_definition_name = "AcrPush"
+  principal_id         = azurerm_user_assigned_identity.cicd_id[0].principal_id
+}
+
+output "CICD_CLIENT_ID" {
+  value       = var.github_repo != "" ? azurerm_user_assigned_identity.cicd_id[0].client_id : null
+  description = "Client ID for GitHub Actions OIDC auth (set as AZURE_CLIENT_ID secret in GitHub)"
+}
+
+output "CICD_TENANT_ID" {
+  value       = var.github_repo != "" ? azurerm_user_assigned_identity.cicd_id[0].tenant_id : null
+  description = "Tenant ID for GitHub Actions OIDC auth (set as AZURE_TENANT_ID secret in GitHub)"
+}
