@@ -29,6 +29,27 @@ async def get_organization():
     return {"name": config.ORGANIZATION_NAME}
 
 
+@router.get("/settings/agentic-prompt")
+async def get_agentic_prompt():
+    """Return the orchestrator system prompt (read-only preview for the UI)."""
+    from classymail.agents.orchestrator import _build_orchestrator_prompt
+    from classymail.services.settings_store import get_categories_prompt_text
+    from classymail.agents.config import get_agentic_settings
+
+    settings = load_settings()
+    agentic = get_agentic_settings(settings)
+    categories_text = get_categories_prompt_text()
+    max_agents = agentic.get("max_parallel_agents", 6)
+
+    prompt = _build_orchestrator_prompt(categories_text, max_agents, "en")
+    return {
+        "prompt": prompt,
+        "model": agentic.get("orchestrator_model", "gpt-4.1-nano"),
+        "max_agents": max_agents,
+        "categories_count": len(settings.get("categories", [])),
+    }
+
+
 
 @router.post("/settings")
 async def set_settings(payload: dict, clients: Clients = Depends(get_clients)):

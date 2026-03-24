@@ -210,6 +210,30 @@ const toggleCategoryIndex = (slug, enabled) => {
   settings.value.agentic.enabled_indexes[slug] = enabled
 }
 
+// Orchestrator prompt preview (read-only)
+const showOrchestratorPrompt = ref(false)
+const orchestratorPromptData = ref(null)
+const loadingOrchestratorPrompt = ref(false)
+
+const loadOrchestratorPrompt = async () => {
+  if (orchestratorPromptData.value) {
+    showOrchestratorPrompt.value = !showOrchestratorPrompt.value
+    return
+  }
+  loadingOrchestratorPrompt.value = true
+  try {
+    const res = await fetch('/api/settings/agentic-prompt')
+    if (res.ok) {
+      orchestratorPromptData.value = await res.json()
+      showOrchestratorPrompt.value = true
+    }
+  } catch (e) {
+    console.warn('Failed to load orchestrator prompt:', e)
+  } finally {
+    loadingOrchestratorPrompt.value = false
+  }
+}
+
 // Auto-populate enabled_indexes from categories when agentic is first activated
 const ensureIndexToggles = () => {
   if (!settings.value.agentic.enabled_indexes) {
@@ -1134,6 +1158,28 @@ onMounted(() => {
             <AdjustmentsHorizontalIcon class="h-5 w-5 text-purple-500" />
             Agentic Pipeline Configuration
           </h4>
+
+          <!-- Orchestrator System Prompt Preview (read-only) -->
+          <div class="mb-4">
+            <button @click="loadOrchestratorPrompt"
+              class="flex items-center gap-2 text-xs font-medium text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-200 transition-colors">
+              <CommandLineIcon class="h-4 w-4" />
+              <span v-if="loadingOrchestratorPrompt">Loading prompt...</span>
+              <span v-else>{{ showOrchestratorPrompt ? 'Hide' : 'View' }} Orchestrator System Prompt</span>
+              <span class="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded">read-only</span>
+            </button>
+            <div v-if="showOrchestratorPrompt && orchestratorPromptData" class="mt-2">
+              <div class="flex items-center gap-3 mb-2 text-[10px] text-gray-500 dark:text-gray-400">
+                <span>Model: <code class="bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-1 rounded">{{ orchestratorPromptData.model }}</code></span>
+                <span>Max agents: <strong>{{ orchestratorPromptData.max_agents }}</strong></span>
+                <span>Categories: <strong>{{ orchestratorPromptData.categories_count }}</strong></span>
+              </div>
+              <pre class="text-[11px] leading-relaxed text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap font-mono">{{ orchestratorPromptData.prompt }}</pre>
+              <p class="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500 italic">
+                This prompt is generated automatically from your configured categories. It instructs the orchestrator to identify the top candidate intents before dispatching specialized agents in parallel.
+              </p>
+            </div>
+          </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <!-- Orchestrator Model -->
