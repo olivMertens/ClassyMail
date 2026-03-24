@@ -11,21 +11,19 @@ from __future__ import annotations
 import json
 import logging
 import time
-from pathlib import Path
 
 import httpx
 from opentelemetry import trace
 
 from classymail.agents.config import get_agentic_settings, resolve_agent_endpoint
 from classymail.agents.models import RedTeamVerdict, SpecializedAgentResult
+from classymail.agents.orchestrator import _load_prompt_template
 from classymail.core.llm_compat import build_chat_params, extract_message_content
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.settings_store import get_categories_prompt_text
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
-
-_PROMPT_DIR = Path(__file__).parent / "prompts"
 
 
 def needs_red_team(
@@ -62,7 +60,7 @@ def _build_red_team_prompt(
     locale: str,
 ) -> str:
     lang = {"fr": "French", "en": "English", "de": "German", "es": "Spanish", "it": "Italian"}.get(locale, "English")
-    template = (_PROMPT_DIR / "red_team.md").read_text(encoding="utf-8")
+    template = _load_prompt_template("red_team")
     return template.format(
         agent_summaries=agent_summaries,
         categories_text=categories_text,

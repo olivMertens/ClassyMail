@@ -14,21 +14,19 @@ from __future__ import annotations
 import json
 import logging
 import time
-from pathlib import Path
 
 import httpx
 from opentelemetry import trace
 
 from classymail.agents.config import get_agentic_settings, resolve_agent_endpoint
 from classymail.agents.models import CandidateIntent, RAGGroundingRef, SpecializedAgentResult
+from classymail.agents.orchestrator import _load_prompt_template
 from classymail.agents.tools.ai_search_tool import search_intent_index
 from classymail.core.llm_compat import build_chat_params, extract_message_content
 from classymail.services.azure_clients import auth_headers, Clients
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
-
-_PROMPT_DIR = Path(__file__).parent / "prompts"
 
 # ── Tool definition factory for per-intent AI Search ─────────────────
 
@@ -106,7 +104,7 @@ Call this tool with key phrases from the email before making your final decision
     if not intent_exclusions:
         intent_exclusions = "(none)"
 
-    template = (_PROMPT_DIR / "specialized.md").read_text(encoding="utf-8")
+    template = _load_prompt_template("specialized")
     return template.format(
         intent_name=intent_name,
         intent_description=intent_description,

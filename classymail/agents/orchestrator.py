@@ -25,11 +25,105 @@ tracer = trace.get_tracer(__name__)
 
 _PROMPT_DIR = Path(__file__).parent / "prompts"
 
+# Fallback prompt if .md file fails to load (Docker layer missing, permissions, etc.)
+_FALLBACK_ORCHESTRATOR = """You are a fast email routing assistant. Your ONLY job is to identify the most likely intent categories for an incoming email.
+
+AVAILABLE INTENTS:
+{categories_text}
+
+RULES:
+- Select the TOP {max_agents} most probable intents (fewer is fine if obvious).
+- Return a JSON array of objects with "intent" (category name), "slug" (technical id), "confidence" (0.0-1.0).
+- Confidence reflects how likely the email matches that intent based on keywords, tone and context.
+- Do NOT classify — only route. Keep your analysis fast and shallow.
+- If the email is clearly simple, select fewer intents.
+
+OUTPUT FORMAT (JSON only, no markdown):
+{{
+  "candidate_intents": [
+    {{"intent": "Category Name", "slug": "category-slug", "confidence": 0.85}}
+  ],
+  "routing_rationale": "Brief explanation of routing decision"
+}}
+
+LANGUAGE: Respond in {lang}."""
+
+
+_FALLBACK_SPECIALIZED = """You are a specialized classification agent for the intent: "{intent_name}".
+
+INTENT DEFINITION:
+{intent_description}
+
+EXCLUSIONS (this intent must NOT include):
+{intent_exclusions}
+{tool_instruction}
+
+YOUR TASK:
+1. Analyze the email content below.
+2. If a search tool is available, call it with key phrases to find reference examples.
+3. Determine if the email matches the intent "{intent_name}" based on the definition and any reference examples.
+4. Assign a confidence score (0.0-1.0).
+5. Provide a brief explanation citing evidence from the email.
+
+OUTPUT FORMAT (JSON only, no markdown):
+{{
+  "intent": "{intent_name}",
+  "is_match": true,
+  "confidence": 0.91,
+  "explanation": "Brief evidence from the email text"
+}}
+
+If the email does NOT match this intent, set is_match=false and confidence < 0.3.
+
+LANGUAGE: Respond in {lang}."""
+
+
+_FALLBACK_RED_TEAM = """You are a Quality Gate / Red Team reviewer for email classification.
+
+AGENT RESULTS:
+{agent_summaries}
+
+ALL AVAILABLE INTENTS:
+{categories_text}
+
+YOUR TASK:
+1. Review the specialized agent results above.
+2. Check if any important intent was MISSED by the orchestrator.
+3. Verify that confidence scores are reasonable.
+4. If agents conflict, determine which classification is more likely correct.
+
+OUTPUT FORMAT (JSON only, no markdown):
+{{
+  "validated": true,
+  "missed_intents": [],
+  "refined_confidences": {{}},
+  "justification": "Brief explanation of your review",
+  "additional_agents_requested": []
+}}
+
+RULES:
+- Set validated=true if the results look correct.
+- Set validated=false if you found issues.
+- missed_intents: list of intent slugs that should have been tested.
+- refined_confidences: dict mapping intent slug to revised confidence (only if you disagree).
+- additional_agents_requested: slugs of agents that should run to improve accuracy.
+
+LANGUAGE: Respond in {lang}."""
+
 
 def _load_prompt_template(name: str) -> str:
-    """Load a prompt template from the prompts/ directory."""
+    """Load a prompt template from the prompts/ directory with inline fallback."""
     path = _PROMPT_DIR / f"{name}.md"
-    return path.read_text(encoding="utf-8")
+    try:
+        return path.read_text(encoding="utf-8")
+    except Exception:
+        logger.warning("Failed to load prompt template %s, using fallback", path)
+        fallbacks = {
+            "orchestrator": _FALLBACK_ORCHESTRATOR,
+            "specialized": _FALLBACK_SPECIALIZED,
+            "red_team": _FALLBACK_RED_TEAM,
+        }
+        return fallbacks.get(name, "You are a helpful assistant. Respond in {lang}.")
 
 
 def _build_orchestrator_prompt(categories_text: str, max_agents: int, locale: str) -> str:

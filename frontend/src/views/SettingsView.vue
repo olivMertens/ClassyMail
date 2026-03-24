@@ -1188,7 +1188,9 @@ onMounted(() => {
               </div>
               <pre class="text-[11px] leading-relaxed text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap font-mono">{{ orchestratorPromptData[activePromptTab]?.prompt || '' }}</pre>
               <p class="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500 italic flex items-center gap-1">
-                📁 {{ orchestratorPromptData[activePromptTab]?.template_file || '' }}
+                <span v-if="orchestratorPromptData[activePromptTab]?.source === 'file'" class="text-green-500">📁</span>
+                <span v-else class="text-amber-500">⚠️ fallback</span>
+                {{ orchestratorPromptData[activePromptTab]?.template_file || '' }}
                 <span v-if="activePromptTab === 'orchestrator'">— Categories are injected at runtime from your configured categories.</span>
                 <span v-else-if="activePromptTab === 'specialized'">— Template: variables like intent_name, intent_description are resolved per category agent.</span>
                 <span v-else>— Red Team receives the agent results and all available intents for review.</span>
