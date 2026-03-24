@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, ExclamationCircleIcon, ShieldExclamationIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
+import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, ExclamationCircleIcon, ShieldExclamationIcon, ChatBubbleLeftRightIcon, ChevronDownIcon, ChevronUpIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
 import { useDialog } from '../composables/useDialog'
 import { useI18n } from 'vue-i18n'
@@ -187,9 +187,26 @@ const strategyBadge = (strategy) => {
     standard: { icon: '📄', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600' },
     reasoning: { icon: '🧠', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200 dark:border-purple-700' },
     vision: { icon: '👁', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300 border-teal-200 dark:border-teal-700' },
+    agentic: { icon: '🤖', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200 dark:border-purple-700' },
   }
   return map[strategy] || map.standard
 }
+
+// Agentic pipeline trace data (from classification.raw_response)
+const agenticData = computed(() => {
+  const raw = email.value?.classification?.raw_response
+  if (!raw?.agentic) return null
+  return {
+    traces: raw.agent_traces || [],
+    redTeam: raw.red_team || null,
+    parallelMs: raw.parallel_latency_ms,
+    totalTokens: raw.usage?.total_tokens || 0,
+    orchestrator: (raw.agent_traces || []).find(t => t.agent_type === 'orchestrator'),
+    agents: (raw.agent_traces || []).filter(t => t.agent_type === 'specialized'),
+    redTeamTrace: (raw.agent_traces || []).find(t => t.agent_type === 'red_team'),
+  }
+})
+const showAgenticTrace = ref(false)
 
 const ocrProviderBadge = (provider) => {
   if (!provider || provider === 'mistral_ocr') return null
@@ -752,6 +769,140 @@ watch(() => email.value, (val) => {
                     </div>
                   </div>
 
+                  <!-- Agentic Pipeline Trace (visible only for strategy=agentic) -->
+                  <div v-if="agenticData" class="mt-1">
+                    <button @click="showAgenticTrace = !showAgenticTrace"
+                      class="flex items-center gap-2 text-sm font-medium text-purple-700 dark:text-purple-400 hover:text-purple-900 dark:hover:text-purple-200 transition-colors w-full">
+                      <span class="text-base">🤖</span>
+                      Agentic Pipeline Trace
+                      <span class="text-[10px] bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 px-1.5 py-0.5 rounded-full">
+                        {{ agenticData.agents.length }} agents
+                        <span v-if="agenticData.redTeam">+ Red Team</span>
+                      </span>
+                      <ChevronDownIcon v-if="!showAgenticTrace" class="h-4 w-4 ml-auto" />
+                      <ChevronUpIcon v-else class="h-4 w-4 ml-auto" />
+                    </button>
+
+                    <div v-if="showAgenticTrace" class="mt-3 space-y-3">
+                      <!-- Visual Flow -->
+                      <div class="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 overflow-x-auto pb-1">
+                        <span class="inline-flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
+                          🎯 Orchestrator
+                        </span>
+                        <span class="text-gray-400">→</span>
+                        <template v-for="(agent, idx) in agenticData.agents" :key="agent.intent">
+                          <span v-if="idx > 0" class="text-gray-400">·</span>
+                          <span
+                            class="inline-flex items-center gap-1 px-2 py-1 rounded-full whitespace-nowrap font-medium"
+                            :class="agent.confidence >= 0.7 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
+                                    agent.confidence >= 0.4 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                    'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'">
+                            {{ agent.confidence >= 0.7 ? '✅' : agent.confidence >= 0.4 ? '⚠️' : '❌' }}
+                            {{ agent.intent }}
+                            <span class="opacity-60">{{ Math.round((agent.confidence || 0) * 100) }}%</span>
+                          </span>
+                        </template>
+                        <template v-if="agenticData.redTeamTrace">
+                          <span class="text-gray-400">→</span>
+                          <span class="inline-flex items-center gap-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
+                            🛡️ Red Team
+                          </span>
+                        </template>
+                        <span class="text-gray-400">→</span>
+                        <span class="inline-flex items-center gap-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
+                          📊 Result
+                        </span>
+                      </div>
+
+                      <!-- Orchestrator Card -->
+                      <div v-if="agenticData.orchestrator"
+                        class="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10 p-3">
+                        <div class="flex items-center justify-between mb-2">
+                          <h5 class="text-xs font-semibold text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                            🎯 Orchestrator (Router)
+                          </h5>
+                          <div class="flex items-center gap-2 text-[10px] text-gray-500">
+                            <code class="bg-blue-100 dark:bg-blue-900/40 px-1 rounded">{{ agenticData.orchestrator.model }}</code>
+                            <span v-if="agenticData.orchestrator.routed_model" class="text-blue-500">
+                              → {{ agenticData.orchestrator.routed_model }}
+                            </span>
+                            <span>{{ agenticData.orchestrator.latency_ms?.toFixed(0) }}ms</span>
+                          </div>
+                        </div>
+                        <p class="text-[11px] text-gray-600 dark:text-gray-400">
+                          Selected {{ agenticData.agents.length }} candidate intents for parallel evaluation.
+                          <span v-if="agenticData.orchestrator.tokens">
+                            ({{ agenticData.orchestrator.tokens.total_tokens || 0 }} tokens)
+                          </span>
+                        </p>
+                      </div>
+
+                      <!-- Specialized Agent Cards -->
+                      <div class="grid grid-cols-1 gap-2">
+                        <div v-for="agent in agenticData.agents" :key="agent.intent"
+                          class="rounded-lg border p-3 transition-colors"
+                          :class="agent.confidence >= 0.7
+                            ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10'
+                            : agent.confidence >= 0.4
+                              ? 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10'
+                              : 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 opacity-60'">
+                          <div class="flex items-center justify-between mb-1">
+                            <h5 class="text-xs font-semibold flex items-center gap-1.5"
+                              :class="agent.confidence >= 0.7 ? 'text-green-800 dark:text-green-300' :
+                                      agent.confidence >= 0.4 ? 'text-amber-800 dark:text-amber-300' :
+                                      'text-gray-500 dark:text-gray-400'">
+                              {{ agent.confidence >= 0.7 ? '✅' : agent.confidence >= 0.4 ? '⚠️' : '❌' }}
+                              {{ agent.intent }}
+                              <span class="font-bold">{{ Math.round((agent.confidence || 0) * 100) }}%</span>
+                            </h5>
+                            <div class="flex items-center gap-2 text-[10px] text-gray-500">
+                              <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">{{ agent.model }}</code>
+                              <span>{{ agent.latency_ms?.toFixed(0) }}ms</span>
+                              <span v-if="agent.rag_hits" class="text-purple-500">📚 {{ agent.rag_hits }} refs</span>
+                            </div>
+                          </div>
+                          <div v-if="agent.search_index" class="text-[10px] text-purple-500 dark:text-purple-400">
+                            🔍 {{ agent.search_index }} ({{ agent.retrieval_mode }})
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Red Team Card -->
+                      <div v-if="agenticData.redTeam"
+                        class="rounded-lg border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10 p-3">
+                        <div class="flex items-center justify-between mb-2">
+                          <h5 class="text-xs font-semibold text-red-800 dark:text-red-300 flex items-center gap-1.5">
+                            🛡️ Red Team / Quality Gate
+                            <span :class="agenticData.redTeam.validated ? 'text-green-600' : 'text-red-600'" class="text-[10px]">
+                              {{ agenticData.redTeam.validated ? '✓ Validated' : '✗ Issues Found' }}
+                            </span>
+                          </h5>
+                          <div class="flex items-center gap-2 text-[10px] text-gray-500">
+                            <code class="bg-red-100 dark:bg-red-900/40 px-1 rounded">{{ agenticData.redTeam.model }}</code>
+                            <span>{{ agenticData.redTeam.latency_ms?.toFixed(0) }}ms</span>
+                          </div>
+                        </div>
+                        <p v-if="agenticData.redTeam.justification"
+                          class="text-[11px] text-gray-600 dark:text-gray-400 italic">
+                          "{{ agenticData.redTeam.justification }}"
+                        </p>
+                        <div v-if="agenticData.redTeam.missed_intents?.length"
+                          class="mt-1 text-[10px] text-red-600 dark:text-red-400">
+                          ⚠ Missed intents: {{ agenticData.redTeam.missed_intents.join(', ') }}
+                        </div>
+                      </div>
+
+                      <!-- Summary Stats -->
+                      <div class="flex items-center gap-4 text-[10px] text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-200 dark:border-gray-700">
+                        <span>⏱ Parallel: {{ agenticData.parallelMs?.toFixed(0) }}ms</span>
+                        <span>🔢 Total: {{ agenticData.totalTokens }} tokens</span>
+                        <span>🤖 {{ agenticData.agents.length }} agents</span>
+                        <span v-if="agenticData.redTeamTrace" class="text-red-500">🛡️ Red Team triggered</span>
+                        <span v-else class="text-green-500">✓ Red Team skipped</span>
+                      </div>
+                    </div>
+                  </div>
+
                   <!-- Reason -->
                   <div>
                     <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Raison /
@@ -866,7 +1017,7 @@ watch(() => email.value, (val) => {
           <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ t('dashboard.reprocess.select_strategy') }}
           </p>
-          <label v-for="s in ['standard', 'reasoning', 'vision']" :key="s"
+          <label v-for="s in ['standard', 'reasoning', 'vision', 'agentic']" :key="s"
             class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all"
             :class="reprocessStrategy === s
               ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-400'

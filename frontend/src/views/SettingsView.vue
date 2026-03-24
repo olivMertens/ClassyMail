@@ -265,6 +265,10 @@ const addNewCategory = () => {
   if (name && slug) {
     if (!settings.value.categories) settings.value.categories = []
     settings.value.categories.push({ name, slug, description: desc, exclusions: excl })
+    // Auto-enable AI Search index for new category
+    if (settings.value.agentic?.enabled_indexes) {
+      settings.value.agentic.enabled_indexes[slug] = true
+    }
     newCategory.value = { name: '', slug: '', description: '', exclusions: '' }
     newCategoryExpanded.value = false
     saveSettings()
@@ -273,7 +277,12 @@ const addNewCategory = () => {
 
 const removeCategory = async (index) => {
   if (await confirm(t('settings.categories.form.remove_confirm'))) {
+    // Remove AI Search index toggle for deleted category
+    const removedSlug = settings.value.categories[index]?.slug
     settings.value.categories.splice(index, 1)
+    if (removedSlug && settings.value.agentic?.enabled_indexes) {
+      delete settings.value.agentic.enabled_indexes[removedSlug]
+    }
     expandedCategories.value.delete(index)
     categoryAssessments.value.delete(index)
     saveSettings()
@@ -968,8 +977,62 @@ onMounted(() => {
           {{ t('settings.processing.desc') }}
         </p>
 
-        <!-- Section: AI Model Selection -->
+        <!-- Section: Processing Strategy (FIRST — determines what's shown below) -->
         <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 mb-6 bg-gray-50/50 dark:bg-gray-900/20">
+          <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+            <AdjustmentsHorizontalIcon class="h-5 w-5 text-purple-500" />
+            {{ t('settings.processing.title') }}
+            <button class="text-gray-400 hover:text-primary-500 transition-colors" title="How these strategies work"
+              @click="showStrategyHelp = true">
+              <QuestionMarkCircleIcon class="h-5 w-5" />
+            </button>
+          </h4>
+          <div class="space-y-4">
+            <div class="flex items-center">
+              <input id="strategy-standard" v-model="settings.processing_strategy" name="processing_strategy"
+                type="radio" value="standard"
+                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
+              <label for="strategy-standard"
+                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
+                {{ t('settings.processing.strategy.standard') }}
+              </label>
+            </div>
+            <div class="flex items-center">
+              <input id="strategy-reasoning" v-model="settings.processing_strategy" name="processing_strategy"
+                type="radio" value="reasoning"
+                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
+              <label for="strategy-reasoning"
+                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
+                {{ t('settings.processing.strategy.reasoning') }}
+              </label>
+            </div>
+            <div class="flex items-center">
+              <input id="strategy-vision" v-model="settings.processing_strategy" name="processing_strategy" type="radio"
+                value="vision"
+                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
+              <label for="strategy-vision"
+                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
+                {{ t('settings.processing.strategy.vision') }}
+              </label>
+            </div>
+            <div class="flex items-center">
+              <input id="strategy-agentic" v-model="settings.processing_strategy" name="processing_strategy" type="radio"
+                value="agentic"
+                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
+              <label for="strategy-agentic"
+                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
+                Agentic (Multi-Agent)
+              </label>
+            </div>
+            <p v-if="settings.processing_strategy === 'agentic'"
+              class="mt-2 text-xs text-purple-600 dark:text-purple-400">
+              Orchestrator selects top intents, specialized agents classify in parallel, optional Red Team quality gate.
+            </p>
+          </div>
+        </div>
+
+        <!-- Section: AI Model Selection (hidden when Agentic — replaced by orchestrator model) -->
+        <div v-if="settings.processing_strategy !== 'agentic'" class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 mb-6 bg-gray-50/50 dark:bg-gray-900/20">
           <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
             <CpuChipIcon class="h-5 w-5 text-blue-500" />
             {{ t('settings.processing.model_select') }}
@@ -1061,59 +1124,7 @@ onMounted(() => {
               </div>
             </div>
           </div>
-        </div> <!-- Section: Processing Strategy -->
-        <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 mb-6 bg-gray-50/50 dark:bg-gray-900/20">
-          <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
-            <AdjustmentsHorizontalIcon class="h-5 w-5 text-purple-500" />
-            {{ t('settings.processing.title') }}
-            <button class="text-gray-400 hover:text-primary-500 transition-colors" title="How these strategies work"
-              @click="showStrategyHelp = true">
-              <QuestionMarkCircleIcon class="h-5 w-5" />
-            </button>
-          </h4>
-          <div class="space-y-4">
-            <div class="flex items-center">
-              <input id="strategy-standard" v-model="settings.processing_strategy" name="processing_strategy"
-                type="radio" value="standard"
-                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
-              <label for="strategy-standard"
-                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
-                {{ t('settings.processing.strategy.standard') }}
-              </label>
-            </div>
-            <div class="flex items-center">
-              <input id="strategy-reasoning" v-model="settings.processing_strategy" name="processing_strategy"
-                type="radio" value="reasoning"
-                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
-              <label for="strategy-reasoning"
-                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
-                {{ t('settings.processing.strategy.reasoning') }}
-              </label>
-            </div>
-            <div class="flex items-center">
-              <input id="strategy-vision" v-model="settings.processing_strategy" name="processing_strategy" type="radio"
-                value="vision"
-                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
-              <label for="strategy-vision"
-                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
-                {{ t('settings.processing.strategy.vision') }}
-              </label>
-            </div>
-            <div class="flex items-center">
-              <input id="strategy-agentic" v-model="settings.processing_strategy" name="processing_strategy"
-                type="radio" value="agentic"
-                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
-              <label for="strategy-agentic"
-                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
-                Agentic (Multi-Agent)
-              </label>
-            </div>
-            <p v-if="settings.processing_strategy === 'agentic'"
-              class="mt-2 text-xs text-purple-600 dark:text-purple-400">
-              Orchestrator selects top intents, specialized agents classify in parallel, optional Red Team quality gate.
-            </p>
-          </div>
-        </div>
+        </div> <!-- End AI Model Section -->
 
         <!-- Section: Agentic Configuration (visible only when agentic strategy selected) -->
         <div v-if="settings.processing_strategy === 'agentic'"
@@ -1153,8 +1164,15 @@ onMounted(() => {
 
             <!-- Agent Tier 1 -->
             <div>
-              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Tier 1
-                (Simple)</label>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                Agent Tier 1 (Simple)
+                <span class="relative group">
+                  <InformationCircleIcon class="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                  <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                    Orchestrator confidence &gt; 80%. Clear emails — cheap model is enough.
+                  </span>
+                </span>
+              </label>
               <select v-model="settings.agentic.agent_tier1_model"
                 class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
                 <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
@@ -1163,8 +1181,15 @@ onMounted(() => {
 
             <!-- Agent Tier 2 -->
             <div>
-              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Tier 2
-                (Ambiguous)</label>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                Agent Tier 2 (Ambiguous)
+                <span class="relative group">
+                  <InformationCircleIcon class="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                  <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                    Orchestrator confidence 50-80%. Subtle signals — a more capable model resolves ambiguity.
+                  </span>
+                </span>
+              </label>
               <select v-model="settings.agentic.agent_tier2_model"
                 class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
                 <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
@@ -1173,8 +1198,15 @@ onMounted(() => {
 
             <!-- Agent Tier 3 -->
             <div>
-              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Tier 3
-                (Critical)</label>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                Agent Tier 3 (Critical)
+                <span class="relative group">
+                  <InformationCircleIcon class="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                  <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                    Orchestrator confidence &lt; 50%. Complex or business-critical — most robust model for accuracy.
+                  </span>
+                </span>
+              </label>
               <select v-model="settings.agentic.agent_tier3_model"
                 class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
                 <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
