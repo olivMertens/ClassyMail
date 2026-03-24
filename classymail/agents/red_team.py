@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from pathlib import Path
 
 import httpx
 from opentelemetry import trace
@@ -23,6 +24,8 @@ from classymail.services.settings_store import get_categories_prompt_text
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
+
+_PROMPT_DIR = Path(__file__).parent / "prompts"
 
 
 def needs_red_team(
@@ -59,37 +62,12 @@ def _build_red_team_prompt(
     locale: str,
 ) -> str:
     lang = {"fr": "French", "en": "English", "de": "German", "es": "Spanish", "it": "Italian"}.get(locale, "English")
-    return f"""You are a Quality Gate / Red Team reviewer for email classification.
-
-AGENT RESULTS:
-{agent_summaries}
-
-ALL AVAILABLE INTENTS:
-{categories_text}
-
-YOUR TASK:
-1. Review the specialized agent results above.
-2. Check if any important intent was MISSED by the orchestrator.
-3. Verify that confidence scores are reasonable.
-4. If agents conflict, determine which classification is more likely correct.
-
-OUTPUT FORMAT (JSON only, no markdown):
-{{
-  "validated": true,
-  "missed_intents": [],
-  "refined_confidences": {{}},
-  "justification": "Brief explanation of your review",
-  "additional_agents_requested": []
-}}
-
-RULES:
-- Set validated=true if the results look correct.
-- Set validated=false if you found issues.
-- missed_intents: list of intent slugs that should have been tested.
-- refined_confidences: dict mapping intent slug to revised confidence (only if you disagree).
-- additional_agents_requested: slugs of agents that should run to improve accuracy.
-
-LANGUAGE: Respond in {lang}."""
+    template = (_PROMPT_DIR / "red_team.md").read_text(encoding="utf-8")
+    return template.format(
+        agent_summaries=agent_summaries,
+        categories_text=categories_text,
+        lang=lang,
+    )
 
 
 async def run_red_team(

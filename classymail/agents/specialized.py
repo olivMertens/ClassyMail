@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from pathlib import Path
 
 import httpx
 from opentelemetry import trace
@@ -26,6 +27,8 @@ from classymail.services.azure_clients import auth_headers, Clients
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
+
+_PROMPT_DIR = Path(__file__).parent / "prompts"
 
 # ── Tool definition factory for per-intent AI Search ─────────────────
 
@@ -100,33 +103,17 @@ This index contains previously classified emails. Use this tool to:
 - Weigh [human_verified] and [human_reinforced] sources more heavily than [llm_classified]
 Call this tool with key phrases from the email before making your final decision."""
 
-    return f"""You are a specialized classification agent for the intent: "{intent_name}".
+    if not intent_exclusions:
+        intent_exclusions = "(none)"
 
-INTENT DEFINITION:
-{intent_description}
-
-EXCLUSIONS (this intent must NOT include):
-{intent_exclusions if intent_exclusions else "(none)"}
-{tool_instruction}
-
-YOUR TASK:
-1. Analyze the email content below.
-2. If a search tool is available, call it with key phrases to find reference examples.
-3. Determine if the email matches the intent "{intent_name}" based on the definition and any reference examples.
-4. Assign a confidence score (0.0-1.0).
-5. Provide a brief explanation citing evidence from the email.
-
-OUTPUT FORMAT (JSON only, no markdown):
-{{
-  "intent": "{intent_name}",
-  "is_match": true,
-  "confidence": 0.91,
-  "explanation": "Brief evidence from the email text"
-}}
-
-If the email does NOT match this intent, set is_match=false and confidence < 0.3.
-
-LANGUAGE: Respond in {lang}."""
+    template = (_PROMPT_DIR / "specialized.md").read_text(encoding="utf-8")
+    return template.format(
+        intent_name=intent_name,
+        intent_description=intent_description,
+        intent_exclusions=intent_exclusions,
+        tool_instruction=tool_instruction,
+        lang=lang,
+    )
 
 
 def _find_category(slug: str, settings: dict | None) -> dict:

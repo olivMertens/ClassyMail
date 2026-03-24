@@ -214,6 +214,7 @@ const toggleCategoryIndex = (slug, enabled) => {
 const showOrchestratorPrompt = ref(false)
 const orchestratorPromptData = ref(null)
 const loadingOrchestratorPrompt = ref(false)
+const activePromptTab = ref('orchestrator')
 
 const loadOrchestratorPrompt = async () => {
   if (orchestratorPromptData.value) {
@@ -1159,13 +1160,13 @@ onMounted(() => {
             Agentic Pipeline Configuration
           </h4>
 
-          <!-- Orchestrator System Prompt Preview (read-only) -->
+          <!-- Agent System Prompts Preview (read-only) -->
           <div class="mb-4">
             <button @click="loadOrchestratorPrompt"
               class="flex items-center gap-2 text-xs font-medium text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-200 transition-colors">
               <CommandLineIcon class="h-4 w-4" />
-              <span v-if="loadingOrchestratorPrompt">Loading prompt...</span>
-              <span v-else>{{ showOrchestratorPrompt ? 'Hide' : 'View' }} Orchestrator System Prompt</span>
+              <span v-if="loadingOrchestratorPrompt">Loading prompts...</span>
+              <span v-else>{{ showOrchestratorPrompt ? 'Hide' : 'View' }} Agent System Prompts</span>
               <span class="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded">read-only</span>
             </button>
             <div v-if="showOrchestratorPrompt && orchestratorPromptData" class="mt-2">
@@ -1174,9 +1175,23 @@ onMounted(() => {
                 <span>Max agents: <strong>{{ orchestratorPromptData.max_agents }}</strong></span>
                 <span>Categories: <strong>{{ orchestratorPromptData.categories_count }}</strong></span>
               </div>
-              <pre class="text-[11px] leading-relaxed text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap font-mono">{{ orchestratorPromptData.prompt }}</pre>
-              <p class="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500 italic">
-                This prompt is generated automatically from your configured categories. It instructs the orchestrator to identify the top candidate intents before dispatching specialized agents in parallel.
+              <!-- Prompt Tabs -->
+              <div class="flex gap-1 mb-2">
+                <button v-for="tab in ['orchestrator', 'specialized', 'red_team']" :key="tab"
+                  @click="activePromptTab = tab"
+                  class="px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors"
+                  :class="activePromptTab === tab
+                    ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
+                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'">
+                  {{ tab === 'orchestrator' ? '🎯 Orchestrator' : tab === 'specialized' ? '🔍 Specialized Agent' : '🛡️ Red Team' }}
+                </button>
+              </div>
+              <pre class="text-[11px] leading-relaxed text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap font-mono">{{ orchestratorPromptData[activePromptTab]?.prompt || '' }}</pre>
+              <p class="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500 italic flex items-center gap-1">
+                📁 {{ orchestratorPromptData[activePromptTab]?.template_file || '' }}
+                <span v-if="activePromptTab === 'orchestrator'">— Categories are injected at runtime from your configured categories.</span>
+                <span v-else-if="activePromptTab === 'specialized'">— Template: variables like intent_name, intent_description are resolved per category agent.</span>
+                <span v-else>— Red Team receives the agent results and all available intents for review.</span>
               </p>
             </div>
           </div>

@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from pathlib import Path
 
 import httpx
 from opentelemetry import trace
@@ -22,30 +23,23 @@ from classymail.services.settings_store import get_categories_prompt_text
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
 
+_PROMPT_DIR = Path(__file__).parent / "prompts"
+
+
+def _load_prompt_template(name: str) -> str:
+    """Load a prompt template from the prompts/ directory."""
+    path = _PROMPT_DIR / f"{name}.md"
+    return path.read_text(encoding="utf-8")
+
 
 def _build_orchestrator_prompt(categories_text: str, max_agents: int, locale: str) -> str:
     lang = {"fr": "French", "en": "English", "de": "German", "es": "Spanish", "it": "Italian"}.get(locale, "English")
-    return f"""You are a fast email routing assistant. Your ONLY job is to identify the most likely intent categories for an incoming email.
-
-AVAILABLE INTENTS:
-{categories_text}
-
-RULES:
-- Select the TOP {max_agents} most probable intents (fewer is fine if obvious).
-- Return a JSON array of objects with "intent" (category name), "slug" (technical id), "confidence" (0.0–1.0).
-- Confidence reflects how likely the email matches that intent based on keywords, tone and context.
-- Do NOT classify — only route. Keep your analysis fast and shallow.
-- If the email is clearly simple, select fewer intents.
-
-OUTPUT FORMAT (JSON only, no markdown):
-{{
-  "candidate_intents": [
-    {{"intent": "Category Name", "slug": "category-slug", "confidence": 0.85}}
-  ],
-  "routing_rationale": "Brief explanation of routing decision"
-}}
-
-LANGUAGE: Respond in {lang}."""
+    template = _load_prompt_template("orchestrator")
+    return template.format(
+        categories_text=categories_text,
+        max_agents=max_agents,
+        lang=lang,
+    )
 
 
 async def run_orchestrator(

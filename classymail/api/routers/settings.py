@@ -31,8 +31,8 @@ async def get_organization():
 
 @router.get("/settings/agentic-prompt")
 async def get_agentic_prompt():
-    """Return the orchestrator system prompt (read-only preview for the UI)."""
-    from classymail.agents.orchestrator import _build_orchestrator_prompt
+    """Return all agent system prompts (read-only preview for the UI)."""
+    from classymail.agents.orchestrator import _build_orchestrator_prompt, _load_prompt_template
     from classymail.services.settings_store import get_categories_prompt_text
     from classymail.agents.config import get_agentic_settings
 
@@ -41,9 +41,26 @@ async def get_agentic_prompt():
     categories_text = get_categories_prompt_text()
     max_agents = agentic.get("max_parallel_agents", 6)
 
-    prompt = _build_orchestrator_prompt(categories_text, max_agents, "en")
+    # Resolved orchestrator prompt (with categories injected)
+    orchestrator_prompt = _build_orchestrator_prompt(categories_text, max_agents, "en")
+
+    # Raw templates (before variable substitution)
+    specialized_template = _load_prompt_template("specialized")
+    red_team_template = _load_prompt_template("red_team")
+
     return {
-        "prompt": prompt,
+        "orchestrator": {
+            "prompt": orchestrator_prompt,
+            "template_file": "classymail/agents/prompts/orchestrator.md",
+        },
+        "specialized": {
+            "prompt": specialized_template,
+            "template_file": "classymail/agents/prompts/specialized.md",
+        },
+        "red_team": {
+            "prompt": red_team_template,
+            "template_file": "classymail/agents/prompts/red_team.md",
+        },
         "model": agentic.get("orchestrator_model", "gpt-4.1-nano"),
         "max_agents": max_agents,
         "categories_count": len(settings.get("categories", [])),
