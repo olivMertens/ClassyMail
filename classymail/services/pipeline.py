@@ -9,6 +9,7 @@ from opentelemetry.trace import Status, StatusCode
 from classymail.models import EmailRecord, ClassificationResult
 from classymail.services.azure_clients import download_blob_as_base64, blob_id_from_url, Clients
 from classymail.services.llm_pipeline import ocr_with_mistral, ocr_with_document_intelligence, classify_with_phi4, process_agent_response, generate_embedding, extract_business_entities
+from classymail.agents.workflow import classify_agentic
 from classymail.services.circuit_breaker import mistral_ocr_breaker, doc_intelligence_breaker
 from classymail.services.costing import compute_cost_di, compute_cost_llm, compute_cost_mistral
 from classymail.models import ContentFilterError
@@ -219,7 +220,12 @@ async def run_classification_pipeline(
     try:
         log("classify", "start")
         stage_start = time.perf_counter()
-        classification_raw = await classify_with_phi4(markdown, strategy=strategy, clients=clients, locale=locale)
+        if strategy == "agentic":
+            classification_raw = await classify_agentic(
+                markdown, settings=settings, clients=clients, locale=locale,
+            )
+        else:
+            classification_raw = await classify_with_phi4(markdown, strategy=strategy, clients=clients, locale=locale)
         stage_timings["classify"] = (time.perf_counter() - stage_start) * 1000
         log("classify", "ok", f"({stage_timings['classify']:.0f}ms)")
     except ContentFilterError as cf_ex:

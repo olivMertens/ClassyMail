@@ -59,7 +59,23 @@ const settings = ref({
     show_time: true,
     show_ocr_provider: true
   },
-  ai_assessment_model: 'gpt-4.1-nano'
+  ai_assessment_model: 'gpt-4.1-nano',
+  agentic: {
+    enabled: false,
+    orchestrator_model: 'gpt-4.1-nano',
+    orchestrator_routing_mode: 'balanced',
+    orchestrator_model_subset: [],
+    agent_tier1_model: 'gpt-4.1-nano',
+    agent_tier2_model: 'gpt-4.1-mini',
+    agent_tier3_model: 'gpt-4.1',
+    red_team_model: 'gpt-4.1',
+    red_team_threshold: 0.7,
+    red_team_conflict_delta: 0.15,
+    max_parallel_agents: 6,
+    retrieval_mode: 'semantic',
+    search_top_k: 5,
+    enabled_indexes: {}
+  }
 })
 const defaults = ref({
   phi4_input_per_1k: null,
@@ -185,6 +201,26 @@ const assessmentModelLabel = computed(() => {
   const pricing = getModelPricing(key)
   return pricing ? pricing.label : key
 })
+
+// Toggle per-category AI Search index for agentic RAG
+const toggleCategoryIndex = (slug, enabled) => {
+  if (!settings.value.agentic.enabled_indexes) {
+    settings.value.agentic.enabled_indexes = {}
+  }
+  settings.value.agentic.enabled_indexes[slug] = enabled
+}
+
+// Auto-populate enabled_indexes from categories when agentic is first activated
+const ensureIndexToggles = () => {
+  if (!settings.value.agentic.enabled_indexes) {
+    settings.value.agentic.enabled_indexes = {}
+  }
+  for (const cat of (settings.value.categories || [])) {
+    if (!(cat.slug in settings.value.agentic.enabled_indexes)) {
+      settings.value.agentic.enabled_indexes[cat.slug] = true
+    }
+  }
+}
 
 const sanitizeInput = (str, type) => {
   if (!str) return ''
@@ -455,7 +491,8 @@ const saveSettings = async () => {
       review_confidence_threshold: settings.value.review_confidence_threshold ? Number(settings.value.review_confidence_threshold) : 0.85,
       categories: settings.value.categories,
       email_preprocessing: settings.value.email_preprocessing,  // FIX: Include email_preprocessing settings
-      csv_export: settings.value.csv_export  // CSV export customization
+      csv_export: settings.value.csv_export,  // CSV export customization
+      agentic: settings.value.agentic  // Agentic classification config
     }
 
     const res = await fetch('/api/settings', {
@@ -1061,6 +1098,162 @@ onMounted(() => {
                 class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
                 {{ t('settings.processing.strategy.vision') }}
               </label>
+            </div>
+            <div class="flex items-center">
+              <input id="strategy-agentic" v-model="settings.processing_strategy" name="processing_strategy"
+                type="radio" value="agentic"
+                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
+              <label for="strategy-agentic"
+                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
+                Agentic (Multi-Agent)
+              </label>
+            </div>
+            <p v-if="settings.processing_strategy === 'agentic'"
+              class="mt-2 text-xs text-purple-600 dark:text-purple-400">
+              Orchestrator selects top intents, specialized agents classify in parallel, optional Red Team quality gate.
+            </p>
+          </div>
+        </div>
+
+        <!-- Section: Agentic Configuration (visible only when agentic strategy selected) -->
+        <div v-if="settings.processing_strategy === 'agentic'"
+          class="rounded-lg border border-purple-200 dark:border-purple-700 p-5 mb-6 bg-purple-50/30 dark:bg-purple-900/10"
+          @vue:mounted="ensureIndexToggles()">
+          <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+            <AdjustmentsHorizontalIcon class="h-5 w-5 text-purple-500" />
+            Agentic Pipeline Configuration
+          </h4>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Orchestrator Model -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Orchestrator Model</label>
+              <select v-model="settings.agentic.orchestrator_model"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option value="gpt-4.1-nano">GPT-4.1 Nano (fast, cheap)</option>
+                <option value="gpt-4.1-mini">GPT-4.1 Mini (balanced)</option>
+                <option value="gpt-4o-mini">GPT-4o Mini (legacy)</option>
+                <option value="gpt-5-nano">GPT-5 Nano (reasoning)</option>
+                <option value="model-router">Model Router (auto-select)</option>
+              </select>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Fast routing model. Phi-4 not recommended here.
+              </p>
+            </div>
+
+            <!-- Routing Mode (model-router only) -->
+            <div v-if="settings.agentic.orchestrator_model === 'model-router'">
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Routing Mode</label>
+              <select v-model="settings.agentic.orchestrator_routing_mode"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option value="balanced">Balanced (quality/cost)</option>
+                <option value="cost">Cost (max savings)</option>
+                <option value="quality">Quality (best model)</option>
+              </select>
+            </div>
+
+            <!-- Agent Tier 1 -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Tier 1
+                (Simple)</label>
+              <select v-model="settings.agentic.agent_tier1_model"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+
+            <!-- Agent Tier 2 -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Tier 2
+                (Ambiguous)</label>
+              <select v-model="settings.agentic.agent_tier2_model"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+
+            <!-- Agent Tier 3 -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Tier 3
+                (Critical)</label>
+              <select v-model="settings.agentic.agent_tier3_model"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+
+            <!-- Red Team Model -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Red Team Model</label>
+              <select v-model="settings.agentic.red_team_model"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+
+            <!-- Retrieval Mode -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">RAG Retrieval Mode</label>
+              <select v-model="settings.agentic.retrieval_mode"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option value="vector">Vector (fastest)</option>
+                <option value="hybrid">Hybrid (balanced)</option>
+                <option value="semantic">Semantic (highest quality)</option>
+              </select>
+            </div>
+
+            <!-- Max Parallel Agents -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Max Parallel Agents</label>
+              <input v-model.number="settings.agentic.max_parallel_agents" type="number" min="1" max="10"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+            </div>
+
+            <!-- Red Team Threshold -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Red Team Threshold: {{ settings.agentic.red_team_threshold }}
+              </label>
+              <input v-model.number="settings.agentic.red_team_threshold" type="range" min="0" max="1" step="0.05"
+                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700">
+              <p class="mt-1 text-xs text-gray-500">Quality gate triggered when max confidence is below this value</p>
+            </div>
+          </div>
+
+          <!-- Per-Category AI Search Index Toggles -->
+          <div v-if="settings.categories && settings.categories.length" class="mt-5 border-t border-purple-200 dark:border-purple-700 pt-4">
+            <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+              <MagnifyingGlassIcon class="h-4 w-4 text-purple-500" />
+              Per-Category AI Search Index (RAG Tool)
+            </h5>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Each agent gets a contextual search tool bound to its category-specific index. Toggle to enable/disable the RAG tool per category.
+            </p>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-2">
+              <div v-for="cat in settings.categories" :key="cat.slug"
+                class="flex items-start gap-3 p-3 rounded-lg border transition-colors"
+                :class="settings.agentic.enabled_indexes[cat.slug] !== false
+                  ? 'border-purple-300 dark:border-purple-600 bg-purple-50/50 dark:bg-purple-900/20'
+                  : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 opacity-60'">
+                <input :id="'idx-' + cat.slug" type="checkbox"
+                  :checked="settings.agentic.enabled_indexes[cat.slug] !== false"
+                  @change="toggleCategoryIndex(cat.slug, $event.target.checked)"
+                  class="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600">
+                <div class="flex-1 min-w-0">
+                  <label :for="'idx-' + cat.slug" class="text-xs font-medium text-gray-800 dark:text-gray-200 block">
+                    {{ cat.name }}
+                  </label>
+                  <div class="mt-1 space-y-0.5">
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-[10px] text-gray-400">Index:</span>
+                      <code class="text-[10px] text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40 px-1 rounded">classymail-intent-{{ cat.slug }}</code>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-[10px] text-gray-400">Tool:</span>
+                      <code class="text-[10px] text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/40 px-1 rounded">search_{{ cat.slug.replaceAll('-', '_') }}()</code>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

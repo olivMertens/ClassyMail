@@ -91,6 +91,7 @@
         "strategy_standard_help": "Rapide & Efficace. Idéal pour les textes dactylographiés standard et emails clairs.",
         "strategy_reasoning_help": "Analyse Profonde. Utilise le 'Chain-of-Thought' pour justifier avant de classifier. Utile pour les cas ambigus.",
         "strategy_vision_help": "Multimodal. Analyse les éléments visuels (images, mise en page). Idéal pour les documents avec photos ou structures complexes. Note : annotations d'images limitées à 8 pages.",
+        "strategy_agentic_help": "Multi-Agent. L'orchestrateur route vers des agents spécialisés en parallèle, avec un contrôle qualité Red Team optionnel. Idéal pour la classification multi-intentions complexe.",
         "categories": {
             "tab_name": "Catégories",
             "warning_title": "⚠️ Avertissement Comportement Système",
@@ -441,7 +442,8 @@
             "upload": "Upload & Ingestion",
             "ocr": "OCR & Extraction",
             "classification": "Classification IA",
-            "storage": "Stockage & Résultats"
+            "storage": "Stockage & Résultats",
+            "agentic": "Pipeline Agentique"
         },
         "usage": {
             "title": "Comment utiliser ClassyMail",
@@ -475,7 +477,9 @@
             "reasoning_title": "Raisonnement",
             "reasoning_desc": "Force l'IA à produire une justification étape par étape avant de classifier. Améliore la précision sur les emails ambigus ou multi-intentions. Latence légèrement plus élevée.",
             "vision_title": "Vision",
-            "vision_desc": "Active l'analyse complète des images via GPT-4o-mini vision. Idéal pour les documents contenant photos, schémas ou écriture manuscrite scannée affectant la classification."
+            "vision_desc": "Active l'analyse complète des images via GPT-4o-mini vision. Idéal pour les documents contenant photos, schémas ou écriture manuscrite scannée affectant la classification.",
+            "agentic_title": "Agentique (Multi-Agent)",
+            "agentic_desc": "L'orchestrateur route vers des agents spécialisés exécutés en parallèle, chacun avec son propre index AI Search pour le grounding RAG. Inclut un contrôle qualité Red Team pour les résultats à faible confiance ou conflictuels. Idéal pour 5+ catégories avec des définitions chevauchantes."
         },
         "ai": {
             "title": "Complexité IA & Raisonnement",

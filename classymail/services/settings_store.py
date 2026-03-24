@@ -63,6 +63,22 @@ DEFAULT_SETTINGS = {
         "show_ocr_provider": True,       # Include SOURCE_OCR column (mistral_ocr | document_intelligence)
     },
     "ai_assessment_model": "gpt-4.1-nano",  # Model for category assessment (fast non-reasoning preferred)
+    "agentic": {
+        "enabled": False,                          # Feature flag (opt-in)
+        "orchestrator_model": "gpt-4.1-nano",      # UI-selectable (or "model-router")
+        "orchestrator_routing_mode": "balanced",    # balanced | cost | quality (model-router only)
+        "orchestrator_model_subset": [],            # Empty = all models; restrict for cost control
+        "agent_tier1_model": "gpt-4.1-nano",       # Simple intents
+        "agent_tier2_model": "gpt-4.1-mini",       # Ambiguous intents
+        "agent_tier3_model": "gpt-4.1",            # Critical intents
+        "red_team_model": "gpt-4.1",               # Quality gate model
+        "red_team_threshold": 0.7,                 # Min confidence to skip red team
+        "red_team_conflict_delta": 0.15,           # Top-2 delta to trigger red team
+        "max_parallel_agents": 6,                  # Max agents in fan-out
+        "retrieval_mode": "semantic",              # vector | hybrid | semantic
+        "search_top_k": 5,                         # RAG docs per agent query
+        "enabled_indexes": {},                      # Per-category index toggle: {slug: true/false}. Empty = all enabled
+    },
 }
 PROCESSING_STRATEGY_ENV = "PROCESSING_STRATEGY"
 
@@ -80,7 +96,7 @@ def _sanitize_ocr_attempts(val) -> int:
 def _apply_env_overrides(settings: dict) -> dict:
     import os
     env_strategy = os.getenv(PROCESSING_STRATEGY_ENV)
-    if env_strategy in ("standard", "reasoning", "vision"):
+    if env_strategy in ("standard", "reasoning", "vision", "agentic"):
         settings["processing_strategy"] = env_strategy
     return settings
 
@@ -134,6 +150,12 @@ def load_settings() -> dict:
             data["csv_export"] = DEFAULT_SETTINGS["csv_export"].copy()
         if "ai_assessment_model" not in data:
             data["ai_assessment_model"] = "gpt-4.1-nano"
+        if "agentic" not in data or not isinstance(data.get("agentic"), dict):
+            data["agentic"] = DEFAULT_SETTINGS["agentic"].copy()
+        else:
+            # Ensure all agentic keys exist
+            for k, v in DEFAULT_SETTINGS["agentic"].items():
+                data["agentic"].setdefault(k, v)
         return _apply_env_overrides(data)
     except Exception:
         return _apply_env_overrides(DEFAULT_SETTINGS.copy())
@@ -178,8 +200,28 @@ def save_settings(settings: dict):
 
     # Sanitize strategy
     if "processing_strategy" in settings:
-        if settings["processing_strategy"] not in ("standard", "reasoning", "vision"):
+        if settings["processing_strategy"] not in ("standard", "reasoning", "vision", "agentic"):
             settings["processing_strategy"] = "standard"
+
+    # Sanitize agentic settings
+    if "agentic" not in settings:
+        settings["agentic"] = DEFAULT_SETTINGS["agentic"].copy()
+    elif isinstance(settings["agentic"], dict):
+        ag = settings["agentic"]
+        for k, v in DEFAULT_SETTINGS["agentic"].items():
+            ag.setdefault(k, v)
+        if ag.get("orchestrator_routing_mode") not in ("balanced", "cost", "quality"):
+            ag["orchestrator_routing_mode"] = "balanced"
+        if ag.get("retrieval_mode") not in ("vector", "hybrid", "semantic"):
+            ag["retrieval_mode"] = "semantic"
+        try:
+            ag["red_team_threshold"] = max(0.0, min(1.0, float(ag["red_team_threshold"])))
+        except (ValueError, TypeError):
+            ag["red_team_threshold"] = 0.7
+        try:
+            ag["max_parallel_agents"] = max(1, min(10, int(ag["max_parallel_agents"])))
+        except (ValueError, TypeError):
+            ag["max_parallel_agents"] = 6
 
     # Sanitize models
     if "ai_model" in settings:

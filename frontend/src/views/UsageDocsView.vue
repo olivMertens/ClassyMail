@@ -72,6 +72,14 @@ flowchart LR
 
     Classify -->|Under 8K| Phi4["Phi-4 - Primary"]
     Classify -->|Over 8K| GPT["GPT-4o-mini - Fallback"]
+    Classify -->|Agentic| Orch["Orchestrator"]
+
+    Orch -->|"Top 5-6 intents"| Agents["Parallel Agents"]
+    Agents -->|"Per-intent"| AISearch["AI Search RAG"]
+    AISearch -->|"Positive + Negative examples"| Agents
+    Agents -->|"Low confidence"| RedTeam["Red Team"]
+    Agents -->|"High confidence"| Result
+    RedTeam --> Result
 
     Phi4 --> Result["Classification Result"]
     GPT --> Result
@@ -96,6 +104,10 @@ flowchart LR
     style Auto fill:#34d399,stroke:#10b981,color:#000
     style Review fill:#eab308,stroke:#ca8a04,color:#000
     style Cosmos fill:#059669,stroke:#047857,color:#fff
+    style Orch fill:#a855f7,stroke:#9333ea,color:#fff
+    style Agents fill:#c084fc,stroke:#a855f7,color:#000
+    style AISearch fill:#e9d5ff,stroke:#a855f7,color:#000
+    style RedTeam fill:#f43f5e,stroke:#e11d48,color:#fff
 `
 
 </script>
@@ -207,6 +219,13 @@ flowchart LR
           />
           <span class="text-gray-600 dark:text-gray-300">{{ t('guide.legend.storage') }}</span>
         </div>
+        <div class="flex items-center gap-2">
+          <span
+            class="inline-block w-3 h-3 rounded"
+            style="background:#a855f7"
+          />
+          <span class="text-gray-600 dark:text-gray-300">{{ t('guide.legend.agentic') }}</span>
+        </div>
       </div>
     </div>
 
@@ -285,7 +304,8 @@ flowchart LR
         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
           {{ t('guide.strategies.desc') }}
         </p>
-        <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+
           <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
             <div class="flex items-center gap-2 mb-2">
               <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" />
@@ -319,6 +339,17 @@ flowchart LR
             </div>
             <p class="text-xs text-gray-600 dark:text-gray-300">
               {{ t('guide.strategies.vision_desc') }}
+            </p>
+          </div>
+          <div class="border border-purple-200 dark:border-purple-700 rounded-lg p-4 bg-purple-50/50 dark:bg-purple-900/10">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="inline-block w-2.5 h-2.5 rounded-full bg-purple-500" />
+              <h5 class="font-medium text-sm text-gray-900 dark:text-white">
+                {{ t('guide.strategies.agentic_title') }}
+              </h5>
+            </div>
+            <p class="text-xs text-gray-600 dark:text-gray-300">
+              {{ t('guide.strategies.agentic_desc') }}
             </p>
           </div>
         </div>

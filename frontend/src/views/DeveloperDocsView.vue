@@ -88,6 +88,12 @@ flowchart TD
     Mistral -.->|${t('developer_docs.diagram.fallback')}| DI[${t('developer_docs.diagram.doc_intelligence')}]
     Worker -->|${t('developer_docs.diagram.classify')}| OPENAI[${t('developer_docs.diagram.openai')}]
 
+    OPENAI -->|"Agentic"| Orch["Orchestrator"]
+    Orch -->|"Fan-out"| ParAgents["Parallel Agents"]
+    ParAgents -->|"Per-intent"| AISearch[("AI Search Indexes")]
+    AISearch -->|"RAG"| ParAgents
+    ParAgents -->|"Verdicts"| OPENAI
+
     subgraph AIFoundry [${t('developer_docs.diagram.ai_foundry')}]
         Mistral
         OPENAI

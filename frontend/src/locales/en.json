@@ -91,6 +91,7 @@
         "strategy_standard_help": "Fast & Efficient. Best for standard typed text documents and clear emails.",
         "strategy_reasoning_help": "Deep Analysis. Uses Chain-of-Thought to justify decisions before classifying. Useful for ambiguous cases.",
         "strategy_vision_help": "Multimodal. Analyzes visual elements (images, layouts) in addition to text. Best for documents with photos or complex structures. Note: image annotations limited to 8 pages.",
+        "strategy_agentic_help": "Multi-Agent. Orchestrator routes to specialized agents in parallel, with optional Red Team quality gate. Best for complex multi-intent classification.",
         "categories": {
             "tab_name": "Categories",
             "warning_title": "⚠️ System Behavior Warning",
@@ -441,7 +442,8 @@
             "upload": "Upload & Ingestion",
             "ocr": "OCR & Extraction",
             "classification": "AI Classification",
-            "storage": "Storage & Results"
+            "storage": "Storage & Results",
+            "agentic": "Agentic Pipeline"
         },
         "exports": {
             "title": "Data Exports & Fine-Tuning",
@@ -486,7 +488,9 @@
             "reasoning_title": "Reasoning",
             "reasoning_desc": "Forces the AI to output a step-by-step justification before classifying. Improves accuracy on ambiguous or multi-intent emails. Slightly higher latency.",
             "vision_title": "Vision",
-            "vision_desc": "Enables full image analysis using GPT-4o-mini vision capabilities. Best for documents containing photos, diagrams, or scanned handwriting that affect classification."
+            "vision_desc": "Enables full image analysis using GPT-4o-mini vision capabilities. Best for documents containing photos, diagrams, or scanned handwriting that affect classification.",
+            "agentic_title": "Agentic (Multi-Agent)",
+            "agentic_desc": "Orchestrator routes to specialized agents running in parallel, each with its own AI Search index for RAG grounding. Includes a Red Team quality gate for low-confidence or conflicting results. Best for 5+ categories with overlapping definitions."
         },
         "ai": {
             "title": "AI Complexity & Reasoning",
