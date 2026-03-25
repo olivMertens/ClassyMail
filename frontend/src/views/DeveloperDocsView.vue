@@ -2,27 +2,46 @@
 import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import mermaid from 'mermaid'
-import { CodeBracketIcon, MapIcon, ServerIcon } from '@heroicons/vue/24/outline'
+import { CodeBracketIcon, MapIcon, ServerIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/vue/24/outline'
 
 const { t } = useI18n()
 
 const currentTab = ref('architecture')
 const isDark = ref(false)
+const refDiagramFullscreen = ref(false)
+const refDiagramSvg = ref('')
 let observer = null
-
-
 
 const initMermaid = async () => {
   const darkMode = document.documentElement.classList.contains('dark')
   mermaid.initialize({
     startOnLoad: false,
     theme: darkMode ? 'dark' : 'default',
-    securityLevel: 'loose'
+    securityLevel: 'loose',
+    flowchart: { curve: 'basis' }
   })
   await nextTick()
-  await mermaid.run({
-    nodes: document.querySelectorAll('.mermaid')
-  })
+
+  // Render main architecture diagram
+  const mainEl = document.querySelector('.mermaid')
+  if (mainEl) {
+    mainEl.removeAttribute('data-processed')
+    mainEl.innerHTML = diagram.value
+  }
+  await mermaid.run({ nodes: document.querySelectorAll('.mermaid') })
+
+  // Render reference diagram and capture SVG
+  const refEl = document.querySelector('.mermaid-ref')
+  if (refEl) {
+    refEl.removeAttribute('data-processed')
+    refEl.innerHTML = refDiagram.value
+  }
+  await mermaid.run({ nodes: document.querySelectorAll('.mermaid-ref') })
+  await nextTick()
+  const svg = document.querySelector('.mermaid-ref svg')
+  if (svg) {
+    refDiagramSvg.value = svg.outerHTML
+  }
 }
 
 onMounted(() => {
@@ -33,7 +52,11 @@ onMounted(() => {
   observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       if (mutation.attributeName === 'class') {
-        isDark.value = document.documentElement.classList.contains('dark')
+        const newDark = document.documentElement.classList.contains('dark')
+        if (newDark !== isDark.value) {
+          isDark.value = newDark
+          if (currentTab.value === 'architecture') initMermaid()
+        }
       }
     })
   })
@@ -109,6 +132,85 @@ flowchart TD
     class FE,API,Worker app
     class Mistral,OPENAI ai
     class DI fallback
+`)
+
+// Reference Architecture Diagram (detailed processing flow)
+const refDiagram = computed(() => `
+flowchart TD
+    classDef user fill:#e2e8f0,stroke:#64748b,stroke-width:2px,color:#1e293b
+    classDef frontend fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e40af
+    classDef api fill:#bfdbfe,stroke:#2563eb,stroke-width:2px,color:#1e3a8a
+    classDef storage fill:#0072C6,stroke:#fff,stroke-width:2px,color:#fff
+    classDef ocr fill:#818cf8,stroke:#6366f1,stroke-width:2px,color:#fff
+    classDef decision fill:#475569,stroke:#e2e8f0,stroke-width:2px,color:#fff
+    classDef model_primary fill:#f97316,stroke:#ea580c,stroke-width:2px,color:#fff
+    classDef model_fallback fill:#22c55e,stroke:#16a34a,stroke-width:2px,color:#fff
+    classDef model_parallel fill:#a855f7,stroke:#7c3aed,stroke-width:2px,color:#fff
+    classDef result fill:#059669,stroke:#047857,stroke-width:2px,color:#fff
+    classDef queue fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff
+    classDef agentic fill:#c084fc,stroke:#a855f7,stroke-width:2px,color:#000
+
+    User(["${t('developer_docs.ref_diagram.user')}"])
+    SPA["${t('developer_docs.ref_diagram.spa')}"]
+    API["${t('developer_docs.ref_diagram.api')}"]
+    Blob[("${t('developer_docs.ref_diagram.blob')}")]
+    SBQ["${t('developer_docs.ref_diagram.sbq')}"]
+    Worker["${t('developer_docs.ref_diagram.worker')}"]
+    MistralOCR["${t('developer_docs.ref_diagram.mistral_ocr')}"]
+    TokenCheck{"${t('developer_docs.ref_diagram.token_check')}"}
+    StratCheck{"${t('developer_docs.ref_diagram.strat_check')}"}
+    Phi4["${t('developer_docs.ref_diagram.phi4')}"]
+    GPTMini["${t('developer_docs.ref_diagram.gpt_mini')}"]
+    Parallel["${t('developer_docs.ref_diagram.parallel')}"]
+    Orch["${t('developer_docs.ref_diagram.orchestrator')}"]
+    Agents["${t('developer_docs.ref_diagram.agents')}"]
+    AISearch[("${t('developer_docs.ref_diagram.ai_search')}")]
+    RedTeam["${t('developer_docs.ref_diagram.red_team')}"]
+    Cosmos[("${t('developer_docs.ref_diagram.cosmos')}")]
+    Result["${t('developer_docs.ref_diagram.result')}"]
+
+    User -->|"Upload PDF"| SPA
+    SPA -->|"API"| API
+    API -->|"GET"| Blob
+    API -->|"Event Grid"| SBQ
+    SBQ -->|"Download"| Worker
+    Worker -->|"OCR"| MistralOCR
+    MistralOCR -->|"Markdown"| API
+    API -->|"Estimate tokens"| TokenCheck
+
+    TokenCheck -->|"YES - Under 8K"| Phi4
+    TokenCheck -->|"NO - Over 8K"| GPTMini
+
+    API --> StratCheck
+    StratCheck -->|"Standard"| Parallel
+    StratCheck -->|"Agentic"| Orch
+
+    Orch -->|"Fan-out"| Agents
+    Agents -->|"Per-intent"| AISearch
+    AISearch -->|"RAG"| Agents
+    Agents -->|"Verdicts"| RedTeam
+    RedTeam --> Result
+
+    Parallel --> Result
+    Phi4 --> Result
+    GPTMini --> Result
+    Result -->|"JSON"| Cosmos
+    Cosmos -->|"Classification"| API
+
+    class User user
+    class SPA frontend
+    class API api
+    class Blob,Cosmos storage
+    class SBQ queue
+    class Worker api
+    class MistralOCR ocr
+    class TokenCheck,StratCheck decision
+    class Phi4 model_primary
+    class GPTMini model_fallback
+    class Parallel model_parallel
+    class Orch,Agents,RedTeam agentic
+    class AISearch storage
+    class Result result
 `)
 </script>
 
@@ -191,17 +293,46 @@ flowchart TD
         </div>
 
         <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
-          <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white mb-4">
-            {{ t('developer_docs.architecture.ref_title') }}
-          </h3>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+              {{ t('developer_docs.architecture.ref_title') }}
+            </h3>
+            <button @click="refDiagramFullscreen = true"
+              class="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700">
+              <ArrowsPointingOutIcon class="h-4 w-4" />
+              Fullscreen
+            </button>
+          </div>
+
+          <!-- Fullscreen overlay -->
+          <Teleport to="body">
+            <div v-if="refDiagramFullscreen"
+              class="fixed inset-0 z-50 bg-gray-950/95 flex flex-col" @keydown.escape="refDiagramFullscreen = false">
+              <div class="flex items-center justify-between px-6 py-3 border-b border-gray-700 bg-gray-900">
+                <h3 class="text-white font-semibold text-sm">{{ t('developer_docs.architecture.ref_title') }}</h3>
+                <button @click="refDiagramFullscreen = false"
+                  class="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 text-sm border border-gray-600 rounded-md px-3 py-1.5 hover:bg-gray-800">
+                  <ArrowsPointingInIcon class="h-4 w-4" />
+                  Close
+                </button>
+              </div>
+              <div class="flex-1 overflow-auto p-8 flex items-center justify-center">
+                <!-- eslint-disable vue/no-v-html -->
+                <div v-if="refDiagramSvg" class="fullscreen-ref-diagram" v-html="refDiagramSvg" />
+                <!-- eslint-enable vue/no-v-html -->
+                <p v-else class="text-gray-400 text-sm">Diagram not available. Close and try again.</p>
+              </div>
+            </div>
+          </Teleport>
+
           <div
-            class="flex justify-center bg-white dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 overflow-hidden"
+            class="flex justify-center bg-white dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto cursor-pointer"
+            @dblclick="refDiagramFullscreen = true"
+            title="Double-click to enlarge"
           >
-            <img
-              src="/images/architecture_app.png"
-              :alt="t('developer_docs.architecture.ref_alt')"
-              class="max-w-full h-auto rounded"
-            >
+            <div class="mermaid-ref w-full flex justify-center">
+              {{ refDiagram }}
+            </div>
           </div>
         </div>
       </div>
@@ -264,9 +395,15 @@ flowchart TD
 </template>
 
 <style>
-.mermaid {
+.mermaid, .mermaid-ref {
   width: 100%;
   display: flex;
   justify-content: center;
+}
+.fullscreen-ref-diagram svg {
+  max-width: 95vw;
+  max-height: 80vh;
+  width: auto;
+  height: auto;
 }
 </style>

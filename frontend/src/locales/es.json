@@ -642,6 +642,26 @@
             "fallback": "OCR Fallback",
             "doc_intelligence": "Document Intelligence via AI Foundry",
             "ai_foundry": "Microsoft AI Foundry"
+        },
+        "ref_diagram": {
+            "user": "Usuario",
+            "spa": "SPA Vue 3 + Tailwind",
+            "api": "FastAPI API",
+            "blob": "Blob Storage",
+            "sbq": "Cola Service Bus",
+            "worker": "Worker - procesador async",
+            "mistral_ocr": "Mistral OCR",
+            "token_check": "Tokens bajo 8K?",
+            "strat_check": "Estrategia?",
+            "phi4": "Phi-4 - Primario 8K",
+            "gpt_mini": "gpt-4o-mini - Fallback 120K",
+            "parallel": "Phi-4 y gpt-4o-mini - Paralelo",
+            "orchestrator": "Orquestador - Router",
+            "agents": "Agentes especializados paralelos",
+            "ai_search": "Indices AI Search",
+            "red_team": "Red Team - Control de calidad",
+            "cosmos": "Cosmos DB",
+            "result": "Resultado de clasificacion"
         }
     },
     "email_detail": {
