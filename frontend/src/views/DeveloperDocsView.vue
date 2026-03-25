@@ -30,17 +30,22 @@ const initMermaid = async () => {
   }
   await mermaid.run({ nodes: document.querySelectorAll('.mermaid') })
 
-  // Render reference diagram and capture SVG
+  // Render reference diagram and capture SVG for fullscreen
   const refEl = document.querySelector('.mermaid-ref')
   if (refEl) {
     refEl.removeAttribute('data-processed')
     refEl.innerHTML = refDiagram.value
   }
   await mermaid.run({ nodes: document.querySelectorAll('.mermaid-ref') })
-  await nextTick()
-  const svg = document.querySelector('.mermaid-ref svg')
-  if (svg) {
-    refDiagramSvg.value = svg.outerHTML
+  try {
+    const { svg } = await mermaid.render('ref-fullscreen-' + Date.now(), refDiagram.value)
+    refDiagramSvg.value = svg
+  } catch {
+    await nextTick()
+    const svgEl = document.querySelector('.mermaid-ref svg')
+    if (svgEl) {
+      refDiagramSvg.value = svgEl.outerHTML
+    }
   }
 }
 
