@@ -204,6 +204,7 @@ const agenticData = computed(() => {
     orchestrator: (raw.agent_traces || []).find(t => t.agent_type === 'orchestrator'),
     agents: (raw.agent_traces || []).filter(t => t.agent_type === 'specialized'),
     redTeamTrace: (raw.agent_traces || []).find(t => t.agent_type === 'red_team'),
+    settings: raw.agentic_settings || null,
   }
 })
 const showAgenticTrace = ref(false)
@@ -899,6 +900,23 @@ watch(() => email.value, (val) => {
                         <span>🤖 {{ agenticData.agents.length }} agents</span>
                         <span v-if="agenticData.redTeamTrace" class="text-red-500">🛡️ Red Team triggered</span>
                         <span v-else class="text-green-500">✓ Red Team skipped</span>
+                      </div>
+
+                      <!-- Settings Snapshot -->
+                      <div v-if="agenticData.settings" class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <div class="flex items-center gap-1 mb-1.5">
+                          <span class="text-[10px] font-medium text-gray-500 dark:text-gray-400">⚙️ Configuration used for this classification:</span>
+                        </div>
+                        <div class="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
+                          <span class="text-gray-500">Orchestrator: <code class="bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-1 rounded">{{ agenticData.settings.orchestrator_model }}</code></span>
+                          <span class="text-gray-500">T1: <code class="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-1 rounded">{{ agenticData.settings.agent_tier1_model }}</code></span>
+                          <span class="text-gray-500">T2: <code class="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1 rounded">{{ agenticData.settings.agent_tier2_model }}</code></span>
+                          <span class="text-gray-500">T3: <code class="bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1 rounded">{{ agenticData.settings.agent_tier3_model }}</code></span>
+                          <span class="text-gray-500">Red Team: <code class="bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1 rounded">{{ agenticData.settings.red_team_model }}</code></span>
+                          <span class="text-gray-500">RAG: <code class="bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-1 rounded">{{ agenticData.settings.retrieval_mode }}</code></span>
+                          <span v-if="agenticData.settings.reasoning_effort !== 'none'" class="text-gray-500">Reasoning: <code class="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-1 rounded">{{ agenticData.settings.reasoning_effort }}</code></span>
+                          <span class="text-gray-500">Threshold: {{ agenticData.settings.red_team_threshold }}</span>
+                        </div>
                       </div>
                     </div>
                   </div>

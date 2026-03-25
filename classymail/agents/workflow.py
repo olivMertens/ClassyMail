@@ -88,7 +88,8 @@ async def classify_agentic(
                     orchestrator_result=orchestrator_result,
                     agent_traces=traces,
                     total_tokens=total_tokens,
-                )
+                ),
+                agentic_settings=agentic,
             )
 
         root_span.set_attribute("agentic.candidates_count", len(candidates))
@@ -211,10 +212,10 @@ async def classify_agentic(
             total_tokens, pipeline_ms,
         )
 
-        return _build_result_dict(result)
+        return _build_result_dict(result, agentic_settings=agentic)
 
 
-def _build_result_dict(result: AgenticClassificationResult) -> dict:
+def _build_result_dict(result: AgenticClassificationResult, agentic_settings: dict | None = None) -> dict:
     """Convert AgenticClassificationResult to the dict format expected by
     ``process_agent_response`` and ``pipeline.py``.
     """
@@ -235,6 +236,18 @@ def _build_result_dict(result: AgenticClassificationResult) -> dict:
         },
         "agent_traces": [t.model_dump() for t in result.agent_traces],
         "parallel_latency_ms": result.parallel_latency_ms,
+        # Snapshot of the agentic settings used for this classification
+        "agentic_settings": {
+            "orchestrator_model": (agentic_settings or {}).get("orchestrator_model", "unknown"),
+            "agent_tier1_model": (agentic_settings or {}).get("agent_tier1_model", "unknown"),
+            "agent_tier2_model": (agentic_settings or {}).get("agent_tier2_model", "unknown"),
+            "agent_tier3_model": (agentic_settings or {}).get("agent_tier3_model", "unknown"),
+            "red_team_model": (agentic_settings or {}).get("red_team_model", "unknown"),
+            "red_team_threshold": (agentic_settings or {}).get("red_team_threshold", 0.7),
+            "max_parallel_agents": (agentic_settings or {}).get("max_parallel_agents", 6),
+            "retrieval_mode": (agentic_settings or {}).get("retrieval_mode", "semantic"),
+            "reasoning_effort": (agentic_settings or {}).get("reasoning_effort", "none"),
+        },
     }
     if result.orchestrator_result:
         d["model"] = result.orchestrator_result.model
