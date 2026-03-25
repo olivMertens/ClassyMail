@@ -1,4 +1,4 @@
-You are a Quality Gate / Red Team reviewer for email classification.
+You are a Quality Gate / Red Team reviewer for document classification.
 
 AGENT RESULTS:
 {agent_summaries}

@@ -1,6 +1,6 @@
 """Orchestrator agent — fast intent routing.
 
-Analyzes an email and selects the top candidate intents (max 5-6) from the
+Analyzes a document and selects the top candidate intents (max 5-6) from the
 configured categories.  Does NOT perform final classification.
 """
 
@@ -26,7 +26,7 @@ tracer = trace.get_tracer(__name__)
 _PROMPT_DIR = Path(__file__).parent / "prompts"
 
 # Fallback prompt if .md file fails to load (Docker layer missing, permissions, etc.)
-_FALLBACK_ORCHESTRATOR = """You are a fast email routing assistant. Your ONLY job is to identify the most likely intent categories for an incoming email.
+_FALLBACK_ORCHESTRATOR = """You are a fast document routing assistant. Your ONLY job is to identify the most likely intent categories for an incoming document.
 
 AVAILABLE INTENTS:
 {categories_text}
@@ -34,9 +34,9 @@ AVAILABLE INTENTS:
 RULES:
 - Select the TOP {max_agents} most probable intents (fewer is fine if obvious).
 - Return a JSON array of objects with "intent" (category name), "slug" (technical id), "confidence" (0.0-1.0).
-- Confidence reflects how likely the email matches that intent based on keywords, tone and context.
+- Confidence reflects how likely the document matches that intent based on keywords, tone and context.
 - Do NOT classify — only route. Keep your analysis fast and shallow.
-- If the email is clearly simple, select fewer intents.
+- If the document is clearly simple, select fewer intents.
 
 OUTPUT FORMAT (JSON only, no markdown):
 {{
@@ -59,26 +59,26 @@ EXCLUSIONS (this intent must NOT include):
 {tool_instruction}
 
 YOUR TASK:
-1. Analyze the email content below.
+1. Analyze the document content below.
 2. If a search tool is available, call it with key phrases to find reference examples.
-3. Determine if the email matches the intent "{intent_name}" based on the definition and any reference examples.
+3. Determine if the document matches the intent "{intent_name}" based on the definition and any reference examples.
 4. Assign a confidence score (0.0-1.0).
-5. Provide a brief explanation citing evidence from the email.
+5. Provide a brief explanation citing evidence from the document.
 
 OUTPUT FORMAT (JSON only, no markdown):
 {{
   "intent": "{intent_name}",
   "is_match": true,
   "confidence": 0.91,
-  "explanation": "Brief evidence from the email text"
+  "explanation": "Brief evidence from the document text"
 }}
 
-If the email does NOT match this intent, set is_match=false and confidence < 0.3.
+If the document does NOT match this intent, set is_match=false and confidence < 0.3.
 
 LANGUAGE: Respond in {lang}."""
 
 
-_FALLBACK_RED_TEAM = """You are a Quality Gate / Red Team reviewer for email classification.
+_FALLBACK_RED_TEAM = """You are a Quality Gate / Red Team reviewer for document classification.
 
 AGENT RESULTS:
 {agent_summaries}

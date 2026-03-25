@@ -43,11 +43,11 @@ def _build_search_tool(slug: str, intent_name: str) -> dict:
             "name": f"search_{slug.replace('-', '_')}",
             "description": (
                 f"Search the AI Search index '{index}' for the '{intent_name}' category. "
-                f"Returns previously classified emails similar to the input: "
+                f"Returns previously classified documents similar to the input: "
                 f"positive examples (correct matches for '{intent_name}') and "
-                f"negative examples (emails wrongly classified as '{intent_name}' with "
+                f"negative examples (documents wrongly classified as '{intent_name}' with "
                 f"correction reasons explaining the mistake). "
-                f"Call this tool with key phrases from the email to calibrate your confidence."
+                f"Call this tool with key phrases from the document to calibrate your confidence."
             ),
             "parameters": {
                 "type": "object",
@@ -94,8 +94,8 @@ def _build_specialized_prompt(
 
 TOOL AVAILABLE: {tool_name}
 You have access to the AI Search index '{index_name}' dedicated to the "{intent_name}" category.
-This index contains previously classified emails. Use this tool to:
-- Find similar emails and see how they were classified
+This index contains previously classified documents. Use this tool to:
+- Find similar documents and see how they were classified
 - See POSITIVE examples (correct matches) to calibrate your confidence
 - See NEGATIVE examples (misclassifications) with REASON explaining why they don't belong
 - Weigh [human_verified] and [human_reinforced] sources more heavily than [llm_classified]
