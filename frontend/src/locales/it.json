@@ -51,6 +51,27 @@
             "pii_llm_model_auto": "Auto (stesso modello della classificazione)",
             "pii_llm_model_description": "Scegliere il LLM per l'estrazione PII. 'Auto' riutilizza il modello di classificazione per evitare distribuzioni aggiuntive."
         },
+        "agentic": {
+            "advice_button": "Consigli modelli",
+            "advice_title": "Guida alla selezione dei modelli per il pipeline agentico",
+            "advice_orchestrator": "Orchestratore (Router)",
+            "advice_orchestrator_desc": "Analisi superficiale rapida — identifica le intenzioni candidate. NON classifica. Serve velocità, non ragionamento profondo.",
+            "advice_orch_nano": "Migliore scelta predefinita — veloce, economico, gestisce il 90% dei casi.",
+            "advice_orch_router": "Migliore FinOps — seleziona automaticamente il modello più economico per prompt.",
+            "advice_orch_mini": "Usare con 10+ categorie sovrapposte che richiedono migliore comprensione.",
+            "advice_orch_reasoning": "Non raccomandato — l'overhead di ragionamento rallenta inutilmente il routing.",
+            "advice_agents": "Agenti specializzati (Tier 1/2/3)",
+            "advice_agents_desc": "Ogni agente classifica UNA intenzione in profondità. La confidenza dell'orchestratore determina quale tier (= modello) viene usato.",
+            "advice_tier1": "Confidenza > 80%. Corrispondenza chiara — modello economico + strumento RAG è sufficiente.",
+            "advice_tier2": "Confidenza 50-80%. Segnali sottili — necessita migliore comprensione.",
+            "advice_tier3": "Confidenza < 50%. Complesso/critico — massima precisione con il modello più robusto.",
+            "advice_redteam": "Red Team (Controllo Qualità)",
+            "advice_redteam_desc": "Rivede tutti i risultati degli agenti. Attivato solo con bassa confidenza o conflitti. Chiamato raramente.",
+            "advice_redteam_model": "Migliore scelta — robusto, veloce nelle revisioni, chiamato raramente quindi costo controllato.",
+            "advice_insight_title": "Punto chiave",
+            "advice_insight": "La famiglia gpt-4.1 è ideale per questo pipeline — progettata per tool-calling e output JSON strutturato. Evitare modelli di ragionamento (gpt-5-*) per gli agenti.",
+            "advice_close": "Capito"
+        },
         "finetuning": {
             "title": "Configurazione Fine-tuning",
             "desc": "Parametri per la generazione di dataset di addestramento.",

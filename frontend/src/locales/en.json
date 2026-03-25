@@ -51,6 +51,27 @@
             "pii_llm_model_auto": "Auto (same as classification model)",
             "pii_llm_model_description": "Choose which LLM to use for PII extraction. 'Auto' reuses the classification model to avoid extra deployments."
         },
+        "agentic": {
+            "advice_button": "Model advice",
+            "advice_title": "Model Selection Guide for Agentic Pipeline",
+            "advice_orchestrator": "Orchestrator (Router)",
+            "advice_orchestrator_desc": "Fast shallow analysis — identifies top candidate intents. Does NOT classify. Needs speed, not deep reasoning.",
+            "advice_orch_nano": "Best default — fast, cheap, handles 90% of routing cases.",
+            "advice_orch_router": "Best FinOps — auto-selects cheapest model within quality band per prompt.",
+            "advice_orch_mini": "Use when you have 10+ overlapping categories needing better comprehension.",
+            "advice_orch_reasoning": "Not recommended — reasoning overhead wastes time on a routing task.",
+            "advice_agents": "Specialized Agents (Tiers 1/2/3)",
+            "advice_agents_desc": "Each agent classifies ONE intent deeply. The orchestrator's confidence determines which tier (= model) is used.",
+            "advice_tier1": "Confidence > 80%. Clear match — cheap model + RAG tool is sufficient.",
+            "advice_tier2": "Confidence 50-80%. Ambiguous signals — needs better comprehension to resolve.",
+            "advice_tier3": "Confidence < 50%. Complex/critical — maximum accuracy with the most robust model.",
+            "advice_redteam": "Red Team (Quality Gate)",
+            "advice_redteam_desc": "Reviews all agent results. Activated only when max confidence is low or agents conflict. Called rarely — worth a robust model.",
+            "advice_redteam_model": "Best choice — robust, fast at review tasks, called rarely so cost is controlled.",
+            "advice_insight_title": "Key Insight",
+            "advice_insight": "The gpt-4.1 family is ideal for this pipeline — designed for tool-calling and structured JSON output. Avoid reasoning models (gpt-5-*) for agents: they're slower and JSON extraction is harder from reasoning traces.",
+            "advice_close": "Got it"
+        },
         "finetuning": {
             "title": "Fine-tuning Configuration",
             "desc": "Configure parameters for Fine-tuning dataset generation.",

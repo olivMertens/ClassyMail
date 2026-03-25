@@ -235,6 +235,9 @@ const loadOrchestratorPrompt = async () => {
   }
 }
 
+// Model advice dialog
+const showModelAdvice = ref(false)
+
 // Auto-populate enabled_indexes from categories when agentic is first activated
 const ensureIndexToggles = () => {
   if (!settings.value.agentic.enabled_indexes) {
@@ -1158,6 +1161,11 @@ onMounted(() => {
           <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
             <AdjustmentsHorizontalIcon class="h-5 w-5 text-purple-500" />
             Agentic Pipeline Configuration
+            <button @click="showModelAdvice = true"
+              class="ml-auto inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-200 border border-purple-300 dark:border-purple-600 rounded-md px-2.5 py-1 hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors">
+              <QuestionMarkCircleIcon class="h-4 w-4" />
+              {{ t('settings.agentic.advice_button') }}
+            </button>
           </h4>
 
           <!-- Agent System Prompts Preview (read-only) -->
@@ -2405,4 +2413,100 @@ onMounted(() => {
       </div>
     </div>
   </div>
+
+  <!-- Model Advice Dialog -->
+  <Teleport to="body">
+    <div v-if="showModelAdvice" class="fixed inset-0 z-50 overflow-y-auto" @click.self="showModelAdvice = false">
+      <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="fixed inset-0 bg-gray-900/75 transition-opacity" @click="showModelAdvice = false" />
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-3xl w-full mx-auto overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <QuestionMarkCircleIcon class="h-5 w-5 text-purple-500" />
+              {{ t('settings.agentic.advice_title') }}
+            </h3>
+            <button @click="showModelAdvice = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+              <span class="text-xl">&times;</span>
+            </button>
+          </div>
+          <div class="px-6 py-5 max-h-[75vh] overflow-y-auto space-y-5">
+            <!-- Orchestrator -->
+            <div class="rounded-lg border-2 border-blue-200 dark:border-blue-800 p-4 bg-blue-50/50 dark:bg-blue-900/10">
+              <h4 class="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">🎯 {{ t('settings.agentic.advice_orchestrator') }}</h4>
+              <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ t('settings.agentic.advice_orchestrator_desc') }}</p>
+              <div class="grid grid-cols-2 gap-2 text-[11px]">
+                <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
+                  <strong class="text-green-600">✓ gpt-4.1-nano</strong>
+                  <p class="text-gray-500 mt-0.5">{{ t('settings.agentic.advice_orch_nano') }}</p>
+                </div>
+                <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
+                  <strong class="text-blue-600">✓ model-router</strong>
+                  <p class="text-gray-500 mt-0.5">{{ t('settings.agentic.advice_orch_router') }}</p>
+                </div>
+                <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
+                  <strong class="text-gray-500">○ gpt-4.1-mini</strong>
+                  <p class="text-gray-500 mt-0.5">{{ t('settings.agentic.advice_orch_mini') }}</p>
+                </div>
+                <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
+                  <strong class="text-red-500">✗ gpt-5-nano</strong>
+                  <p class="text-gray-500 mt-0.5">{{ t('settings.agentic.advice_orch_reasoning') }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Agent Tiers -->
+            <div class="rounded-lg border-2 border-purple-200 dark:border-purple-800 p-4 bg-purple-50/50 dark:bg-purple-900/10">
+              <h4 class="text-sm font-semibold text-purple-800 dark:text-purple-300 mb-2">🔍 {{ t('settings.agentic.advice_agents') }}</h4>
+              <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ t('settings.agentic.advice_agents_desc') }}</p>
+              <div class="space-y-2 text-[11px]">
+                <div class="flex items-center gap-3 bg-white dark:bg-gray-900 rounded p-2 border border-green-200 dark:border-green-900">
+                  <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white text-[10px] font-bold">1</span>
+                  <div class="flex-1">
+                    <strong class="text-green-700 dark:text-green-400">Tier 1 — gpt-4.1-nano</strong>
+                    <p class="text-gray-500">{{ t('settings.agentic.advice_tier1') }}</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3 bg-white dark:bg-gray-900 rounded p-2 border border-amber-200 dark:border-amber-900">
+                  <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold">2</span>
+                  <div class="flex-1">
+                    <strong class="text-amber-700 dark:text-amber-400">Tier 2 — gpt-4.1-mini</strong>
+                    <p class="text-gray-500">{{ t('settings.agentic.advice_tier2') }}</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3 bg-white dark:bg-gray-900 rounded p-2 border border-red-200 dark:border-red-900">
+                  <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold">3</span>
+                  <div class="flex-1">
+                    <strong class="text-red-700 dark:text-red-400">Tier 3 — gpt-4.1</strong>
+                    <p class="text-gray-500">{{ t('settings.agentic.advice_tier3') }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Red Team -->
+            <div class="rounded-lg border-2 border-red-200 dark:border-red-800 p-4 bg-red-50/50 dark:bg-red-900/10">
+              <h4 class="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">🛡️ {{ t('settings.agentic.advice_redteam') }}</h4>
+              <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ t('settings.agentic.advice_redteam_desc') }}</p>
+              <div class="text-[11px] bg-white dark:bg-gray-900 rounded p-2 border border-red-100 dark:border-red-900">
+                <strong class="text-green-600">✓ gpt-4.1</strong>
+                <span class="text-gray-500 ml-1">{{ t('settings.agentic.advice_redteam_model') }}</span>
+              </div>
+            </div>
+
+            <!-- Key Insight -->
+            <div class="rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4">
+              <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">💡 {{ t('settings.agentic.advice_insight_title') }}</h4>
+              <p class="text-xs text-gray-600 dark:text-gray-300">{{ t('settings.agentic.advice_insight') }}</p>
+            </div>
+          </div>
+          <div class="bg-gray-50 dark:bg-gray-700 px-6 py-3 flex justify-end">
+            <button @click="showModelAdvice = false"
+              class="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none">
+              {{ t('settings.agentic.advice_close') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
