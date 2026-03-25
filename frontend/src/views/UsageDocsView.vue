@@ -7,6 +7,7 @@ import mermaid from 'mermaid'
 const { t } = useI18n()
 const isDark = ref(false)
 const diagramFullscreen = ref(false)
+const diagramSvgHtml = ref('')
 let observer = null
 
 const initMermaid = async () => {
@@ -18,7 +19,6 @@ const initMermaid = async () => {
     flowchart: { curve: 'basis' }
   })
   await nextTick()
-  // Reset any previous SVG
   const element = document.querySelector('.mermaid-graph')
   if (element) {
     element.removeAttribute('data-processed')
@@ -27,6 +27,12 @@ const initMermaid = async () => {
   await mermaid.run({
     nodes: document.querySelectorAll('.mermaid-graph')
   })
+  // Capture rendered SVG for fullscreen reuse
+  await nextTick()
+  const svg = document.querySelector('.mermaid-graph svg')
+  if (svg) {
+    diagramSvgHtml.value = svg.outerHTML
+  }
 }
 
 onMounted(() => {
@@ -192,7 +198,7 @@ flowchart LR
         {{ t('guide.flow_desc') }}
       </p>
 
-      <!-- Fullscreen overlay -->
+      <!-- Fullscreen overlay — uses pre-rendered SVG -->
       <Teleport to="body">
         <div v-if="diagramFullscreen"
           class="fixed inset-0 z-50 bg-gray-950/95 flex flex-col" @keydown.escape="diagramFullscreen = false">
@@ -205,9 +211,10 @@ flowchart LR
             </button>
           </div>
           <div class="flex-1 overflow-auto p-8 flex items-center justify-center">
-            <div class="mermaid-graph" style="transform: scale(1.6); transform-origin: center center;">
-              {{ diagram }}
-            </div>
+            <!-- eslint-disable vue/no-v-html -->
+            <div v-if="diagramSvgHtml" class="fullscreen-diagram" v-html="diagramSvgHtml" />
+            <!-- eslint-enable vue/no-v-html -->
+            <p v-else class="text-gray-400 text-sm">Diagram not available. Close and try again.</p>
           </div>
         </div>
       </Teleport>
@@ -688,5 +695,15 @@ flowchart LR
 <style scoped>
 .mermaid-graph {
   min-width: 300px;
+}
+</style>
+
+<style>
+/* Fullscreen diagram SVG scaling (unscoped - targets teleported content) */
+.fullscreen-diagram svg {
+  max-width: 95vw;
+  max-height: 80vh;
+  width: auto;
+  height: auto;
 }
 </style>
