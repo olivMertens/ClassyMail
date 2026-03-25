@@ -532,7 +532,7 @@ async def reprocess_email(
 
     Optional payload:
     {
-        "processing_strategy": "standard" | "reasoning" | "vision"
+        "processing_strategy": "standard" | "reasoning" | "vision" | "agentic"
     }
     If omitted, uses the global default strategy.
     """
@@ -545,7 +545,7 @@ async def reprocess_email(
         message_data: dict = {"blob_url": blob_url}
 
         # Optional per-email strategy override
-        if payload and payload.get("processing_strategy") in ("standard", "reasoning", "vision"):
+        if payload and payload.get("processing_strategy") in ("standard", "reasoning", "vision", "agentic"):
             message_data["processing_strategy"] = payload["processing_strategy"]
 
         # Pass locale for language-aware classification
@@ -577,7 +577,7 @@ async def batch_reprocess_emails(
     Payload:
     {
         "ids": ["id1", "id2", ...],
-        "processing_strategy": "standard" | "reasoning" | "vision"  (optional)
+        "processing_strategy": "standard" | "reasoning" | "vision" | "agentic"  (optional)
     }
     """
     ids = payload.get("ids", [])
@@ -599,7 +599,7 @@ async def batch_reprocess_emails(
                     continue
 
                 message_data: dict = {"blob_url": blob_url}
-                if strategy in ("standard", "reasoning", "vision"):
+                if strategy in ("standard", "reasoning", "vision", "agentic"):
                     message_data["processing_strategy"] = strategy
 
                 await sender.send_messages(ServiceBusMessage(json.dumps(message_data)))

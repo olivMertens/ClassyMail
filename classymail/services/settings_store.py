@@ -41,6 +41,7 @@ DEFAULT_SETTINGS = {
     "cost_overrides": {},
     "categories": DEFAULT_CATEGORIES,
     "processing_strategy": "standard",  # standard | reasoning | vision
+    "default_locale": "en",  # Default output language for classification (en|fr|de|es|it)
     "ai_model": "phi4",
     "finetune_min_examples": 5,
     "ocr_max_attempts": 3,
@@ -100,6 +101,9 @@ def _apply_env_overrides(settings: dict) -> dict:
     if env_strategy in ("standard", "reasoning", "vision", "agentic"):
         settings["processing_strategy"] = env_strategy
     return settings
+
+
+VALID_STRATEGIES = ("standard", "reasoning", "vision", "agentic")
 
 def _migrate_categories(categories: list) -> list:
     """Migrate old categories to new format with slug and exclusions."""

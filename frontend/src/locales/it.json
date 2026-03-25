@@ -263,6 +263,9 @@
             "vision": "Vision",
             "vision_short": "VIS",
             "vision_desc": "Analisi visiva (sperimentale)",
+            "agentic": "Agentico",
+            "agentic_short": "AGT",
+            "agentic_desc": "Pipeline orchestratore multi-agenti",
             "experimental": "Sperimentale",
             "unknown": "Predefinito"
         },

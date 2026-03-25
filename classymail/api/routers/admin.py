@@ -586,7 +586,7 @@ async def reprocess_all(
             async for item in clients.cosmos_container.query_items(query):
                 try:
                     message_data: dict = {"blob_url": item["file_url"]}
-                    if payload.processing_strategy in ("standard", "reasoning", "vision"):
+                    if payload.processing_strategy in ("standard", "reasoning", "vision", "agentic"):
                         message_data["processing_strategy"] = payload.processing_strategy
                     await sender.send_messages(
                         ServiceBusMessage(json.dumps(message_data))
