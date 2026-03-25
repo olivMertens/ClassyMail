@@ -214,7 +214,8 @@ const mermaidFlowSvg = ref('')
 
 const truncate = (text, max) => {
   if (!text) return ''
-  const clean = text.replace(/["\[\]|#]/g, '').replace(/\n/g, ' ').trim()
+  // Strip all mermaid-unsafe characters
+  const clean = text.replace(/["\[\]|#{}();:&<>]/g, '').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
   return clean.length > max ? clean.slice(0, max) + '...' : clean
 }
 
@@ -226,23 +227,23 @@ const mermaidFlowDef = computed(() => {
   // Orchestrator
   const orchModel = d.orchestrator?.routed_model || d.orchestrator?.model || '?'
   const orchMs = d.orchestrator?.latency_ms?.toFixed(0) || '?'
-  lines.push(`  ORCH["Orchestrator - ${orchModel} - ${orchMs}ms"]`)
+  lines.push(`  ORCH["Orchestrator - ${truncate(orchModel, 30)} - ${orchMs}ms"]`)
   lines.push('  style ORCH fill:#dbeafe,stroke:#3b82f6,color:#1e40af')
 
-  // Parallel fan-out
+  // Parallel fan-out agents
   const agentIds = []
   for (const [i, agent] of d.agents.entries()) {
     const id = `A${i}`
     agentIds.push(id)
     const pct = Math.round((agent.confidence || 0) * 100)
-    const expl = truncate(agent.explanation, 60)
-    const ragTag = agent.rag_hits ? ` - RAG: ${agent.rag_hits} refs` : ''
-    const model = agent.model || '?'
+    const expl = truncate(agent.explanation, 50)
+    const ragTag = agent.rag_hits ? ` RAG ${agent.rag_hits}` : ''
+    const model = truncate(agent.model || '?', 20)
     const ms = agent.latency_ms?.toFixed(0) || '?'
-    const label = `${agent.intent}: ${pct}% - ${model} ${ms}ms${ragTag}`
+    const intentName = truncate(agent.intent || 'unknown', 25)
+    const label = `${intentName} ${pct}pct - ${model} ${ms}ms${ragTag}`
     lines.push(`  ${id}["${label}"]`)
 
-    // Color by confidence
     if (agent.confidence >= 0.7) {
       lines.push(`  style ${id} fill:#dcfce7,stroke:#22c55e,color:#166534`)
     } else if (agent.confidence >= 0.4) {
@@ -251,31 +252,47 @@ const mermaidFlowDef = computed(() => {
       lines.push(`  style ${id} fill:#f3f4f6,stroke:#9ca3af,color:#6b7280`)
     }
 
-    // Edge from orchestrator
-    const edgeLabel = expl ? `"${expl}"` : '""'
-    lines.push(`  ORCH -->|${edgeLabel}| ${id}`)
+    if (expl) {
+      lines.push(`  ORCH -->|"${expl}"| ${id}`)
+    } else {
+      lines.push(`  ORCH --> ${id}`)
+    }
   }
 
-  // Red Team or Result
+  // Red Team
   if (d.redTeam) {
-    const rtModel = d.redTeam.model || '?'
+    const rtModel = truncate(d.redTeam.model || '?', 20)
     const rtMs = d.redTeam.latency_ms?.toFixed(0) || '?'
     const rtVerdict = d.redTeam.validated ? 'VALIDATED' : 'ISSUES FOUND'
-    const rtJustif = truncate(d.redTeam.justification, 50)
-    lines.push(`  RT["Red Team: ${rtVerdict} - ${rtModel} ${rtMs}ms"]`)
+    lines.push(`  RT["Red Team - ${rtVerdict} - ${rtModel} ${rtMs}ms"]`)
     if (d.redTeam.validated) {
       lines.push('  style RT fill:#fef2f2,stroke:#ef4444,color:#991b1b')
     } else {
       lines.push('  style RT fill:#fee2e2,stroke:#dc2626,color:#7f1d1d')
     }
-    for (const id of agentIds) {
-      lines.push(`  ${id} --> RT`)
+
+    if (agentIds.length > 0) {
+      for (const id of agentIds) {
+        lines.push(`  ${id} --> RT`)
+      }
+    } else {
+      // 0 agents: orchestrator goes directly to Red Team
+      lines.push('  ORCH --> RT')
     }
-    const rtEdge = rtJustif ? `"${rtJustif}"` : '""'
-    lines.push(`  RT -->|${rtEdge}| RESULT`)
+
+    const rtJustif = truncate(d.redTeam.justification, 40)
+    if (rtJustif) {
+      lines.push(`  RT -->|"${rtJustif}"| RESULT`)
+    } else {
+      lines.push('  RT --> RESULT')
+    }
   } else {
-    for (const id of agentIds) {
-      lines.push(`  ${id} --> RESULT`)
+    if (agentIds.length > 0) {
+      for (const id of agentIds) {
+        lines.push(`  ${id} --> RESULT`)
+      }
+    } else {
+      lines.push('  ORCH --> RESULT')
     }
   }
 
