@@ -25,6 +25,7 @@ AGENTIC_DEFAULTS: dict = {
     "max_parallel_agents": 6,
     "retrieval_mode": "semantic",
     "search_top_k": 5,
+    "reasoning_effort": "none",  # none | low | medium | high (for gpt-5 family)
     "enabled_indexes": {},  # Per-category: {slug: true/false}. Empty = all enabled
 }
 

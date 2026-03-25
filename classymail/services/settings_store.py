@@ -77,6 +77,7 @@ DEFAULT_SETTINGS = {
         "max_parallel_agents": 6,                  # Max agents in fan-out
         "retrieval_mode": "semantic",              # vector | hybrid | semantic
         "search_top_k": 5,                         # RAG docs per agent query
+        "reasoning_effort": "none",                # none | low | medium | high (gpt-5 family)
         "enabled_indexes": {},                      # Per-category index toggle: {slug: true/false}. Empty = all enabled
     },
 }

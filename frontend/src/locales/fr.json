@@ -59,7 +59,7 @@
             "advice_orch_nano": "Meilleur choix par défaut — rapide, économique, gère 90% des cas de routage.",
             "advice_orch_router": "Meilleur FinOps — sélectionne automatiquement le modèle le moins cher dans la bande de qualité.",
             "advice_orch_mini": "Utiliser si 10+ catégories chevauchantes nécessitant une meilleure compréhension.",
-            "advice_orch_reasoning": "Non recommandé — le surcoût de raisonnement ralentit inutilement le routage.",
+            "advice_orch_reasoning": "Option valide — modèle le moins cher (0,00005$/1K). Mettre reasoning_effort à 'none' pour un routage rapide. Supporte tool-calling + sorties structurées.",
             "advice_agents": "Agents spécialisés (Tiers 1/2/3)",
             "advice_agents_desc": "Chaque agent classifie UNE intention en profondeur. La confiance de l'orchestrateur détermine le tier (= modèle) utilisé.",
             "advice_tier1": "Confiance > 80%. Correspondance claire — modèle économique + outil RAG suffisent.",
@@ -69,8 +69,11 @@
             "advice_redteam_desc": "Révise tous les résultats des agents. Activé uniquement si la confiance max est basse ou si les agents sont en conflit. Appelé rarement.",
             "advice_redteam_model": "Meilleur choix — robuste, rapide pour les tâches de révision, appelé rarement donc coût maîtrisé.",
             "advice_insight_title": "Point clé",
-            "advice_insight": "La famille gpt-4.1 est idéale pour ce pipeline — conçue pour le tool-calling et la sortie JSON structurée. Évitez les modèles de raisonnement (gpt-5-*) pour les agents : plus lents et extraction JSON plus difficile.",
-            "advice_close": "Compris"
+            "advice_insight": "Les familles gpt-4.1 et gpt-5 supportent toutes deux le tool-calling et les sorties JSON structurées. gpt-5-nano est l'option la moins chère. Utilisez reasoning_effort='none' pour la vitesse, 'medium' pour la précision.",
+            "advice_close": "Compris",
+            "gpt5_warning": "Les modèles GPT-5 incluent des capacités de raisonnement qui peuvent ajouter 200-500ms de latence par appel. Mettez l'Effort de Raisonnement à 'none' pour un routage rapide.",
+            "reasoning_effort_label": "Effort de Raisonnement (famille GPT-5)",
+            "reasoning_effort_help": "Contrôle la profondeur de raisonnement pour les modèles GPT-5. 'none' = le plus rapide. 'low'/'medium'/'high' ajoute une chaîne de pensée mais augmente la latence."
         },
         "finetuning": {
             "title": "Configuration Fine-tuning",

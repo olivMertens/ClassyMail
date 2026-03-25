@@ -59,7 +59,7 @@
             "advice_orch_nano": "Mejor opción por defecto — rápido, económico, maneja el 90% de los casos.",
             "advice_orch_router": "Mejor FinOps — selecciona automáticamente el modelo más económico por prompt.",
             "advice_orch_mini": "Usar con 10+ categorías superpuestas que necesitan mejor comprensión.",
-            "advice_orch_reasoning": "No recomendado — el overhead de razonamiento ralentiza el enrutamiento.",
+            "advice_orch_reasoning": "Opción válida — modelo más económico ($0.00005/1K). Poner reasoning_effort en 'none' para enrutamiento rápido. Soporta tool-calling + salidas estructuradas.",
             "advice_agents": "Agentes especializados (Tier 1/2/3)",
             "advice_agents_desc": "Cada agente clasifica UNA intención en profundidad. La confianza del orquestador determina qué tier (= modelo) se usa.",
             "advice_tier1": "Confianza > 80%. Coincidencia clara — modelo económico + herramienta RAG es suficiente.",
@@ -69,8 +69,11 @@
             "advice_redteam_desc": "Revisa todos los resultados de los agentes. Solo se activa con baja confianza o conflictos. Se llama raramente.",
             "advice_redteam_model": "Mejor opción — robusto, rápido en tareas de revisión, se llama poco así que el coste es controlado.",
             "advice_insight_title": "Punto clave",
-            "advice_insight": "La familia gpt-4.1 es ideal para este pipeline — diseñada para tool-calling y salida JSON estructurada. Evite modelos de razonamiento (gpt-5-*) para agentes.",
-            "advice_close": "Entendido"
+            "advice_insight": "Tanto gpt-4.1 como gpt-5 soportan tool-calling y salida JSON estructurada. gpt-5-nano es la opción más económica. Use reasoning_effort='none' para velocidad, 'medium' para precisión.",
+            "advice_close": "Entendido",
+            "gpt5_warning": "Los modelos GPT-5 incluyen capacidades de razonamiento que pueden añadir 200-500ms de latencia por llamada. Configure Esfuerzo de Razonamiento en 'none' para enrutamiento rápido.",
+            "reasoning_effort_label": "Esfuerzo de Razonamiento (familia GPT-5)",
+            "reasoning_effort_help": "Controla la profundidad de razonamiento para modelos GPT-5. 'none' = más rápido. 'low'/'medium'/'high' añade cadena de pensamiento pero aumenta la latencia."
         },
         "finetuning": {
             "title": "Configuración Fine-tuning",

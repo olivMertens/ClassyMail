@@ -22,7 +22,7 @@ from classymail.agents.config import get_agentic_settings, resolve_agent_endpoin
 from classymail.agents.models import CandidateIntent, RAGGroundingRef, SpecializedAgentResult
 from classymail.agents.orchestrator import _load_prompt_template
 from classymail.agents.tools.ai_search_tool import search_intent_index
-from classymail.core.llm_compat import build_chat_params, extract_message_content
+from classymail.core.llm_compat import build_chat_params, extract_message_content, is_reasoning_model
 from classymail.services.azure_clients import auth_headers, Clients
 
 logger = logging.getLogger(__name__)
@@ -219,6 +219,10 @@ async def run_specialized_agent(
             "messages": messages,
             **build_chat_params(deployment, temperature=0.1, max_output_tokens=500),
         }
+        # Add reasoning_effort for gpt-5 family models
+        if is_reasoning_model(deployment):
+            payload["reasoning_effort"] = agentic.get("reasoning_effort", "none")
+
         # Only attach tool + json_object format if index is enabled
         if index_enabled:
             payload["tools"] = [search_tool]
@@ -285,6 +289,8 @@ async def run_specialized_agent(
                     "messages": messages,
                     **build_chat_params(deployment, temperature=0.1, max_output_tokens=500),
                 }
+                if is_reasoning_model(deployment):
+                    payload2["reasoning_effort"] = agentic.get("reasoning_effort", "none")
                 resp2 = await http.post(url, json=payload2, headers=headers)
                 resp2.raise_for_status()
                 data2 = resp2.json()

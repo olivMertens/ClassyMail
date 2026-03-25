@@ -59,7 +59,7 @@
             "advice_orch_nano": "Beste Standardwahl — schnell, günstig, bewältigt 90% der Routing-Fälle.",
             "advice_orch_router": "Bestes FinOps — wählt automatisch das günstigste Modell pro Prompt.",
             "advice_orch_mini": "Verwenden bei 10+ überlappenden Kategorien mit besserer Komprehension.",
-            "advice_orch_reasoning": "Nicht empfohlen — Reasoning-Overhead verlangsamt das Routing unnötig.",
+            "advice_orch_reasoning": "Gültige Option — günstigstes Modell ($0,00005/1K). reasoning_effort auf 'none' setzen für schnelles Routing. Unterstützt Tool-Calling + strukturierte Ausgaben.",
             "advice_agents": "Spezialisierte Agenten (Tier 1/2/3)",
             "advice_agents_desc": "Jeder Agent klassifiziert EINE Intention tiefgehend. Die Konfidenz des Orchestrators bestimmt welcher Tier (= Modell) verwendet wird.",
             "advice_tier1": "Konfidenz > 80%. Klare Übereinstimmung — günstiges Modell + RAG-Tool reicht.",
@@ -69,8 +69,11 @@
             "advice_redteam_desc": "Prüft alle Agenten-Ergebnisse. Nur aktiviert bei niedriger Konfidenz oder Konflikten. Selten aufgerufen.",
             "advice_redteam_model": "Beste Wahl — robust, schnell bei Review-Aufgaben, selten aufgerufen daher Kosten kontrolliert.",
             "advice_insight_title": "Kernaussage",
-            "advice_insight": "Die gpt-4.1-Familie ist ideal für diese Pipeline — für Tool-Calling und strukturierte JSON-Ausgabe konzipiert. Vermeiden Sie Reasoning-Modelle (gpt-5-*) für Agenten.",
-            "advice_close": "Verstanden"
+            "advice_insight": "Sowohl gpt-4.1 als auch gpt-5 Familien unterstützen Tool-Calling und strukturierte JSON-Ausgabe. gpt-5-nano ist die günstigste Option. reasoning_effort='none' für Geschwindigkeit, 'medium' für Genauigkeit.",
+            "advice_close": "Verstanden",
+            "gpt5_warning": "GPT-5 Modelle enthalten Reasoning-Fähigkeiten, die 200-500ms Latenz pro Aufruf hinzufügen können. Setzen Sie Reasoning Effort auf 'none' für schnelles Routing.",
+            "reasoning_effort_label": "Reasoning-Aufwand (GPT-5 Familie)",
+            "reasoning_effort_help": "Steuert die Reasoning-Tiefe für GPT-5 Modelle. 'none' = schnellstes. 'low'/'medium'/'high' fügt Chain-of-Thought hinzu, erhöht aber die Latenz."
         },
         "finetuning": {
             "title": "Fine-tuning-Konfiguration",

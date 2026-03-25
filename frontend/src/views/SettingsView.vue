@@ -74,6 +74,7 @@ const settings = ref({
     max_parallel_agents: 6,
     retrieval_mode: 'semantic',
     search_top_k: 5,
+    reasoning_effort: 'none',
     enabled_indexes: {}
   }
 })
@@ -1215,11 +1216,17 @@ onMounted(() => {
                 <option value="gpt-4.1-nano">GPT-4.1 Nano (fast, cheap)</option>
                 <option value="gpt-4.1-mini">GPT-4.1 Mini (balanced)</option>
                 <option value="gpt-4o-mini">GPT-4o Mini (legacy)</option>
-                <option value="gpt-5-nano">GPT-5 Nano (reasoning)</option>
+                <option value="gpt-5-nano">GPT-5 Nano (reasoning, cheapest)</option>
+                <option value="gpt-5-mini">GPT-5 Mini (reasoning, balanced)</option>
                 <option value="model-router">Model Router (auto-select)</option>
               </select>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Fast routing model. Phi-4 not recommended here.
-              </p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Fast routing model. Phi-4 not recommended here.</p>
+              <!-- GPT-5 latency disclaimer -->
+              <div v-if="settings.agentic.orchestrator_model?.startsWith('gpt-5')"
+                class="mt-1.5 flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded p-2">
+                <span class="text-sm">⚠️</span>
+                <span>{{ t('settings.agentic.gpt5_warning') }}</span>
+              </div>
             </div>
 
             <!-- Routing Mode (model-router only) -->
@@ -1319,6 +1326,26 @@ onMounted(() => {
               <input v-model.number="settings.agentic.red_team_threshold" type="range" min="0" max="1" step="0.05"
                 class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700">
               <p class="mt-1 text-xs text-gray-500">Quality gate triggered when max confidence is below this value</p>
+            </div>
+
+            <!-- Reasoning Effort (for gpt-5 family) -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                {{ t('settings.agentic.reasoning_effort_label') }}
+                <span class="relative group">
+                  <InformationCircleIcon class="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                  <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                    {{ t('settings.agentic.reasoning_effort_help') }}
+                  </span>
+                </span>
+              </label>
+              <select v-model="settings.agentic.reasoning_effort"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option value="none">None (no reasoning, fastest)</option>
+                <option value="low">Low (light reasoning)</option>
+                <option value="medium">Medium (balanced)</option>
+                <option value="high">High (deep reasoning, slowest)</option>
+              </select>
             </div>
           </div>
 
@@ -2448,7 +2475,7 @@ onMounted(() => {
                   <p class="text-gray-500 mt-0.5">{{ t('settings.agentic.advice_orch_mini') }}</p>
                 </div>
                 <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
-                  <strong class="text-red-500">✗ gpt-5-nano</strong>
+                  <strong class="text-green-600">✓ gpt-5-nano</strong>
                   <p class="text-gray-500 mt-0.5">{{ t('settings.agentic.advice_orch_reasoning') }}</p>
                 </div>
               </div>
