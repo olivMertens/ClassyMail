@@ -31,10 +31,12 @@ Build a **scalable, FinOps-friendly agentic architecture** for email classificat
 Email entrant
    |
    v
-Agent Orchestrator (Router / Light Reasoning)
+Agent Orchestrator (Expert Inspector)
    |  model: UI-selectable (gpt-4.1-nano | gpt-4.1-mini | model-router)
+   |  Analyzes document against EVERY category definition
+   |  Cross-references content, context, tone, hidden intents
    |
-   +-- Selects top 5-6 candidate intents
+   +-- Selects top candidate intents (or 0 if genuinely none match)
    |
    v
  ┌──────────── Fan-Out (parallel) ────────────┐
@@ -48,13 +50,17 @@ Agent Orchestrator (Router / Light Reasoning)
  └──────────── Fan-In (aggregate) ────────────┘
    |
    v
-Agent Red Team / Quality Gate (conditional)
-   |  triggered if: max_confidence < 0.7 | top-2 conflict | critical intent
+Agent Red Team / Adversarial Quality Gate
+   |  triggered if: 0 candidates from orchestrator | max_confidence < 0.7 | top-2 conflict
    |  model: robust / different (UI-selectable)
    |
-   +-- Challenges decisions
+   +-- Challenges every decision adversarially
    +-- Detects missed intents
-   +-- Proposes 1-2 additional agents
+   +-- Requests extra specialized agents for missed intents
+   |   (those agents actually run and their results are added)
+   |
+   v
+Subject + Sender extraction (from markdown, independent of LLM)
    |
    v
 Final classification decision (traceable, explainable)

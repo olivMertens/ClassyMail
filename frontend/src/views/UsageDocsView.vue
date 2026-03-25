@@ -87,14 +87,17 @@ flowchart LR
 
     Classify -->|Under 8K| Phi4["Phi-4 - Primary"]
     Classify -->|Over 8K| GPT["GPT-4o-mini - Fallback"]
-    Classify -->|Agentic| Orch["Orchestrator"]
+    Classify -->|Agentic| Orch["Orchestrator - Inspector"]
 
-    Orch -->|"Top 5-6 intents"| Agents["Parallel Agents"]
+    Orch -->|"Top intents"| Agents["Parallel Agents"]
+    Orch -->|"0 intents"| RedTeam
     Agents -->|"Per-intent"| AISearch["AI Search RAG"]
     AISearch -->|"Positive + Negative examples"| Agents
-    Agents -->|"Low confidence"| RedTeam["Red Team"]
+    Agents -->|"Low confidence or 0 agents"| RedTeam["Red Team - Adversarial"]
     Agents -->|"High confidence"| Result
-    RedTeam --> Result
+    RedTeam -->|"Missed intents"| ExtraAgents["Extra Agents"]
+    ExtraAgents --> Result
+    RedTeam -->|"Validated"| Result
 
     Phi4 --> Result["Classification Result"]
     GPT --> Result
@@ -123,6 +126,7 @@ flowchart LR
     style Agents fill:#c084fc,stroke:#a855f7,color:#000
     style AISearch fill:#e9d5ff,stroke:#a855f7,color:#000
     style RedTeam fill:#f43f5e,stroke:#e11d48,color:#fff
+    style ExtraAgents fill:#c084fc,stroke:#a855f7,color:#000
 `
 
 </script>

@@ -119,11 +119,14 @@ flowchart TD
     Mistral -.->|${t('developer_docs.diagram.fallback')}| DI[${t('developer_docs.diagram.doc_intelligence')}]
     Worker -->|${t('developer_docs.diagram.classify')}| OPENAI[${t('developer_docs.diagram.openai')}]
 
-    OPENAI -->|"Agentic"| Orch["Orchestrator"]
+    OPENAI -->|"Agentic"| Orch["Orchestrator Inspector"]
     Orch -->|"Fan-out"| ParAgents["Parallel Agents"]
+    Orch -->|"0 intents"| RT["Red Team"]
     ParAgents -->|"Per-intent"| AISearch[("AI Search Indexes")]
     AISearch -->|"RAG"| ParAgents
-    ParAgents -->|"Verdicts"| OPENAI
+    ParAgents -->|"Verdicts"| RT
+    RT -->|"Missed intents"| ParAgents
+    RT -->|"Validated"| OPENAI
 
     subgraph AIFoundry [${t('developer_docs.diagram.ai_foundry')}]
         Mistral
@@ -194,10 +197,12 @@ flowchart TD
     StratCheck -->|"Agentic"| Orch
 
     Orch -->|"Fan-out"| Agents
+    Orch -->|"0 intents"| RedTeam
     Agents -->|"Per-intent"| AISearch
     AISearch -->|"RAG"| Agents
     Agents -->|"Verdicts"| RedTeam
-    RedTeam --> Result
+    RedTeam -->|"Missed intents"| Agents
+    RedTeam -->|"Validated"| Result
 
     Parallel --> Result
     Phi4 --> Result

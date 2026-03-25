@@ -17,7 +17,7 @@ Pattern: Event-Driven + Container Apps + AI Foundry (Mistral OCR & Phi-4)
 3. **OCR (Extraction):** The worker (FastAPI) downloads the PDF and sends it to the OCR model (Mistral) to extract Markdown. On failure (timeout, quota, open circuit breaker), the pipeline automatically falls back to **Azure Document Intelligence** (prebuilt-layout, text only).
 4. **Intelligence (Classification):**
    *   **Standard Mode**: Markdown sent to Primary LLM (Phi-4). Fallback to GPT-4o-mini if token budget exceeded.
-   *   **Agentic Mode** (NEW): Multi-agent pipeline with orchestrator, parallel specialized agents (per-intent RAG via AI Search), and optional Red Team quality gate. See [AGENTIC_CLASSIFICATION.md](AGENTIC_CLASSIFICATION.md).
+   *   **Agentic Mode** (NEW): Multi-agent pipeline with expert orchestrator inspector, parallel specialized agents (per-intent RAG via AI Search), adversarial Red Team quality gate that can request extra agents for missed intents. See [AGENTIC_CLASSIFICATION.md](AGENTIC_CLASSIFICATION.md).
 5. **Storage:** The result (JSON + usage/cost) is stored in Cosmos DB (with CSV export available from the app).
 
 ```mermaid
@@ -46,13 +46,15 @@ flowchart TD
     API -->|"Category Assessment"| Nano["gpt-5-nano Reasoning"]
     Nano -->|"Advice JSON"| API
 
-    Check -->|"Agentic Strategy"| Orch["Orchestrator: gpt-4.1-nano or model-router"]
-    Orch -->|"Top 5-6 intents"| FanOut["Parallel Agents: asyncio.gather"]
+    Check -->|"Agentic Strategy"| Orch["Orchestrator Inspector"]
+    Orch -->|"Top intents"| FanOut["Parallel Agents: asyncio.gather"]
+    Orch -->|"0 intents"| RT
     FanOut -->|"Per-intent query"| Search[("AI Search: per-intent indexes")]
     Search -->|"RAG: positive + negative examples"| FanOut
     FanOut -->|"Verdicts"| Agg["Aggregation"]
-    Agg -->|"Low confidence"| RT["Red Team: Quality Gate"]
-    RT -->|"Refined"| API
+    Agg -->|"Low confidence or 0 agents"| RT["Red Team: Adversarial Gate"]
+    RT -->|"Missed intents"| FanOut
+    RT -->|"Validated"| API
     Agg -->|"High confidence"| API
 
     API --> Cosmos[(Cosmos DB)]

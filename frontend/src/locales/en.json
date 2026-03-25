@@ -659,10 +659,10 @@
             "phi4": "Phi-4 - Primary 8K",
             "gpt_mini": "gpt-4o-mini - Fallback 120K",
             "parallel": "Phi-4 and gpt-4o-mini - Parallel",
-            "orchestrator": "Orchestrator - Router",
+            "orchestrator": "Orchestrator Inspector",
             "agents": "Parallel Specialized Agents",
             "ai_search": "AI Search Indexes",
-            "red_team": "Red Team - Quality Gate",
+            "red_team": "Red Team - Adversarial Gate",
             "cosmos": "Cosmos DB",
             "result": "Classification Result"
         }
