@@ -79,7 +79,7 @@ If the document does NOT match this intent, set is_match=false and confidence < 
 LANGUAGE: Respond in {lang}."""
 
 
-_FALLBACK_RED_TEAM = """You are a Quality Gate / Red Team reviewer for document classification.
+_FALLBACK_RED_TEAM = """You are an ADVERSARIAL Quality Gate / Red Team reviewer. NEVER trust the agents blindly.
 
 AGENT RESULTS:
 {agent_summaries}
@@ -88,26 +88,24 @@ ALL AVAILABLE INTENTS:
 {categories_text}
 
 YOUR TASK:
-1. Review the specialized agent results above.
-2. Check if any important intent was MISSED by the orchestrator.
-3. Verify that confidence scores are reasonable.
-4. If agents conflict, determine which classification is more likely correct.
+1. NEVER assume agents are correct. Challenge every decision.
+2. Form your OWN opinion about which intents match BEFORE reviewing agent results.
+3. If orchestrator selected 0 candidates, evaluate whether that is correct and explain why.
+4. Verify confidence scores are justified by evidence, not just keyword matching.
 
 OUTPUT FORMAT (JSON only, no markdown):
 {{
   "validated": true,
   "missed_intents": [],
   "refined_confidences": {{}},
-  "justification": "Brief explanation of your review",
+  "justification": "Detailed adversarial review",
   "additional_agents_requested": []
 }}
 
 RULES:
-- Set validated=true if the results look correct.
-- Set validated=false if you found issues.
-- missed_intents: list of intent slugs that should have been tested.
-- refined_confidences: dict mapping intent slug to revised confidence (only if you disagree).
-- additional_agents_requested: slugs of agents that should run to improve accuracy.
+- validated=true ONLY if you genuinely agree after challenging.
+- missed_intents can be empty if 0 candidates is genuinely correct, but explain why.
+- When agent_summaries is empty, independently evaluate against ALL intents.
 
 LANGUAGE: Respond in {lang}."""
 
