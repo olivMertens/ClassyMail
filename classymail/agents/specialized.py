@@ -248,12 +248,6 @@ async def run_specialized_agent(
             tool_calls = message.get("tool_calls", [])
             if tool_calls and index_enabled:
                 span.add_event("tool_call", {"tool": tool_name, "index": f"classymail-intent-{candidate.slug}"})
-            elif index_enabled and not tool_calls:
-                logger.warning(
-                    "[agentic] Agent %s: tool_choice was required but LLM returned no tool call",
-                    candidate.slug,
-                )
-                span.add_event("tool_call_skipped", {"reason": "llm_ignored_required_tool"})
 
                 for tc in tool_calls:
                     fn_name = tc.get("function", {}).get("name", "")
@@ -307,6 +301,13 @@ async def run_specialized_agent(
                 usage2 = data2.get("usage", {})
                 for k in ("prompt_tokens", "completion_tokens", "total_tokens"):
                     total_usage[k] = total_usage.get(k, 0) + usage2.get(k, 0)
+
+            elif index_enabled and not tool_calls:
+                logger.warning(
+                    "[agentic] Agent %s: tool_choice was required but LLM returned no tool call",
+                    candidate.slug,
+                )
+                span.add_event("tool_call_skipped", {"reason": "llm_ignored_required_tool"})
 
         latency_ms = (time.perf_counter() - t0) * 1000
         content = extract_message_content(message) or "{}"
