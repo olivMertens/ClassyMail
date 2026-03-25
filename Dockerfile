@@ -21,7 +21,7 @@ ENV UV_PROJECT_ENV=.venv \
 # build-essential is NOT needed — all Python deps ship pre-compiled wheels.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        curl libgl1 libglib2.0-0 \
+    curl libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv (fast Python package manager)

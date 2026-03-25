@@ -1196,9 +1196,7 @@ onMounted(() => {
                   class="px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors" :class="activePromptTab === tab
                     ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
                     : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'">
-                  {{ tab === 'orchestrator' ? '🎯 Orchestrator' : tab === 'specialized' ? '🔍 Specialized Agent' : '🛡️
-                  Red
-                  Team' }}
+                  {{ tab === 'orchestrator' ? '🎯 Orchestrator' : tab === 'specialized' ? '🔍 Specialized Agent' : '🛡️ Red Team' }}
                 </button>
               </div>
               <pre
@@ -2180,9 +2178,7 @@ onMounted(() => {
                   Status:
                   <span
                     :class="acaValidationResults.all_required_present ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                    {{ acaValidationResults.all_required_present ? '✓ All Required Variables Present' : '✗ Missing
-                    Required
-                    Variables' }}
+                    {{ acaValidationResults.all_required_present ? '✓ All Required Variables Present' : '✗ Missing Required Variables' }}
                   </span>
                 </p>
                 <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
