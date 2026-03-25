@@ -18,7 +18,7 @@ from opentelemetry import trace
 from classymail.agents.config import get_agentic_settings, resolve_agent_endpoint
 from classymail.agents.models import RedTeamVerdict, SpecializedAgentResult
 from classymail.agents.orchestrator import _load_prompt_template
-from classymail.core.llm_compat import build_chat_params, extract_message_content
+from classymail.core.llm_compat import build_chat_params, extract_message_content, supports_response_format
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.settings_store import get_categories_prompt_text, _build_categories_prompt
 
@@ -99,13 +99,14 @@ async def run_red_team(
 
     payload: dict = {
         "model": deployment,
-        "response_format": {"type": "json_object"},
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": text_markdown[:8000]},
         ],
         **build_chat_params(deployment, temperature=0.2, max_output_tokens=800),
     }
+    if supports_response_format(deployment):
+        payload["response_format"] = {"type": "json_object"}
 
     with tracer.start_as_current_span("agentic.red_team") as span:
         span.set_attribute("gen_ai.request.model", deployment)

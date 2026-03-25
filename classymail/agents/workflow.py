@@ -123,6 +123,7 @@ async def classify_agentic(
                 retrieval_mode=ar.retrieval_mode,
                 rag_hits=len(ar.rag_grounding),
                 tool_called=ar.tool_called,
+                triggered_by="orchestrator",
             ))
             total_tokens += _sum_tokens(ar.tokens)
 
@@ -206,6 +207,7 @@ async def classify_agentic(
                             retrieval_mode=ar.retrieval_mode,
                             rag_hits=len(ar.rag_grounding),
                             tool_called=ar.tool_called,
+                            triggered_by="red_team",
                         ))
                         total_tokens += _sum_tokens(ar.tokens)
                     agent_results.extend(extra_results)

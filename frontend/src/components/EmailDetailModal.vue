@@ -224,52 +224,64 @@ const mermaidFlowDef = computed(() => {
   if (!d) return ''
   const lines = ['flowchart TD']
 
-  // Orchestrator
-  const orchModel = d.orchestrator?.routed_model || d.orchestrator?.model || '?'
-  const orchMs = d.orchestrator?.latency_ms?.toFixed(0) || '?'
-  lines.push(`  ORCH["Orchestrator - ${truncate(orchModel, 30)} - ${orchMs}ms"]`)
-  lines.push('  style ORCH fill:#dbeafe,stroke:#3b82f6,color:#1e40af')
-
-  // Parallel fan-out agents
-  const agentIds = []
-  for (const [i, agent] of d.agents.entries()) {
-    const id = `A${i}`
-    agentIds.push(id)
-    const pct = Math.round((agent.confidence || 0) * 100)
-    const expl = truncate(agent.explanation, 50)
-    const model = truncate(agent.model || '?', 20)
-    const ms = agent.latency_ms?.toFixed(0) || '?'
-    const intentName = truncate(agent.intent || 'unknown', 25)
-    const label = `${intentName} ${pct}pct - ${model} ${ms}ms`
-    lines.push(`  ${id}["${label}"]`)
-
-    if (agent.confidence >= 0.7) {
+  // Helper: style an agent node by confidence
+  const styleAgent = (id, confidence, isRedTeamSpawned) => {
+    if (isRedTeamSpawned) {
+      lines.push(`  style ${id} fill:#fce7f3,stroke:#ec4899,color:#9d174d`)
+    } else if (confidence >= 0.7) {
       lines.push(`  style ${id} fill:#dcfce7,stroke:#22c55e,color:#166534`)
-    } else if (agent.confidence >= 0.4) {
+    } else if (confidence >= 0.4) {
       lines.push(`  style ${id} fill:#fef9c3,stroke:#eab308,color:#854d0e`)
     } else {
       lines.push(`  style ${id} fill:#f3f4f6,stroke:#9ca3af,color:#6b7280`)
     }
+  }
 
-    if (expl) {
-      lines.push(`  ORCH -->|"${expl}"| ${id}`)
-    } else {
-      lines.push(`  ORCH --> ${id}`)
-    }
+  // Helper: emit agent node + optional RAG child, returns the leaf node id
+  const emitAgent = (id, agent, isRedTeamSpawned) => {
+    const pct = Math.round((agent.confidence || 0) * 100)
+    const model = truncate(agent.model || '?', 20)
+    const ms = agent.latency_ms?.toFixed(0) || '?'
+    const intentName = truncate(agent.intent || 'unknown', 25)
+    const prefix = isRedTeamSpawned ? 'RT: ' : ''
+    const label = `${prefix}${intentName} ${pct}pct - ${model} ${ms}ms`
+    lines.push(`  ${id}["${label}"]`)
+    styleAgent(id, agent.confidence, isRedTeamSpawned)
 
-    // RAG AI Search node — shown when the tool was called
+    // RAG AI Search sub-node
     if (agent.tool_called) {
-      const ragId = `RAG${i}`
+      const ragId = `RAG_${id}`
       const indexName = truncate(agent.search_index || 'ai-search', 30)
       const mode = agent.retrieval_mode || 'semantic'
       const hits = agent.rag_hits || 0
       lines.push(`  ${ragId}[/"AI Search: ${mode} - ${hits} hits - ${indexName}"/]`)
       lines.push(`  style ${ragId} fill:#fef3c7,stroke:#f59e0b,color:#92400e`)
       lines.push(`  ${id} --> ${ragId}`)
+      return ragId
     }
+    return id
   }
 
-  // Red Team
+  // Orchestrator
+  const orchModel = d.orchestrator?.routed_model || d.orchestrator?.model || '?'
+  const orchMs = d.orchestrator?.latency_ms?.toFixed(0) || '?'
+  lines.push(`  ORCH["Orchestrator - ${truncate(orchModel, 30)} - ${orchMs}ms"]`)
+  lines.push('  style ORCH fill:#dbeafe,stroke:#3b82f6,color:#1e40af')
+
+  // Split agents: orchestrator-triggered vs red-team-triggered
+  const initialAgents = d.agents.filter(a => a.triggered_by !== 'red_team')
+  const rtAgents = d.agents.filter(a => a.triggered_by === 'red_team')
+
+  // ── Orchestrator fan-out agents (parallel branches) ──
+  const initialLeafIds = []
+  for (const [i, agent] of initialAgents.entries()) {
+    const id = `A${i}`
+    const leafId = emitAgent(id, agent, false)
+    initialLeafIds.push(leafId)
+    lines.push(`  ORCH --> ${id}`)
+  }
+
+  // ── Red Team ──
   if (d.redTeam) {
     const rtModel = truncate(d.redTeam.model || '?', 20)
     const rtMs = d.redTeam.latency_ms?.toFixed(0) || '?'
@@ -281,27 +293,49 @@ const mermaidFlowDef = computed(() => {
       lines.push('  style RT fill:#fee2e2,stroke:#dc2626,color:#7f1d1d')
     }
 
-    if (agentIds.length > 0) {
-      for (const [i, id] of agentIds.entries()) {
-        const downstream = d.agents[i]?.tool_called ? `RAG${i}` : id
-        lines.push(`  ${downstream} --> RT`)
+    if (initialLeafIds.length > 0) {
+      for (const leafId of initialLeafIds) {
+        lines.push(`  ${leafId} --> RT`)
       }
     } else {
-      // 0 agents: orchestrator goes directly to Red Team
-      lines.push('  ORCH --> RT')
+      // 0 candidates from orchestrator — direct path to Red Team
+      lines.push(`  ORCH -->|"0 candidates"| RT`)
     }
 
+    // ── Red Team spawned agents (branches from RT) ──
+    const rtLeafIds = []
+    for (const [i, agent] of rtAgents.entries()) {
+      const id = `RTA${i}`
+      const leafId = emitAgent(id, agent, true)
+      rtLeafIds.push(leafId)
+      lines.push(`  RT -->|"missed intent"| ${id}`)
+    }
+
+    // Justification edge into RESULT
     const rtJustif = truncate(d.redTeam.justification, 40)
-    if (rtJustif) {
-      lines.push(`  RT -->|"${rtJustif}"| RESULT`)
+    if (rtLeafIds.length > 0) {
+      // RT-spawned agents feed into RESULT
+      for (const leafId of rtLeafIds) {
+        lines.push(`  ${leafId} --> RESULT`)
+      }
+      // RT itself also connects to RESULT
+      if (rtJustif) {
+        lines.push(`  RT -->|"${rtJustif}"| RESULT`)
+      } else {
+        lines.push('  RT --> RESULT')
+      }
     } else {
-      lines.push('  RT --> RESULT')
+      if (rtJustif) {
+        lines.push(`  RT -->|"${rtJustif}"| RESULT`)
+      } else {
+        lines.push('  RT --> RESULT')
+      }
     }
   } else {
-    if (agentIds.length > 0) {
-      for (const [i, id] of agentIds.entries()) {
-        const downstream = d.agents[i]?.tool_called ? `RAG${i}` : id
-        lines.push(`  ${downstream} --> RESULT`)
+    // No Red Team — agents feed directly into RESULT
+    if (initialLeafIds.length > 0) {
+      for (const leafId of initialLeafIds) {
+        lines.push(`  ${leafId} --> RESULT`)
       }
     } else {
       lines.push('  ORCH --> RESULT')
@@ -918,7 +952,7 @@ watch(() => email.value, (val) => {
                           🎯 Orchestrator
                         </span>
                         <span class="text-gray-400">→</span>
-                        <template v-for="(agent, idx) in agenticData.agents" :key="agent.intent">
+                        <template v-for="(agent, idx) in agenticData.agents.filter(a => a.triggered_by !== 'red_team')" :key="'orch-' + agent.intent">
                           <span v-if="idx > 0" class="text-gray-400">·</span>
                           <span
                             class="inline-flex items-center gap-1 px-2 py-1 rounded-full whitespace-nowrap font-medium"
@@ -935,6 +969,15 @@ watch(() => email.value, (val) => {
                           <span
                             class="inline-flex items-center gap-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
                             🛡️ Red Team
+                          </span>
+                        </template>
+                        <template v-for="(agent, idx) in agenticData.agents.filter(a => a.triggered_by === 'red_team')" :key="'rt-' + agent.intent">
+                          <span v-if="idx === 0" class="text-gray-400">→</span>
+                          <span v-else class="text-gray-400">·</span>
+                          <span
+                            class="inline-flex items-center gap-1 px-2 py-1 rounded-full whitespace-nowrap font-medium bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300">
+                            🔍 {{ agent.intent }}
+                            <span class="opacity-60">{{ Math.round((agent.confidence || 0) * 100) }}%</span>
                           </span>
                         </template>
                         <span class="text-gray-400">→</span>

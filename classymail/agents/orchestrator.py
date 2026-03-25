@@ -16,7 +16,7 @@ from opentelemetry import trace
 
 from classymail.agents.config import get_agentic_settings, resolve_agent_endpoint
 from classymail.agents.models import CandidateIntent, OrchestratorResult
-from classymail.core.llm_compat import build_chat_params, extract_message_content
+from classymail.core.llm_compat import build_chat_params, extract_message_content, supports_response_format
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.settings_store import get_categories_prompt_text, _build_categories_prompt
 
@@ -164,13 +164,18 @@ async def run_orchestrator(
 
     payload: dict = {
         "model": deployment,
-        "response_format": {"type": "json_object"},
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": text_markdown[:12000]},  # cap for routing
         ],
+        # model-router can route to reasoning models; use max_completion_tokens
+        # (accepted by all modern models) and omit response_format for safety.
         **build_chat_params(deployment, temperature=0.1, max_output_tokens=800),
     }
+    # response_format: json_object unsupported by reasoning models — model-router
+    # may route to one, so only include when we know the deployment supports it.
+    if supports_response_format(deployment):
+        payload["response_format"] = {"type": "json_object"}
 
     with tracer.start_as_current_span("agentic.orchestrator") as span:
         span.set_attribute("gen_ai.system", "azure_openai")

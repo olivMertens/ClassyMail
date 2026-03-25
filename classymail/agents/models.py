@@ -92,6 +92,7 @@ class AgentTrace(BaseModel):
     retrieval_mode: Optional[str] = None
     rag_hits: int = 0
     tool_called: bool = False
+    triggered_by: Optional[str] = None  # orchestrator | red_team
 
 
 class AgenticClassificationResult(BaseModel):
