@@ -530,7 +530,8 @@ const saveSettings = async () => {
       categories: settings.value.categories,
       email_preprocessing: settings.value.email_preprocessing,  // FIX: Include email_preprocessing settings
       csv_export: settings.value.csv_export,  // CSV export customization
-      agentic: settings.value.agentic  // Agentic classification config
+      agentic: settings.value.agentic,  // Agentic classification config
+      default_locale: locale.value || 'en'  // Default language for classification output
     }
 
     const res = await fetch('/api/settings', {
@@ -1045,8 +1046,8 @@ onMounted(() => {
               </label>
             </div>
             <div class="flex items-center">
-              <input id="strategy-agentic" v-model="settings.processing_strategy" name="processing_strategy" type="radio"
-                value="agentic"
+              <input id="strategy-agentic" v-model="settings.processing_strategy" name="processing_strategy"
+                type="radio" value="agentic"
                 class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
               <label for="strategy-agentic"
                 class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
@@ -1061,7 +1062,8 @@ onMounted(() => {
         </div>
 
         <!-- Section: AI Model Selection (hidden when Agentic — replaced by orchestrator model) -->
-        <div v-if="settings.processing_strategy !== 'agentic'" class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 mb-6 bg-gray-50/50 dark:bg-gray-900/20">
+        <div v-if="settings.processing_strategy !== 'agentic'"
+          class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 mb-6 bg-gray-50/50 dark:bg-gray-900/20">
           <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
             <CpuChipIcon class="h-5 w-5 text-blue-500" />
             {{ t('settings.processing.model_select') }}
@@ -1176,11 +1178,14 @@ onMounted(() => {
               <CommandLineIcon class="h-4 w-4" />
               <span v-if="loadingOrchestratorPrompt">Loading prompts...</span>
               <span v-else>{{ showOrchestratorPrompt ? 'Hide' : 'View' }} Agent System Prompts</span>
-              <span class="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded">read-only</span>
+              <span
+                class="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded">read-only</span>
             </button>
             <div v-if="showOrchestratorPrompt && orchestratorPromptData" class="mt-2">
               <div class="flex items-center gap-3 mb-2 text-[10px] text-gray-500 dark:text-gray-400">
-                <span>Model: <code class="bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-1 rounded">{{ orchestratorPromptData.model }}</code></span>
+                <span>Model: <code
+                    class="bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-1 rounded">{{
+                      orchestratorPromptData.model }}</code></span>
                 <span>Max agents: <strong>{{ orchestratorPromptData.max_agents }}</strong></span>
                 <span>Categories: <strong>{{ orchestratorPromptData.categories_count }}</strong></span>
               </div>
@@ -1188,20 +1193,27 @@ onMounted(() => {
               <div class="flex gap-1 mb-2">
                 <button v-for="tab in ['orchestrator', 'specialized', 'red_team']" :key="tab"
                   @click="activePromptTab = tab"
-                  class="px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors"
-                  :class="activePromptTab === tab
+                  class="px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors" :class="activePromptTab === tab
                     ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
                     : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'">
-                  {{ tab === 'orchestrator' ? '🎯 Orchestrator' : tab === 'specialized' ? '🔍 Specialized Agent' : '🛡️ Red Team' }}
+                  {{ tab === 'orchestrator' ? '🎯 Orchestrator' : tab === 'specialized' ? '🔍 Specialized Agent' : '🛡️
+                  Red
+                  Team' }}
                 </button>
               </div>
-              <pre class="text-[11px] leading-relaxed text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap font-mono">{{ orchestratorPromptData[activePromptTab]?.prompt || '' }}</pre>
+              <pre
+                class="text-[11px] leading-relaxed text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap font-mono">
+        {{ orchestratorPromptData[activePromptTab]?.prompt || '' }}</pre>
               <p class="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500 italic flex items-center gap-1">
                 <span v-if="orchestratorPromptData[activePromptTab]?.source === 'file'" class="text-green-500">📁</span>
                 <span v-else class="text-amber-500">⚠️ fallback</span>
                 {{ orchestratorPromptData[activePromptTab]?.template_file || '' }}
-                <span v-if="activePromptTab === 'orchestrator'">— Categories are injected at runtime from your configured categories.</span>
-                <span v-else-if="activePromptTab === 'specialized'">— Template: variables like intent_name, intent_description are resolved per category agent.</span>
+                <span v-if="activePromptTab === 'orchestrator'">— Categories are injected at runtime from your
+                  configured
+                  categories.</span>
+                <span v-else-if="activePromptTab === 'specialized'">— Template: variables like intent_name,
+                  intent_description
+                  are resolved per category agent.</span>
                 <span v-else>— Red Team receives the agent results and all available intents for review.</span>
               </p>
             </div>
@@ -1220,7 +1232,8 @@ onMounted(() => {
                 <option value="gpt-5-mini">GPT-5 Mini (reasoning, balanced)</option>
                 <option value="model-router">Model Router (auto-select)</option>
               </select>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Fast routing model. Phi-4 not recommended here.</p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Fast routing model. Phi-4 not recommended here.
+              </p>
               <!-- GPT-5 latency disclaimer -->
               <div v-if="settings.agentic.orchestrator_model?.startsWith('gpt-5')"
                 class="mt-1.5 flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded p-2">
@@ -1246,7 +1259,8 @@ onMounted(() => {
                 Agent Tier 1 (Simple)
                 <span class="relative group">
                   <InformationCircleIcon class="h-3.5 w-3.5 text-gray-400 cursor-help" />
-                  <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                  <span
+                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
                     Orchestrator confidence &gt; 80%. Clear emails — cheap model is enough.
                   </span>
                 </span>
@@ -1263,7 +1277,8 @@ onMounted(() => {
                 Agent Tier 2 (Ambiguous)
                 <span class="relative group">
                   <InformationCircleIcon class="h-3.5 w-3.5 text-gray-400 cursor-help" />
-                  <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                  <span
+                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
                     Orchestrator confidence 50-80%. Subtle signals — a more capable model resolves ambiguity.
                   </span>
                 </span>
@@ -1280,7 +1295,8 @@ onMounted(() => {
                 Agent Tier 3 (Critical)
                 <span class="relative group">
                   <InformationCircleIcon class="h-3.5 w-3.5 text-gray-400 cursor-help" />
-                  <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                  <span
+                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
                     Orchestrator confidence &lt; 50%. Complex or business-critical — most robust model for accuracy.
                   </span>
                 </span>
@@ -1334,7 +1350,8 @@ onMounted(() => {
                 {{ t('settings.agentic.reasoning_effort_label') }}
                 <span class="relative group">
                   <InformationCircleIcon class="h-3.5 w-3.5 text-gray-400 cursor-help" />
-                  <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                  <span
+                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
                     {{ t('settings.agentic.reasoning_effort_help') }}
                   </span>
                 </span>
@@ -1350,18 +1367,20 @@ onMounted(() => {
           </div>
 
           <!-- Per-Category AI Search Index Toggles -->
-          <div v-if="settings.categories && settings.categories.length" class="mt-5 border-t border-purple-200 dark:border-purple-700 pt-4">
+          <div v-if="settings.categories && settings.categories.length"
+            class="mt-5 border-t border-purple-200 dark:border-purple-700 pt-4">
             <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
               <MagnifyingGlassIcon class="h-4 w-4 text-purple-500" />
               Per-Category AI Search Index (RAG Tool)
             </h5>
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-              Each agent gets a contextual search tool bound to its category-specific index. Toggle to enable/disable the RAG tool per category.
+              Each agent gets a contextual search tool bound to its category-specific index. Toggle to enable/disable
+              the RAG
+              tool per category.
             </p>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-2">
               <div v-for="cat in settings.categories" :key="cat.slug"
-                class="flex items-start gap-3 p-3 rounded-lg border transition-colors"
-                :class="settings.agentic.enabled_indexes[cat.slug] !== false
+                class="flex items-start gap-3 p-3 rounded-lg border transition-colors" :class="settings.agentic.enabled_indexes[cat.slug] !== false
                   ? 'border-purple-300 dark:border-purple-600 bg-purple-50/50 dark:bg-purple-900/20'
                   : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 opacity-60'">
                 <input :id="'idx-' + cat.slug" type="checkbox"
@@ -1375,11 +1394,15 @@ onMounted(() => {
                   <div class="mt-1 space-y-0.5">
                     <div class="flex items-center gap-1.5">
                       <span class="text-[10px] text-gray-400">Index:</span>
-                      <code class="text-[10px] text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40 px-1 rounded">classymail-intent-{{ cat.slug }}</code>
+                      <code
+                        class="text-[10px] text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40 px-1 rounded">classymail-intent-{{
+                cat.slug }}</code>
                     </div>
                     <div class="flex items-center gap-1.5">
                       <span class="text-[10px] text-gray-400">Tool:</span>
-                      <code class="text-[10px] text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/40 px-1 rounded">search_{{ cat.slug.replaceAll('-', '_') }}()</code>
+                      <code
+                        class="text-[10px] text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/40 px-1 rounded">search_{{
+                          cat.slug.replaceAll('-', '_') }}()</code>
                     </div>
                   </div>
                 </div>
@@ -2157,7 +2180,9 @@ onMounted(() => {
                   Status:
                   <span
                     :class="acaValidationResults.all_required_present ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                    {{ acaValidationResults.all_required_present ? '✓ All Required Variables Present' : '✗ Missing Required Variables' }}
+                    {{ acaValidationResults.all_required_present ? '✓ All Required Variables Present' : '✗ Missing
+                    Required
+                    Variables' }}
                   </span>
                 </p>
                 <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
@@ -2459,8 +2484,10 @@ onMounted(() => {
           <div class="px-6 py-5 max-h-[75vh] overflow-y-auto space-y-5">
             <!-- Orchestrator -->
             <div class="rounded-lg border-2 border-blue-200 dark:border-blue-800 p-4 bg-blue-50/50 dark:bg-blue-900/10">
-              <h4 class="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">🎯 {{ t('settings.agentic.advice_orchestrator') }}</h4>
-              <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ t('settings.agentic.advice_orchestrator_desc') }}</p>
+              <h4 class="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">🎯 {{
+                t('settings.agentic.advice_orchestrator') }}</h4>
+              <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ t('settings.agentic.advice_orchestrator_desc')
+                }}</p>
               <div class="grid grid-cols-2 gap-2 text-[11px]">
                 <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
                   <strong class="text-green-600">✓ gpt-4.1-nano</strong>
@@ -2482,26 +2509,35 @@ onMounted(() => {
             </div>
 
             <!-- Agent Tiers -->
-            <div class="rounded-lg border-2 border-purple-200 dark:border-purple-800 p-4 bg-purple-50/50 dark:bg-purple-900/10">
-              <h4 class="text-sm font-semibold text-purple-800 dark:text-purple-300 mb-2">🔍 {{ t('settings.agentic.advice_agents') }}</h4>
-              <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ t('settings.agentic.advice_agents_desc') }}</p>
+            <div
+              class="rounded-lg border-2 border-purple-200 dark:border-purple-800 p-4 bg-purple-50/50 dark:bg-purple-900/10">
+              <h4 class="text-sm font-semibold text-purple-800 dark:text-purple-300 mb-2">🔍 {{
+                t('settings.agentic.advice_agents') }}</h4>
+              <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ t('settings.agentic.advice_agents_desc') }}
+              </p>
               <div class="space-y-2 text-[11px]">
-                <div class="flex items-center gap-3 bg-white dark:bg-gray-900 rounded p-2 border border-green-200 dark:border-green-900">
-                  <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white text-[10px] font-bold">1</span>
+                <div
+                  class="flex items-center gap-3 bg-white dark:bg-gray-900 rounded p-2 border border-green-200 dark:border-green-900">
+                  <span
+                    class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white text-[10px] font-bold">1</span>
                   <div class="flex-1">
                     <strong class="text-green-700 dark:text-green-400">Tier 1 — gpt-4.1-nano</strong>
                     <p class="text-gray-500">{{ t('settings.agentic.advice_tier1') }}</p>
                   </div>
                 </div>
-                <div class="flex items-center gap-3 bg-white dark:bg-gray-900 rounded p-2 border border-amber-200 dark:border-amber-900">
-                  <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold">2</span>
+                <div
+                  class="flex items-center gap-3 bg-white dark:bg-gray-900 rounded p-2 border border-amber-200 dark:border-amber-900">
+                  <span
+                    class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold">2</span>
                   <div class="flex-1">
                     <strong class="text-amber-700 dark:text-amber-400">Tier 2 — gpt-4.1-mini</strong>
                     <p class="text-gray-500">{{ t('settings.agentic.advice_tier2') }}</p>
                   </div>
                 </div>
-                <div class="flex items-center gap-3 bg-white dark:bg-gray-900 rounded p-2 border border-red-200 dark:border-red-900">
-                  <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold">3</span>
+                <div
+                  class="flex items-center gap-3 bg-white dark:bg-gray-900 rounded p-2 border border-red-200 dark:border-red-900">
+                  <span
+                    class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold">3</span>
                   <div class="flex-1">
                     <strong class="text-red-700 dark:text-red-400">Tier 3 — gpt-4.1</strong>
                     <p class="text-gray-500">{{ t('settings.agentic.advice_tier3') }}</p>
@@ -2512,8 +2548,10 @@ onMounted(() => {
 
             <!-- Red Team -->
             <div class="rounded-lg border-2 border-red-200 dark:border-red-800 p-4 bg-red-50/50 dark:bg-red-900/10">
-              <h4 class="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">🛡️ {{ t('settings.agentic.advice_redteam') }}</h4>
-              <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ t('settings.agentic.advice_redteam_desc') }}</p>
+              <h4 class="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">🛡️ {{
+                t('settings.agentic.advice_redteam') }}</h4>
+              <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ t('settings.agentic.advice_redteam_desc') }}
+              </p>
               <div class="text-[11px] bg-white dark:bg-gray-900 rounded p-2 border border-red-100 dark:border-red-900">
                 <strong class="text-green-600">✓ gpt-4.1</strong>
                 <span class="text-gray-500 ml-1">{{ t('settings.agentic.advice_redteam_model') }}</span>
@@ -2522,7 +2560,8 @@ onMounted(() => {
 
             <!-- Key Insight -->
             <div class="rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4">
-              <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">💡 {{ t('settings.agentic.advice_insight_title') }}</h4>
+              <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">💡 {{
+                t('settings.agentic.advice_insight_title') }}</h4>
               <p class="text-xs text-gray-600 dark:text-gray-300">{{ t('settings.agentic.advice_insight') }}</p>
             </div>
           </div>

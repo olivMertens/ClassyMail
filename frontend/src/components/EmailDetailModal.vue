@@ -629,18 +629,6 @@ watch(() => email.value, (val) => {
                     </div>
                   </div>
 
-                  <!-- Debug URLs -->
-                  <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
-                    <div v-if="email.file_url">
-                      <span class="font-semibold">Blob URL:</span>
-                      <code class="break-all">{{ email.file_url }}</code>
-                    </div>
-                    <div v-if="email.file_url_sas">
-                      <span class="font-semibold">SAS URL:</span>
-                      <code class="break-all">{{ email.file_url_sas }}</code>
-                    </div>
-                  </div>
-
                   <!-- Content Filter Alert -->
                   <div v-if="email.status === 'CONTENT_FILTERED' && email.content_filter_result"
                     class="rounded-md bg-purple-50 dark:bg-purple-900/20 p-3 border border-purple-200 dark:border-purple-800">
@@ -878,7 +866,8 @@ watch(() => email.value, (val) => {
                       class="flex items-center gap-2 text-sm font-medium text-purple-700 dark:text-purple-400 hover:text-purple-900 dark:hover:text-purple-200 transition-colors w-full">
                       <span class="text-base">🤖</span>
                       Agentic Pipeline Trace
-                      <span class="text-[10px] bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 px-1.5 py-0.5 rounded-full">
+                      <span
+                        class="text-[10px] bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 px-1.5 py-0.5 rounded-full">
                         {{ agenticData.agents.length }} agents
                         <span v-if="agenticData.redTeam">+ Red Team</span>
                       </span>
@@ -888,8 +877,10 @@ watch(() => email.value, (val) => {
 
                     <div v-if="showAgenticTrace" class="mt-3 space-y-3">
                       <!-- Visual Flow -->
-                      <div class="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 overflow-x-auto pb-1">
-                        <span class="inline-flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
+                      <div
+                        class="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 overflow-x-auto pb-1">
+                        <span
+                          class="inline-flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
                           🎯 Orchestrator
                         </span>
                         <span class="text-gray-400">→</span>
@@ -898,8 +889,8 @@ watch(() => email.value, (val) => {
                           <span
                             class="inline-flex items-center gap-1 px-2 py-1 rounded-full whitespace-nowrap font-medium"
                             :class="agent.confidence >= 0.7 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
-                                    agent.confidence >= 0.4 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
-                                    'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'">
+                              agent.confidence >= 0.4 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'">
                             {{ agent.confidence >= 0.7 ? '✅' : agent.confidence >= 0.4 ? '⚠️' : '❌' }}
                             {{ agent.intent }}
                             <span class="opacity-60">{{ Math.round((agent.confidence || 0) * 100) }}%</span>
@@ -907,12 +898,14 @@ watch(() => email.value, (val) => {
                         </template>
                         <template v-if="agenticData.redTeamTrace">
                           <span class="text-gray-400">→</span>
-                          <span class="inline-flex items-center gap-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
+                          <span
+                            class="inline-flex items-center gap-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
                             🛡️ Red Team
                           </span>
                         </template>
                         <span class="text-gray-400">→</span>
-                        <span class="inline-flex items-center gap-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
+                        <span
+                          class="inline-flex items-center gap-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
                           📊 Result
                         </span>
                       </div>
@@ -927,7 +920,8 @@ watch(() => email.value, (val) => {
                           {{ showMermaidFlow ? '▼ Hide Flow Diagram' : '▶ Show Flow Diagram' }}
                         </button>
                       </div>
-                      <div v-if="showMermaidFlow" class="rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-900 p-3 overflow-x-auto">
+                      <div v-if="showMermaidFlow"
+                        class="rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-900 p-3 overflow-x-auto">
                         <div v-html="mermaidFlowSvg" class="flex justify-center [&>svg]:max-w-full"></div>
                       </div>
 
@@ -939,7 +933,8 @@ watch(() => email.value, (val) => {
                             🎯 Orchestrator (Router)
                           </h5>
                           <div class="flex items-center gap-2 text-[10px] text-gray-500">
-                            <code class="bg-blue-100 dark:bg-blue-900/40 px-1 rounded">{{ agenticData.orchestrator.model }}</code>
+                            <code
+                              class="bg-blue-100 dark:bg-blue-900/40 px-1 rounded">{{ agenticData.orchestrator.model }}</code>
                             <span v-if="agenticData.orchestrator.routed_model" class="text-blue-500">
                               → {{ agenticData.orchestrator.routed_model }}
                             </span>
@@ -957,17 +952,15 @@ watch(() => email.value, (val) => {
                       <!-- Specialized Agent Cards -->
                       <div class="grid grid-cols-1 gap-2">
                         <div v-for="agent in agenticData.agents" :key="agent.intent"
-                          class="rounded-lg border p-3 transition-colors"
-                          :class="agent.confidence >= 0.7
+                          class="rounded-lg border p-3 transition-colors" :class="agent.confidence >= 0.7
                             ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10'
                             : agent.confidence >= 0.4
                               ? 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10'
                               : 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 opacity-60'">
                           <div class="flex items-center justify-between mb-1">
-                            <h5 class="text-xs font-semibold flex items-center gap-1.5"
-                              :class="agent.confidence >= 0.7 ? 'text-green-800 dark:text-green-300' :
-                                      agent.confidence >= 0.4 ? 'text-amber-800 dark:text-amber-300' :
-                                      'text-gray-500 dark:text-gray-400'">
+                            <h5 class="text-xs font-semibold flex items-center gap-1.5" :class="agent.confidence >= 0.7 ? 'text-green-800 dark:text-green-300' :
+                              agent.confidence >= 0.4 ? 'text-amber-800 dark:text-amber-300' :
+                                'text-gray-500 dark:text-gray-400'">
                               {{ agent.confidence >= 0.7 ? '✅' : agent.confidence >= 0.4 ? '⚠️' : '❌' }}
                               {{ agent.intent }}
                               <span class="font-bold">{{ Math.round((agent.confidence || 0) * 100) }}%</span>
@@ -990,12 +983,14 @@ watch(() => email.value, (val) => {
                         <div class="flex items-center justify-between mb-2">
                           <h5 class="text-xs font-semibold text-red-800 dark:text-red-300 flex items-center gap-1.5">
                             🛡️ Red Team / Quality Gate
-                            <span :class="agenticData.redTeam.validated ? 'text-green-600' : 'text-red-600'" class="text-[10px]">
+                            <span :class="agenticData.redTeam.validated ? 'text-green-600' : 'text-red-600'"
+                              class="text-[10px]">
                               {{ agenticData.redTeam.validated ? '✓ Validated' : '✗ Issues Found' }}
                             </span>
                           </h5>
                           <div class="flex items-center gap-2 text-[10px] text-gray-500">
-                            <code class="bg-red-100 dark:bg-red-900/40 px-1 rounded">{{ agenticData.redTeam.model }}</code>
+                            <code
+                              class="bg-red-100 dark:bg-red-900/40 px-1 rounded">{{ agenticData.redTeam.model }}</code>
                             <span>{{ agenticData.redTeam.latency_ms?.toFixed(0) }}ms</span>
                           </div>
                         </div>
@@ -1010,7 +1005,8 @@ watch(() => email.value, (val) => {
                       </div>
 
                       <!-- Summary Stats -->
-                      <div class="flex items-center gap-4 text-[10px] text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-200 dark:border-gray-700">
+                      <div
+                        class="flex items-center gap-4 text-[10px] text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-200 dark:border-gray-700">
                         <span>⏱ Parallel: {{ agenticData.parallelMs?.toFixed(0) }}ms</span>
                         <span>🔢 Total: {{ agenticData.totalTokens }} tokens</span>
                         <span>🤖 {{ agenticData.agents.length }} agents</span>
@@ -1021,16 +1017,33 @@ watch(() => email.value, (val) => {
                       <!-- Settings Snapshot -->
                       <div v-if="agenticData.settings" class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                         <div class="flex items-center gap-1 mb-1.5">
-                          <span class="text-[10px] font-medium text-gray-500 dark:text-gray-400">⚙️ Configuration used for this classification:</span>
+                          <span class="text-[10px] font-medium text-gray-500 dark:text-gray-400">⚙️ Configuration used
+                            for this
+                            classification:</span>
                         </div>
                         <div class="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
-                          <span class="text-gray-500">Orchestrator: <code class="bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-1 rounded">{{ agenticData.settings.orchestrator_model }}</code></span>
-                          <span class="text-gray-500">T1: <code class="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-1 rounded">{{ agenticData.settings.agent_tier1_model }}</code></span>
-                          <span class="text-gray-500">T2: <code class="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1 rounded">{{ agenticData.settings.agent_tier2_model }}</code></span>
-                          <span class="text-gray-500">T3: <code class="bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1 rounded">{{ agenticData.settings.agent_tier3_model }}</code></span>
-                          <span class="text-gray-500">Red Team: <code class="bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1 rounded">{{ agenticData.settings.red_team_model }}</code></span>
-                          <span class="text-gray-500">RAG: <code class="bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-1 rounded">{{ agenticData.settings.retrieval_mode }}</code></span>
-                          <span v-if="agenticData.settings.reasoning_effort !== 'none'" class="text-gray-500">Reasoning: <code class="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-1 rounded">{{ agenticData.settings.reasoning_effort }}</code></span>
+                          <span class="text-gray-500">Orchestrator: <code
+                              class="bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-1 rounded">{{
+                                agenticData.settings.orchestrator_model }}</code></span>
+                          <span class="text-gray-500">T1: <code
+                              class="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-1 rounded">{{
+                                agenticData.settings.agent_tier1_model }}</code></span>
+                          <span class="text-gray-500">T2: <code
+                              class="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1 rounded">{{
+                                agenticData.settings.agent_tier2_model }}</code></span>
+                          <span class="text-gray-500">T3: <code
+                              class="bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1 rounded">{{
+                                agenticData.settings.agent_tier3_model }}</code></span>
+                          <span class="text-gray-500">Red Team: <code
+                              class="bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1 rounded">{{
+                                agenticData.settings.red_team_model }}</code></span>
+                          <span class="text-gray-500">RAG: <code
+                              class="bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-1 rounded">{{
+                                agenticData.settings.retrieval_mode }}</code></span>
+                          <span v-if="agenticData.settings.reasoning_effort !== 'none'" class="text-gray-500">Reasoning:
+                            <code
+                              class="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-1 rounded">{{
+                                agenticData.settings.reasoning_effort }}</code></span>
                           <span class="text-gray-500">Threshold: {{ agenticData.settings.red_team_threshold }}</span>
                         </div>
                       </div>
