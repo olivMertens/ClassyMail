@@ -91,6 +91,7 @@
         "strategy_standard_help": "Schnell & Effizient. Ideal für Standard-getippte Texte und klare E-Mails.",
         "strategy_reasoning_help": "Tiefenanalyse. Verwendet 'Chain-of-Thought' zur Begründung vor der Klassifizierung. Nützlich bei mehrdeutigen Fällen.",
         "strategy_vision_help": "Multimodal. Analysiert visuelle Elemente (Bilder, Layout). Ideal für Dokumente mit Fotos oder komplexen Strukturen. Hinweis: Bildannotationen auf 8 Seiten begrenzt.",
+        "strategy_agentic_help": "Multi-Agent. Orchestrator leitet an spezialisierte Agenten parallel weiter, jeder mit eigenem AI Search Index für RAG-Grounding. Enthält ein Red Team Quality Gate für niedrige Konfidenz oder widersprüchliche Ergebnisse.",
         "categories": {
             "tab_name": "Kategorien",
             "warning_title": "⚠️ Systemverhalten-Warnung",
@@ -441,7 +442,8 @@
             "upload": "Upload & Aufnahme",
             "ocr": "OCR & Extraktion",
             "classification": "KI-Klassifizierung",
-            "storage": "Speicherung & Ergebnisse"
+            "storage": "Speicherung & Ergebnisse",
+            "agentic": "Agentische Pipeline"
         },
         "usage": {
             "title": "ClassyMail verwenden",
@@ -464,26 +466,28 @@
             "step4_title": "4. Einstellungen & Konfiguration",
             "step4_desc": "Optimieren Sie das Engine-Verhalten im Tab Einstellungen passend zu Ihrem Anwendungsfall.",
             "step4_li1": "Kategorien: Definieren Sie genaue Absichtsnamen und Beschreibungen. Änderungen gelten sofort für neue Klassifizierungen.",
-            "step4_li2": "Verarbeitungsstrategie: Wechseln Sie zwischen Standard (schnell), Reasoning (genau) oder Vision (bildgestützt).",
+            "step4_li2": "Verarbeitungsstrategie: Wechseln Sie zwischen Standard (schnell), Reasoning (genau), Vision (bildgestützt) oder Agentisch (Multi-Agent mit pro-Intention RAG) Modi.",
             "step4_li3": "PII-Einstellungen: Aktivieren/deaktivieren Sie PII-Erkennung, wählen Sie die Methode (LLM, Azure AI Language oder Hybrid) und das Modell."
         },
         "strategies": {
             "title": "Verarbeitungsstrategien",
             "desc": "Wählen Sie die Strategie, die am besten zu Ihren Dokumenttypen passt. Jede Strategie optimiert verschiedene Kompromisse zwischen Geschwindigkeit, Genauigkeit und Kosten.",
             "standard_title": "Standard",
-            "standard_desc": "Schnelle Klassifizierung mit Phi-4 (unter 8K Tokens) oder GPT-4o-mini (größere Dokumente). Am besten für textlastige E-Mails mit klarer Absicht. Niedrigste Kosten pro Dokument.",
+            "standard_desc": "Schnelle Klassifizierung mit einem einzigen LLM-Aufruf des Primärmodells. Am besten für textlastige Dokumente mit klarer Absicht. Niedrigste Kosten pro Dokument.",
             "reasoning_title": "Reasoning",
-            "reasoning_desc": "Zwingt die KI, eine schrittweise Begründung vor der Klassifizierung auszugeben. Verbessert die Genauigkeit bei mehrdeutigen oder Multi-Absicht-E-Mails. Etwas höhere Latenz.",
+            "reasoning_desc": "Zwingt die KI, eine schrittweise Begründung vor der Klassifizierung auszugeben. Verbessert die Genauigkeit bei mehrdeutigen oder Multi-Absicht-Dokumenten. Etwas höhere Latenz.",
             "vision_title": "Vision",
-            "vision_desc": "Aktiviert vollständige Bildanalyse mit GPT-4o-mini Vision-Fähigkeiten. Am besten für Dokumente mit Fotos, Diagrammen oder gescannter Handschrift, die die Klassifizierung beeinflussen."
+            "vision_desc": "Aktiviert die vollständige Bildanalyse. Ideal für Dokumente mit Fotos, Diagrammen oder gescannter Handschrift.",
+            "agentic_title": "Agentisch (Multi-Agent)",
+            "agentic_desc": "Orchestrator leitet an spezialisierte Agenten parallel weiter, jeder mit eigenem AI Search Index für RAG-Grounding. Enthält ein Red Team Quality Gate. Ideal für 5+ Kategorien mit überlappenden Definitionen."
         },
         "ai": {
             "title": "KI-Komplexität & Reasoning",
-            "desc": "Das System bewertet die Komplexität jeder E-Mail und passt seinen Ansatz an:",
-            "li1": "Multi-Absicht-Erkennung: Identifiziert E-Mails mit mehreren verschiedenen Aktionen (z.B. 'Adresse ändern UND Kontoauszug senden') und klassifiziert jede Absicht einzeln.",
+            "desc": "Das System bewertet die Komplexität jedes Dokuments und passt seinen Ansatz an:",
+            "li1": "Multi-Absicht-Erkennung: Identifiziert Dokumente mit mehreren verschiedenen Aktionen und klassifiziert jede Absicht einzeln.",
             "li2": "Mehrdeutigkeits-Behandlung: Löst vage Formulierungen durch Nutzung von Kontext aus Anhängen, Headern und Dokumentstruktur.",
             "li3": "Reasoning-Modus: Wenn aktiviert, gibt die KI eine Gedankenkette als Begründung aus, bevor sie klassifiziert, was die Genauigkeit bei komplexen Fällen deutlich verbessert.",
-            "li4": "Token-Budget-Routing: Dokumente unter 8K Tokens werden von Phi-4 verarbeitet (schneller, günstiger); größere Dokumente werden automatisch an GPT-4o-mini weitergeleitet."
+            "li4": "Token-Budget-Routing: Dokumente unter 8K Tokens werden vom Primärmodell verarbeitet (schneller, günstiger); größere Dokumente werden automatisch an das Fallback-Modell weitergeleitet."
         },
         "exports": {
             "title": "Datenexporte & Fine-Tuning",
@@ -500,9 +504,9 @@
             "title": "Datenschutz & Datensicherheit (PII)",
             "desc": "DSGVO-konforme Verwaltung personenbezogener Daten (PII) mit konfigurierbarer Erkennung und Anonymisierung:",
             "detection_title": "PII-Erkennung",
-            "detection_desc": "Die KI markiert E-Mails mit sensiblen Daten. Aktivieren unter Einstellungen > Verarbeitung > E-Mail-Vorverarbeitung.",
+            "detection_desc": "Die KI markiert Dokumente mit sensiblen Daten. Aktivieren unter Einstellungen > Verarbeitung > Vorverarbeitung.",
             "detection_li1": "LLM-basiert: Kontextuelles Verständnis mit dem gewählten Modell — extrahiert Namen, E-Mails, Telefonnummern, Adressen, Vertragsnummern und Daten.",
-            "detection_li2": "Azure AI Language: Nativer Dienst mit 40+ vordefinierten PII-Kategorien (~€0.001/E-Mail).",
+            "detection_li2": "Azure AI Language: Nativer Dienst mit 40+ vordefinierten PII-Kategorien (~€0.001/Dokument).",
             "detection_li3": "Hybrid: Führt beide Methoden parallel aus und fusioniert Ergebnisse für maximale Genauigkeit.",
             "detection_li4": "Konfigurierbares Modell: PII-Erkennung kann Ihr Klassifizierungsmodell wiederverwenden (Auto) oder ein dediziertes Deployment nutzen (gpt-4o-mini, gpt-5-nano, etc.).",
             "detection_categories": "Erkannte Kategorien: Namen, E-Mails, Telefonnummern, Adressen, Vertrags-/Policennummern, Daten und andere Identifikatoren (Ausweisnr., Reisepass, IBAN).",
@@ -511,7 +515,7 @@
             "anonymization_li1": "Namen, E-Mails und Daten werden durch generische Platzhalter ersetzt ([Name], [E-Mail], [Datum]).",
             "anonymization_li2": "Finanzbeträge, Adressen und Referenznummern werden maskiert.",
             "anonymization_li3": "Die Markdown-Struktur (Überschriften, Links, Tabellen) wird vollständig beibehalten.",
-            "settings_hint": "Konfigurieren Sie PII-Erkennungsmethode und -Modell unter Einstellungen > Verarbeitung > E-Mail-Vorverarbeitung."
+            "settings_hint": "Konfigurieren Sie PII-Erkennungsmethode und -Modell unter Einstellungen > Verarbeitung > Vorverarbeitung."
         },
         "vision": {
             "title": "Smart Vision (Mistral Document AI)",

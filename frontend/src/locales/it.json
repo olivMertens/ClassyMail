@@ -91,6 +91,7 @@
         "strategy_standard_help": "Veloce ed Efficiente. Ideale per testi dattiloscritti standard ed email chiare.",
         "strategy_reasoning_help": "Analisi Approfondita. Usa 'Chain-of-Thought' per giustificare prima di classificare. Utile per casi ambigui.",
         "strategy_vision_help": "Multimodale. Analizza elementi visivi (immagini, layout). Ideale per documenti con foto o strutture complesse. Nota: annotazioni immagini limitate a 8 pagine.",
+        "strategy_agentic_help": "Multi-Agente. L'orchestratore indirizza ad agenti specializzati in parallelo, ciascuno con il proprio indice AI Search per il grounding RAG. Include un Quality Gate Red Team per risultati a bassa confidenza o conflittuali.",
         "categories": {
             "tab_name": "Categorie",
             "warning_title": "⚠️ Avviso Comportamento Sistema",
@@ -441,7 +442,8 @@
             "upload": "Caricamento e Acquisizione",
             "ocr": "OCR ed Estrazione",
             "classification": "Classificazione IA",
-            "storage": "Archiviazione e Risultati"
+            "storage": "Archiviazione e Risultati",
+            "agentic": "Pipeline Agentico"
         },
         "usage": {
             "title": "Come usare ClassyMail",
@@ -464,18 +466,20 @@
             "step4_title": "4. Impostazioni e Configurazione",
             "step4_desc": "Regolare il comportamento del motore nella scheda Impostazioni in base al proprio caso d'uso.",
             "step4_li1": "Categorie: Definire nomi di intento precisi e descrizioni. Le modifiche si applicano immediatamente alle nuove classificazioni.",
-            "step4_li2": "Strategia di Elaborazione: Alternare tra Standard (veloce), Ragionamento (preciso) o Vision (basata su immagini).",
+            "step4_li2": "Strategia di Elaborazione: Alternare tra Standard (veloce), Ragionamento (preciso), Vision (immagini) o Agentico (multi-agente con RAG per intenzione).",
             "step4_li3": "Impostazioni PII: Attivare/disattivare il rilevamento PII, scegliere il metodo (LLM, Azure AI Language o Ibrido) e il modello."
         },
         "strategies": {
             "title": "Strategie di Elaborazione",
             "desc": "Scegliere la strategia più adatta ai propri tipi di documento. Ogni strategia ottimizza diversi compromessi tra velocità, precisione e costo.",
             "standard_title": "Standard",
-            "standard_desc": "Classificazione rapida con Phi-4 (sotto 8K token) o GPT-4o-mini (documenti più grandi). Ideale per email con testo chiaro. Costo minimo per documento.",
+            "standard_desc": "Classificazione rapida con una singola chiamata LLM al modello primario. Ideale per documenti con testo chiaro. Costo minimo per documento.",
             "reasoning_title": "Ragionamento",
-            "reasoning_desc": "Forza l'IA a produrre un ragionamento passo-passo prima di classificare. Migliora la precisione su email ambigue o con intenti multipli. Latenza leggermente superiore.",
+            "reasoning_desc": "Forza l'IA a produrre un ragionamento passo-passo prima di classificare. Migliora la precisione su documenti ambigui o con intenti multipli. Latenza leggermente superiore.",
             "vision_title": "Vision",
-            "vision_desc": "Attiva l'analisi completa delle immagini con le capacità Vision di GPT-4o-mini. Ideale per documenti con foto, diagrammi o scrittura scansionata che influenzano la classificazione."
+            "vision_desc": "Attiva l'analisi completa delle immagini. Ideale per documenti con foto, diagrammi o scrittura scansionata.",
+            "agentic_title": "Agentico (Multi-Agente)",
+            "agentic_desc": "L'orchestratore indirizza ad agenti specializzati in parallelo, ciascuno con il proprio indice AI Search per il grounding RAG. Include Quality Gate Red Team. Ideale per 5+ categorie con definizioni sovrapposte."
         },
         "ai": {
             "title": "Complessità IA e Ragionamento",
@@ -483,7 +487,7 @@
             "li1": "Rilevamento Multi-Intento: Identifica email con più azioni distinte (es: 'Cambiare indirizzo E inviare estratto conto') e classifica ogni intento separatamente.",
             "li2": "Gestione dell'Ambiguità: Risolve formulazioni vaghe usando contesto da allegati, intestazioni e struttura del documento.",
             "li3": "Modalità Ragionamento: Quando attiva, l'IA produce un ragionamento a catena prima di classificare, migliorando notevolmente la precisione nei casi complessi.",
-            "li4": "Routing per Token: Documenti sotto 8K token vengono elaborati da Phi-4 (più veloce, più economico); documenti più grandi vengono automaticamente indirizzati a GPT-4o-mini."
+            "li4": "Routing per Token: Documenti sotto 8K token vengono elaborati dal modello primario (più veloce, più economico); documenti più grandi vengono automaticamente indirizzati al modello di riserva."
         },
         "exports": {
             "title": "Esportazioni Dati e Fine-Tuning",
