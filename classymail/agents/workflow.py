@@ -78,43 +78,33 @@ async def classify_agentic(
         total_tokens += _sum_tokens(orchestrator_result.tokens)
 
         candidates = orchestrator_result.candidate_intents
-        if not candidates:
-            # No candidates — return empty classification
-            root_span.set_attribute("agentic.matched_intents", 0)
-            root_span.set_status(Status(StatusCode.OK))
-            return _build_result_dict(
-                AgenticClassificationResult(
-                    classification_reason="Orchestrator found no candidate intents",
-                    orchestrator_result=orchestrator_result,
-                    agent_traces=traces,
-                    total_tokens=total_tokens,
-                ),
-                agentic_settings=agentic,
-            )
 
         root_span.set_attribute("agentic.candidates_count", len(candidates))
 
         # ── Step 2: Parallel agents (fan-out / fan-in) ───────────────
-        with tracer.start_as_current_span("agentic.parallel_agents") as par_span:
-            par_span.set_attribute("agentic.parallel.agent_count", len(candidates))
-            par_t0 = time.perf_counter()
+        agent_results: list[SpecializedAgentResult] = []
+        parallel_ms = 0.0
+        if candidates:
+            with tracer.start_as_current_span("agentic.parallel_agents") as par_span:
+                par_span.set_attribute("agentic.parallel.agent_count", len(candidates))
+                par_t0 = time.perf_counter()
 
-            tasks = [
-                run_specialized_agent(
-                    text_markdown,
-                    candidate,
-                    settings=settings,
-                    clients=clients,
-                    locale=locale,
+                tasks = [
+                    run_specialized_agent(
+                        text_markdown,
+                        candidate,
+                        settings=settings,
+                        clients=clients,
+                        locale=locale,
+                    )
+                    for candidate in candidates
+                ]
+                agent_results = await asyncio.gather(
+                    *tasks, return_exceptions=False
                 )
-                for candidate in candidates
-            ]
-            agent_results: list[SpecializedAgentResult] = await asyncio.gather(
-                *tasks, return_exceptions=False
-            )
 
-            parallel_ms = (time.perf_counter() - par_t0) * 1000
-            par_span.set_attribute("agentic.parallel.latency_ms", round(parallel_ms, 1))
+                parallel_ms = (time.perf_counter() - par_t0) * 1000
+                par_span.set_attribute("agentic.parallel.latency_ms", round(parallel_ms, 1))
 
         for ar in agent_results:
             traces.append(AgentTrace(
@@ -131,8 +121,10 @@ async def classify_agentic(
             total_tokens += _sum_tokens(ar.tokens)
 
         # ── Step 3: Red Team (conditional) ───────────────────────────
+        # Trigger Red Team if: confidence is low/conflicting OR if orchestrator found 0 candidates
         red_team_verdict = None
-        if needs_red_team(agent_results, agentic):
+        trigger_red_team = needs_red_team(agent_results, agentic) or not candidates
+        if trigger_red_team:
             red_team_verdict = await run_red_team(
                 text_markdown,
                 agent_results,
