@@ -1,7 +1,8 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, nextTick } from 'vue'
 import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, ExclamationCircleIcon, ShieldExclamationIcon, ChatBubbleLeftRightIcon, ChevronDownIcon, ChevronUpIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
+import mermaid from 'mermaid'
 import { useDialog } from '../composables/useDialog'
 import { useI18n } from 'vue-i18n'
 import { trackException, trackEvent } from '../services/telemetry'
@@ -208,6 +209,107 @@ const agenticData = computed(() => {
   }
 })
 const showAgenticTrace = ref(false)
+const showMermaidFlow = ref(false)
+const mermaidFlowSvg = ref('')
+
+const truncate = (text, max) => {
+  if (!text) return ''
+  const clean = text.replace(/["\[\]|#]/g, '').replace(/\n/g, ' ').trim()
+  return clean.length > max ? clean.slice(0, max) + '...' : clean
+}
+
+const mermaidFlowDef = computed(() => {
+  const d = agenticData.value
+  if (!d) return ''
+  const lines = ['flowchart TD']
+
+  // Orchestrator
+  const orchModel = d.orchestrator?.routed_model || d.orchestrator?.model || '?'
+  const orchMs = d.orchestrator?.latency_ms?.toFixed(0) || '?'
+  lines.push(`  ORCH["Orchestrator - ${orchModel} - ${orchMs}ms"]`)
+  lines.push('  style ORCH fill:#dbeafe,stroke:#3b82f6,color:#1e40af')
+
+  // Parallel fan-out
+  const agentIds = []
+  for (const [i, agent] of d.agents.entries()) {
+    const id = `A${i}`
+    agentIds.push(id)
+    const pct = Math.round((agent.confidence || 0) * 100)
+    const expl = truncate(agent.explanation, 60)
+    const ragTag = agent.rag_hits ? ` - RAG: ${agent.rag_hits} refs` : ''
+    const model = agent.model || '?'
+    const ms = agent.latency_ms?.toFixed(0) || '?'
+    const label = `${agent.intent}: ${pct}% - ${model} ${ms}ms${ragTag}`
+    lines.push(`  ${id}["${label}"]`)
+
+    // Color by confidence
+    if (agent.confidence >= 0.7) {
+      lines.push(`  style ${id} fill:#dcfce7,stroke:#22c55e,color:#166534`)
+    } else if (agent.confidence >= 0.4) {
+      lines.push(`  style ${id} fill:#fef9c3,stroke:#eab308,color:#854d0e`)
+    } else {
+      lines.push(`  style ${id} fill:#f3f4f6,stroke:#9ca3af,color:#6b7280`)
+    }
+
+    // Edge from orchestrator
+    const edgeLabel = expl ? `"${expl}"` : '""'
+    lines.push(`  ORCH -->|${edgeLabel}| ${id}`)
+  }
+
+  // Red Team or Result
+  if (d.redTeam) {
+    const rtModel = d.redTeam.model || '?'
+    const rtMs = d.redTeam.latency_ms?.toFixed(0) || '?'
+    const rtVerdict = d.redTeam.validated ? 'VALIDATED' : 'ISSUES FOUND'
+    const rtJustif = truncate(d.redTeam.justification, 50)
+    lines.push(`  RT["Red Team: ${rtVerdict} - ${rtModel} ${rtMs}ms"]`)
+    if (d.redTeam.validated) {
+      lines.push('  style RT fill:#fef2f2,stroke:#ef4444,color:#991b1b')
+    } else {
+      lines.push('  style RT fill:#fee2e2,stroke:#dc2626,color:#7f1d1d')
+    }
+    for (const id of agentIds) {
+      lines.push(`  ${id} --> RT`)
+    }
+    const rtEdge = rtJustif ? `"${rtJustif}"` : '""'
+    lines.push(`  RT -->|${rtEdge}| RESULT`)
+  } else {
+    for (const id of agentIds) {
+      lines.push(`  ${id} --> RESULT`)
+    }
+  }
+
+  // Result
+  const totalMs = d.parallelMs?.toFixed(0) || '?'
+  lines.push(`  RESULT["Result - ${d.totalTokens} tokens - ${totalMs}ms"]`)
+  lines.push('  style RESULT fill:#f3e8ff,stroke:#a855f7,color:#6b21a8')
+
+  return lines.join('\n')
+})
+
+const renderMermaidFlow = async () => {
+  if (!mermaidFlowDef.value) return
+  const darkMode = document.documentElement.classList.contains('dark')
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: darkMode ? 'dark' : 'default',
+    securityLevel: 'strict',
+    flowchart: { curve: 'basis', nodeSpacing: 30, rankSpacing: 40 }
+  })
+  try {
+    const { svg } = await mermaid.render('agentic-flow-' + Date.now(), mermaidFlowDef.value)
+    mermaidFlowSvg.value = svg
+  } catch {
+    mermaidFlowSvg.value = '<p class="text-red-500 text-xs">Failed to render flow diagram</p>'
+  }
+}
+
+watch(showMermaidFlow, async (val) => {
+  if (val) {
+    await nextTick()
+    await renderMermaidFlow()
+  }
+})
 
 const ocrProviderBadge = (provider) => {
   if (!provider || provider === 'mistral_ocr') return null
@@ -813,6 +915,20 @@ watch(() => email.value, (val) => {
                         <span class="inline-flex items-center gap-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
                           📊 Result
                         </span>
+                      </div>
+
+                      <!-- Mermaid Flow Diagram Toggle -->
+                      <div class="flex justify-end">
+                        <button @click="showMermaidFlow = !showMermaidFlow"
+                          class="text-[10px] font-medium px-2 py-1 rounded-md transition-colors"
+                          :class="showMermaidFlow
+                            ? 'bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-purple-100 dark:hover:bg-purple-900/40'">
+                          {{ showMermaidFlow ? '▼ Hide Flow Diagram' : '▶ Show Flow Diagram' }}
+                        </button>
+                      </div>
+                      <div v-if="showMermaidFlow" class="rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-900 p-3 overflow-x-auto">
+                        <div v-html="mermaidFlowSvg" class="flex justify-center [&>svg]:max-w-full"></div>
                       </div>
 
                       <!-- Orchestrator Card -->
