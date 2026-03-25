@@ -18,7 +18,7 @@ from classymail.agents.config import get_agentic_settings, resolve_agent_endpoin
 from classymail.agents.models import CandidateIntent, OrchestratorResult
 from classymail.core.llm_compat import build_chat_params, extract_message_content
 from classymail.services.azure_clients import auth_headers, Clients
-from classymail.services.settings_store import get_categories_prompt_text
+from classymail.services.settings_store import get_categories_prompt_text, _build_categories_prompt
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -33,10 +33,11 @@ AVAILABLE INTENTS:
 
 RULES:
 - Select the TOP {max_agents} most probable intents (fewer is fine if obvious).
+- You MUST select AT LEAST 1 intent. Every document matches at least one category.
 - Return a JSON array of objects with "intent" (category name), "slug" (technical id), "confidence" (0.0-1.0).
 - Confidence reflects how likely the document matches that intent based on keywords, tone and context.
 - Do NOT classify — only route. Keep your analysis fast and shallow.
-- If the document is clearly simple, select fewer intents.
+- If the document is clearly simple, select fewer intents (but never zero).
 
 OUTPUT FORMAT (JSON only, no markdown):
 {{
@@ -151,7 +152,10 @@ async def run_orchestrator(
     routing_mode = agentic.get("orchestrator_routing_mode", "balanced")
 
     endpoint, deployment, api_version = resolve_agent_endpoint(model_key)
-    categories_text = get_categories_prompt_text()
+    # Build categories from the settings dict (passed from workflow, read from Cosmos)
+    # rather than sync file which doesn't exist in Docker containers
+    cats = (settings or {}).get("categories") or []
+    categories_text = _build_categories_prompt(cats) if cats else get_categories_prompt_text()
 
     system_prompt = _build_orchestrator_prompt(categories_text, max_agents, locale)
     headers = await auth_headers(clients=clients)

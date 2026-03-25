@@ -20,7 +20,7 @@ from classymail.agents.models import RedTeamVerdict, SpecializedAgentResult
 from classymail.agents.orchestrator import _load_prompt_template
 from classymail.core.llm_compat import build_chat_params, extract_message_content
 from classymail.services.azure_clients import auth_headers, Clients
-from classymail.services.settings_store import get_categories_prompt_text
+from classymail.services.settings_store import get_categories_prompt_text, _build_categories_prompt
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -82,7 +82,7 @@ async def run_red_team(
     model_key = agentic["red_team_model"]
     endpoint, deployment, api_version = resolve_agent_endpoint(model_key)
 
-    categories_text = get_categories_prompt_text()
+    categories_text = _build_categories_prompt((settings or {}).get("categories") or []) or get_categories_prompt_text()
 
     # Build summary of agent results
     summaries = []

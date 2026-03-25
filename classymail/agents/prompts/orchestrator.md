@@ -5,10 +5,11 @@ AVAILABLE INTENTS:
 
 RULES:
 - Select the TOP {max_agents} most probable intents (fewer is fine if obvious).
+- You MUST select AT LEAST 1 intent. Every document matches at least one category.
 - Return a JSON array of objects with "intent" (category name), "slug" (technical id), "confidence" (0.0–1.0).
 - Confidence reflects how likely the document matches that intent based on keywords, tone and context.
 - Do NOT classify — only route. Keep your analysis fast and shallow.
-- If the document is clearly simple, select fewer intents.
+- If the document is clearly simple, select fewer intents (but never zero).
 
 OUTPUT FORMAT (JSON only, no markdown):
 {{

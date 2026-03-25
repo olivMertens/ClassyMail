@@ -1206,9 +1206,7 @@ onMounted(() => {
                 <span v-if="orchestratorPromptData[activePromptTab]?.source === 'file'" class="text-green-500">📁</span>
                 <span v-else class="text-amber-500">⚠️ fallback</span>
                 {{ orchestratorPromptData[activePromptTab]?.template_file || '' }}
-                <span v-if="activePromptTab === 'orchestrator'">— Categories are injected at runtime from your
-                  configured
-                  categories.</span>
+                <span v-if="activePromptTab === 'orchestrator'">— Categories are injected at runtime from your configured categories.</span>
                 <span v-else-if="activePromptTab === 'specialized'">— Template: variables like intent_name,
                   intent_description
                   are resolved per category agent.</span>
@@ -1394,7 +1392,7 @@ onMounted(() => {
                       <span class="text-[10px] text-gray-400">Index:</span>
                       <code
                         class="text-[10px] text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40 px-1 rounded">classymail-intent-{{
-                cat.slug }}</code>
+                          cat.slug }}</code>
                     </div>
                     <div class="flex items-center gap-1.5">
                       <span class="text-[10px] text-gray-400">Tool:</span>
@@ -2483,7 +2481,7 @@ onMounted(() => {
               <h4 class="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">🎯 {{
                 t('settings.agentic.advice_orchestrator') }}</h4>
               <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ t('settings.agentic.advice_orchestrator_desc')
-                }}</p>
+              }}</p>
               <div class="grid grid-cols-2 gap-2 text-[11px]">
                 <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
                   <strong class="text-green-600">✓ gpt-4.1-nano</strong>
