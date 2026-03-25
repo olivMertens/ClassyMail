@@ -7,7 +7,7 @@ import sys
 from classymail.core import config
 from classymail.core.telemetry import init_telemetry
 from classymail.services.azure_clients import Clients, set_default_clients
-from classymail.services.settings_store import load_settings
+from classymail.services.settings_store import load_settings_async
 from classymail.services.worker import worker_loop_forever
 
 # Ensure all log output reaches container stdout/stderr so it appears in
@@ -42,7 +42,7 @@ async def main():
         await worker_loop_forever(
             clients=clients,
             queue_name=config.SERVICE_BUS_QUEUE,
-            get_settings=load_settings,
+            get_settings=lambda: load_settings_async(clients=clients),
         )
     finally:
         await clients.close()
