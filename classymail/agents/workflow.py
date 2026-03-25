@@ -122,6 +122,7 @@ async def classify_agentic(
                 search_index=ar.search_index,
                 retrieval_mode=ar.retrieval_mode,
                 rag_hits=len(ar.rag_grounding),
+                tool_called=ar.tool_called,
             ))
             total_tokens += _sum_tokens(ar.tokens)
 
@@ -204,6 +205,7 @@ async def classify_agentic(
                             search_index=ar.search_index,
                             retrieval_mode=ar.retrieval_mode,
                             rag_hits=len(ar.rag_grounding),
+                            tool_called=ar.tool_called,
                         ))
                         total_tokens += _sum_tokens(ar.tokens)
                     agent_results.extend(extra_results)

@@ -59,9 +59,7 @@ class SpecializedAgentResult(BaseModel):
     latency_ms: Optional[float] = None
     search_index: Optional[str] = None
     retrieval_mode: Optional[str] = None
-
-
-# ── Red Team / Quality Gate ──────────────────────────────────────────
+    tool_called: bool = False
 
 
 class RedTeamVerdict(BaseModel):
@@ -93,6 +91,7 @@ class AgentTrace(BaseModel):
     search_index: Optional[str] = None
     retrieval_mode: Optional[str] = None
     rag_hits: int = 0
+    tool_called: bool = False
 
 
 class AgenticClassificationResult(BaseModel):

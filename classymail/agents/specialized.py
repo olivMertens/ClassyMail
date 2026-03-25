@@ -226,7 +226,8 @@ async def run_specialized_agent(
         # Only attach tool + json_object format if index is enabled
         if index_enabled:
             payload["tools"] = [search_tool]
-            payload["tool_choice"] = "auto"
+            # Force the LLM to call the search tool — mandatory RAG grounding
+            payload["tool_choice"] = {"type": "function", "function": {"name": tool_name}}
         else:
             payload["response_format"] = {"type": "json_object"}
 
@@ -247,6 +248,12 @@ async def run_specialized_agent(
             tool_calls = message.get("tool_calls", [])
             if tool_calls and index_enabled:
                 span.add_event("tool_call", {"tool": tool_name, "index": f"classymail-intent-{candidate.slug}"})
+            elif index_enabled and not tool_calls:
+                logger.warning(
+                    "[agentic] Agent %s: tool_choice was required but LLM returned no tool call",
+                    candidate.slug,
+                )
+                span.add_event("tool_call_skipped", {"reason": "llm_ignored_required_tool"})
 
                 for tc in tool_calls:
                     fn_name = tc.get("function", {}).get("name", "")
@@ -305,6 +312,7 @@ async def run_specialized_agent(
         content = extract_message_content(message) or "{}"
 
         parsed = json.loads(content)
+        tool_was_called = bool(tool_calls) and index_enabled
         result = SpecializedAgentResult(
             intent=parsed.get("intent", candidate.intent),
             slug=candidate.slug,
@@ -315,15 +323,16 @@ async def run_specialized_agent(
             model=deployment,
             tokens=total_usage,
             latency_ms=round(latency_ms, 1),
-            search_index=f"classymail-intent-{candidate.slug}" if rag_refs else None,
-            retrieval_mode=retrieval_mode if rag_refs else None,
+            search_index=f"classymail-intent-{candidate.slug}" if index_enabled else None,
+            retrieval_mode=retrieval_mode if index_enabled else None,
+            tool_called=tool_was_called,
         )
 
         span.set_attribute("agentic.confidence", result.confidence)
         span.set_attribute("agentic.is_match", result.is_match)
         span.set_attribute("agentic.rag_hits", len(rag_refs))
-        span.set_attribute("agentic.tool_called", bool(rag_refs))
-        if rag_refs:
+        span.set_attribute("agentic.tool_called", tool_was_called)
+        if index_enabled:
             span.set_attribute("agentic.search_index", f"classymail-intent-{candidate.slug}")
             span.set_attribute("agentic.retrieval_mode", retrieval_mode)
 

@@ -237,11 +237,10 @@ const mermaidFlowDef = computed(() => {
     agentIds.push(id)
     const pct = Math.round((agent.confidence || 0) * 100)
     const expl = truncate(agent.explanation, 50)
-    const ragTag = agent.rag_hits ? ` RAG ${agent.rag_hits}` : ''
     const model = truncate(agent.model || '?', 20)
     const ms = agent.latency_ms?.toFixed(0) || '?'
     const intentName = truncate(agent.intent || 'unknown', 25)
-    const label = `${intentName} ${pct}pct - ${model} ${ms}ms${ragTag}`
+    const label = `${intentName} ${pct}pct - ${model} ${ms}ms`
     lines.push(`  ${id}["${label}"]`)
 
     if (agent.confidence >= 0.7) {
@@ -256,6 +255,17 @@ const mermaidFlowDef = computed(() => {
       lines.push(`  ORCH -->|"${expl}"| ${id}`)
     } else {
       lines.push(`  ORCH --> ${id}`)
+    }
+
+    // RAG AI Search node — shown when the tool was called
+    if (agent.tool_called) {
+      const ragId = `RAG${i}`
+      const indexName = truncate(agent.search_index || 'ai-search', 30)
+      const mode = agent.retrieval_mode || 'semantic'
+      const hits = agent.rag_hits || 0
+      lines.push(`  ${ragId}[/"AI Search: ${mode} - ${hits} hits - ${indexName}"/]`)
+      lines.push(`  style ${ragId} fill:#fef3c7,stroke:#f59e0b,color:#92400e`)
+      lines.push(`  ${id} --> ${ragId}`)
     }
   }
 
@@ -272,8 +282,9 @@ const mermaidFlowDef = computed(() => {
     }
 
     if (agentIds.length > 0) {
-      for (const id of agentIds) {
-        lines.push(`  ${id} --> RT`)
+      for (const [i, id] of agentIds.entries()) {
+        const downstream = d.agents[i]?.tool_called ? `RAG${i}` : id
+        lines.push(`  ${downstream} --> RT`)
       }
     } else {
       // 0 agents: orchestrator goes directly to Red Team
@@ -288,8 +299,9 @@ const mermaidFlowDef = computed(() => {
     }
   } else {
     if (agentIds.length > 0) {
-      for (const id of agentIds) {
-        lines.push(`  ${id} --> RESULT`)
+      for (const [i, id] of agentIds.entries()) {
+        const downstream = d.agents[i]?.tool_called ? `RAG${i}` : id
+        lines.push(`  ${downstream} --> RESULT`)
       }
     } else {
       lines.push('  ORCH --> RESULT')
@@ -991,9 +1003,10 @@ watch(() => email.value, (val) => {
                               <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">{{ agent.model }}</code>
                               <span>{{ agent.latency_ms?.toFixed(0) }}ms</span>
                               <span v-if="agent.rag_hits" class="text-purple-500">📚 {{ agent.rag_hits }} refs</span>
+                              <span v-else-if="agent.tool_called" class="text-orange-500">📚 0 refs</span>
                             </div>
                           </div>
-                          <div v-if="agent.search_index" class="text-[10px] text-purple-500 dark:text-purple-400">
+                          <div v-if="agent.tool_called" class="text-[10px] text-purple-500 dark:text-purple-400">
                             🔍 {{ agent.search_index }} ({{ agent.retrieval_mode }})
                           </div>
                         </div>
