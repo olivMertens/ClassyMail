@@ -313,12 +313,17 @@ const renderMermaidFlow = async () => {
     securityLevel: 'strict',
     flowchart: { curve: 'basis', nodeSpacing: 30, rankSpacing: 40 }
   })
+  const renderId = 'agentic-flow-' + Date.now()
   try {
-    const { svg } = await mermaid.render('agentic-flow-' + Date.now(), mermaidFlowDef.value)
+    const { svg } = await mermaid.render(renderId, mermaidFlowDef.value)
     mermaidFlowSvg.value = svg
   } catch {
     mermaidFlowSvg.value = '<p class="text-red-500 text-xs">Failed to render flow diagram</p>'
   }
+  // Clean up temporary mermaid render containers from the DOM body
+  const tempEl = document.getElementById('d' + renderId)
+  if (tempEl) tempEl.remove()
+  document.querySelectorAll('[id^="dagentic-flow-"]').forEach(el => el.remove())
 }
 
 watch(showMermaidFlow, async (val) => {

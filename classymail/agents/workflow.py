@@ -24,6 +24,10 @@ from classymail.agents.orchestrator import run_orchestrator
 from classymail.agents.red_team import needs_red_team, run_red_team
 from classymail.agents.specialized import run_specialized_agent
 from classymail.services.azure_clients import Clients
+from classymail.services.email_preprocessing import (
+    extract_sender_from_markdown,
+    extract_subject_from_markdown,
+)
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -225,11 +229,17 @@ async def classify_agentic(
             if red_team_verdict and red_team_verdict.justification:
                 classification_reason += f". Red Team: {red_team_verdict.justification}"
 
+        # Extract subject and sender from the document text (same as non-agentic path)
+        subject = extract_subject_from_markdown(text_markdown) or None
+        sender = extract_sender_from_markdown(text_markdown) or None
+
         result = AgenticClassificationResult(
             detected_intents=detected_intents,
             global_complexity="Complex" if len(detected_intents) > 1 else "Simple",
             needs_review=needs_review,
             classification_reason=classification_reason,
+            subject=subject,
+            sender=sender,
             orchestrator_result=orchestrator_result,
             agent_results=agent_results,
             red_team_verdict=red_team_verdict,
@@ -263,6 +273,8 @@ def _build_result_dict(result: AgenticClassificationResult, agentic_settings: di
         "global_complexity": result.global_complexity,
         "needs_review": result.needs_review,
         "classification_reason": result.classification_reason,
+        "subject": result.subject,
+        "sender": result.sender,
         "agentic": True,
         "usage": {
             "total_tokens": result.total_tokens,

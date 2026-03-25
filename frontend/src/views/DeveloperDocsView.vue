@@ -37,8 +37,9 @@ const initMermaid = async () => {
     refEl.innerHTML = refDiagram.value
   }
   await mermaid.run({ nodes: document.querySelectorAll('.mermaid-ref') })
+  const refId = 'ref-fullscreen-' + Date.now()
   try {
-    const { svg } = await mermaid.render('ref-fullscreen-' + Date.now(), refDiagram.value)
+    const { svg } = await mermaid.render(refId, refDiagram.value)
     refDiagramSvg.value = svg
   } catch {
     await nextTick()
@@ -47,6 +48,8 @@ const initMermaid = async () => {
       refDiagramSvg.value = svgEl.outerHTML
     }
   }
+  // Clean up temp mermaid render containers
+  document.querySelectorAll('[id^=\"dref-fullscreen-\"]').forEach(el => el.remove())
 }
 
 onMounted(() => {

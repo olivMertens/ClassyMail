@@ -106,6 +106,8 @@ class AgenticClassificationResult(BaseModel):
     global_complexity: Optional[str] = None
     needs_review: bool = False
     classification_reason: Optional[str] = None
+    subject: Optional[str] = None
+    sender: Optional[str] = None
     raw_response: Optional[dict] = None
 
     # Agentic-specific fields
