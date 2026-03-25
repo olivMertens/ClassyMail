@@ -56,10 +56,10 @@ def test_build_categories_prompt_full():
         {"name": "B", "slug": "b", "description": "Desc B", "exclusions": ""},
     ]
     result = _build_categories_prompt(cats)
-    assert "1. A" in result
+    assert "1. A (slug: a)" in result
     assert "DÉFINITION: Desc A" in result
     assert "EXCLUSIONS: Excl A" in result
-    assert "2. B" in result
+    assert "2. B (slug: b)" in result
     assert "EXCLUSIONS: (aucune)" in result
 
 

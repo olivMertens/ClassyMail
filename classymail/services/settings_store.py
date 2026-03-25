@@ -304,11 +304,12 @@ def _build_categories_prompt(cats: list) -> str:
         if not name:
             continue
         idx += 1
+        slug = (c.get('slug') or '').strip()
         desc = (c.get('description') or '').strip()
         excl = (c.get('exclusions') or '').strip()
 
         # Always use structured format so the LLM sees consistent blocks
-        lines.append(f"{idx}. {name}")
+        lines.append(f"{idx}. {name} (slug: {slug})" if slug else f"{idx}. {name}")
         lines.append(f"   DÉFINITION: {desc if desc else '(non définie)'}")
         lines.append(f"   EXCLUSIONS: {excl if excl else '(aucune)'}")
 

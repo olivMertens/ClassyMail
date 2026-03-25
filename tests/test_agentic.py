@@ -243,17 +243,26 @@ class TestSettingsStoreAgentic:
 class TestClassifyAgentic:
     @pytest.mark.asyncio
     async def test_classify_agentic_no_candidates(self):
-        """When orchestrator returns no candidates, result has empty intents."""
+        """When orchestrator returns no candidates, Red Team fires then result has empty intents."""
         empty_orch = OrchestratorResult(candidate_intents=[], model="gpt-4.1-nano")
+        rt_verdict = RedTeamVerdict(
+            validated=True, justification="No match is correct", model="gpt-4.1",
+            tokens={"total_tokens": 50},
+        )
 
-        with patch("classymail.agents.workflow.run_orchestrator", new_callable=AsyncMock) as mock_orch:
+        with (
+            patch("classymail.agents.workflow.run_orchestrator", new_callable=AsyncMock) as mock_orch,
+            patch("classymail.agents.workflow.run_red_team", new_callable=AsyncMock) as mock_rt,
+        ):
             mock_orch.return_value = empty_orch
+            mock_rt.return_value = rt_verdict
 
             from classymail.agents.workflow import classify_agentic
             result = await classify_agentic("Test email", settings={"agentic": {"enabled": True}})
 
             assert result["detected_intents"] == []
             assert result.get("agentic") is True
+            mock_rt.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_classify_agentic_full_flow(self):

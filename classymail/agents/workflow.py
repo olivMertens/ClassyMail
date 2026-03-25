@@ -157,18 +157,26 @@ async def classify_agentic(
             # ── Step 3b: Launch agents for Red Team missed intents ────
             missed_slugs = set(red_team_verdict.missed_intents or [])
             requested_slugs = set(red_team_verdict.additional_agents_requested or [])
-            all_extra_slugs = (missed_slugs | requested_slugs) - {ar.slug for ar in agent_results}
+            # Normalise to hyphens for dedup against already-run agents
+            already_run = {ar.slug.replace("_", "-") for ar in agent_results}
+            all_extra_slugs = {
+                s for s in (missed_slugs | requested_slugs)
+                if s.replace("_", "-") not in already_run
+            }
 
             if all_extra_slugs:
                 cats = (settings or {}).get("categories") or []
                 cat_by_slug = {c.get("slug"): c for c in cats if c.get("slug")}
+                # Also index by normalised slug (underscores→hyphens) for LLM tolerance
+                cat_by_norm = {k.replace("_", "-"): v for k, v in cat_by_slug.items()}
                 extra_candidates = []
                 for slug in all_extra_slugs:
-                    cat = cat_by_slug.get(slug)
+                    cat = cat_by_slug.get(slug) or cat_by_norm.get(slug.replace("_", "-"))
                     if cat:
+                        # Use canonical slug from settings (hyphens) not LLM slug
                         extra_candidates.append(CandidateIntent(
                             intent=cat["name"],
-                            slug=slug,
+                            slug=cat["slug"],
                             confidence=0.5,
                         ))
 
