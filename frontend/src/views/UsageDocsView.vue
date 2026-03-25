@@ -1,11 +1,12 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import { BookOpenIcon, CpuChipIcon, ShieldCheckIcon, EyeIcon, ArrowPathIcon, ChartBarIcon } from '@heroicons/vue/24/outline'
+import { BookOpenIcon, CpuChipIcon, ShieldCheckIcon, EyeIcon, ArrowPathIcon, ChartBarIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, AdjustmentsHorizontalIcon } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 import mermaid from 'mermaid'
 
 const { t } = useI18n()
 const isDark = ref(false)
+const diagramFullscreen = ref(false)
 let observer = null
 
 const initMermaid = async () => {
@@ -177,14 +178,44 @@ flowchart LR
 
     <!-- Process Flow Diagram -->
     <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg overflow-hidden p-6">
-      <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white mb-2">
-        {{ t('guide.flow_title') }}
-      </h3>
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+          {{ t('guide.flow_title') }}
+        </h3>
+        <button @click="diagramFullscreen = true"
+          class="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700">
+          <ArrowsPointingOutIcon class="h-4 w-4" />
+          Fullscreen
+        </button>
+      </div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
         {{ t('guide.flow_desc') }}
       </p>
+
+      <!-- Fullscreen overlay -->
+      <Teleport to="body">
+        <div v-if="diagramFullscreen"
+          class="fixed inset-0 z-50 bg-gray-950/95 flex flex-col" @keydown.escape="diagramFullscreen = false">
+          <div class="flex items-center justify-between px-6 py-3 border-b border-gray-700 bg-gray-900">
+            <h3 class="text-white font-semibold text-sm">{{ t('guide.flow_title') }}</h3>
+            <button @click="diagramFullscreen = false"
+              class="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 text-sm border border-gray-600 rounded-md px-3 py-1.5 hover:bg-gray-800">
+              <ArrowsPointingInIcon class="h-4 w-4" />
+              Close
+            </button>
+          </div>
+          <div class="flex-1 overflow-auto p-8 flex items-center justify-center">
+            <div class="mermaid-graph" style="transform: scale(1.6); transform-origin: center center;">
+              {{ diagram }}
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
       <div
-        class="flex justify-center bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto"
+        class="flex justify-center bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto cursor-pointer"
+        @dblclick="diagramFullscreen = true"
+        title="Double-click to enlarge"
       >
         <div class="mermaid-graph w-full flex justify-center">
           {{ diagram }}
@@ -352,6 +383,70 @@ flowchart LR
               {{ t('guide.strategies.agentic_desc') }}
             </p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agentic Tier System -->
+    <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg overflow-hidden">
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white flex items-center gap-2">
+          <AdjustmentsHorizontalIcon class="h-5 w-5 text-purple-500" />
+          Agentic Pipeline — How Tiers Work
+        </h3>
+        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          In Agentic mode, the orchestrator assigns a rough confidence to each candidate intent. That confidence determines which model tier the specialized agent uses — optimizing cost for easy cases and accuracy for hard ones.
+        </p>
+
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="rounded-lg border-2 border-green-200 dark:border-green-800 p-4 bg-green-50/50 dark:bg-green-900/10">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white text-xs font-bold">1</span>
+              <h5 class="font-medium text-sm text-gray-900 dark:text-white">Tier 1 — Simple</h5>
+            </div>
+            <p class="text-xs text-gray-600 dark:text-gray-300 mb-1"><strong>Trigger:</strong> Orchestrator confidence &gt; 80%</p>
+            <p class="text-xs text-gray-600 dark:text-gray-300 mb-2"><strong>Default model:</strong> gpt-4.1-nano</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              The document clearly matches — keywords are obvious, tone is unambiguous. The cheapest model is sufficient. The agent may still call its AI Search tool to verify.
+            </p>
+          </div>
+
+          <div class="rounded-lg border-2 border-amber-200 dark:border-amber-800 p-4 bg-amber-50/50 dark:bg-amber-900/10">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold">2</span>
+              <h5 class="font-medium text-sm text-gray-900 dark:text-white">Tier 2 — Ambiguous</h5>
+            </div>
+            <p class="text-xs text-gray-600 dark:text-gray-300 mb-1"><strong>Trigger:</strong> Orchestrator confidence 50–80%</p>
+            <p class="text-xs text-gray-600 dark:text-gray-300 mb-2"><strong>Default model:</strong> gpt-4.1-mini</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              The document has subtle signals — could match multiple intents. A more capable model resolves ambiguity. RAG provides context from similar previously classified documents.
+            </p>
+          </div>
+
+          <div class="rounded-lg border-2 border-red-200 dark:border-red-800 p-4 bg-red-50/50 dark:bg-red-900/10">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold">3</span>
+              <h5 class="font-medium text-sm text-gray-900 dark:text-white">Tier 3 — Critical</h5>
+            </div>
+            <p class="text-xs text-gray-600 dark:text-gray-300 mb-1"><strong>Trigger:</strong> Orchestrator confidence &lt; 50%</p>
+            <p class="text-xs text-gray-600 dark:text-gray-300 mb-2"><strong>Default model:</strong> gpt-4.1</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              The document is complex or the intent is unclear. The most robust model is used for maximum accuracy. Red Team quality gate is more likely to trigger.
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-6 rounded-lg bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800 p-4">
+          <h4 class="text-sm font-semibold text-purple-800 dark:text-purple-300 mb-2">Tips for Better Performance</h4>
+          <ul class="text-xs text-gray-600 dark:text-gray-300 space-y-1.5">
+            <li>• <strong>Category definitions matter most</strong> — clear, specific definitions with concrete keywords help the orchestrator route with higher confidence (Tier 1 more often = cheaper).</li>
+            <li>• <strong>Exclusions reduce false positives</strong> — defining what an intent is NOT prevents agents from matching similar-but-wrong documents.</li>
+            <li>• <strong>Enable AI Search indexes</strong> — the RAG tool gives each agent reference examples (positive + negative), significantly improving accuracy.</li>
+            <li>• <strong>Human corrections feed back</strong> — when you correct a classification in the UI, it becomes a negative example in the AI Search index.</li>
+            <li>• <strong>Red Team threshold tuning</strong> — start with 0.7, lower to 0.5 for strict reviews, raise to 0.85 for lenient.</li>
+            <li>• <strong>Model selection per tier</strong> — use nano for Tier 1, keep robust models only for Tier 3.</li>
+            <li>• <strong>Retrieval mode</strong> — "semantic" for best quality, "hybrid" for balanced, "vector" for fastest.</li>
+          </ul>
         </div>
       </div>
     </div>

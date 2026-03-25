@@ -477,16 +477,16 @@
             "step4_title": "4. Settings & Configuration",
             "step4_desc": "Fine-tune the engine behavior in the Settings tab to match your use case.",
             "step4_li1": "Categories: Define exact intent names and descriptions. Changes apply immediately to new classifications.",
-            "step4_li2": "Processing Strategy: Switch between Standard (fast), Reasoning (accurate), or Vision (image-aware) modes.",
+            "step4_li2": "Processing Strategy: Switch between Standard (fast), Reasoning (accurate), Vision (image-aware), or Agentic (multi-agent with per-intent RAG) modes.",
             "step4_li3": "PII Settings: Enable or disable PII detection, choose the method (LLM, Azure AI Language, or Hybrid), and select the model."
         },
         "strategies": {
             "title": "Processing Strategies",
             "desc": "Choose the strategy that best fits your document types. Each strategy optimizes for different trade-offs between speed, accuracy, and cost.",
             "standard_title": "Standard",
-            "standard_desc": "Fast classification using Phi-4 (under 8K tokens) or GPT-4o-mini (larger documents). Best for text-heavy emails with clear intent. Lowest cost per document.",
+            "standard_desc": "Fast classification using a single LLM call with the primary model. Best for text-heavy documents with clear intent. Lowest cost per document.",
             "reasoning_title": "Reasoning",
-            "reasoning_desc": "Forces the AI to output a step-by-step justification before classifying. Improves accuracy on ambiguous or multi-intent emails. Slightly higher latency.",
+            "reasoning_desc": "Forces the AI to output a step-by-step justification before classifying. Improves accuracy on ambiguous or multi-intent documents. Slightly higher latency.",
             "vision_title": "Vision",
             "vision_desc": "Enables full image analysis using GPT-4o-mini vision capabilities. Best for documents containing photos, diagrams, or scanned handwriting that affect classification.",
             "agentic_title": "Agentic (Multi-Agent)",
@@ -494,19 +494,19 @@
         },
         "ai": {
             "title": "AI Complexity & Reasoning",
-            "desc": "The system assesses each email's complexity and adapts its approach:",
-            "li1": "Multi-Intent Detection: Identifies emails requesting multiple distinct actions (e.g., 'Change address AND send statement') and classifies each intent separately.",
+            "desc": "The system assesses each document's complexity and adapts its approach:",
+            "li1": "Multi-Intent Detection: Identifies documents requesting multiple distinct actions and classifies each intent separately.",
             "li2": "Ambiguity Handling: Resolves vague wording by leveraging context from attachments, headers, and document structure.",
             "li3": "Reasoning Mode: When enabled, the AI outputs a chain-of-thought justification before classifying, significantly improving accuracy on complex cases.",
-            "li4": "Token Budget Routing: Documents under 8K tokens are processed by Phi-4 (faster, cheaper); larger documents automatically route to GPT-4o-mini."
+            "li4": "Token Budget Routing: Documents under 8K tokens are processed by the primary model (faster, cheaper); larger documents automatically route to the fallback model."
         },
         "privacy": {
             "title": "Privacy & Data Safety (PII)",
             "desc": "GDPR-compliant Personal Identifiable Information (PII) management with configurable detection and anonymization:",
             "detection_title": "PII Detection",
-            "detection_desc": "The AI flags emails containing sensitive data. Enable in Settings > Processing > Email Preprocessing.",
+            "detection_desc": "The AI flags documents containing sensitive data. Enable in Settings > Processing > Preprocessing.",
             "detection_li1": "LLM-based: Contextual understanding using your chosen model — extracts names, emails, phones, addresses, contract IDs, and dates.",
-            "detection_li2": "Azure AI Language: Native service with 40+ predefined PII categories (~€0.001/email).",
+            "detection_li2": "Azure AI Language: Native service with 40+ predefined PII categories (~€0.001/document).",
             "detection_li3": "Hybrid: Runs both methods in parallel and merges results for maximum accuracy.",
             "detection_li4": "Configurable Model: PII detection can reuse your classification model (Auto) or use a dedicated deployment (gpt-4o-mini, gpt-5-nano, etc.).",
             "detection_categories": "Detected categories: names, emails, phones, addresses, contract/policy numbers, dates, and other identifiers (SSN, passport, IBAN).",
@@ -515,7 +515,7 @@
             "anonymization_li1": "Names, emails, and dates are replaced with generic placeholders ([Name], [Email], [Date]).",
             "anonymization_li2": "Financial figures, addresses, and reference numbers are masked.",
             "anonymization_li3": "Markdown structure (headers, links, tables) is fully preserved.",
-            "settings_hint": "Configure PII detection method and model in Settings > Processing > Email Preprocessing."
+            "settings_hint": "Configure PII detection method and model in Settings > Processing > Preprocessing."
         },
         "vision": {
             "title": "Smart Vision (Mistral Document AI)",
