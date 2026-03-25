@@ -17,6 +17,7 @@ from classymail.agents.config import get_agentic_settings
 from classymail.agents.models import (
     AgentTrace,
     AgenticClassificationResult,
+    CandidateIntent,
     SpecializedAgentResult,
 )
 from classymail.agents.orchestrator import run_orchestrator
@@ -148,6 +149,52 @@ async def classify_agentic(
                 for ar in agent_results:
                     if ar.slug in red_team_verdict.refined_confidences:
                         ar.confidence = float(red_team_verdict.refined_confidences[ar.slug])
+
+            # ── Step 3b: Launch agents for Red Team missed intents ────
+            missed_slugs = set(red_team_verdict.missed_intents or [])
+            requested_slugs = set(red_team_verdict.additional_agents_requested or [])
+            all_extra_slugs = (missed_slugs | requested_slugs) - {ar.slug for ar in agent_results}
+
+            if all_extra_slugs:
+                cats = (settings or {}).get("categories") or []
+                cat_by_slug = {c.get("slug"): c for c in cats if c.get("slug")}
+                extra_candidates = []
+                for slug in all_extra_slugs:
+                    cat = cat_by_slug.get(slug)
+                    if cat:
+                        extra_candidates.append(CandidateIntent(
+                            intent=cat["name"],
+                            slug=slug,
+                            confidence=0.5,
+                        ))
+
+                if extra_candidates:
+                    logger.info("[agentic] Red Team requested %d extra agents: %s",
+                                len(extra_candidates), [c.slug for c in extra_candidates])
+                    extra_tasks = [
+                        run_specialized_agent(
+                            text_markdown, candidate,
+                            settings=settings, clients=clients, locale=locale,
+                        )
+                        for candidate in extra_candidates
+                    ]
+                    extra_results: list[SpecializedAgentResult] = await asyncio.gather(
+                        *extra_tasks, return_exceptions=False
+                    )
+                    for ar in extra_results:
+                        traces.append(AgentTrace(
+                            agent_type="specialized",
+                            intent=ar.slug,
+                            model=ar.model or "unknown",
+                            tokens=ar.tokens,
+                            latency_ms=ar.latency_ms,
+                            confidence=ar.confidence,
+                            search_index=ar.search_index,
+                            retrieval_mode=ar.retrieval_mode,
+                            rag_hits=len(ar.rag_grounding),
+                        ))
+                        total_tokens += _sum_tokens(ar.tokens)
+                    agent_results.extend(extra_results)
         else:
             root_span.set_attribute("agentic.red_team.triggered", False)
 
