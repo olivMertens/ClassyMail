@@ -173,10 +173,10 @@
     },
     "upload": {
         "title": "Dokumente hochladen",
-        "subtitle": "Laden Sie PDF-Dokumente hoch (max. 10 Dateien), um die Klassifizierung zu starten.",
+        "subtitle": "Laden Sie PDF-Dokumente hoch (max. 20 Dateien, 100MB gesamt), um die Klassifizierung zu starten.",
         "drop_text": "oder Drag & Drop",
         "select": "Datei auswählen",
-        "limits": "PDF bis zu 10MB",
+        "limits": "PDF bis zu 10MB pro Datei, 100MB gesamt",
         "start": "Upload starten",
         "uploading": "Hochladen..."
     },

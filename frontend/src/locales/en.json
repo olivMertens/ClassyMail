@@ -173,10 +173,10 @@
     },
     "upload": {
         "title": "Upload Documents",
-        "subtitle": "Upload PDF documents (max 10 files) to trigger the classification pipeline.",
+        "subtitle": "Upload PDF documents (max 20 files, 100MB total) to trigger the classification pipeline.",
         "drop_text": "or drag and drop",
         "select": "Upload a file",
-        "limits": "PDF up to 10MB",
+        "limits": "PDF up to 10MB each, 100MB total",
         "start": "Start Upload",
         "uploading": "Uploading..."
     },

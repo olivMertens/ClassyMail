@@ -173,10 +173,10 @@
     },
     "upload": {
         "title": "Subir Documentos",
-        "subtitle": "Suba documentos PDF (máx. 10 archivos) para iniciar la clasificación.",
+        "subtitle": "Suba documentos PDF (máx. 20 archivos, 100MB en total) para iniciar la clasificación.",
         "drop_text": "o arrastrar y soltar",
         "select": "Elegir un archivo",
-        "limits": "PDF hasta 10MB",
+        "limits": "PDF hasta 10MB cada uno, 100MB en total",
         "start": "Iniciar Subida",
         "uploading": "Subiendo..."
     },

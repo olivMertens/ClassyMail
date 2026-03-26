@@ -173,10 +173,10 @@
     },
     "upload": {
         "title": "Importer des documents",
-        "subtitle": "Importer des documents PDF (max 10 fichiers) pour lancer la classification.",
+        "subtitle": "Importer des documents PDF (max 20 fichiers, 100Mo au total) pour lancer la classification.",
         "drop_text": "ou glisser-déposer",
         "select": "Choisir un fichier",
-        "limits": "PDF jusqu'à 10MB",
+        "limits": "PDF jusqu'à 10Mo chacun, 100Mo au total",
         "start": "Lancer l'import",
         "uploading": "Envoi..."
     },

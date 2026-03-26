@@ -173,10 +173,10 @@
     },
     "upload": {
         "title": "Carica Documenti",
-        "subtitle": "Caricare documenti PDF (max 10 file) per avviare la classificazione.",
+        "subtitle": "Caricare documenti PDF (max 20 file, 100MB totali) per avviare la classificazione.",
         "drop_text": "o trascinare e rilasciare",
         "select": "Scegliere un file",
-        "limits": "PDF fino a 10MB",
+        "limits": "PDF fino a 10MB ciascuno, 100MB totali",
         "start": "Avvia Caricamento",
         "uploading": "Caricamento..."
     },
