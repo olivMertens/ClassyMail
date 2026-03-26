@@ -1162,7 +1162,7 @@ async def classify_with_phi4(text_markdown: str, *, force_fallback: bool = False
             pii_llm_model = preprocessing_config.get("pii_llm_model", "auto")
             # Resolve "auto" to the classification model
             if pii_llm_model in ("auto", None, ""):
-                pii_llm_model = settings.get("ai_model", "phi4")
+                pii_llm_model = settings.get("ai_model", "phi-4")
             # Resolve friendly model name to actual Azure deployment name
             # e.g. "phi4" → config.PHI_DEPLOYMENT ("Phi-4")
             _, resolved_deployment, _ = resolve_model_config(pii_llm_model)

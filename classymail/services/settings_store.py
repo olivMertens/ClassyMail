@@ -42,7 +42,7 @@ DEFAULT_SETTINGS = {
     "categories": DEFAULT_CATEGORIES,
     "processing_strategy": "standard",  # standard | reasoning | vision
     "default_locale": "en",  # Default output language for classification (en|fr|de|es|it)
-    "ai_model": "phi4",
+    "ai_model": "phi-4",
     "finetune_min_examples": 5,
     "ocr_max_attempts": 3,
     "email_preprocessing": {
@@ -142,7 +142,7 @@ def load_settings() -> dict:
         if "processing_strategy" not in data:
             data["processing_strategy"] = "standard"
         if "ai_model" not in data:
-            data["ai_model"] = "phi4"
+            data["ai_model"] = "phi-4"
         if "finetune_min_examples" not in data:
             data["finetune_min_examples"] = 5
         if "ocr_max_attempts" not in data:

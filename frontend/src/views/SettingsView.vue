@@ -34,7 +34,7 @@ const showStrategyHelp = ref(false)
 // Config Data
 const settings = ref({
   processing_strategy: 'standard',
-  ai_model: 'phi4', // Default
+  ai_model: 'phi-4', // Default
   phi4_input_per_1k: null,
   phi4_output_per_1k: null,
   mistral_per_1k_pages: null,
@@ -173,18 +173,6 @@ const loadDeployments = async () => {
     }
   }
 }
-
-// Hypothesis: tokens per email (classification only — single LLM call)
-const TOKEN_HYPOTHESIS = { inputLow: 800, inputHigh: 1500, outputLow: 200, outputHigh: 500 }
-
-const modelCostEstimates = computed(() => {
-  const n = 10_000
-  return Object.entries(MODEL_PRICING).map(([key, m]) => {
-    const costLow = n * ((m.input * TOKEN_HYPOTHESIS.inputLow / 1000) + (m.output * TOKEN_HYPOTHESIS.outputLow / 1000))
-    const costHigh = n * ((m.input * TOKEN_HYPOTHESIS.inputHigh / 1000) + (m.output * TOKEN_HYPOTHESIS.outputHigh / 1000))
-    return { key, ...m, costLow: Math.round(costLow * 100) / 100, costHigh: Math.round(costHigh * 100) / 100 }
-  })
-})
 
 // --- Category Management & Sanitization ---
 
@@ -488,9 +476,14 @@ const loadSettings = async () => {
     if (res.ok) {
       const data = await res.json()
       settings.value = data
+      // Normalize model aliases to canonical deployment names
+      const modelAliases = { 'phi4': 'phi-4', 'gpt4o-mini': 'gpt-4o-mini', 'gpt4o_mini': 'gpt-4o-mini' }
+      if (settings.value.ai_model && modelAliases[settings.value.ai_model]) {
+        settings.value.ai_model = modelAliases[settings.value.ai_model]
+      }
       // Enforce default model if missing
       if (!settings.value.ai_model) {
-        settings.value.ai_model = 'phi4'
+        settings.value.ai_model = 'phi-4'
       }
       // Ensure csv_export defaults
       if (!settings.value.csv_export) {
@@ -1088,73 +1081,6 @@ onMounted(() => {
             <span>{{ t('settings.processing.finetuning_available') }}</span>
           </div>
 
-          <!-- Cost/Quality Trade-off Info (computed from MODEL_PRICING) -->
-          <div class="mt-3 rounded-md bg-blue-50 dark:bg-blue-900/20 p-3 border border-blue-200 dark:border-blue-800">
-            <div class="flex">
-              <div class="flex-shrink-0">
-                <QuestionMarkCircleIcon class="h-5 w-5 text-blue-400" aria-hidden="true" />
-              </div>
-              <div class="ml-3 flex-1 text-sm">
-                <p class="font-medium text-blue-800 dark:text-blue-300 mb-1">
-                  Model Comparison — Estimated Quality & Cost
-                </p>
-                <!-- Token hypothesis -->
-                <div
-                  class="text-[11px] text-blue-600 dark:text-blue-300 mb-2 bg-blue-100/50 dark:bg-blue-800/30 rounded p-2 space-y-1">
-                  <p class="font-semibold">
-                    📊 Hypothesis (classification only — single LLM call/email):
-                  </p>
-                  <p>
-                    Input: ~{{ TOKEN_HYPOTHESIS.inputLow }}–{{ TOKEN_HYPOTHESIS.inputHigh }} tokens/email
-                    (system prompt + categories + email content)
-                  </p>
-                  <p>
-                    Output: ~{{ TOKEN_HYPOTHESIS.outputLow }}–{{ TOKEN_HYPOTHESIS.outputHigh }} tokens/email
-                    (JSON response)
-                  </p>
-                  <p class="italic mt-1">
-                    💡 Prices vary by region, volume, and caching. Verify with the
-                    <a href="https://azure.microsoft.com/en-us/pricing/calculator/" target="_blank"
-                      class="underline font-semibold">Azure Pricing Calculator</a>.
-                  </p>
-                </div>
-                <!-- Dynamic model list -->
-                <div class="text-blue-700 dark:text-blue-200 space-y-1">
-                  <div v-for="m in modelCostEstimates" :key="m.key" class="flex items-center justify-between gap-2">
-                    <span>
-                      <strong>{{ m.label }}:</strong>
-                      Quality {{ m.quality.toFixed(2) }}
-                      <template v-if="m.quality >= 0.90"> ⭐⭐</template>
-                      <template v-else-if="m.quality >= 0.85"> ⭐</template>,
-                      Cost ~${{ m.costLow.toFixed(0) }}–{{ m.costHigh.toFixed(0) }}/10K emails
-                    </span>
-                    <div class="flex gap-2 shrink-0">
-                      <span v-if="settings.ai_model === m.key"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-                        ✓ Primary
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <!-- Cost multiplier warnings -->
-                <div
-                  class="mt-3 text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50/60 dark:bg-amber-900/20 rounded p-2 space-y-1 border border-amber-200/50 dark:border-amber-800/30">
-                  <p class="font-semibold">
-                    ⚠️ These estimates cover classification only. Actual costs increase with:
-                  </p>
-                  <ul class="list-disc pl-4 space-y-0.5">
-                    <li><strong>Entity extraction:</strong> +1 LLM call/email (~×1.3 cost)</li>
-                    <li><strong>PII detection (LLM mode):</strong> +1 LLM call/email (~×1.5 cost)</li>
-                    <li><strong>Email preprocessing:</strong> +1 LLM call/email (~×1.3 cost)</li>
-                    <li><strong>Reprocessing:</strong> multiplies ALL above by number of passes</li>
-                  </ul>
-                  <p class="italic mt-1">
-                    With all features enabled: expect ~×3–4 the base estimate.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
         </div> <!-- End AI Model Section -->
 
         <!-- Section: Agentic Configuration (visible only when agentic strategy selected) -->
@@ -1530,7 +1456,7 @@ onMounted(() => {
                   <option value="auto">
                     {{ t('settings.processing.pii_llm_model_auto') }}
                   </option>
-                  <option value="phi4">
+                  <option value="phi-4">
                     Phi-4
                   </option>
                   <option value="gpt-4o-mini">
