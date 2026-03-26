@@ -11,7 +11,6 @@ import {
   CpuChipIcon,
   AdjustmentsHorizontalIcon,
   QueueListIcon,
-  BanknotesIcon,
   ArrowPathIcon,
   QuestionMarkCircleIcon,
   ChevronDownIcon,
@@ -35,12 +34,8 @@ const showStrategyHelp = ref(false)
 const settings = ref({
   processing_strategy: 'standard',
   ai_model: 'phi-4', // Default
-  phi4_input_per_1k: null,
-  phi4_output_per_1k: null,
-  mistral_per_1k_pages: null,
   finetune_min_examples: 50,
   ocr_max_attempts: 3,
-  review_confidence_threshold: 0.85,
   categories: [],
   email_preprocessing: {
     enabled: true,
@@ -79,11 +74,7 @@ const settings = ref({
   }
 })
 const defaults = ref({
-  phi4_input_per_1k: null,
-  phi4_output_per_1k: null,
-  mistral_per_1k_pages: null,
-  ocr_max_attempts: 3,
-  review_confidence_threshold: 0.85
+  ocr_max_attempts: 3
 })
 const loading = ref(false)
 const saved = ref(false)
@@ -514,12 +505,8 @@ const saveSettings = async () => {
     const payload = {
       processing_strategy: settings.value.processing_strategy,
       ai_model: settings.value.ai_model,
-      phi4_input_per_1k: settings.value.phi4_input_per_1k ? Number(settings.value.phi4_input_per_1k) : undefined,
-      phi4_output_per_1k: settings.value.phi4_output_per_1k ? Number(settings.value.phi4_output_per_1k) : undefined,
-      mistral_per_1k_pages: settings.value.mistral_per_1k_pages ? Number(settings.value.mistral_per_1k_pages) : undefined,
       finetune_min_examples: settings.value.finetune_min_examples ? Number(settings.value.finetune_min_examples) : 50,
       ocr_max_attempts: settings.value.ocr_max_attempts ? Number(settings.value.ocr_max_attempts) : 3,
-      review_confidence_threshold: settings.value.review_confidence_threshold ? Number(settings.value.review_confidence_threshold) : 0.85,
       categories: settings.value.categories,
       email_preprocessing: settings.value.email_preprocessing,  // FIX: Include email_preprocessing settings
       csv_export: settings.value.csv_export,  // CSV export customization
@@ -886,12 +873,6 @@ onMounted(() => {
           @click="activeTab = 'design'">
           <SwatchIcon class="h-4 w-4" />
           {{ t('settings.appearance') }}
-        </button>
-        <button
-          :class="[activeTab === 'general' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
-          @click="activeTab = 'general'">
-          <BanknotesIcon class="h-4 w-4" />
-          {{ t('settings.tabs.general') }}
         </button>
         <button
           :class="[activeTab === 'finetuning' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
@@ -1624,78 +1605,6 @@ onMounted(() => {
             </p>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- General & Costs Tab -->
-    <div v-show="activeTab === 'general'" class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-      <div class="px-4 py-5 sm:p-6">
-        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
-          {{ t('settings.costs_title') }}
-        </h3>
-        <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
-          <p>{{ t('settings.costs_desc') }}</p>
-        </div>
-
-        <form class="mt-5 space-y-6" @submit.prevent="saveSettings">
-          <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Phi-4 Input Cost (€ /
-              1K tokens)</label>
-            <div class="mt-1">
-              <input v-model="settings.phi4_input_per_1k" :placeholder="defaults.phi4_input_per_1k ?? ''" type="number"
-                step="0.000001"
-                class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Review Confidence
-              Threshold (0-1)</label>
-            <div class="mt-1">
-              <input v-model="settings.review_confidence_threshold"
-                :placeholder="defaults.review_confidence_threshold ?? 0.85" type="number" min="0" max="1" step="0.01"
-                class="block w-full max-w-xs rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
-            </div>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Emails with any intent confidence below this threshold are flagged <strong>To Review</strong>.
-            </p>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Phi-4 Output Cost (€ /
-              1K tokens)</label>
-            <div class="mt-1">
-              <input v-model="settings.phi4_output_per_1k" :placeholder="defaults.phi4_output_per_1k ?? ''"
-                type="number" step="0.000001"
-                class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Mistral OCR Cost (€ /
-              1K pages)</label>
-            <div class="mt-1">
-              <input v-model="settings.mistral_per_1k_pages" :placeholder="defaults.mistral_per_1k_pages ?? ''"
-                type="number" step="0.001"
-                class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
-            </div>
-          </div>
-
-          <div class="flex items-center gap-4">
-            <button type="submit" :disabled="loading"
-              class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50">
-              {{ loading ? t('settings.saving') : t('settings.save') }}
-            </button>
-            <transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 translate-y-1"
-              enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-150"
-              leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 translate-y-1">
-              <div v-if="saved" class="flex items-center text-green-600 dark:text-green-400 text-sm font-medium">
-                <CheckCircleIcon class="h-5 w-5 mr-1" />
-                {{ t('settings.saved') }}
-              </div>
-            </transition>
-          </div>
-        </form>
       </div>
     </div>
 
