@@ -23,8 +23,23 @@
         "tabs": {
             "processing": "Procesamiento",
             "finetuning": "Fine-tuning",
+            "general": "General",
             "logs": "Logs",
             "danger": "Zona Peligrosa"
+        },
+        "general": {
+            "title": "Configuración de Modelos",
+            "desc": "Configurar los modelos de IA utilizados para los consejos de categorías y la generación de datos sintéticos.",
+            "assessment_model": "Modelo de Consejo de Categorías",
+            "assessment_model_help": "Modelo utilizado para la evaluación y recomendaciones de calidad de categorías.",
+            "generation_model": "Modelo de Generación de Datos",
+            "generation_model_help": "Modelo utilizado para generar datos de entrenamiento sintéticos para fine-tuning.",
+            "reasoning_effort": "Esfuerzo de Razonamiento",
+            "effort_none": "Ninguno (más rápido)",
+            "effort_low": "Bajo (razonamiento ligero)",
+            "effort_medium": "Medio (equilibrado)",
+            "effort_high": "Alto (razonamiento profundo, más lento)",
+            "reasoning_warning": "Los modelos GPT-5 con razonamiento tardan significativamente más. Use 'Ninguno' para resultados más rápidos."
         },
         "processing": {
             "title": "Estrategia de Procesamiento",
@@ -134,7 +149,6 @@
                 "cancel_adding": "Cancelar Adición de Categoría",
                 "remove_confirm": "¿Está seguro de que desea eliminar esta categoría?"
             },
-            "assessment_model": "Modelo de Asesoramiento IA",
             "assessment": {
                 "button": "Obtener Consejo IA ({model})",
                 "analyzing": "Analizando...",
@@ -593,9 +607,9 @@
             "all": "Descargar Dataset Completo (JSONL)",
             "requirement_title": "Requisito Previo",
             "requirement_desc": "Necesita {n} correos procesados para activar la generación.",
-            "generate": "Generar datos con GPT-5.2",
+            "generate": "Generar datos sintéticos",
             "generating": "Generando...",
-            "generate_confirm": "Esto usará GPT-5.2 para generar correos sintéticos a partir de sus datos existentes para alcanzar el umbral mínimo. ¿Continuar?",
+            "generate_confirm": "Se generarán correos sintéticos a partir de sus datos existentes para alcanzar el umbral mínimo. ¿Continuar?",
             "generate_error": "Error en la Generación: {error}"
         }
     },

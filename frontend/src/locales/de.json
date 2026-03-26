@@ -23,8 +23,23 @@
         "tabs": {
             "processing": "Verarbeitung",
             "finetuning": "Fine-tuning",
+            "general": "Allgemein",
             "logs": "Logs",
             "danger": "Gefahrenzone"
+        },
+        "general": {
+            "title": "Modellkonfiguration",
+            "desc": "KI-Modelle für Kategorieberatung und synthetische Datengenerierung konfigurieren.",
+            "assessment_model": "Kategorieberatungs-Modell",
+            "assessment_model_help": "Modell für KI-gestützte Kategoriebewertung und Empfehlungen.",
+            "generation_model": "Datengenerierungs-Modell",
+            "generation_model_help": "Modell zur Generierung synthetischer Trainingsdaten für Fine-Tuning.",
+            "reasoning_effort": "Reasoning-Aufwand",
+            "effort_none": "Keins (schnellste)",
+            "effort_low": "Niedrig (leichtes Reasoning)",
+            "effort_medium": "Mittel (ausgewogen)",
+            "effort_high": "Hoch (tiefes Reasoning, langsamste)",
+            "reasoning_warning": "GPT-5-Modelle mit Reasoning brauchen deutlich länger. Verwenden Sie 'Keins' für schnellere Ergebnisse."
         },
         "processing": {
             "title": "Verarbeitungsstrategie",
@@ -134,7 +149,6 @@
                 "cancel_adding": "Kategorie-Hinzufügung abbrechen",
                 "remove_confirm": "Sind Sie sicher, dass Sie diese Kategorie entfernen möchten?"
             },
-            "assessment_model": "KI-Beratungsmodell",
             "assessment": {
                 "button": "KI-Beratung erhalten ({model})",
                 "analyzing": "Analysiere...",
@@ -593,9 +607,9 @@
             "all": "Vollständigen Datensatz herunterladen (JSONL)",
             "requirement_title": "Voraussetzung",
             "requirement_desc": "Sie benötigen {n} verarbeitete E-Mails, um die Generierung zu aktivieren.",
-            "generate": "Daten mit GPT-5.2 generieren",
+            "generate": "Synthetische Daten generieren",
             "generating": "Generiere...",
-            "generate_confirm": "Dies verwendet GPT-5.2, um synthetische E-Mails basierend auf Ihren vorhandenen Daten zu generieren, um die Mindestanforderung zu erreichen. Fortfahren?",
+            "generate_confirm": "Es werden synthetische E-Mails basierend auf Ihren vorhandenen Daten generiert, um die Mindestanforderung zu erreichen. Fortfahren?",
             "generate_error": "Generierung fehlgeschlagen: {error}"
         }
     },

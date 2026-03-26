@@ -23,8 +23,23 @@
         "tabs": {
             "processing": "Processing",
             "finetuning": "Fine-tuning",
+            "general": "General",
             "logs": "Logs",
             "danger": "Danger Zone"
+        },
+        "general": {
+            "title": "Model Configuration",
+            "desc": "Configure AI models used for category advice and synthetic data generation.",
+            "assessment_model": "Category Advice Model",
+            "assessment_model_help": "Model used for AI-powered category quality assessment and recommendations.",
+            "generation_model": "Data Generation Model",
+            "generation_model_help": "Model used to generate synthetic training data for fine-tuning.",
+            "reasoning_effort": "Reasoning Effort",
+            "effort_none": "None (fastest)",
+            "effort_low": "Low (light reasoning)",
+            "effort_medium": "Medium (balanced)",
+            "effort_high": "High (deep reasoning, slowest)",
+            "reasoning_warning": "GPT-5 models with reasoning enabled take significantly longer to respond. Use 'None' for faster results."
         },
         "processing": {
             "title": "Processing Strategy",
@@ -134,7 +149,6 @@
                 "cancel_adding": "Cancel Adding Category",
                 "remove_confirm": "Are you sure you want to remove this category?"
             },
-            "assessment_model": "Advice Model",
             "assessment": {
                 "button": "Get AI Advice ({model})",
                 "analyzing": "Analyzing...",
@@ -593,9 +607,9 @@
             "all": "Download Complete Dataset (JSONL)",
             "requirement_title": "Start Requirement",
             "requirement_desc": "You need {n} processed emails to enable dataset generation.",
-            "generate": "Generate data with GPT-5.2",
+            "generate": "Generate synthetic data",
             "generating": "Generating...",
-            "generate_confirm": "This will use GPT-5.2 to generate synthetic emails based on your existing data to help you reach the minimum requirement. Continue?",
+            "generate_confirm": "This will generate synthetic emails based on your existing data to help you reach the minimum requirement. Continue?",
             "generate_error": "Generation Failed: {error}"
         }
     },

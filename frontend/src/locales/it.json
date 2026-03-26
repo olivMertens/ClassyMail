@@ -23,8 +23,23 @@
         "tabs": {
             "processing": "Elaborazione",
             "finetuning": "Fine-tuning",
+            "general": "Generale",
             "logs": "Log",
             "danger": "Zona Pericolosa"
+        },
+        "general": {
+            "title": "Configurazione Modelli",
+            "desc": "Configura i modelli IA utilizzati per i consigli sulle categorie e la generazione di dati sintetici.",
+            "assessment_model": "Modello Consigli Categorie",
+            "assessment_model_help": "Modello utilizzato per la valutazione e le raccomandazioni sulla qualità delle categorie.",
+            "generation_model": "Modello Generazione Dati",
+            "generation_model_help": "Modello utilizzato per generare dati di addestramento sintetici per il fine-tuning.",
+            "reasoning_effort": "Sforzo di Ragionamento",
+            "effort_none": "Nessuno (più veloce)",
+            "effort_low": "Basso (ragionamento leggero)",
+            "effort_medium": "Medio (equilibrato)",
+            "effort_high": "Alto (ragionamento profondo, più lento)",
+            "reasoning_warning": "I modelli GPT-5 con ragionamento richiedono molto più tempo. Usa 'Nessuno' per risultati più rapidi."
         },
         "processing": {
             "title": "Strategia di Elaborazione",
@@ -134,7 +149,6 @@
                 "cancel_adding": "Annulla Aggiunta Categoria",
                 "remove_confirm": "Sei sicuro di voler rimuovere questa categoria?"
             },
-            "assessment_model": "Modello di Consulenza IA",
             "assessment": {
                 "button": "Ottieni Consiglio IA ({model})",
                 "analyzing": "Analizzando...",
@@ -593,9 +607,9 @@
             "all": "Scarica Dataset Completo (JSONL)",
             "requirement_title": "Prerequisito",
             "requirement_desc": "Sono necessari {n} email elaborate per attivare la generazione.",
-            "generate": "Genera dati con GPT-5.2",
+            "generate": "Genera dati sintetici",
             "generating": "Generazione...",
-            "generate_confirm": "Verrà utilizzato GPT-5.2 per generare email sintetiche basate sui dati esistenti per raggiungere la soglia minima. Continuare?",
+            "generate_confirm": "Verranno generate email sintetiche basate sui dati esistenti per raggiungere la soglia minima. Continuare?",
             "generate_error": "Generazione Fallita: {error}"
         }
     },

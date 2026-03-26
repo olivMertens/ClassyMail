@@ -17,7 +17,8 @@ import {
   ChevronUpIcon,
   CommandLineIcon,
   InformationCircleIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  Cog6ToothIcon
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '../composables/useDialog'
@@ -55,6 +56,8 @@ const settings = ref({
     show_ocr_provider: true
   },
   ai_assessment_model: 'gpt-4.1-nano',
+  data_generation_model: 'gpt-5.2-chat',
+  generation_reasoning_effort: 'none',
   agentic: {
     enabled: false,
     orchestrator_model: 'gpt-4.1-nano',
@@ -505,6 +508,9 @@ const saveSettings = async () => {
     const payload = {
       processing_strategy: settings.value.processing_strategy,
       ai_model: settings.value.ai_model,
+      ai_assessment_model: settings.value.ai_assessment_model,
+      data_generation_model: settings.value.data_generation_model,
+      generation_reasoning_effort: settings.value.generation_reasoning_effort,
       finetune_min_examples: settings.value.finetune_min_examples ? Number(settings.value.finetune_min_examples) : 50,
       ocr_max_attempts: settings.value.ocr_max_attempts ? Number(settings.value.ocr_max_attempts) : 3,
       categories: settings.value.categories,
@@ -873,6 +879,12 @@ onMounted(() => {
           @click="activeTab = 'design'">
           <SwatchIcon class="h-4 w-4" />
           {{ t('settings.appearance') }}
+        </button>
+        <button
+          :class="[activeTab === 'general' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          @click="activeTab = 'general'">
+          <Cog6ToothIcon class="h-4 w-4" />
+          {{ t('settings.tabs.general') }}
         </button>
         <button
           :class="[activeTab === 'finetuning' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
@@ -1556,6 +1568,85 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- General Tab -->
+    <div v-show="activeTab === 'general'" class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+          {{ t('settings.general.title') }}
+        </h3>
+        <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+          <p>{{ t('settings.general.desc') }}</p>
+        </div>
+
+        <form class="mt-5 space-y-6" @submit.prevent="saveSettings">
+          <!-- Assessment Model -->
+          <div>
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">
+              <CpuChipIcon class="inline h-4 w-4 -mt-0.5 mr-1 text-blue-500" />
+              {{ t('settings.general.assessment_model') }}
+            </label>
+            <div class="mt-1">
+              <select v-model="settings.ai_assessment_model"
+                class="block w-full max-w-xs rounded-md border-0 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('settings.general.assessment_model_help') }}</p>
+          </div>
+
+          <!-- Data Generation Model -->
+          <div>
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">
+              <CpuChipIcon class="inline h-4 w-4 -mt-0.5 mr-1 text-purple-500" />
+              {{ t('settings.general.generation_model') }}
+            </label>
+            <div class="mt-1">
+              <select v-model="settings.data_generation_model"
+                class="block w-full max-w-xs rounded-md border-0 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('settings.general.generation_model_help') }}</p>
+          </div>
+
+          <!-- Reasoning Effort (shown when GPT-5 family selected for either model) -->
+          <div v-if="settings.data_generation_model?.includes('gpt-5') || settings.ai_assessment_model?.includes('gpt-5')">
+            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">
+              {{ t('settings.general.reasoning_effort') }}
+            </label>
+            <div class="mt-1">
+              <select v-model="settings.generation_reasoning_effort"
+                class="block w-full max-w-xs rounded-md border-0 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option value="none">{{ t('settings.general.effort_none') }}</option>
+                <option value="low">{{ t('settings.general.effort_low') }}</option>
+                <option value="medium">{{ t('settings.general.effort_medium') }}</option>
+                <option value="high">{{ t('settings.general.effort_high') }}</option>
+              </select>
+            </div>
+            <div class="mt-2 flex items-start gap-2 text-amber-600 dark:text-amber-400 text-xs">
+              <ExclamationTriangleIcon class="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <span>{{ t('settings.general.reasoning_warning') }}</span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-4">
+            <button type="submit" :disabled="loading"
+              class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50">
+              {{ loading ? t('settings.saving') : t('settings.save') }}
+            </button>
+            <transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 translate-y-1"
+              enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-150"
+              leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 translate-y-1">
+              <div v-if="saved" class="flex items-center text-green-600 dark:text-green-400 text-sm font-medium">
+                <CheckCircleIcon class="h-5 w-5 mr-1" />
+                {{ t('settings.saved') }}
+              </div>
+            </transition>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Fine-tuning Tab -->
     <div v-show="activeTab === 'finetuning'" class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
       <div class="px-4 py-5 sm:p-6">
@@ -1636,20 +1727,6 @@ onMounted(() => {
             {{ t('settings.categories.managed_title') }}
           </h3>
           <div class="flex items-center gap-4">
-            <!-- AI Assessment Model Selector -->
-            <div class="flex items-center gap-2">
-              <label class="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                <CpuChipIcon class="inline h-4 w-4 -mt-0.5 mr-0.5" />
-                {{ t('settings.categories.assessment_model') }}
-              </label>
-              <select v-model="settings.ai_assessment_model"
-                class="block w-44 rounded-md border-0 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
-                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">
-                  {{ opt.label }}
-                </option>
-              </select>
-            </div>
-
             <!-- Save Button -->
             <button type="button" :disabled="loading"
               class="inline-flex items-center rounded-md bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
