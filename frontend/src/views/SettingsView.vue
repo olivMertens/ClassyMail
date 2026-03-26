@@ -28,7 +28,7 @@ const { t, locale } = useI18n()
 const { confirm, alert: showAlert } = useDialog() // Rename alert because it conflicts with window.alert if not careful, though in setup scope it shadows it.
 
 // Tabs
-const activeTab = ref('classification')
+const activeTab = ref('general')
 const showStrategyHelp = ref(false)
 
 // Config Data
@@ -130,23 +130,24 @@ const availableDeployments = ref([])
 const deploymentsLoaded = ref(false)
 const assessmentEnabled = ref(true)
 
-// Merged model options: real deployments first, then MODEL_PRICING keys as fallback
+// Merged model options: model-router first, then real deployments, then MODEL_PRICING keys as fallback
+const MODEL_ROUTER_OPTION = { value: 'model-router', label: 'Model Router (Auto)' }
 const modelOptions = computed(() => {
   if (availableDeployments.value.length > 0) {
-    return availableDeployments.value.map(d => {
-      // Match pricing by deployment id, model name, or model name prefix
+    const opts = availableDeployments.value.map(d => {
       const pricing = getModelPricing(d.id) || getModelPricing(d.model) || Object.values(MODEL_PRICING).find(p => d.id.toLowerCase().startsWith(p.label.toLowerCase().replace(/ /g, '-')))
       return {
         value: d.id,
         label: pricing ? `${pricing.label} (${d.model})` : `${d.id} (${d.model})`,
       }
     }).filter(d => !d.value.includes('embedding') && !d.value.includes('mistral'))
+    return [MODEL_ROUTER_OPTION, ...opts]
   }
   // Fallback: use hardcoded MODEL_PRICING keys
-  return Object.entries(MODEL_PRICING).map(([key, m]) => ({
+  return [MODEL_ROUTER_OPTION, ...Object.entries(MODEL_PRICING).map(([key, m]) => ({
     value: key,
     label: m.label,
-  }))
+  }))]
 })
 
 const loadDeployments = async () => {
@@ -863,6 +864,12 @@ onMounted(() => {
     <div class="border-b border-gray-200 dark:border-gray-700 overflow-x-auto overflow-y-hidden">
       <nav class="-mb-px flex space-x-8" aria-label="Tabs">
         <button
+          :class="[activeTab === 'general' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          @click="activeTab = 'general'">
+          <Cog6ToothIcon class="h-4 w-4" />
+          {{ t('settings.tabs.general') }}
+        </button>
+        <button
           :class="[activeTab === 'classification' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
           @click="activeTab = 'classification'">
           <QueueListIcon class="h-4 w-4" />
@@ -875,29 +882,24 @@ onMounted(() => {
           {{ t('settings.tabs.processing') }}
         </button>
         <button
-          :class="[activeTab === 'design' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
-          @click="activeTab = 'design'">
-          <SwatchIcon class="h-4 w-4" />
-          {{ t('settings.appearance') }}
-        </button>
-        <button
-          :class="[activeTab === 'general' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
-          @click="activeTab = 'general'">
-          <Cog6ToothIcon class="h-4 w-4" />
-          {{ t('settings.tabs.general') }}
-        </button>
-        <button
           :class="[activeTab === 'finetuning' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
           @click="activeTab = 'finetuning'">
           <AdjustmentsHorizontalIcon class="h-4 w-4" />
           {{ t('settings.tabs.finetuning') }}
         </button>
-
         <button
-          :class="[activeTab === 'danger' ? 'border-red-500 text-red-600 dark:text-red-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          :class="[activeTab === 'design' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          @click="activeTab = 'design'">
+          <SwatchIcon class="h-4 w-4" />
+          {{ t('settings.appearance') }}
+        </button>
+
+        <div class="flex-1"></div>
+        <button
+          :class="[activeTab === 'danger' ? 'border-red-500 text-red-600 dark:text-red-400' : 'border-transparent text-red-400/60 hover:border-red-300 hover:text-red-500 dark:text-red-500/50 dark:hover:text-red-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
           @click="activeTab = 'danger'">
+          <ExclamationTriangleIcon class="h-4 w-4" />
           {{ t('settings.tabs.danger') }}
-          <ExclamationTriangleIcon class="h-4 w-4 text-red-500" />
         </button>
       </nav>
     </div>
@@ -1610,7 +1612,7 @@ onMounted(() => {
           </div>
 
           <!-- Reasoning Effort (shown when GPT-5 family selected for either model) -->
-          <div v-if="settings.data_generation_model?.includes('gpt-5') || settings.ai_assessment_model?.includes('gpt-5')">
+          <div v-if="settings.data_generation_model?.includes('gpt-5') || settings.ai_assessment_model?.includes('gpt-5') || settings.data_generation_model === 'model-router' || settings.ai_assessment_model === 'model-router'">
             <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">
               {{ t('settings.general.reasoning_effort') }}
             </label>
