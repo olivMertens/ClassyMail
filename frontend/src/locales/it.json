@@ -19,13 +19,10 @@
         "theme": "Tema Colori",
         "dark_mode": "Modalità Scura",
         "language": "Lingua",
-        "costs_title": "Sovrascrittura Costi",
-        "costs_desc": "Modificare la tariffazione predefinita per il calcolo dei costi. Lasciare vuoto per usare i valori predefiniti.",
         "telemetry_title": "Telemetria Application Insights",
         "tabs": {
             "processing": "Elaborazione",
             "finetuning": "Fine-tuning",
-            "general": "Generale e Costi",
             "logs": "Log",
             "danger": "Zona Pericolosa"
         },

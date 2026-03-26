@@ -19,13 +19,10 @@
         "theme": "Tema de Color",
         "dark_mode": "Modo Oscuro",
         "language": "Idioma",
-        "costs_title": "Sobrecarga de Costes",
-        "costs_desc": "Modificar la tarificación por defecto para el cálculo de costes. Dejar en blanco para usar los valores por defecto.",
         "telemetry_title": "Telemetría Application Insights",
         "tabs": {
             "processing": "Procesamiento",
             "finetuning": "Fine-tuning",
-            "general": "General y Costes",
             "logs": "Logs",
             "danger": "Zona Peligrosa"
         },

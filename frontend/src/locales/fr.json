@@ -19,13 +19,10 @@
         "theme": "Thème de couleur",
         "dark_mode": "Mode Sombre",
         "language": "Langue",
-        "costs_title": "Surcharge des Coûts",
-        "costs_desc": "Modifier la tarification par défaut pour le calcul des coûts. Laisser vide pour utiliser les défauts.",
         "telemetry_title": "Télémétrie Application Insights",
         "tabs": {
             "processing": "Traitement",
             "finetuning": "Fine-tuning",
-            "general": "Général & Coûts",
             "logs": "Logs",
             "danger": "Danger"
         },

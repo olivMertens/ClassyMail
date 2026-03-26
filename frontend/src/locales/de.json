@@ -19,13 +19,10 @@
         "theme": "Farbthema",
         "dark_mode": "Dunkelmodus",
         "language": "Sprache",
-        "costs_title": "Kostenüberschreibung",
-        "costs_desc": "Standardtarife für die Kostenberechnung überschreiben. Leer lassen für Standardwerte.",
         "telemetry_title": "Application Insights Telemetrie",
         "tabs": {
             "processing": "Verarbeitung",
             "finetuning": "Fine-tuning",
-            "general": "Allgemein & Kosten",
             "logs": "Logs",
             "danger": "Gefahrenzone"
         },
