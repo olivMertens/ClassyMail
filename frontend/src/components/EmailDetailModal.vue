@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed, nextTick } from 'vue'
-import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, ExclamationCircleIcon, ShieldExclamationIcon, ChatBubbleLeftRightIcon, ChevronDownIcon, ChevronUpIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
+import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, ExclamationCircleIcon, ShieldExclamationIcon, ChatBubbleLeftRightIcon, ChevronDownIcon, ChevronUpIcon, ChevronLeftIcon, ChevronRightIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
 import mermaid from 'mermaid'
 import { useDialog } from '../composables/useDialog'
@@ -211,6 +211,8 @@ const agenticData = computed(() => {
 const showAgenticTrace = ref(false)
 const showMermaidFlow = ref(false)
 const mermaidFlowSvg = ref('')
+const showPdfPanel = ref(true)
+const showAgenticSettings = ref(false)
 
 const truncate = (text, max) => {
   if (!text) return ''
@@ -222,7 +224,7 @@ const truncate = (text, max) => {
 const mermaidFlowDef = computed(() => {
   const d = agenticData.value
   if (!d) return ''
-  const lines = ['flowchart TD']
+  const lines = ['flowchart LR']
 
   // Helper: style an agent node by confidence
   const styleAgent = (id, confidence, isRedTeamSpawned) => {
@@ -502,6 +504,15 @@ watch(() => props.isOpen, (newVal) => {
   }
 })
 
+watch(() => props.emailId, (newId, oldId) => {
+  if (newId && newId !== oldId && props.isOpen) {
+    showAgenticTrace.value = false
+    showMermaidFlow.value = false
+    mermaidFlowSvg.value = ''
+    loadSettings().then(loadEmail)
+  }
+})
+
 const parseArrivalDate = (fileUrl) => {
   if (!fileUrl) return null
   try {
@@ -617,7 +628,8 @@ watch(() => email.value, (val) => {
           <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
             <!-- Left: PDF -->
             <div
-              class="md:w-1/2 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 flex flex-col">
+              class="md:h-full border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 flex flex-col transition-all duration-300 overflow-hidden"
+              :class="showPdfPanel ? 'md:w-1/2 h-1/2' : 'md:w-0 h-0 md:h-full'">
               <div class="flex-1 flex flex-col">
                 <iframe v-if="pdfUrl" :src="pdfUrl" class="w-full flex-1" title="PDF Preview" />
                 <div v-else class="flex-1 flex items-center justify-center text-gray-500">
@@ -633,8 +645,18 @@ watch(() => email.value, (val) => {
               </div>
             </div>
 
+            <!-- PDF Panel Toggle -->
+            <button
+              @click="showPdfPanel = !showPdfPanel"
+              class="hidden md:flex items-center justify-center w-5 flex-shrink-0 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer border-x border-gray-200 dark:border-gray-700"
+              :title="showPdfPanel ? 'Hide PDF panel' : 'Show PDF panel'">
+              <ChevronLeftIcon v-if="showPdfPanel" class="h-4 w-4 text-gray-400" />
+              <ChevronRightIcon v-else class="h-4 w-4 text-gray-400" />
+            </button>
+
             <!-- Right: Data -->
-            <div class="md:w-1/2 h-1/2 md:h-full overflow-y-auto bg-white dark:bg-gray-900 flex flex-col">
+            <div class="md:h-full overflow-y-auto bg-white dark:bg-gray-900 flex flex-col transition-all duration-300"
+              :class="showPdfPanel ? 'md:w-1/2 h-1/2' : 'md:w-full h-full'">
               <!-- Tabs -->
               <div class="border-b border-gray-200 dark:border-gray-700">
                 <nav class="flex -mb-px" aria-label="Tabs">
@@ -944,47 +966,62 @@ watch(() => email.value, (val) => {
                     </button>
 
                     <div v-if="showAgenticTrace" class="mt-3 space-y-3">
-                      <!-- Visual Flow -->
-                      <div
-                        class="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 overflow-x-auto pb-1">
-                        <span
-                          class="inline-flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
-                          🎯 Orchestrator
-                        </span>
-                        <span class="text-gray-400">→</span>
-                        <template v-for="(agent, idx) in agenticData.agents.filter(a => a.triggered_by !== 'red_team')" :key="'orch-' + agent.intent">
-                          <span v-if="idx > 0" class="text-gray-400">·</span>
-                          <span
-                            class="inline-flex items-center gap-1 px-2 py-1 rounded-full whitespace-nowrap font-medium"
-                            :class="agent.confidence >= 0.7 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
-                              agent.confidence >= 0.4 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
-                                'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'">
-                            {{ agent.confidence >= 0.7 ? '✅' : agent.confidence >= 0.4 ? '⚠️' : '❌' }}
-                            {{ agent.intent }}
-                            <span class="opacity-60">{{ Math.round((agent.confidence || 0) * 100) }}%</span>
-                          </span>
-                        </template>
-                        <template v-if="agenticData.redTeamTrace">
-                          <span class="text-gray-400">→</span>
-                          <span
-                            class="inline-flex items-center gap-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
-                            🛡️ Red Team
-                          </span>
-                        </template>
-                        <template v-for="(agent, idx) in agenticData.agents.filter(a => a.triggered_by === 'red_team')" :key="'rt-' + agent.intent">
-                          <span v-if="idx === 0" class="text-gray-400">→</span>
-                          <span v-else class="text-gray-400">·</span>
-                          <span
-                            class="inline-flex items-center gap-1 px-2 py-1 rounded-full whitespace-nowrap font-medium bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300">
-                            🔍 {{ agent.intent }}
-                            <span class="opacity-60">{{ Math.round((agent.confidence || 0) * 100) }}%</span>
-                          </span>
-                        </template>
-                        <span class="text-gray-400">→</span>
-                        <span
-                          class="inline-flex items-center gap-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
-                          📊 Result
-                        </span>
+                      <!-- Visual Flow - vertical pipeline steps -->
+                      <div class="text-[10px] text-gray-500 dark:text-gray-400">
+                        <!-- Step 1: Orchestrator -->
+                        <div class="flex items-start gap-2">
+                          <div class="flex flex-col items-center">
+                            <span
+                              class="inline-flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
+                              🎯 Orchestrator
+                            </span>
+                            <div class="w-px h-3 bg-gray-300 dark:bg-gray-600"></div>
+                          </div>
+                        </div>
+
+                        <!-- Step 2: Red Team (if triggered before agents) -->
+                        <div v-if="agenticData.redTeamTrace" class="flex items-start gap-2">
+                          <div class="flex flex-col items-center">
+                            <span
+                              class="inline-flex items-center gap-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
+                              🛡️ Red Team
+                            </span>
+                            <div class="w-px h-3 bg-gray-300 dark:bg-gray-600"></div>
+                          </div>
+                        </div>
+
+                        <!-- Step 3: Agent candidates (wrapped grid) -->
+                        <div class="flex flex-wrap items-center gap-1.5 py-1">
+                          <template v-for="(agent, idx) in agenticData.agents.filter(a => a.triggered_by !== 'red_team')" :key="'orch-' + agent.intent">
+                            <span
+                              class="inline-flex items-center gap-1 px-2 py-1 rounded-full font-medium"
+                              :class="agent.confidence >= 0.7 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
+                                agent.confidence >= 0.4 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                  'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'">
+                              {{ agent.confidence >= 0.7 ? '✅' : agent.confidence >= 0.4 ? '⚠️' : '❌' }}
+                              {{ agent.intent }}
+                              <span class="opacity-60">{{ Math.round((agent.confidence || 0) * 100) }}%</span>
+                            </span>
+                          </template>
+                          <template v-for="agent in agenticData.agents.filter(a => a.triggered_by === 'red_team')" :key="'rt-' + agent.intent">
+                            <span
+                              class="inline-flex items-center gap-1 px-2 py-1 rounded-full font-medium bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300">
+                              🔍 {{ agent.intent }}
+                              <span class="opacity-60">{{ Math.round((agent.confidence || 0) * 100) }}%</span>
+                            </span>
+                          </template>
+                        </div>
+
+                        <!-- Step 4: Result -->
+                        <div class="flex items-start gap-2">
+                          <div class="flex flex-col items-center">
+                            <div class="w-px h-3 bg-gray-300 dark:bg-gray-600"></div>
+                            <span
+                              class="inline-flex items-center gap-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
+                              📊 Result
+                            </span>
+                          </div>
+                        </div>
                       </div>
 
                       <!-- Mermaid Flow Diagram Toggle -->
@@ -998,8 +1035,8 @@ watch(() => email.value, (val) => {
                         </button>
                       </div>
                       <div v-if="showMermaidFlow"
-                        class="rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-900 p-3 overflow-x-auto">
-                        <div v-html="mermaidFlowSvg" class="flex justify-center [&>svg]:max-w-full"></div>
+                        class="rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-900 p-3">
+                        <div v-html="mermaidFlowSvg" class="flex justify-center [&>svg]:max-w-full [&>svg]:h-auto"></div>
                       </div>
 
                       <!-- Orchestrator Card -->
@@ -1027,7 +1064,7 @@ watch(() => email.value, (val) => {
                       </div>
 
                       <!-- Specialized Agent Cards -->
-                      <div class="grid grid-cols-1 gap-2">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <div v-for="agent in agenticData.agents" :key="agent.intent"
                           class="rounded-lg border p-3 transition-colors" :class="agent.confidence >= 0.7
                             ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10'
@@ -1084,7 +1121,7 @@ watch(() => email.value, (val) => {
 
                       <!-- Summary Stats -->
                       <div
-                        class="flex items-center gap-4 text-[10px] text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-200 dark:border-gray-700">
+                        class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-200 dark:border-gray-700">
                         <span>⏱ Parallel: {{ agenticData.parallelMs?.toFixed(0) }}ms</span>
                         <span>🔢 Total: {{ agenticData.totalTokens }} tokens</span>
                         <span>🤖 {{ agenticData.agents.length }} agents</span>
@@ -1094,12 +1131,15 @@ watch(() => email.value, (val) => {
 
                       <!-- Settings Snapshot -->
                       <div v-if="agenticData.settings" class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                        <div class="flex items-center gap-1 mb-1.5">
+                        <button @click="showAgenticSettings = !showAgenticSettings"
+                          class="flex items-center gap-1 mb-1.5 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
                           <span class="text-[10px] font-medium text-gray-500 dark:text-gray-400">⚙️ Configuration used
                             for this
-                            classification:</span>
-                        </div>
-                        <div class="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
+                            classification</span>
+                          <ChevronDownIcon v-if="!showAgenticSettings" class="h-3 w-3 text-gray-400" />
+                          <ChevronUpIcon v-else class="h-3 w-3 text-gray-400" />
+                        </button>
+                        <div v-show="showAgenticSettings" class="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
                           <span class="text-gray-500">Orchestrator: <code
                               class="bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-1 rounded">{{
                                 agenticData.settings.orchestrator_model }}</code></span>
