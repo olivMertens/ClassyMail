@@ -45,7 +45,7 @@ Thumbs.db
 # Builds
 build/
 dist/
-.build-context/
+.tmp/
 build-context.tar.gz
 
 # Notebooks

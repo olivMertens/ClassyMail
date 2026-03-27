@@ -38,12 +38,13 @@ infra/
 
 # ── Build artifacts ──
 *.log
+.tmp/
+.build-context/
+build-context.tar.gz
 *.sarif
 static/dist/
 *.tfstate*
 tfplan
-build-context.tar.gz
-.build-context/
 
 # ── Files never needed in image ──
 LICENSE

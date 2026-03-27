@@ -61,13 +61,13 @@ tar -czf build-context.tar.gz \
   --exclude='*.log' --exclude='secrets.env' \
   -C . .
 
-# 2. Extract into .build-context directory
-mkdir -p .build-context && tar -xzf build-context.tar.gz -C .build-context
+# 2. Extract into .tmp directory
+mkdir -p .tmp && tar -xzf build-context.tar.gz -C .tmp
 
 # 3. Cloud build via ACR Tasks (~2-3 min)
 az acr build --registry <ACR_NAME> \
   --image classymail:latest --image classymail:<COMMIT_SHA> \
-  --platform linux/amd64 .build-context
+  --platform linux/amd64 .tmp
 
 # 4. Update Container Apps
 az containerapp update --name <PREFIX>-api --resource-group <PREFIX>-rg \
@@ -79,10 +79,11 @@ az containerapp update --name <PREFIX>-worker --resource-group <PREFIX>-rg \
 curl https://<API_FQDN>/healthz
 
 # 6. Clean up
-rm -rf .build-context build-context.tar.gz
+rm -rf .tmp build-context.tar.gz
 ```
 
 - The `.dockerignore` is optimized — context should be ~500 KB, not 100+ MB.
+- Temporary build artifacts go in `.tmp/` (gitignored + dockerignored). Never use `.build-context/`.
 - Always tag with both `latest` and the short commit SHA.
 - Both ACAs (api/worker) use the **same image** — the entrypoint differs via `CMD` override in Terraform.
 - CI/CD uses `#.github/workflows/` — see `docs/CICD_GITHUB.md` for OIDC + GitHub Actions details.
