@@ -1,6 +1,6 @@
 # ClassyMail – Agentic Classification Architecture
 
-> Microsoft Agent Framework RC4 — Multi-agent email classification with orchestrator, specialized agents, per-intent AI Search indexes, and quality gate.
+> Microsoft Agent Framework GA 1.0 — Multi-agent email classification with orchestrator, specialized agents, per-intent AI Search indexes, and quality gate.
 
 ## 1. Objective
 
@@ -70,7 +70,7 @@ Final classification decision (traceable, explainable)
 
 ### Why Custom Routing (not GroupChat / Magentic)
 
-After analyzing the [Agent Framework RC4 workflow samples](https://github.com/microsoft/agent-framework/tree/main/python/samples/03-workflows), the best pattern for ClassyMail is:
+After analyzing the [Agent Framework GA 1.0 workflow samples](https://github.com/microsoft/agent-framework/tree/main/python/samples/03-workflows), the best pattern for ClassyMail is:
 
 | Pattern | Fit | Reason |
 |---|---|---|

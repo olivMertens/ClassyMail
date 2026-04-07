@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import json
 import subprocess
-import uuid
 from datetime import datetime, timezone
 
 # ---------------------------------------------------------------------------
@@ -994,8 +993,8 @@ async def main():
     ai_endpoint = foundry_info["properties"]["endpoint"]
     print(f"  AI Foundry endpoint: {ai_endpoint}")
 
-    # ── Step 3: Create indexes ───────────────────────────────────────
-    print("\n=== Step 3: Create per-intent indexes ===")
+    # ── Step 3: Create indexes (idempotent — create-or-update) ─────
+    print("\n=== Step 3: Create per-intent indexes (idempotent) ===")
     import httpx
 
     for cat in CATEGORIES:
@@ -1003,20 +1002,17 @@ async def main():
         index_name = f"classymail-intent-{slug}"
         schema = build_index_schema(slug)
 
-        # Check if index exists
         async with httpx.AsyncClient(timeout=30) as client:
+            # Check if index exists — if so, skip (preserve data)
             check_resp = await client.get(
                 f"{search_endpoint}/indexes/{index_name}?api-version=2024-07-01",
                 headers={"api-key": admin_key},
             )
             if check_resp.status_code == 200:
-                print(f"  Index '{index_name}' already exists — deleting and recreating...")
-                await client.delete(
-                    f"{search_endpoint}/indexes/{index_name}?api-version=2024-07-01",
-                    headers={"api-key": admin_key},
-                )
+                print(f"  Index '{index_name}' already exists — skipping (data preserved).")
+                continue
 
-            # Create index
+            # Create index (PUT is idempotent)
             resp = await client.put(
                 f"{search_endpoint}/indexes/{index_name}?api-version=2024-07-01",
                 headers={"api-key": admin_key, "Content-Type": "application/json"},
@@ -1051,8 +1047,8 @@ async def main():
                 vector = [0.0] * EMBEDDING_DIMENSIONS  # fallback zero vector
 
             doc = {
-                "@search.action": "upload",
-                "id": str(uuid.uuid4()),
+                "@search.action": "mergeOrUpload",
+                "id": f"sample-{slug}-{i:03d}",
                 "email_id": f"sample-{slug}-{i:03d}",
                 "content": email_data["content"],
                 "label": email_data["label"],

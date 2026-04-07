@@ -1,7 +1,7 @@
 """
 Chat Agent — Microsoft Agent Framework integration.
 
-Uses agent-framework-azure-ai for tool orchestration.
+Uses agent-framework-core for tool orchestration.
 Preserves: semantic cache, chat history, chunk grounding, link enrichment, OTel tracing.
 """
 from __future__ import annotations
@@ -426,7 +426,7 @@ class ClassyMailChatAgent:
             return self._agent
 
         from agent_framework import Agent
-        from agent_framework.azure import AzureOpenAIChatClient
+        from agent_framework.openai import OpenAIChatClient
 
         endpoint = (config.CHAT_ENDPOINT or "").rstrip("/")
         deployment = config.CHAT_DEPLOYMENT or "gpt-4o"
@@ -444,8 +444,8 @@ class ClassyMailChatAgent:
             api_version = "2024-05-01-preview"
 
         client_kwargs = {
-            "endpoint": endpoint,
-            "deployment_name": deployment,
+            "azure_endpoint": endpoint,
+            "model": deployment,
             "api_version": api_version,
         }
 
@@ -454,7 +454,7 @@ class ClassyMailChatAgent:
         else:
             client_kwargs["credential"] = DefaultAzureCredential()
 
-        client = AzureOpenAIChatClient(**client_kwargs)
+        client = OpenAIChatClient(**client_kwargs)
 
         self._agent = Agent(
             client=client,
