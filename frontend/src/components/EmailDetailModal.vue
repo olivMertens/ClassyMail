@@ -35,6 +35,8 @@ const primaryModel = ref('Phi-4')
 const correctionReason = ref('')
 const activeTab = ref('review') // review | history
 const isFullWidth = ref(false)
+const reinforcing = ref(false)
+const reinforced = ref(false)
 
 const pdfUrl = computed(() => {
   const url = email.value?.file_url_proxy || email.value?.file_url_sas || email.value?.file_url || null
@@ -99,6 +101,7 @@ const loadEmail = async () => {
   correctionReason.value = ''
   selectedCategoryNames.value = []
   customCategories.value = []
+  reinforced.value = false
 
   try {
     const res = await fetch(`/api/emails/${props.emailId}`)
@@ -492,6 +495,29 @@ const saveIntents = async () => {
   } catch (e) {
     trackException(e)
     showAlert('Error Saving: ' + e.message)
+  }
+}
+
+const reinforceAsExample = async () => {
+  if (!email.value) return
+  reinforcing.value = true
+  reinforced.value = false
+  try {
+    const res = await fetch(`/api/emails/${email.value.id}/reinforce`, { method: 'POST' })
+    if (res.ok) {
+      const data = await res.json()
+      reinforced.value = true
+      trackEvent('reinforce_example', { count: data.count, slugs: data.reinforced })
+      setTimeout(() => { reinforced.value = false }, 4000)
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
+      showAlert(err.detail || 'Failed to reinforce')
+    }
+  } catch (e) {
+    trackException(e)
+    showAlert('Error: ' + e.message)
+  } finally {
+    reinforcing.value = false
   }
 }
 
@@ -1178,17 +1204,33 @@ watch(() => email.value, (val) => {
                   </div>
 
                   <!-- Actions -->
-                  <div class="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div class="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
                     <button class="text-red-600 hover:text-red-500 text-sm font-medium flex items-center"
                       @click="markAsInvalid">
                       <TrashIcon class="w-4 h-4 mr-1" />
-                      Mark as Garbage/Invalid
+                      {{ t('email_detail.mark_garbage') }}
                     </button>
-                    <button
-                      class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50"
-                      :disabled="selectedCategoryNames.length === 0" @click="saveIntents">
-                      Validate & Save
-                    </button>
+                    <div class="flex items-center gap-2">
+                      <!-- Reinforce as example (correct classification) -->
+                      <button v-if="email?.status === 'PROCESSED' && email?.classification?.detected_intents?.length"
+                        class="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors"
+                        :class="reinforced
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 cursor-default'
+                          : 'text-purple-600 dark:text-purple-400 border border-purple-300 dark:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/30'"
+                        :disabled="reinforcing || reinforced"
+                        :title="t('email_detail.reinforce_tooltip')"
+                        @click="reinforceAsExample">
+                        <CheckIcon v-if="reinforced" class="w-3.5 h-3.5" />
+                        <ArrowPathIcon v-else-if="reinforcing" class="w-3.5 h-3.5 animate-spin" />
+                        <ShieldExclamationIcon v-else class="w-3.5 h-3.5" />
+                        {{ reinforced ? t('email_detail.reinforced') : reinforcing ? t('email_detail.reinforcing') : t('email_detail.reinforce') }}
+                      </button>
+                      <button
+                        class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50"
+                        :disabled="selectedCategoryNames.length === 0" @click="saveIntents">
+                        {{ t('email_detail.validate_save') }}
+                      </button>
+                    </div>
                   </div>
                 </div>
 

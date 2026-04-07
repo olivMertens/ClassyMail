@@ -23,20 +23,14 @@ const initMermaid = async () => {
   await nextTick()
 
   // Render main architecture diagram
-  const mainEl = document.querySelector('.mermaid')
+  const mainEl = document.querySelector('.mermaid-ref')
   if (mainEl) {
     mainEl.removeAttribute('data-processed')
-    mainEl.innerHTML = diagram.value
-  }
-  await mermaid.run({ nodes: document.querySelectorAll('.mermaid') })
-
-  // Render reference diagram and capture SVG for fullscreen
-  const refEl = document.querySelector('.mermaid-ref')
-  if (refEl) {
-    refEl.removeAttribute('data-processed')
-    refEl.innerHTML = refDiagram.value
+    mainEl.innerHTML = refDiagram.value
   }
   await mermaid.run({ nodes: document.querySelectorAll('.mermaid-ref') })
+
+  // Capture SVG for fullscreen
   const refId = 'ref-fullscreen-' + Date.now()
   try {
     const { svg } = await mermaid.render(refId, refDiagram.value)
@@ -91,61 +85,7 @@ const switchTab = (tab) => {
   }
 }
 
-// Architecture Diagram Definition
-// Removing strict classDefs and semi-colons which can sometimes cause parsing issues in strict mode
-const diagram = computed(() => `
-flowchart TD
-    classDef azure fill:#0072C6,stroke:#fff,stroke-width:2px,color:#fff
-    classDef app fill:#50e6ff,stroke:#333,stroke-width:2px,color:#000
-    classDef db fill:#59b4d9,stroke:#333,stroke-width:2px
-    classDef ai fill:#ff9900,stroke:#333,stroke-width:2px,color:#000
-    classDef fallback fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000
-
-    Client([${t('developer_docs.diagram.client')}]) -->|HTTPS| FE[${t('developer_docs.diagram.frontend')}]
-    FE -->|API Calls| API[${t('developer_docs.diagram.backend')}]
-
-    subgraph AzureContainerApps [${t('developer_docs.diagram.aca')}]
-        API
-        Worker[${t('developer_docs.diagram.worker')}]
-    end
-
-    API -->|${t('developer_docs.diagram.save_upload')}| Blob[${t('developer_docs.diagram.blob')}]
-    API -->|${t('developer_docs.diagram.metadata')}| Cosmos[${t('developer_docs.diagram.cosmos')}]
-    API -->|${t('developer_docs.diagram.queue_job')}| SB[${t('developer_docs.diagram.sb')}]
-
-    SB -->|${t('developer_docs.diagram.trigger')}| Worker
-    Worker -->|${t('developer_docs.diagram.read_file')}| Blob
-    Worker -->|${t('developer_docs.diagram.ocr')}| Mistral[${t('developer_docs.diagram.mistral')}]
-    Mistral -.->|${t('developer_docs.diagram.fallback')}| DI[${t('developer_docs.diagram.doc_intelligence')}]
-    Worker -->|${t('developer_docs.diagram.classify')}| OPENAI[${t('developer_docs.diagram.openai')}]
-
-    OPENAI -->|"Agentic"| Orch["Orchestrator Inspector"]
-    Orch -->|"Fan-out"| ParAgents["Parallel Agents"]
-    Orch -->|"0 intents"| RT["Red Team"]
-    ParAgents -->|"Per-intent"| AISearch[("AI Search Indexes")]
-    AISearch -->|"RAG"| ParAgents
-    ParAgents -->|"Verdicts"| RT
-    RT -->|"Missed intents"| ParAgents
-    RT -->|"Validated"| OPENAI
-
-    subgraph AIFoundry [${t('developer_docs.diagram.ai_foundry')}]
-        Mistral
-        OPENAI
-        DI
-    end
-
-    Mistral -->|Markdown| Worker
-    DI -.->|Markdown| Worker
-    OPENAI -->|JSON Intent| Worker
-    Worker -->|${t('developer_docs.diagram.update')}| Cosmos
-
-    class Blob,Cosmos,SB azure
-    class FE,API,Worker app
-    class Mistral,OPENAI ai
-    class DI fallback
-`)
-
-// Reference Architecture Diagram (detailed processing flow)
+// Architecture Diagram Definition (detailed processing flow)
 const refDiagram = computed(() => `
 flowchart TD
     classDef user fill:#e2e8f0,stroke:#64748b,stroke-width:2px,color:#1e293b
@@ -267,27 +207,16 @@ flowchart TD
       <!-- Architecture Tab -->
       <div v-if="currentTab === 'architecture'" class="space-y-8">
         <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
-          <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white mb-4">
-            {{ t('developer_docs.architecture.title') }}
-          </h3>
-          <!-- eslint-disable vue/no-v-html -->
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-6"
-            v-html="t('developer_docs.architecture.desc_html')" />
-          <!-- eslint-enable vue/no-v-html -->
-
-          <div
-            class="flex justify-center bg-white dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto">
-            <div class="mermaid">
-              {{ diagram }}
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg p-6">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
-              {{ t('developer_docs.architecture.ref_title') }}
-            </h3>
+            <div>
+              <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+                {{ t('developer_docs.architecture.ref_title') }}
+              </h3>
+              <!-- eslint-disable vue/no-v-html -->
+              <p class="text-sm text-gray-500 dark:text-gray-400 mt-2"
+                v-html="t('developer_docs.architecture.desc_html')" />
+              <!-- eslint-enable vue/no-v-html -->
+            </div>
             <button @click="refDiagramFullscreen = true"
               class="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700">
               <ArrowsPointingOutIcon class="h-4 w-4" />

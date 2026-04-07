@@ -194,6 +194,115 @@ const toggleCategoryIndex = (slug, enabled) => {
   settings.value.agentic.enabled_indexes[slug] = enabled
 }
 
+// ── AI Search Index Management ──────────────────────────────────────
+const showAISearchInfo = ref(false)
+const aiSearchIndexes = ref({}) // { slug: { status, doc_count, loading } }
+const aiSearchExamples = ref({}) // { slug: { items: [], loading, expanded } }
+const newExample = ref({}) // { slug: { content, is_positive, correction_reason } }
+const addingExample = ref({}) // { slug: boolean }
+
+const loadAISearchIndexes = async () => {
+  try {
+    const res = await fetch('/api/admin/ai-search/indexes')
+    if (!res.ok) return
+    const data = await res.json()
+    if (!data.enabled) return
+    for (const ix of (data.indexes || [])) {
+      aiSearchIndexes.value[ix.slug] = { status: 'exists', doc_count: ix.doc_count, loading: false }
+    }
+  } catch { /* ignore */ }
+}
+
+const ensureCategoryIndex = async (slug) => {
+  aiSearchIndexes.value[slug] = { ...(aiSearchIndexes.value[slug] || {}), loading: true }
+  try {
+    const res = await fetch('/api/admin/ai-search/indexes/ensure', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug })
+    })
+    const data = await res.json()
+    aiSearchIndexes.value[slug] = { status: data.status, doc_count: aiSearchIndexes.value[slug]?.doc_count || 0, loading: false }
+  } catch (e) {
+    aiSearchIndexes.value[slug] = { status: 'error', doc_count: 0, loading: false }
+    trackException(e)
+  }
+}
+
+const toggleExamplesPanel = async (slug) => {
+  if (!aiSearchExamples.value[slug]) {
+    aiSearchExamples.value[slug] = { items: [], loading: true, expanded: true }
+  } else {
+    aiSearchExamples.value[slug].expanded = !aiSearchExamples.value[slug].expanded
+    if (!aiSearchExamples.value[slug].expanded) return
+  }
+  await loadExamples(slug)
+}
+
+const loadExamples = async (slug) => {
+  if (!aiSearchExamples.value[slug]) {
+    aiSearchExamples.value[slug] = { items: [], loading: true, expanded: true }
+  }
+  aiSearchExamples.value[slug].loading = true
+  try {
+    const res = await fetch(`/api/admin/ai-search/indexes/${encodeURIComponent(slug)}/examples?top=20`)
+    if (res.ok) {
+      const data = await res.json()
+      aiSearchExamples.value[slug].items = data.examples || []
+    }
+  } catch { /* ignore */ }
+  aiSearchExamples.value[slug].loading = false
+}
+
+const initNewExample = (slug) => {
+  if (!newExample.value[slug]) {
+    newExample.value[slug] = { content: '', is_positive: true, correction_reason: '' }
+  }
+}
+
+const addExample = async (slug) => {
+  const ex = newExample.value[slug]
+  if (!ex || !ex.content?.trim()) return
+  addingExample.value[slug] = true
+  try {
+    // Auto-ensure index first
+    await ensureCategoryIndex(slug)
+    const res = await fetch(`/api/admin/ai-search/indexes/${encodeURIComponent(slug)}/examples`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: ex.content.trim(),
+        is_positive: ex.is_positive,
+        correction_reason: ex.is_positive ? '' : (ex.correction_reason || '').trim(),
+        label_source: 'human_verified'
+      })
+    })
+    if (res.ok) {
+      newExample.value[slug] = { content: '', is_positive: true, correction_reason: '' }
+      await loadExamples(slug)
+      // Update doc count
+      if (aiSearchIndexes.value[slug]) {
+        aiSearchIndexes.value[slug].doc_count = (aiSearchIndexes.value[slug].doc_count || 0) + 1
+      }
+    }
+  } catch (e) {
+    trackException(e)
+  }
+  addingExample.value[slug] = false
+}
+
+const deleteExample = async (slug, docId) => {
+  try {
+    await fetch(`/api/admin/ai-search/indexes/${encodeURIComponent(slug)}/examples/${encodeURIComponent(docId)}`, { method: 'DELETE' })
+    await loadExamples(slug)
+    if (aiSearchIndexes.value[slug]) {
+      aiSearchIndexes.value[slug].doc_count = Math.max(0, (aiSearchIndexes.value[slug].doc_count || 1) - 1)
+    }
+  } catch (e) {
+    trackException(e)
+  }
+}
+
 // Orchestrator prompt preview (read-only)
 const showOrchestratorPrompt = ref(false)
 const orchestratorPromptData = ref(null)
@@ -289,11 +398,20 @@ const addNewCategory = () => {
 
 const removeCategory = async (index) => {
   if (await confirm(t('settings.categories.form.remove_confirm'))) {
-    // Remove AI Search index toggle for deleted category
     const removedSlug = settings.value.categories[index]?.slug
     settings.value.categories.splice(index, 1)
-    if (removedSlug && settings.value.agentic?.enabled_indexes) {
-      delete settings.value.agentic.enabled_indexes[removedSlug]
+    if (removedSlug) {
+      // Remove AI Search index toggle
+      if (settings.value.agentic?.enabled_indexes) {
+        delete settings.value.agentic.enabled_indexes[removedSlug]
+      }
+      // Delete the AI Search index in the background
+      try {
+        await fetch(`/api/admin/ai-search/indexes/${encodeURIComponent(removedSlug)}`, { method: 'DELETE' })
+      } catch { /* best-effort */ }
+      delete aiSearchIndexes.value[removedSlug]
+      delete aiSearchExamples.value[removedSlug]
+      delete newExample.value[removedSlug]
     }
     expandedCategories.value.delete(index)
     categoryAssessments.value.delete(index)
@@ -833,6 +951,7 @@ const setLocale = (l) => {
 onMounted(() => {
   loadSettings()
   loadDeployments()
+  loadAISearchIndexes()
 
   const savedDark = localStorage.getItem('ClassyMail-dark')
   isDark.value = savedDark === 'true'
@@ -1286,46 +1405,219 @@ onMounted(() => {
           <!-- Per-Category AI Search Index Toggles -->
           <div v-if="settings.categories && settings.categories.length"
             class="mt-5 border-t border-purple-200 dark:border-purple-700 pt-4">
-            <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+            <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
               <MagnifyingGlassIcon class="h-4 w-4 text-purple-500" />
-              Per-Category AI Search Index (RAG Tool)
+              {{ t('settings.agentic.ai_search.title') }}
+              <button @click="showAISearchInfo = true"
+                class="ml-1 text-purple-400 hover:text-purple-600 dark:hover:text-purple-300 transition-colors"
+                :title="t('settings.agentic.ai_search.info_tooltip')">
+                <InformationCircleIcon class="h-4 w-4" />
+              </button>
             </h5>
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-              Each agent gets a contextual search tool bound to its category-specific index. Toggle to enable/disable
-              the RAG
-              tool per category.
+              {{ t('settings.agentic.ai_search.desc') }}
             </p>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-2">
+
+            <div class="space-y-2">
               <div v-for="cat in settings.categories" :key="cat.slug"
-                class="flex items-start gap-3 p-3 rounded-lg border transition-colors" :class="settings.agentic.enabled_indexes[cat.slug] !== false
+                class="rounded-lg border transition-colors" :class="settings.agentic.enabled_indexes[cat.slug] !== false
                   ? 'border-purple-300 dark:border-purple-600 bg-purple-50/50 dark:bg-purple-900/20'
                   : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 opacity-60'">
-                <input :id="'idx-' + cat.slug" type="checkbox"
-                  :checked="settings.agentic.enabled_indexes[cat.slug] !== false"
-                  @change="toggleCategoryIndex(cat.slug, $event.target.checked)"
-                  class="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600">
-                <div class="flex-1 min-w-0">
-                  <label :for="'idx-' + cat.slug" class="text-xs font-medium text-gray-800 dark:text-gray-200 block">
-                    {{ cat.name }}
-                  </label>
-                  <div class="mt-1 space-y-0.5">
-                    <div class="flex items-center gap-1.5">
-                      <span class="text-[10px] text-gray-400">Index:</span>
-                      <code
-                        class="text-[10px] text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40 px-1 rounded">classymail-intent-{{
-                          cat.slug }}</code>
+                <!-- Category header row -->
+                <div class="flex items-start gap-3 p-3">
+                  <input :id="'idx-' + cat.slug" type="checkbox"
+                    :checked="settings.agentic.enabled_indexes[cat.slug] !== false"
+                    @change="toggleCategoryIndex(cat.slug, $event.target.checked)"
+                    class="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600">
+                  <div class="flex-1 min-w-0">
+                    <label :for="'idx-' + cat.slug" class="text-xs font-medium text-gray-800 dark:text-gray-200 block">
+                      {{ cat.name }}
+                    </label>
+                    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                      <code class="text-[10px] text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40 px-1 rounded">classymail-intent-{{ cat.slug }}</code>
+                      <code class="text-[10px] text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/40 px-1 rounded">search_{{ cat.slug.replaceAll('-', '_') }}()</code>
+                      <span v-if="aiSearchIndexes[cat.slug]?.doc_count > 0"
+                        class="text-[10px] text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/40 px-1.5 rounded font-medium">
+                        {{ aiSearchIndexes[cat.slug].doc_count }} {{ t('settings.agentic.ai_search.examples') }}
+                      </span>
+                      <span v-else-if="aiSearchIndexes[cat.slug]?.status === 'exists'"
+                        class="text-[10px] text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 rounded">
+                        0 {{ t('settings.agentic.ai_search.examples') }}
+                      </span>
                     </div>
-                    <div class="flex items-center gap-1.5">
-                      <span class="text-[10px] text-gray-400">Tool:</span>
-                      <code
-                        class="text-[10px] text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/40 px-1 rounded">search_{{
-                          cat.slug.replaceAll('-', '_') }}()</code>
+                  </div>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <!-- Ensure Index button -->
+                    <button v-if="!aiSearchIndexes[cat.slug] || aiSearchIndexes[cat.slug]?.status === 'error'"
+                      @click="ensureCategoryIndex(cat.slug)"
+                      :disabled="aiSearchIndexes[cat.slug]?.loading"
+                      class="text-[10px] font-medium text-purple-600 dark:text-purple-400 border border-purple-300 dark:border-purple-600 rounded px-2 py-0.5 hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors disabled:opacity-50">
+                      <span v-if="aiSearchIndexes[cat.slug]?.loading">{{ t('settings.agentic.ai_search.creating') }}</span>
+                      <span v-else>{{ t('settings.agentic.ai_search.create_index') }}</span>
+                    </button>
+                    <span v-else-if="aiSearchIndexes[cat.slug]?.status === 'exists' || aiSearchIndexes[cat.slug]?.status === 'created'"
+                      class="text-[10px] text-green-600 dark:text-green-400">
+                      <CheckCircleIcon class="h-3.5 w-3.5 inline" />
+                    </span>
+                    <!-- Manage Examples toggle -->
+                    <button @click="toggleExamplesPanel(cat.slug); initNewExample(cat.slug)"
+                      class="text-[10px] font-medium text-indigo-600 dark:text-indigo-400 border border-indigo-300 dark:border-indigo-600 rounded px-2 py-0.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors">
+                      {{ aiSearchExamples[cat.slug]?.expanded ? t('settings.agentic.ai_search.hide') : t('settings.agentic.ai_search.examples') }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Manage Examples panel (expandable) -->
+                <div v-if="aiSearchExamples[cat.slug]?.expanded"
+                  class="border-t border-purple-200 dark:border-purple-700 px-3 pb-3 pt-2 space-y-2">
+                  <!-- Loading state -->
+                  <div v-if="aiSearchExamples[cat.slug]?.loading" class="text-xs text-gray-400 py-2 text-center">
+                    {{ t('settings.agentic.ai_search.loading') }}
+                  </div>
+
+                  <!-- Existing examples list -->
+                  <div v-if="aiSearchExamples[cat.slug]?.items?.length" class="space-y-1 max-h-48 overflow-y-auto">
+                    <div v-for="ex in aiSearchExamples[cat.slug].items" :key="ex.id"
+                      class="flex items-start gap-2 p-2 rounded text-[11px]"
+                      :class="ex.is_positive
+                        ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                        : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'">
+                      <span :class="ex.is_positive ? 'text-green-600' : 'text-red-600'" class="font-bold shrink-0 mt-0.5">
+                        {{ ex.is_positive ? '+' : '-' }}
+                      </span>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-gray-700 dark:text-gray-300 line-clamp-2">{{ ex.content }}</p>
+                        <p v-if="ex.correction_reason" class="text-red-500 dark:text-red-400 mt-0.5 italic">
+                          {{ t('settings.agentic.ai_search.reason') }}: {{ ex.correction_reason }}
+                        </p>
+                        <div class="flex items-center gap-2 mt-0.5 text-[10px] text-gray-400">
+                          <span>{{ ex.label_source }}</span>
+                          <span v-if="ex.created_at">{{ new Date(ex.created_at).toLocaleDateString() }}</span>
+                        </div>
+                      </div>
+                      <button @click="deleteExample(cat.slug, ex.id)"
+                        class="text-gray-400 hover:text-red-500 transition-colors shrink-0" title="Remove example">
+                        <TrashIcon class="h-3.5 w-3.5" />
+                      </button>
                     </div>
+                  </div>
+                  <div v-else-if="!aiSearchExamples[cat.slug]?.loading" class="text-xs text-gray-400 py-1">
+                    {{ t('settings.agentic.ai_search.no_examples') }}
+                  </div>
+
+                  <!-- Add new example form -->
+                  <div v-if="newExample[cat.slug]" class="border-t border-purple-100 dark:border-purple-800 pt-2 space-y-2">
+                    <div class="flex items-center gap-3">
+                      <label class="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                        <input type="radio" :name="'ex-type-' + cat.slug" :value="true"
+                          v-model="newExample[cat.slug].is_positive"
+                          class="h-3 w-3 text-green-600 focus:ring-green-500">
+                        <span class="text-green-700 dark:text-green-400 font-medium">{{ t('settings.agentic.ai_search.good_example') }}</span>
+                      </label>
+                      <label class="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                        <input type="radio" :name="'ex-type-' + cat.slug" :value="false"
+                          v-model="newExample[cat.slug].is_positive"
+                          class="h-3 w-3 text-red-600 focus:ring-red-500">
+                        <span class="text-red-700 dark:text-red-400 font-medium">{{ t('settings.agentic.ai_search.bad_example') }}</span>
+                      </label>
+                    </div>
+                    <textarea v-model="newExample[cat.slug].content"
+                      :placeholder="newExample[cat.slug].is_positive
+                        ? t('settings.agentic.ai_search.good_placeholder')
+                        : t('settings.agentic.ai_search.bad_placeholder')"
+                      rows="3"
+                      class="w-full text-xs rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-purple-500 focus:border-purple-500 resize-y" />
+                    <textarea v-if="!newExample[cat.slug].is_positive"
+                      v-model="newExample[cat.slug].correction_reason"
+                      :placeholder="t('settings.agentic.ai_search.reason_placeholder')"
+                      rows="1"
+                      class="w-full text-xs rounded-md border-red-300 dark:border-red-600 dark:bg-gray-700 dark:text-white focus:ring-red-500 focus:border-red-500 resize-y" />
+                    <button @click="addExample(cat.slug)"
+                      :disabled="!newExample[cat.slug]?.content?.trim() || addingExample[cat.slug]"
+                      class="inline-flex items-center gap-1 text-[11px] font-medium text-white bg-purple-600 hover:bg-purple-700 rounded px-3 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                      <PlusIcon class="h-3.5 w-3.5" />
+                      {{ addingExample[cat.slug] ? t('settings.agentic.ai_search.adding') : t('settings.agentic.ai_search.add_button') }}
+                    </button>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+
+          <!-- AI Search Info Modal -->
+          <Teleport to="body">
+            <div v-if="showAISearchInfo" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" @click.self="showAISearchInfo = false">
+              <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6 space-y-4">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <MagnifyingGlassIcon class="h-5 w-5 text-purple-500" />
+                    {{ t('settings.agentic.ai_search.info_title') }}
+                  </h3>
+                  <button @click="showAISearchInfo = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <span class="text-lg">&times;</span>
+                  </button>
+                </div>
+
+                <div class="text-xs text-gray-600 dark:text-gray-300 space-y-3">
+                  <div>
+                    <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-1">{{ t('settings.agentic.ai_search.info_what_title') }}</h4>
+                    <p>{{ t('settings.agentic.ai_search.info_what_desc') }}</p>
+                  </div>
+
+                  <div>
+                    <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-1">{{ t('settings.agentic.ai_search.info_how_title') }}</h4>
+                    <ol class="list-decimal ml-4 space-y-1">
+                      <li v-html="t('settings.agentic.ai_search.info_step1')" />
+                      <li v-html="t('settings.agentic.ai_search.info_step2')" />
+                      <li v-html="t('settings.agentic.ai_search.info_step3')" />
+                      <li>{{ t('settings.agentic.ai_search.info_step4') }}</li>
+                    </ol>
+                  </div>
+
+                  <div>
+                    <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-1">{{ t('settings.agentic.ai_search.info_quality_title') }}</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div class="bg-green-50 dark:bg-green-900/20 rounded p-2 border border-green-200 dark:border-green-800">
+                        <p class="font-medium text-green-700 dark:text-green-400 mb-1">{{ t('settings.agentic.ai_search.info_works_well') }}</p>
+                        <ul class="text-green-600 dark:text-green-300 space-y-0.5">
+                          <li>{{ t('settings.agentic.ai_search.info_good1') }}</li>
+                          <li>{{ t('settings.agentic.ai_search.info_good2') }}</li>
+                          <li>{{ t('settings.agentic.ai_search.info_good3') }}</li>
+                          <li>{{ t('settings.agentic.ai_search.info_good4') }}</li>
+                        </ul>
+                      </div>
+                      <div class="bg-red-50 dark:bg-red-900/20 rounded p-2 border border-red-200 dark:border-red-800">
+                        <p class="font-medium text-red-700 dark:text-red-400 mb-1">{{ t('settings.agentic.ai_search.info_avoid') }}</p>
+                        <ul class="text-red-600 dark:text-red-300 space-y-0.5">
+                          <li>{{ t('settings.agentic.ai_search.info_bad1') }}</li>
+                          <li>{{ t('settings.agentic.ai_search.info_bad2') }}</li>
+                          <li>{{ t('settings.agentic.ai_search.info_bad3') }}</li>
+                          <li>{{ t('settings.agentic.ai_search.info_bad4') }}</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-1">{{ t('settings.agentic.ai_search.info_flow_title') }}</h4>
+                    <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 font-mono text-[10px] leading-relaxed">
+                      Agent calls search_billing_inquiry("invoice discrepancy")<br/>
+                      &rarr; AI Search returns positive + negative examples<br/>
+                      &rarr; Agent sees: "POSITIVE: [human_verified] Invoice #INV-4782..."<br/>
+                      &rarr; Agent sees: "NEGATIVE: [human_corrected] Password reset... REASON: NOT billing"<br/>
+                      &rarr; Agent calibrates confidence based on similarity
+                    </div>
+                  </div>
+
+                  <div class="bg-purple-50 dark:bg-purple-900/20 rounded p-2 border border-purple-200 dark:border-purple-800">
+                    <p class="text-purple-700 dark:text-purple-300">
+                      <strong>{{ t('settings.agentic.ai_search.info_tip_label') }}</strong> {{ t('settings.agentic.ai_search.info_tip') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Teleport>
         </div>
 
         <!-- Section: OCR Configuration -->

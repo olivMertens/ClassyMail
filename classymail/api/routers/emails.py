@@ -515,9 +515,116 @@ async def patch_email(item_id: str, payload: dict, cosmos_container=Depends(get_
         if item.get("search_text") is None:
             item["search_text"] = compute_search_text(item.get("markdown"))
         await cosmos_container.upsert_item(item)
+
+        # ── Auto-feed correction to AI Search indexes (best-effort) ──
+        if intents and item.get("markdown"):
+            try:
+                from classymail.agents.tools.ai_search_index import ensure_index, upsert_example
+                from classymail.agents.config import SEARCH_ENDPOINT
+
+                if SEARCH_ENDPOINT:
+                    markdown = item["markdown"][:8000]
+                    old_intents = history_entry.get("previous_intents", [])
+                    new_intent_names = [i.get("intent", "") for i in intents]
+
+                    # Find category slugs
+                    settings_data = None
+                    try:
+                        from classymail.services.settings_store import load_settings
+                        settings_data = load_settings()
+                    except Exception:
+                        pass
+                    cats = (settings_data or {}).get("categories", [])
+                    name_to_slug = {c["name"]: c["slug"] for c in cats if "name" in c and "slug" in c}
+
+                    # Old intents that are NOT in new → negative examples
+                    old_names = {i.get("intent", "") for i in old_intents}
+                    removed = old_names - set(new_intent_names)
+                    reason = payload.get("reason", "")
+                    for name in removed:
+                        slug = name_to_slug.get(name)
+                        if slug:
+                            await ensure_index(slug, clients=clients)
+                            await upsert_example(
+                                slug, markdown,
+                                is_positive=False,
+                                correction_reason=reason or f"Corrected by user: removed from {name}",
+                                label_source="human_corrected",
+                                email_id=item_id,
+                                clients=clients,
+                            )
+
+                    # New intents → positive examples
+                    for name in new_intent_names:
+                        slug = name_to_slug.get(name)
+                        if slug:
+                            await ensure_index(slug, clients=clients)
+                            await upsert_example(
+                                slug, markdown,
+                                is_positive=True,
+                                label_source="human_corrected",
+                                email_id=item_id,
+                                clients=clients,
+                            )
+            except Exception as ex:
+                logger.warning("Auto-feed correction to AI Search failed: %s", ex)
+
         return EmailRecord(**item)
     except Exception as ex:
         raise HTTPException(status_code=400, detail=str(ex))
+
+
+@router.post("/emails/{item_id}/reinforce")
+async def reinforce_email(
+    item_id: str,
+    cosmos_container=Depends(get_cosmos_container),
+    clients: Clients = Depends(get_clients),
+):
+    """Push the current email's OCR content as a positive example into its
+    classified category AI Search indexes.  One-click reinforcement for
+    correctly classified emails — tells the agentic pipeline "this is right".
+    """
+    try:
+        item = await cosmos_container.read_item(item=item_id, partition_key=item_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Email not found")
+
+    markdown = item.get("markdown")
+    if not markdown:
+        raise HTTPException(status_code=400, detail="Email has no OCR content")
+
+    intents = (item.get("classification") or {}).get("detected_intents", [])
+    if not intents:
+        raise HTTPException(status_code=400, detail="Email has no classification")
+
+    from classymail.agents.tools.ai_search_index import ensure_index, upsert_example
+    from classymail.agents.config import SEARCH_ENDPOINT
+
+    if not SEARCH_ENDPOINT:
+        return {"status": "disabled", "message": "AI Search not configured"}
+
+    # Load category slugs
+    from classymail.services.settings_store import load_settings
+    cats = load_settings().get("categories", [])
+    name_to_slug = {c["name"]: c["slug"] for c in cats if "name" in c and "slug" in c}
+
+    reinforced = []
+    content = markdown[:8000]
+    for intent in intents:
+        name = intent.get("intent", "")
+        slug = name_to_slug.get(name)
+        if slug:
+            await ensure_index(slug, clients=clients)
+            await upsert_example(
+                slug, content,
+                is_positive=True,
+                label_source="human_reinforced",
+                email_id=item_id,
+                clients=clients,
+            )
+            reinforced.append(slug)
+
+    return {"status": "ok", "reinforced": reinforced, "count": len(reinforced)}
 
 
 @router.post("/emails/{item_id}/reprocess")

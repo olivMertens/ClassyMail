@@ -31,7 +31,27 @@ Agent calibrates confidence based on reference examples
 
 ## Adding Good and Bad Examples
 
-### Via the API
+There are **5 ways** to populate AI Search indexes with examples:
+
+### 1. Manual paste in the Settings UI
+
+**Settings > Processing > Agentic > Per-Category AI Search > Examples**
+
+Click "Examples" on any category, select Good/Bad, paste email content, and click "Add Example". The system auto-creates the index and generates embeddings. An info button (ℹ) explains how it works with a complete guide.
+
+### 2. One-Click Reinforcement (Email Detail Modal)
+
+When viewing a correctly classified email, click the **"Reinforce"** button in the Email Detail Modal. This pushes the email's OCR content as a `human_reinforced` positive example into each of its classified category indexes.
+
+### 3. Auto-Feed from User Corrections
+
+When a user corrects a classification via the Email Detail Modal ("Validate & Save"):
+- **Old (wrong) categories** → email pushed as a **negative example** with the correction reason
+- **New (correct) categories** → email pushed as a **positive example** with `label_source: "human_corrected"`
+
+This happens automatically in the background — no extra action needed. Corrections immediately improve future agentic classifications.
+
+### 4. REST API
 
 ```bash
 # Good example (email that correctly matches "billing-inquiry")
@@ -54,13 +74,21 @@ curl -X POST /api/admin/ai-search/indexes/billing-inquiry/examples \
   }'
 ```
 
-### Via the Seed Script
+### 5. Seed Script
 
 ```bash
 uv run python scripts/seed_ai_search.py
 ```
 
 This script creates indexes and uploads 35 sample emails (5 positive + 2 negative per category) with embeddings. It is fully idempotent — re-running preserves existing data.
+
+## Reinforcement API
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/emails/{id}/reinforce` | Push email as positive example into its classified categories |
+
+Response: `{"status": "ok", "reinforced": ["billing-inquiry"], "count": 1}`
 
 ## What Makes a Good Embeddable Example?
 
