@@ -13,6 +13,8 @@ Each classification category has its own dedicated AI Search index (`classymail-
 
 ## How It Works End-to-End
 
+![Per-Category AI Search Index Manager — Settings UI](assets/setttingsagenticpipeline.png)
+
 ```
 User adds category → POST /api/settings
      ↓

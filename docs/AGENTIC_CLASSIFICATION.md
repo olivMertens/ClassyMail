@@ -2,6 +2,10 @@
 
 > Microsoft Agent Framework GA 1.0 — Multi-agent email classification with orchestrator, specialized agents, per-intent AI Search indexes, and quality gate.
 
+## Architecture Overview
+
+![Agentic Classification Pipeline — Architecture](assets/mermaidflow.png)
+
 ## 1. Objective
 
 Build a **scalable, FinOps-friendly agentic architecture** for email classification:
@@ -560,7 +564,61 @@ The Settings page strategy dropdown adds "Agentic (Multi-Agent)" as a fourth opt
 - Optional: fine-tune specialized models on collected labeled data
 - Optional: model-router subset tuning per deployment profile
 
-## 11. Current State
+## 11. Managing Agentic Classification in the UI
+
+### Step 1: Enable Agentic Strategy
+
+Go to **Settings > Processing** and select **"Agentic (Multi-Agent)"** as the processing strategy.
+
+### Step 2: Configure the Pipeline
+
+The **Agentic Pipeline Configuration** panel appears with all tunable parameters:
+
+![Agentic Pipeline Configuration — Settings UI](assets/setttingsagenticpipeline.png)
+
+| Setting | Purpose | Recommended |
+|---------|---------|-------------|
+| **Orchestrator Model** | Fast routing — selects top candidate intents | gpt-4.1-nano or model-router |
+| **Agent Tier 1 (Simple)** | Handles clear matches (confidence > 80%) | gpt-4.1-nano |
+| **Agent Tier 2 (Ambiguous)** | Handles uncertain matches (50-80%) | gpt-4.1-mini |
+| **Agent Tier 3 (Critical)** | Handles complex/low-confidence cases (< 50%) | gpt-4.1 |
+| **Red Team Model** | Adversarial quality gate | gpt-4.1 |
+| **Red Team Threshold** | Confidence below which Red Team triggers | 0.7 |
+| **RAG Retrieval Mode** | How AI Search indexes are queried | Semantic (best quality) |
+| **Max Parallel Agents** | Max concurrent agent executions | 6 |
+| **Reasoning Effort** | GPT-5 family chain-of-thought depth | None (fastest) |
+
+### Step 3: Manage Per-Category AI Search Indexes
+
+At the bottom of the agentic config panel, each category shows its own **AI Search index** with:
+- Toggle checkbox to enable/disable RAG for that category
+- Index name (`classymail-intent-{slug}`) and tool name (`search_{slug}()`)
+- **"Create Index"** button — provisions the index if it doesn't exist
+- **"Examples"** button — expand to manage good and bad examples
+- Click the **info icon (i)** for an explanation of how AI Search indexes work
+
+### Step 4: View Agentic Pipeline Trace
+
+After processing an email, open the **Email Detail Modal**. The right panel shows the full **Agentic Pipeline Trace**:
+
+![Agentic Pipeline Trace — Email Detail View](assets/agenticviewui.png)
+
+The trace shows:
+- **Orchestrator** — which model was used, how many candidates were selected, token count
+- **Per-agent cards** — each with intent name, confidence %, model used, latency, AI Search index queried, number of RAG references
+- **Red Team** — if triggered, shows the adversarial review with specific issues found and missed intents
+- **Summary bar** — total tokens, agent count, whether Red Team was triggered
+- **Interactive flow diagram** — toggle "Show/Hide Flow Diagram" to see the Mermaid visualization
+
+![Agentic Pipeline Trace — Zoomed View](assets/spotlightmermaidagentic.png)
+
+### Step 5: Improve with Feedback
+
+- **Correct a misclassification** — old category gets a negative example, new category gets a positive example (auto-fed to AI Search)
+- **Reinforce a correct classification** — click "Reinforce as Example" to push the email as a positive example
+- The agentic pipeline immediately benefits from these examples on the next classification
+
+## 12. Current State
 
 ### `main` branch (standard pipeline)
 

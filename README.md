@@ -36,8 +36,31 @@ The entire pipeline is event-driven: Blob Storage → Event Grid → Service Bus
 ### Configurable Categories & Settings
 - **Custom Category Taxonomy**: Define your own business categories with name, slug, description, and exclusion rules — all editable from the Settings UI
 - **Model Selection**: Switch classification model (Phi-4, GPT-4o-mini, GPT-5-mini, Kimi-K2.5, etc.) from Settings — **models are auto-discovered from your AI Foundry project deployments** with a hardcoded fallback list
-- **Processing Strategies**: Choose between Standard (fast), Deep Reasoning (Chain-of-Thought), or Vision (image-aware) per processing run
+- **Processing Strategies**: Choose between Standard (fast), Deep Reasoning (Chain-of-Thought), Vision (image-aware), or **Agentic (Multi-Agent)** per processing run
 - **Batch Reprocessing**: Reprocess all emails with a different model or strategy for A/B testing
+
+### Agentic Classification (Multi-Agent Pipeline)
+
+![Agentic Pipeline Architecture](docs/assets/mermaidflow.png)
+
+- **Orchestrator Inspector**: A fast, cheap model (gpt-4.1-nano) scans the document and shortlists the top 3-5 candidate categories — cuts 80% of unnecessary computation
+- **Parallel Specialized Agents**: One agent per candidate category, each with its own RAG tool calling a dedicated Azure AI Search index for reference examples
+- **Red Team Quality Gate**: Adversarial reviewer activated when confidence is low or agents disagree
+- **Per-Category AI Search Indexes**: Add good and bad examples via the Settings UI — agents use them to calibrate confidence
+
+![Agentic Pipeline Configuration — Settings UI](docs/assets/setttingsagenticpipeline.png)
+
+| Setting | Description |
+|---------|-------------|
+| Orchestrator Model | Fast routing model (gpt-4.1-nano recommended) |
+| Agent Tiers 1/2/3 | Model per confidence band: nano for clear, mini for ambiguous, full for critical |
+| Red Team | Quality gate model + threshold slider |
+| RAG Mode | Vector, Hybrid, or Semantic retrieval for per-category indexes |
+| Per-Category Index | Toggle AI Search RAG on/off per category, manage good/bad examples |
+
+![Agentic Pipeline Trace — Email Detail](docs/assets/spotlightmermaidagentic.png)
+
+Full documentation: [AGENTIC_CLASSIFICATION](docs/AGENTIC_CLASSIFICATION.md) | [AI_SEARCH_INDEXES](docs/AI_SEARCH_INDEXES.md)
 
 ### Dashboard & Export
 - **Classification Dashboard**: Card or table view with confidence filters (high/low), status filters (processed/review/error), PII indicators, and real-time search
