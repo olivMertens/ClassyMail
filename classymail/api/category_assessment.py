@@ -13,7 +13,7 @@ from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel, Field
 
-from classymail.core.llm_compat import build_chat_params, extract_message_content, is_reasoning_model
+from classymail.core.llm_compat import build_chat_params, extract_message_content, is_reasoning_model, supports_response_format
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.llm_pipeline import resolve_model_config
 from classymail.services.settings_store import load_settings
@@ -255,7 +255,8 @@ Assess quality and provide rewrites."""
                 )
 
             # Prepare content based on model capabilities
-            if is_reasoning_model(deployment):
+            _is_router = deployment.lower().strip() == "model-router"
+            if is_reasoning_model(deployment) or _is_router:
                 # Reasoning models (e.g., GPT-5, o1) often restrict 'system' messages.
                 # Combine instructions into the user prompt for compatibility.
                 messages = [
@@ -273,7 +274,7 @@ Assess quality and provide rewrites."""
             # SLMs (Phi-4): need more tokens (3000) as they tend to be more verbose.
             _d_lower = deployment.lower()
             _is_slm = any(s in _d_lower for s in ("phi", "mistral", "llama"))
-            if is_reasoning_model(deployment):
+            if is_reasoning_model(deployment) or _is_router:
                 token_budget = 10000
             elif _is_slm:
                 token_budget = 3000
@@ -285,10 +286,9 @@ Assess quality and provide rewrites."""
                 **build_chat_params(deployment, temperature=0.3, max_output_tokens=token_budget),
             }
 
-            # response_format=json_object: supported by OpenAI models, but some
-            # SLMs (Phi-4 on Microsoft AI Foundry) may not support it.  Skip for SLMs
-            # to avoid 4xx errors; the JSON cleanup logic handles raw output.
-            if not is_reasoning_model(deployment) and not _is_slm:
+            # response_format=json_object: not supported by reasoning models,
+            # model-router (may route to reasoning), or SLMs.
+            if supports_response_format(deployment) and not _is_slm:
                 payload["response_format"] = {"type": "json_object"}
 
             span.set_attribute("gen_ai.system", "azure_openai")
@@ -298,10 +298,10 @@ Assess quality and provide rewrites."""
                         name, deployment, is_reasoning_model(deployment))
 
             # Timeout per model family:
-            # - Reasoning models (o1/o3/o4/gpt-5): 120s (thinking overhead)
+            # - Reasoning models / model-router (o1/o3/o4/gpt-5): 120s (thinking overhead)
             # - SLMs (phi-4, mistral): 90s (smaller GPU, slower inference)
             # - Fast classic models (gpt-4.1-nano, gpt-4o-mini): 30s
-            if is_reasoning_model(deployment):
+            if is_reasoning_model(deployment) or _is_router:
                 timeout_s = 120
             elif _is_slm:
                 timeout_s = 90
@@ -324,7 +324,7 @@ Assess quality and provide rewrites."""
                     logger.error(f"[assessment] Invalid AI response: Empty content. Finish reason: {choices[0].get('finish_reason')}. Data: {data}")
                     detail_msg = f"AI Model returned empty content (Finish Reason: {choices[0].get('finish_reason', 'unknown')})."
                     if choices[0].get('finish_reason') == 'length':
-                        detail_msg += " The model exhausted its token limit (10k) while reasoning. The prompt has been optimized to reduce overhead."
+                        detail_msg += f" The model exhausted its token limit ({token_budget}) while reasoning."
                     raise HTTPException(status_code=502, detail=detail_msg)
 
                 # Parse JSON response – cleanup potential markdown or whitespace

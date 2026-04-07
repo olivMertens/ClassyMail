@@ -19,15 +19,27 @@
         "theme": "Thème de couleur",
         "dark_mode": "Mode Sombre",
         "language": "Langue",
-        "costs_title": "Surcharge des Coûts",
-        "costs_desc": "Modifier la tarification par défaut pour le calcul des coûts. Laisser vide pour utiliser les défauts.",
         "telemetry_title": "Télémétrie Application Insights",
         "tabs": {
             "processing": "Traitement",
             "finetuning": "Fine-tuning",
-            "general": "Général & Coûts",
+            "general": "Général",
             "logs": "Logs",
             "danger": "Danger"
+        },
+        "general": {
+            "title": "Configuration des Modèles",
+            "desc": "Configurer les modèles IA utilisés pour les conseils de catégories et la génération de données synthétiques.",
+            "assessment_model": "Modèle de Conseil Catégories",
+            "assessment_model_help": "Modèle utilisé pour l'évaluation et les recommandations de qualité des catégories.",
+            "generation_model": "Modèle de Génération de Données",
+            "generation_model_help": "Modèle utilisé pour générer des données d'entraînement synthétiques pour le fine-tuning.",
+            "reasoning_effort": "Effort de Raisonnement",
+            "effort_none": "Aucun (le plus rapide)",
+            "effort_low": "Faible (raisonnement léger)",
+            "effort_medium": "Moyen (équilibré)",
+            "effort_high": "Élevé (raisonnement profond, le plus lent)",
+            "reasoning_warning": "Les modèles GPT-5 avec raisonnement prennent beaucoup plus de temps. Utilisez 'Aucun' pour des résultats plus rapides."
         },
         "processing": {
             "title": "Stratégie de Traitement",
@@ -50,6 +62,71 @@
             "pii_llm_model": "Modèle LLM pour PII",
             "pii_llm_model_auto": "Auto (même modèle que la classification)",
             "pii_llm_model_description": "Choisir le LLM pour l'extraction PII. 'Auto' réutilise le modèle de classification pour éviter un déploiement supplémentaire."
+        },
+        "agentic": {
+            "advice_button": "Conseil modèles",
+            "advice_title": "Guide de sélection des modèles pour le pipeline agentique",
+            "advice_orchestrator": "Orchestrateur (Routeur)",
+            "advice_orchestrator_desc": "Analyse superficielle rapide — identifie les intentions candidates. Ne classifie PAS. Besoin de vitesse, pas de raisonnement profond.",
+            "advice_orch_nano": "Meilleur choix par défaut — rapide, économique, gère 90% des cas de routage.",
+            "advice_orch_router": "Meilleur FinOps — sélectionne automatiquement le modèle le moins cher dans la bande de qualité.",
+            "advice_orch_mini": "Utiliser si 10+ catégories chevauchantes nécessitant une meilleure compréhension.",
+            "advice_orch_reasoning": "Option valide — modèle le moins cher (0,00005$/1K). Mettre reasoning_effort à 'none' pour un routage rapide. Supporte tool-calling + sorties structurées.",
+            "advice_agents": "Agents spécialisés (Tiers 1/2/3)",
+            "advice_agents_desc": "Chaque agent classifie UNE intention en profondeur. La confiance de l'orchestrateur détermine le tier (= modèle) utilisé.",
+            "advice_tier1": "Confiance > 80%. Correspondance claire — modèle économique + outil RAG suffisent.",
+            "advice_tier2": "Confiance 50-80%. Signaux subtils — nécessite une meilleure compréhension.",
+            "advice_tier3": "Confiance < 50%. Complexe/critique — précision maximale avec le modèle le plus robuste.",
+            "advice_redteam": "Red Team (Contrôle Qualité)",
+            "advice_redteam_desc": "Révise tous les résultats des agents. Activé uniquement si la confiance max est basse ou si les agents sont en conflit. Appelé rarement.",
+            "advice_redteam_model": "Meilleur choix — robuste, rapide pour les tâches de révision, appelé rarement donc coût maîtrisé.",
+            "advice_insight_title": "Point clé",
+            "advice_insight": "Les familles gpt-4.1 et gpt-5 supportent toutes deux le tool-calling et les sorties JSON structurées. gpt-5-nano est l'option la moins chère. Utilisez reasoning_effort='none' pour la vitesse, 'medium' pour la précision.",
+            "advice_close": "Compris",
+            "gpt5_warning": "Les modèles GPT-5 incluent des capacités de raisonnement qui peuvent ajouter 200-500ms de latence par appel. Mettez l'Effort de Raisonnement à 'none' pour un routage rapide.",
+            "reasoning_effort_label": "Effort de Raisonnement (famille GPT-5)",
+            "reasoning_effort_help": "Contrôle la profondeur de raisonnement pour les modèles GPT-5. 'none' = le plus rapide. 'low'/'medium'/'high' ajoute une chaîne de raisonnement mais augmente la latence.",
+            "ai_search": {
+                "title": "Index AI Search par Catégorie (Outil RAG)",
+                "desc": "Chaque agent dispose d'un outil de recherche contextuel lié à l'index de sa catégorie. Ajoutez des bons et mauvais exemples pour améliorer la précision.",
+                "info_tooltip": "Comment fonctionnent les index AI Search",
+                "examples": "exemples",
+                "creating": "Création...",
+                "create_index": "Créer l'index",
+                "hide": "Masquer",
+                "loading": "Chargement des exemples...",
+                "reason": "Raison",
+                "no_examples": "Aucun exemple. Ajoutez des bons et mauvais exemples ci-dessous pour améliorer la classification.",
+                "good_example": "Bon exemple",
+                "bad_example": "Mauvais exemple",
+                "good_placeholder": "Collez un email qui appartient correctement à cette catégorie (500-3000 caractères recommandés)...",
+                "bad_placeholder": "Collez un email qui a été MAL classé ici...",
+                "reason_placeholder": "Pourquoi cet email n'appartient-il pas ici ? ex: 'PAS facturation - c'est une demande de support technique'",
+                "adding": "Ajout...",
+                "add_button": "Ajouter un exemple",
+                "info_title": "Comment fonctionnent les index AI Search",
+                "info_what_title": "Qu'est-ce que les index par catégorie ?",
+                "info_what_desc": "Chaque catégorie de classification dispose de son propre index Azure AI Search (classymail-intent-{slug}). Lors de la classification agentique, chaque agent spécialisé interroge son propre index pour obtenir des exemples de référence.",
+                "info_how_title": "Comment alimenter les index",
+                "info_step1": "<strong>Cliquez sur 'Exemples'</strong> sur n'importe quelle catégorie pour ouvrir le gestionnaire",
+                "info_step2": "<strong>Ajoutez des bons exemples</strong> (+) : Collez des emails qui correspondent à cette catégorie",
+                "info_step3": "<strong>Ajoutez des mauvais exemples</strong> (-) : Collez des emails mal classés ici, avec la raison",
+                "info_step4": "Le système crée automatiquement l'index et génère les embeddings",
+                "info_quality_title": "Qu'est-ce qui fait un bon exemple ?",
+                "info_works_well": "Fonctionne bien",
+                "info_good1": "Contenu email en texte brut (500-3000 caractères)",
+                "info_good2": "Inclure les en-têtes De/Date/Objet",
+                "info_good3": "Vocabulaire métier réel (numéros de facture, codes erreur)",
+                "info_good4": "Le contenu multilingue est accepté",
+                "info_avoid": "À éviter",
+                "info_bad1": "Texte très court (<50 caractères)",
+                "info_bad2": "Balisage HTML lourd",
+                "info_bad3": "Texte générique sans contenu",
+                "info_bad4": "Contenu binaire/PDF",
+                "info_flow_title": "Comment les exemples influencent la classification",
+                "info_tip_label": "Conseil :",
+                "info_tip": "Commencez par 3-5 bons exemples et 1-2 mauvais exemples par catégorie. Les exemples vérifiés par un humain ont plus de poids."
+            }
         },
         "finetuning": {
             "title": "Configuration Fine-tuning",
@@ -91,6 +168,7 @@
         "strategy_standard_help": "Rapide & Efficace. Idéal pour les textes dactylographiés standard et emails clairs.",
         "strategy_reasoning_help": "Analyse Profonde. Utilise le 'Chain-of-Thought' pour justifier avant de classifier. Utile pour les cas ambigus.",
         "strategy_vision_help": "Multimodal. Analyse les éléments visuels (images, mise en page). Idéal pour les documents avec photos ou structures complexes. Note : annotations d'images limitées à 8 pages.",
+        "strategy_agentic_help": "Multi-Agent. L'orchestrateur route vers des agents spécialisés en parallèle, avec un contrôle qualité Red Team optionnel. Idéal pour la classification multi-intentions complexe.",
         "categories": {
             "tab_name": "Catégories",
             "warning_title": "⚠️ Avertissement Comportement Système",
@@ -112,7 +190,6 @@
                 "cancel_adding": "Annuler l'Ajout de Catégorie",
                 "remove_confirm": "Êtes-vous sûr de vouloir supprimer cette catégorie ?"
             },
-            "assessment_model": "Modèle IA Conseil",
             "assessment": {
                 "button": "Obtenir des Conseils IA ({model})",
                 "analyzing": "Analyse en cours...",
@@ -137,10 +214,10 @@
     },
     "upload": {
         "title": "Importer des documents",
-        "subtitle": "Importer des documents PDF (max 10 fichiers) pour lancer la classification.",
+        "subtitle": "Importer des documents PDF (max 20 fichiers, 100Mo au total) pour lancer la classification.",
         "drop_text": "ou glisser-déposer",
         "select": "Choisir un fichier",
-        "limits": "PDF jusqu'à 10MB",
+        "limits": "PDF jusqu'à 10Mo chacun, 100Mo au total",
         "start": "Lancer l'import",
         "uploading": "Envoi..."
     },
@@ -238,6 +315,9 @@
             "vision": "Vision",
             "vision_short": "VIS",
             "vision_desc": "Analyse visuelle (expérimental)",
+            "agentic": "Agentique",
+            "agentic_short": "AGT",
+            "agentic_desc": "Pipeline orchestrateur multi-agents",
             "experimental": "Expérimental",
             "unknown": "Défaut"
         },
@@ -441,7 +521,8 @@
             "upload": "Upload & Ingestion",
             "ocr": "OCR & Extraction",
             "classification": "Classification IA",
-            "storage": "Stockage & Résultats"
+            "storage": "Stockage & Résultats",
+            "agentic": "Pipeline Agentique"
         },
         "usage": {
             "title": "Comment utiliser ClassyMail",
@@ -464,18 +545,20 @@
             "step4_title": "4. Paramètres & Configuration",
             "step4_desc": "Affinez le comportement du moteur dans l'onglet Paramètres selon votre cas d'usage.",
             "step4_li1": "Catégories : Définissez les noms et descriptions d'intention. Les changements s'appliquent immédiatement aux nouvelles classifications.",
-            "step4_li2": "Stratégie de Traitement : Basculez entre Standard (rapide), Raisonnement (précis) ou Vision (images).",
+            "step4_li2": "Stratégie de Traitement : Basculez entre Standard (rapide), Raisonnement (précis), Vision (images) ou Agentique (multi-agent avec RAG par intention).",
             "step4_li3": "Paramètres PII : Activez/désactivez la détection PII, choisissez la méthode (LLM, Azure AI Language ou Hybride) et le modèle."
         },
         "strategies": {
             "title": "Stratégies de Traitement",
             "desc": "Choisissez la stratégie adaptée à vos types de documents. Chaque stratégie optimise différents compromis entre vitesse, précision et coût.",
             "standard_title": "Standard",
-            "standard_desc": "Classification rapide avec Phi-4 (sous 8K tokens) ou GPT-4o-mini (documents plus longs). Idéal pour les emails textuels à intention claire. Coût le plus bas par document.",
+            "standard_desc": "Classification rapide avec un seul appel LLM au modèle primaire. Idéal pour les documents textuels à intention claire. Coût le plus bas par document.",
             "reasoning_title": "Raisonnement",
-            "reasoning_desc": "Force l'IA à produire une justification étape par étape avant de classifier. Améliore la précision sur les emails ambigus ou multi-intentions. Latence légèrement plus élevée.",
+            "reasoning_desc": "Force l'IA à produire une justification étape par étape avant de classifier. Améliore la précision sur les documents ambigus ou multi-intentions. Latence légèrement plus élevée.",
             "vision_title": "Vision",
-            "vision_desc": "Active l'analyse complète des images via GPT-4o-mini vision. Idéal pour les documents contenant photos, schémas ou écriture manuscrite scannée affectant la classification."
+            "vision_desc": "Active l'analyse complète des images via GPT-4o-mini vision. Idéal pour les documents contenant photos, schémas ou écriture manuscrite scannée affectant la classification.",
+            "agentic_title": "Agentique (Multi-Agent)",
+            "agentic_desc": "L'orchestrateur route vers des agents spécialisés exécutés en parallèle, chacun avec son propre index AI Search pour le grounding RAG. Inclut un contrôle qualité Red Team pour les résultats à faible confiance ou conflictuels. Idéal pour 5+ catégories avec des définitions chevauchantes."
         },
         "ai": {
             "title": "Complexité IA & Raisonnement",
@@ -565,9 +648,9 @@
             "all": "Télécharger le dataset complet (JSONL)",
             "requirement_title": "Pré-requis",
             "requirement_desc": "Vous avez besoin de {n} emails traités pour activer la génération.",
-            "generate": "Générer des données avec GPT-5.2",
+            "generate": "Générer des données synthétiques",
             "generating": "Génération...",
-            "generate_confirm": "Cela utilisera GPT-5.2 pour générer des emails synthétiques à partir de vos données existantes afin d'atteindre le seuil minimum. Continuer ?",
+            "generate_confirm": "Des emails synthétiques seront générés à partir de vos données existantes afin d'atteindre le seuil minimum. Continuer ?",
             "generate_error": "Échec de la génération : {error}"
         }
     },
@@ -614,6 +697,26 @@
             "fallback": "Fallback OCR",
             "doc_intelligence": "Document Intelligence via AI Foundry",
             "ai_foundry": "Microsoft AI Foundry"
+        },
+        "ref_diagram": {
+            "user": "Utilisateur",
+            "spa": "SPA Vue 3 + Tailwind",
+            "api": "FastAPI API",
+            "blob": "Blob Storage",
+            "sbq": "File Service Bus",
+            "worker": "Worker - processeur async",
+            "mistral_ocr": "Mistral OCR",
+            "token_check": "Tokens sous 8K ?",
+            "strat_check": "Strategie ?",
+            "phi4": "Phi-4 - Primaire 8K",
+            "gpt_mini": "gpt-4o-mini - Fallback 120K",
+            "parallel": "Phi-4 et gpt-4o-mini - Parallele",
+            "orchestrator": "Orchestrateur Inspecteur",
+            "agents": "Agents specialises paralleles",
+            "ai_search": "Index AI Search",
+            "red_team": "Red Team - Controle adversarial",
+            "cosmos": "Cosmos DB",
+            "result": "Resultat de classification"
         }
     },
     "email_detail": {
@@ -644,6 +747,10 @@
         "vision_reprocess_hint": "Essayez de retraiter avec la stratégie Vision pour générer une description via GPT-4o-mini.",
         "vision_details": "Détails",
         "vision_type_detected": "Type d'image détecté",
-        "vision_bbox": "Boîte englobante"
+        "vision_bbox": "Boîte englobante",
+        "reinforce": "Renforcer",
+        "reinforcing": "Renforcement...",
+        "reinforced": "Renforcé ✓",
+        "reinforce_tooltip": "Ajouter cet email comme exemple positif dans l'index AI Search de sa catégorie pour améliorer la classification future"
     }
 }

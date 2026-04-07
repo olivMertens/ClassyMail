@@ -29,6 +29,47 @@ async def get_organization():
     return {"name": config.ORGANIZATION_NAME}
 
 
+@router.get("/settings/agentic-prompt")
+async def get_agentic_prompt():
+    """Return all agent system prompts (read-only preview for the UI)."""
+    from classymail.agents.orchestrator import _build_orchestrator_prompt, _load_prompt_template, _PROMPT_DIR
+    from classymail.services.settings_store import get_categories_prompt_text
+    from classymail.agents.config import get_agentic_settings
+
+    settings = load_settings()
+    agentic = get_agentic_settings(settings)
+    categories_text = get_categories_prompt_text()
+    max_agents = agentic.get("max_parallel_agents", 6)
+
+    # Resolved orchestrator prompt (with categories injected)
+    orchestrator_prompt = _build_orchestrator_prompt(categories_text, max_agents, "en")
+
+    # Raw templates (before variable substitution)
+    specialized_template = _load_prompt_template("specialized")
+    red_team_template = _load_prompt_template("red_team")
+
+    return {
+        "orchestrator": {
+            "prompt": orchestrator_prompt,
+            "template_file": "classymail/agents/prompts/orchestrator.md",
+            "source": "file" if (_PROMPT_DIR / "orchestrator.md").exists() else "fallback",
+        },
+        "specialized": {
+            "prompt": specialized_template,
+            "template_file": "classymail/agents/prompts/specialized.md",
+            "source": "file" if (_PROMPT_DIR / "specialized.md").exists() else "fallback",
+        },
+        "red_team": {
+            "prompt": red_team_template,
+            "template_file": "classymail/agents/prompts/red_team.md",
+            "source": "file" if (_PROMPT_DIR / "red_team.md").exists() else "fallback",
+        },
+        "model": agentic.get("orchestrator_model", "gpt-4.1-nano"),
+        "max_agents": max_agents,
+        "categories_count": len(settings.get("categories", [])),
+    }
+
+
 
 @router.post("/settings")
 async def set_settings(payload: dict, clients: Clients = Depends(get_clients)):

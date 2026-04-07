@@ -36,8 +36,31 @@ The entire pipeline is event-driven: Blob Storage → Event Grid → Service Bus
 ### Configurable Categories & Settings
 - **Custom Category Taxonomy**: Define your own business categories with name, slug, description, and exclusion rules — all editable from the Settings UI
 - **Model Selection**: Switch classification model (Phi-4, GPT-4o-mini, GPT-5-mini, Kimi-K2.5, etc.) from Settings — **models are auto-discovered from your AI Foundry project deployments** with a hardcoded fallback list
-- **Processing Strategies**: Choose between Standard (fast), Deep Reasoning (Chain-of-Thought), or Vision (image-aware) per processing run
+- **Processing Strategies**: Choose between Standard (fast), Deep Reasoning (Chain-of-Thought), Vision (image-aware), or **Agentic (Multi-Agent)** per processing run
 - **Batch Reprocessing**: Reprocess all emails with a different model or strategy for A/B testing
+
+### Agentic Classification (Multi-Agent Pipeline)
+
+![Agentic Pipeline Architecture](docs/assets/mermaidflow.png)
+
+- **Orchestrator Inspector**: A fast, cheap model (gpt-4.1-nano) scans the document and shortlists the top 3-5 candidate categories — cuts 80% of unnecessary computation
+- **Parallel Specialized Agents**: One agent per candidate category, each with its own RAG tool calling a dedicated Azure AI Search index for reference examples
+- **Red Team Quality Gate**: Adversarial reviewer activated when confidence is low or agents disagree
+- **Per-Category AI Search Indexes**: Add good and bad examples via the Settings UI — agents use them to calibrate confidence
+
+![Agentic Pipeline Configuration — Settings UI](docs/assets/setttingsagenticpipeline.png)
+
+| Setting | Description |
+|---------|-------------|
+| Orchestrator Model | Fast routing model (gpt-4.1-nano recommended) |
+| Agent Tiers 1/2/3 | Model per confidence band: nano for clear, mini for ambiguous, full for critical |
+| Red Team | Quality gate model + threshold slider |
+| RAG Mode | Vector, Hybrid, or Semantic retrieval for per-category indexes |
+| Per-Category Index | Toggle AI Search RAG on/off per category, manage good/bad examples |
+
+![Agentic Pipeline Trace — Email Detail](docs/assets/spotlightmermaidagentic.png)
+
+Full documentation: [AGENTIC_CLASSIFICATION](docs/AGENTIC_CLASSIFICATION.md) | [AI_SEARCH_INDEXES](docs/AI_SEARCH_INDEXES.md)
 
 ### Dashboard & Export
 - **Classification Dashboard**: Card or table view with confidence filters (high/low), status filters (processed/review/error), PII indicators, and real-time search
@@ -48,12 +71,15 @@ The entire pipeline is event-driven: Blob Storage → Event Grid → Service Bus
 ### Human Review & Fine-Tuning Loop
 - **Correction Workflow**: Reviewers override wrong classifications with a reason — corrections are stored as golden labels with full audit trail
 - **AI Feedback**: Each correction generates an LLM feedback message explaining what the model missed, used for prompt improvement
+- **Auto-Feed to AI Search**: When a user corrects a classification, the email is automatically pushed as a negative example to the old (wrong) category and a positive example to the new (correct) category in the per-category AI Search indexes
+- **One-Click Reinforcement**: Click "Reinforce" on any correctly classified email to push it as a `human_reinforced` positive example into its category's AI Search index — teaches the agentic pipeline "this is right"
 - **Fine-Tuning Export**: Export anonymized JSONL datasets (train/test split) matching the production system prompt format — ready for Microsoft AI Foundry (Phi-4 LoRA, GPT-4o-mini)
 - **Human Reinforcement**: Corrected examples are weighted higher in training data, closing the feedback loop between human reviewers and model quality
 - **Category AI Assessment**: GPT-4.1-nano analyzes your category definitions and suggests improvements based on classification patterns
+- **Per-Category AI Search Indexes**: Each category gets its own Azure AI Search index with positive and negative reference examples — agents use RAG to calibrate confidence (see [AI_SEARCH_INDEXES](docs/AI_SEARCH_INDEXES.md))
 
 ### RAG Chatbot
-- **Chat with your emails**: GPT-5.2-chat with vector search over all processed documents, orchestrated by **Microsoft Agent Framework** (`agent-framework-azure-ai`)
+- **Chat with your emails**: GPT-5.2-chat with vector search over all processed documents, orchestrated by **Microsoft Agent Framework** (`agent-framework-core` + `agent-framework-openai`)
 - **Agent-driven suggestions**: The LLM agent generates contextual follow-up action pills after each response — no hardcoded logic
 - **Ask AI button**: Click ✨ on any email card or table row to open the chatbot pre-filled with that email’s context
 - **12 agent tools**: Semantic search (with date filtering), keyword search (case-insensitive), reclassification handoff, sequential review, stats, error analysis, category explanation
@@ -118,7 +144,7 @@ See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for full setup or [do
 - **Backend**: FastAPI (Python 3.12) + uv
 - **Frontend**: Vue 3 + Vite + TailwindCSS + vue-i18n
 - **Infra**: Terraform (azurerm v4 + azapi)
-- **AI**: Microsoft AI Foundry (Mistral, Phi-4, GPT-4o-mini, GPT-5.2-chat) + Microsoft Agent Framework
+- **AI**: Microsoft AI Foundry (Mistral, Phi-4, GPT-4o-mini, GPT-5.2-chat) + Microsoft Agent Framework GA 1.0
 - **Storage**: Cosmos DB (serverless + vector search + composite indexes), Blob Storage
 - **Auth**: Managed Identity (zero secrets)
 - **CI/CD**: GitHub Actions with OIDC
@@ -148,7 +174,7 @@ See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for full setup or [do
 
 ### RAG Chatbot (Vector Search)
 
-The chatbot uses **semantic vector search** over all processed emails, powered by **Microsoft Agent Framework**:
+The chatbot uses **semantic vector search** over all processed emails, powered by **Microsoft Agent Framework** GA 1.0:
 
 1. **During processing**: Each email’s OCR markdown is embedded using `text-embedding-3-small` (1536 dimensions) and stored in Cosmos DB with `type: "email"`. Chunks are also embedded separately with `type: "chunk"`
 2. **During chat**: User queries are embedded, then Cosmos DB `VectorDistance()` finds the most semantically similar emails — with optional date filtering (`days` parameter for “last week” queries)
@@ -177,6 +203,7 @@ The chatbot uses **semantic vector search** over all processed emails, powered b
 | | [COSTS_LOGIC](docs/COSTS_LOGIC.md) | Cost estimation and token tracking |
 | **Features** | [USER_INTERFACE](docs/USER_INTERFACE.md) | Dashboard and UI guide |
 | | [CUSTOMIZATION](docs/CUSTOMIZATION.md) | Category taxonomy and configuration |
+| | [AI_SEARCH_INDEXES](docs/AI_SEARCH_INDEXES.md) | Per-category AI Search indexes and examples |
 | | [INTEGRATION](docs/INTEGRATION.md) | CSV export, slug system, API |
 
 Full index: [docs/INDEX.md](docs/INDEX.md)

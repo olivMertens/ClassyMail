@@ -17,6 +17,7 @@ Pattern: Event-Driven + Container Apps + AI Foundry (Mistral OCR & Phi-4)
 3. **OCR (Extraction):** The worker (FastAPI) downloads the PDF and sends it to the OCR model (Mistral) to extract Markdown. On failure (timeout, quota, open circuit breaker), the pipeline automatically falls back to **Azure Document Intelligence** (prebuilt-layout, text only).
 4. **Intelligence (Classification):**
    *   **Standard Mode**: Markdown sent to Primary LLM (Phi-4). Fallback to GPT-4o-mini if token budget exceeded.
+   *   **Agentic Mode** (NEW): Multi-agent pipeline with expert orchestrator inspector, parallel specialized agents (per-intent RAG via AI Search), adversarial Red Team quality gate that can request extra agents for missed intents. See [AGENTIC_CLASSIFICATION.md](AGENTIC_CLASSIFICATION.md).
 5. **Storage:** The result (JSON + usage/cost) is stored in Cosmos DB (with CSV export available from the app).
 
 ```mermaid
@@ -44,6 +45,18 @@ flowchart TD
     Hybrid -->|Merged PII| API
     API -->|"Category Assessment"| Nano["gpt-5-nano Reasoning"]
     Nano -->|"Advice JSON"| API
+
+    Check -->|"Agentic Strategy"| Orch["Orchestrator Inspector"]
+    Orch -->|"Top intents"| FanOut["Parallel Agents: asyncio.gather"]
+    Orch -->|"0 intents"| RT
+    FanOut -->|"Per-intent query"| Search[("AI Search: per-intent indexes")]
+    Search -->|"RAG: positive + negative examples"| FanOut
+    FanOut -->|"Verdicts"| Agg["Aggregation"]
+    Agg -->|"Low confidence or 0 agents"| RT["Red Team: Adversarial Gate"]
+    RT -->|"Missed intents"| FanOut
+    RT -->|"Validated"| API
+    Agg -->|"High confidence"| API
+
     API --> Cosmos[(Cosmos DB)]
     Cosmos --> API
     API --> UI[Dashboard]
@@ -55,6 +68,11 @@ flowchart TD
     style Hybrid fill:#fff3e0
     style Nano fill:#fff9c4
     style DI fill:#fff3e0
+    style Orch fill:#f3e5f5
+    style FanOut fill:#f3e5f5
+    style Search fill:#e8eaf6
+    style Agg fill:#f3e5f5
+    style RT fill:#fce4ec
 ```
 
 ## 2. Processing Sequence
@@ -111,6 +129,7 @@ The managed identity assigned to Container Apps (`api` and `worker`) must have t
 | **AI Foundry Project** | `Cognitive Services User` | `a97b65f3-24c7-4388-baec-2e87135dc908` | **Deployed Models**: Phi-4 (Primary classification), Mistral Document AI 2512 (OCR + Vision), GPT-5-nano (Category Assessment, reasoning), GPT-5.2-chat (Conversational AI), GPT-4o-mini (Fallback + PII), text-embedding-3-small (Embeddings) |
 | **Azure AI Language** ⚙️ | `Cognitive Services Language Reader` | `36e80216-4058-40c5-bf25-3b30a0199a10` | **Native PII Detection API** (optional, `deploy_language_service=true`). TextAnalytics service with 43+ predefined PII categories. |
 | **Document Intelligence** (via AI Foundry) | `Cognitive Services User` | `a97b65f3-24c7-4388-baec-2e87135dc908` | **OCR Fallback** — uses the AI Foundry endpoint by default (`Cognitive Services User` on AI Foundry covers DI access). Optionally deployable as standalone resource (`deploy_document_intelligence=true`). |
+| **Azure AI Search** | `Search Index Data Contributor` | `8ebe5a00-799e-43f5-93ac-243d3dce84a7` | **Agentic RAG** — per-intent indexes for specialized agent grounding (`deploy_ai_search=true`). Read/write documents in search indexes. |
 | **Container Registry**| `AcrPull` | `7f951dda-4ed3-4680-a7ca-43fe172d538d` | Pull Docker image for the Container Apps environment. |
 | **Application Insights** | `Monitoring Metrics Publisher` | `3913510d-42f4-4e42-8a64-420c390055eb` | OpenTelemetry telemetry (distributed traces, metrics). |
 | **Event Grid System Topic** | `EventGrid EventSubscription Contributor` | `428e0ff0-5e57-4d9c-a221-2c70d0e0a443` | Subscribe to Blob Storage events → Service Bus. |

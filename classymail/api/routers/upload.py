@@ -23,8 +23,17 @@ async def upload_pdfs(
     files: list[UploadFile] = File(...),
     blob_service_client=Depends(get_blob_service_client),
 ):
-    if len(files) > 10:
-        raise HTTPException(status_code=400, detail="Max 10 fichiers")
+    if len(files) > 20:
+        raise HTTPException(status_code=400, detail="Max 20 files per batch")
+
+    # Enforce 100MB total batch size
+    total_size = 0
+    for f in files:
+        f.file.seek(0, 2)
+        total_size += f.file.tell()
+        f.file.seek(0)
+    if total_size > 100 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Total batch size exceeds 100MB")
 
     today = datetime.now(timezone.utc).strftime("%Y/%m/%d")
     container = config.BLOB_CONTAINER_INPUT

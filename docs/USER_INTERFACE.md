@@ -102,9 +102,31 @@ The application settings allow customization of the classification engine and en
     - Configure pricing per model: Phi-4, GPT-4o/4o-mini, GPT-4.1/5 family, Kimi-K2.5, Mistral OCR
     - Prices in € per 1K tokens (input/output)
     - Links to [Microsoft Azure OpenAI Pricing](https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/)
-- **Processing Strategy**: Switch between "Standard" (Fast), "Reasoning" (CoT), or "Vision" modes.
+- **Processing Strategy**: Switch between "Standard" (Fast), "Reasoning" (CoT), "Vision" (Multimodal), or "Agentic" (Multi-Agent) modes.
 - **Email Preprocessing**: Advanced settings for subject extraction, PII detection, conversation isolation
 - **Model Selection**: Primary model auto-discovered from AI Foundry deployments
+
+### Agentic Configuration Panel
+Visible only when "Agentic (Multi-Agent)" strategy is selected. Provides full control over the multi-agent classification pipeline:
+
+**Model Selection** (per role):
+- **Orchestrator Model**: Dropdown with `gpt-4.1-nano` (default), `gpt-4.1-mini`, `gpt-4o-mini`, `gpt-5-nano`, `model-router`
+  - When `model-router` is selected, an additional **Routing Mode** dropdown appears: `Balanced` (default), `Cost`, `Quality`
+- **Agent Tier 1 (Simple)**: Model for clear, unambiguous intents
+- **Agent Tier 2 (Ambiguous)**: Model for emails with subtle signals
+- **Agent Tier 3 (Critical)**: Robust model for business-sensitive intents
+- **Red Team Model**: Model for the quality gate / second opinion
+
+**RAG Configuration**:
+- **Retrieval Mode**: `Vector` (fastest) / `Hybrid` (balanced) / `Semantic` (highest quality)
+  - Controls how each specialized agent queries its per-intent AI Search index
+  - Each index stores positive examples (verified matches) and negative examples (known misclassifications with correction reasons)
+
+**Pipeline Control**:
+- **Max Parallel Agents**: Number spinner (1-10, default 6) — limits the fan-out width
+- **Red Team Threshold**: Slider (0.0-1.0, default 0.7) — quality gate activates when max confidence falls below this value
+
+> **Tip**: The agentic strategy is most valuable when you have 5+ categories with overlapping definitions. For simple use cases (2-3 categories), "Standard" mode is faster and cheaper.
 
 ### Categories Tab
 Manage classification categories with AI assistance:
@@ -127,6 +149,7 @@ Admin operations organized into three severity-grouped sections:
 **Bulk Operations** (amber, reversible):
 - **Batch Reprocessing**: Re-enqueue all processed emails for new classification with current settings
 - **Rebuild Vector Index**: Delete all chunks and regenerate embeddings for semantic search
+- **Reseed AI Search Indexes** (Agentic): Rebuild per-intent AI Search indexes from classification history
 - **DLQ Management**: View and purge dead-letter queue messages
 
 **Destructive Operations** (red, irreversible):

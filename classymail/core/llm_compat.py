@@ -60,9 +60,12 @@ def build_chat_params(
     """
     params: dict = {}
     reasoning = is_reasoning_model(deployment)
+    # model-router may route to a reasoning model; use max_completion_tokens
+    # (accepted by all modern Azure OpenAI models) for safety.
+    is_router = deployment and deployment.lower().strip() == "model-router"
 
     if max_output_tokens is not None:
-        if reasoning:
+        if reasoning or is_router:
             params["max_completion_tokens"] = max_output_tokens
         else:
             params["max_tokens"] = max_output_tokens
@@ -89,5 +92,12 @@ def supports_response_format(deployment: str) -> bool:
     Reasoning models (o1, o3, o4, GPT-5.x, Kimi) do **not** support
     the ``response_format`` API parameter.  They must be instructed via
     the system prompt to return JSON instead.
+
+    ``model-router`` may route to a reasoning model, so it is treated
+    as unsupported to avoid runtime failures.
     """
+    if not deployment:
+        return True
+    if deployment.lower().strip() == "model-router":
+        return False
     return not is_reasoning_model(deployment)

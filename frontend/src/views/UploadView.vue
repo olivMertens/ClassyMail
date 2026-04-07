@@ -32,22 +32,30 @@ const handleFileSelect = (e) => {
 }
 
 const addFiles = (newFiles) => {
-  // Filter by type (PDF) and size (max 10MB)
-  const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+  // Filter by type (PDF) and size (max 10MB per file)
+  const MAX_SIZE = 10 * 1024 * 1024 // 10MB per file
+  const MAX_FILES = 20
+  const MAX_BATCH_SIZE = 100 * 1024 * 1024 // 100MB total batch
+
+  const currentBatchSize = files.value.reduce((sum, f) => sum + (f.file?.size || 0), 0)
+  let remainingBudget = MAX_BATCH_SIZE - currentBatchSize
 
   const validFiles = newFiles
     .filter(f => f.type === 'application/pdf')
-    .slice(0, 10 - files.value.length)
+    .slice(0, MAX_FILES - files.value.length)
 
   validFiles.forEach(f => {
-    if (files.value.length < 10) {
+    if (files.value.length < MAX_FILES) {
       const isTooLarge = f.size > MAX_SIZE
+      const exceedsBatch = f.size > remainingBudget
+      const hasError = isTooLarge || exceedsBatch
       files.value.push({
         file: f,
         id: Math.random().toString(36).substring(7),
-        status: isTooLarge ? 'error' : 'pending',
-        message: isTooLarge ? 'File exceeds 10MB limit' : ''
+        status: hasError ? 'error' : 'pending',
+        message: isTooLarge ? 'File exceeds 10MB limit' : exceedsBatch ? 'Batch size exceeds 100MB limit' : ''
       })
+      if (!hasError) remainingBudget -= f.size
     }
   })
 }
@@ -162,6 +170,17 @@ const uploadFiles = async () => {
       v-if="files.length"
       class="bg-white dark:bg-gray-800 shadow sm:rounded-lg overflow-hidden"
     >
+      <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 flex items-center justify-between border-b border-gray-200 dark:border-gray-600">
+        <span class="text-sm text-gray-600 dark:text-gray-300">{{ files.length }} {{ files.length === 1 ? 'file' : 'files' }}</span>
+        <button
+          type="button"
+          :disabled="uploading || !files.some(f => f.status === 'pending' || f.status === 'error')"
+          class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          @click="uploadFiles"
+        >
+          {{ uploading ? t('upload.uploading') : t('upload.start') }}
+        </button>
+      </div>
       <ul
         role="list"
         class="divide-y divide-gray-200 dark:divide-gray-700"

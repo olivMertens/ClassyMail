@@ -1,7 +1,8 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
-import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, ExclamationCircleIcon, ShieldExclamationIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
+import { ref, watch, computed, nextTick } from 'vue'
+import { XMarkIcon, ArrowPathIcon, CheckIcon, TrashIcon, ClockIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon, ExclamationCircleIcon, ShieldExclamationIcon, ChatBubbleLeftRightIcon, ChevronDownIcon, ChevronUpIcon, ChevronLeftIcon, ChevronRightIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
 import MarkdownIt from 'markdown-it'
+import mermaid from 'mermaid'
 import { useDialog } from '../composables/useDialog'
 import { useI18n } from 'vue-i18n'
 import { trackException, trackEvent } from '../services/telemetry'
@@ -34,6 +35,8 @@ const primaryModel = ref('Phi-4')
 const correctionReason = ref('')
 const activeTab = ref('review') // review | history
 const isFullWidth = ref(false)
+const reinforcing = ref(false)
+const reinforced = ref(false)
 
 const pdfUrl = computed(() => {
   const url = email.value?.file_url_proxy || email.value?.file_url_sas || email.value?.file_url || null
@@ -98,6 +101,7 @@ const loadEmail = async () => {
   correctionReason.value = ''
   selectedCategoryNames.value = []
   customCategories.value = []
+  reinforced.value = false
 
   try {
     const res = await fetch(`/api/emails/${props.emailId}`)
@@ -187,9 +191,198 @@ const strategyBadge = (strategy) => {
     standard: { icon: '📄', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600' },
     reasoning: { icon: '🧠', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200 dark:border-purple-700' },
     vision: { icon: '👁', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300 border-teal-200 dark:border-teal-700' },
+    agentic: { icon: '🤖', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200 dark:border-purple-700' },
   }
   return map[strategy] || map.standard
 }
+
+// Agentic pipeline trace data (from classification.raw_response)
+const agenticData = computed(() => {
+  const raw = email.value?.classification?.raw_response
+  if (!raw?.agentic) return null
+  return {
+    traces: raw.agent_traces || [],
+    redTeam: raw.red_team || null,
+    parallelMs: raw.parallel_latency_ms,
+    totalTokens: raw.usage?.total_tokens || 0,
+    orchestrator: (raw.agent_traces || []).find(t => t.agent_type === 'orchestrator'),
+    agents: (raw.agent_traces || []).filter(t => t.agent_type === 'specialized'),
+    redTeamTrace: (raw.agent_traces || []).find(t => t.agent_type === 'red_team'),
+    settings: raw.agentic_settings || null,
+  }
+})
+const showAgenticTrace = ref(false)
+const showMermaidFlow = ref(false)
+const mermaidFlowSvg = ref('')
+const showPdfPanel = ref(true)
+const showAgenticSettings = ref(false)
+
+const truncate = (text, max) => {
+  if (!text) return ''
+  // Strip all mermaid-unsafe characters
+  const clean = text.replace(/["\[\]|#{}();:&<>]/g, '').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
+  return clean.length > max ? clean.slice(0, max) + '...' : clean
+}
+
+const mermaidFlowDef = computed(() => {
+  const d = agenticData.value
+  if (!d) return ''
+  const lines = ['flowchart LR']
+
+  // Helper: style an agent node by confidence
+  const styleAgent = (id, confidence, isRedTeamSpawned) => {
+    if (isRedTeamSpawned) {
+      lines.push(`  style ${id} fill:#fce7f3,stroke:#ec4899,color:#9d174d`)
+    } else if (confidence >= 0.7) {
+      lines.push(`  style ${id} fill:#dcfce7,stroke:#22c55e,color:#166534`)
+    } else if (confidence >= 0.4) {
+      lines.push(`  style ${id} fill:#fef9c3,stroke:#eab308,color:#854d0e`)
+    } else {
+      lines.push(`  style ${id} fill:#f3f4f6,stroke:#9ca3af,color:#6b7280`)
+    }
+  }
+
+  // Helper: emit agent node + optional RAG child, returns the leaf node id
+  const emitAgent = (id, agent, isRedTeamSpawned) => {
+    const pct = Math.round((agent.confidence || 0) * 100)
+    const model = truncate(agent.model || '?', 20)
+    const ms = agent.latency_ms?.toFixed(0) || '?'
+    const intentName = truncate(agent.intent || 'unknown', 25)
+    const prefix = isRedTeamSpawned ? 'RT: ' : ''
+    const label = `${prefix}${intentName} ${pct}pct - ${model} ${ms}ms`
+    lines.push(`  ${id}["${label}"]`)
+    styleAgent(id, agent.confidence, isRedTeamSpawned)
+
+    // RAG AI Search sub-node
+    if (agent.tool_called) {
+      const ragId = `RAG_${id}`
+      const indexName = truncate(agent.search_index || 'ai-search', 30)
+      const mode = agent.retrieval_mode || 'semantic'
+      const hits = agent.rag_hits || 0
+      lines.push(`  ${ragId}[/"AI Search: ${mode} - ${hits} hits - ${indexName}"/]`)
+      lines.push(`  style ${ragId} fill:#fef3c7,stroke:#f59e0b,color:#92400e`)
+      lines.push(`  ${id} --> ${ragId}`)
+      return ragId
+    }
+    return id
+  }
+
+  // Orchestrator
+  const orchModel = d.orchestrator?.routed_model || d.orchestrator?.model || '?'
+  const orchMs = d.orchestrator?.latency_ms?.toFixed(0) || '?'
+  lines.push(`  ORCH["Orchestrator - ${truncate(orchModel, 30)} - ${orchMs}ms"]`)
+  lines.push('  style ORCH fill:#dbeafe,stroke:#3b82f6,color:#1e40af')
+
+  // Split agents: orchestrator-triggered vs red-team-triggered
+  const initialAgents = d.agents.filter(a => a.triggered_by !== 'red_team')
+  const rtAgents = d.agents.filter(a => a.triggered_by === 'red_team')
+
+  // ── Orchestrator fan-out agents (parallel branches) ──
+  const initialLeafIds = []
+  for (const [i, agent] of initialAgents.entries()) {
+    const id = `A${i}`
+    const leafId = emitAgent(id, agent, false)
+    initialLeafIds.push(leafId)
+    lines.push(`  ORCH --> ${id}`)
+  }
+
+  // ── Red Team ──
+  if (d.redTeam) {
+    const rtModel = truncate(d.redTeam.model || '?', 20)
+    const rtMs = d.redTeam.latency_ms?.toFixed(0) || '?'
+    const rtVerdict = d.redTeam.validated ? 'VALIDATED' : 'ISSUES FOUND'
+    lines.push(`  RT["Red Team - ${rtVerdict} - ${rtModel} ${rtMs}ms"]`)
+    if (d.redTeam.validated) {
+      lines.push('  style RT fill:#fef2f2,stroke:#ef4444,color:#991b1b')
+    } else {
+      lines.push('  style RT fill:#fee2e2,stroke:#dc2626,color:#7f1d1d')
+    }
+
+    if (initialLeafIds.length > 0) {
+      for (const leafId of initialLeafIds) {
+        lines.push(`  ${leafId} --> RT`)
+      }
+    } else {
+      // 0 candidates from orchestrator — direct path to Red Team
+      lines.push(`  ORCH -->|"0 candidates"| RT`)
+    }
+
+    // ── Red Team spawned agents (branches from RT) ──
+    const rtLeafIds = []
+    for (const [i, agent] of rtAgents.entries()) {
+      const id = `RTA${i}`
+      const leafId = emitAgent(id, agent, true)
+      rtLeafIds.push(leafId)
+      lines.push(`  RT -->|"missed intent"| ${id}`)
+    }
+
+    // Justification edge into RESULT
+    const rtJustif = truncate(d.redTeam.justification, 40)
+    if (rtLeafIds.length > 0) {
+      // RT-spawned agents feed into RESULT
+      for (const leafId of rtLeafIds) {
+        lines.push(`  ${leafId} --> RESULT`)
+      }
+      // RT itself also connects to RESULT
+      if (rtJustif) {
+        lines.push(`  RT -->|"${rtJustif}"| RESULT`)
+      } else {
+        lines.push('  RT --> RESULT')
+      }
+    } else {
+      if (rtJustif) {
+        lines.push(`  RT -->|"${rtJustif}"| RESULT`)
+      } else {
+        lines.push('  RT --> RESULT')
+      }
+    }
+  } else {
+    // No Red Team — agents feed directly into RESULT
+    if (initialLeafIds.length > 0) {
+      for (const leafId of initialLeafIds) {
+        lines.push(`  ${leafId} --> RESULT`)
+      }
+    } else {
+      lines.push('  ORCH --> RESULT')
+    }
+  }
+
+  // Result
+  const totalMs = d.parallelMs?.toFixed(0) || '?'
+  lines.push(`  RESULT["Result - ${d.totalTokens} tokens - ${totalMs}ms"]`)
+  lines.push('  style RESULT fill:#f3e8ff,stroke:#a855f7,color:#6b21a8')
+
+  return lines.join('\n')
+})
+
+const renderMermaidFlow = async () => {
+  if (!mermaidFlowDef.value) return
+  const darkMode = document.documentElement.classList.contains('dark')
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: darkMode ? 'dark' : 'default',
+    securityLevel: 'strict',
+    flowchart: { curve: 'basis', nodeSpacing: 30, rankSpacing: 40 }
+  })
+  const renderId = 'agentic-flow-' + Date.now()
+  try {
+    const { svg } = await mermaid.render(renderId, mermaidFlowDef.value)
+    mermaidFlowSvg.value = svg
+  } catch {
+    mermaidFlowSvg.value = '<p class="text-red-500 text-xs">Failed to render flow diagram</p>'
+  }
+  // Clean up temporary mermaid render containers from the DOM body
+  const tempEl = document.getElementById('d' + renderId)
+  if (tempEl) tempEl.remove()
+  document.querySelectorAll('[id^="dagentic-flow-"]').forEach(el => el.remove())
+}
+
+watch(showMermaidFlow, async (val) => {
+  if (val) {
+    await nextTick()
+    await renderMermaidFlow()
+  }
+})
 
 const ocrProviderBadge = (provider) => {
   if (!provider || provider === 'mistral_ocr') return null
@@ -305,12 +498,44 @@ const saveIntents = async () => {
   }
 }
 
+const reinforceAsExample = async () => {
+  if (!email.value) return
+  reinforcing.value = true
+  reinforced.value = false
+  try {
+    const res = await fetch(`/api/emails/${email.value.id}/reinforce`, { method: 'POST' })
+    if (res.ok) {
+      const data = await res.json()
+      reinforced.value = true
+      trackEvent('reinforce_example', { count: data.count, slugs: data.reinforced })
+      setTimeout(() => { reinforced.value = false }, 4000)
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
+      showAlert(err.detail || 'Failed to reinforce')
+    }
+  } catch (e) {
+    trackException(e)
+    showAlert('Error: ' + e.message)
+  } finally {
+    reinforcing.value = false
+  }
+}
+
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
     loadSettings().then(loadEmail)
   } else {
     email.value = null
     activeTab.value = 'review'
+  }
+})
+
+watch(() => props.emailId, (newId, oldId) => {
+  if (newId && newId !== oldId && props.isOpen) {
+    showAgenticTrace.value = false
+    showMermaidFlow.value = false
+    mermaidFlowSvg.value = ''
+    loadSettings().then(loadEmail)
   }
 })
 
@@ -429,7 +654,8 @@ watch(() => email.value, (val) => {
           <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
             <!-- Left: PDF -->
             <div
-              class="md:w-1/2 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 flex flex-col">
+              class="md:h-full border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 flex flex-col transition-all duration-300 overflow-hidden"
+              :class="showPdfPanel ? 'md:w-1/2 h-1/2' : 'md:w-0 h-0 md:h-full'">
               <div class="flex-1 flex flex-col">
                 <iframe v-if="pdfUrl" :src="pdfUrl" class="w-full flex-1" title="PDF Preview" />
                 <div v-else class="flex-1 flex items-center justify-center text-gray-500">
@@ -445,8 +671,18 @@ watch(() => email.value, (val) => {
               </div>
             </div>
 
+            <!-- PDF Panel Toggle -->
+            <button
+              @click="showPdfPanel = !showPdfPanel"
+              class="hidden md:flex items-center justify-center w-5 flex-shrink-0 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer border-x border-gray-200 dark:border-gray-700"
+              :title="showPdfPanel ? 'Hide PDF panel' : 'Show PDF panel'">
+              <ChevronLeftIcon v-if="showPdfPanel" class="h-4 w-4 text-gray-400" />
+              <ChevronRightIcon v-else class="h-4 w-4 text-gray-400" />
+            </button>
+
             <!-- Right: Data -->
-            <div class="md:w-1/2 h-1/2 md:h-full overflow-y-auto bg-white dark:bg-gray-900 flex flex-col">
+            <div class="md:h-full overflow-y-auto bg-white dark:bg-gray-900 flex flex-col transition-all duration-300"
+              :class="showPdfPanel ? 'md:w-1/2 h-1/2' : 'md:w-full h-full'">
               <!-- Tabs -->
               <div class="border-b border-gray-200 dark:border-gray-700">
                 <nav class="flex -mb-px" aria-label="Tabs">
@@ -506,18 +742,6 @@ watch(() => email.value, (val) => {
                             items.length > 3 ? ` (+${items.length - 3})` : '' }}</span>
                         </template>
                       </div>
-                    </div>
-                  </div>
-
-                  <!-- Debug URLs -->
-                  <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
-                    <div v-if="email.file_url">
-                      <span class="font-semibold">Blob URL:</span>
-                      <code class="break-all">{{ email.file_url }}</code>
-                    </div>
-                    <div v-if="email.file_url_sas">
-                      <span class="font-semibold">SAS URL:</span>
-                      <code class="break-all">{{ email.file_url_sas }}</code>
                     </div>
                   </div>
 
@@ -752,6 +976,224 @@ watch(() => email.value, (val) => {
                     </div>
                   </div>
 
+                  <!-- Agentic Pipeline Trace (visible only for strategy=agentic) -->
+                  <div v-if="agenticData" class="mt-1">
+                    <button @click="showAgenticTrace = !showAgenticTrace"
+                      class="flex items-center gap-2 text-sm font-medium text-purple-700 dark:text-purple-400 hover:text-purple-900 dark:hover:text-purple-200 transition-colors w-full">
+                      <span class="text-base">🤖</span>
+                      Agentic Pipeline Trace
+                      <span
+                        class="text-[10px] bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 px-1.5 py-0.5 rounded-full">
+                        {{ agenticData.agents.length }} agents
+                        <span v-if="agenticData.redTeam">+ Red Team</span>
+                      </span>
+                      <ChevronDownIcon v-if="!showAgenticTrace" class="h-4 w-4 ml-auto" />
+                      <ChevronUpIcon v-else class="h-4 w-4 ml-auto" />
+                    </button>
+
+                    <div v-if="showAgenticTrace" class="mt-3 space-y-3">
+                      <!-- Visual Flow - vertical pipeline steps -->
+                      <div class="text-[10px] text-gray-500 dark:text-gray-400">
+                        <!-- Step 1: Orchestrator -->
+                        <div class="flex items-start gap-2">
+                          <div class="flex flex-col items-center">
+                            <span
+                              class="inline-flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
+                              🎯 Orchestrator
+                            </span>
+                            <div class="w-px h-3 bg-gray-300 dark:bg-gray-600"></div>
+                          </div>
+                        </div>
+
+                        <!-- Step 2: Red Team (if triggered before agents) -->
+                        <div v-if="agenticData.redTeamTrace" class="flex items-start gap-2">
+                          <div class="flex flex-col items-center">
+                            <span
+                              class="inline-flex items-center gap-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
+                              🛡️ Red Team
+                            </span>
+                            <div class="w-px h-3 bg-gray-300 dark:bg-gray-600"></div>
+                          </div>
+                        </div>
+
+                        <!-- Step 3: Agent candidates (wrapped grid) -->
+                        <div class="flex flex-wrap items-center gap-1.5 py-1">
+                          <template v-for="(agent, idx) in agenticData.agents.filter(a => a.triggered_by !== 'red_team')" :key="'orch-' + agent.intent">
+                            <span
+                              class="inline-flex items-center gap-1 px-2 py-1 rounded-full font-medium"
+                              :class="agent.confidence >= 0.7 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
+                                agent.confidence >= 0.4 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                  'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'">
+                              {{ agent.confidence >= 0.7 ? '✅' : agent.confidence >= 0.4 ? '⚠️' : '❌' }}
+                              {{ agent.intent }}
+                              <span class="opacity-60">{{ Math.round((agent.confidence || 0) * 100) }}%</span>
+                            </span>
+                          </template>
+                          <template v-for="agent in agenticData.agents.filter(a => a.triggered_by === 'red_team')" :key="'rt-' + agent.intent">
+                            <span
+                              class="inline-flex items-center gap-1 px-2 py-1 rounded-full font-medium bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300">
+                              🔍 {{ agent.intent }}
+                              <span class="opacity-60">{{ Math.round((agent.confidence || 0) * 100) }}%</span>
+                            </span>
+                          </template>
+                        </div>
+
+                        <!-- Step 4: Result -->
+                        <div class="flex items-start gap-2">
+                          <div class="flex flex-col items-center">
+                            <div class="w-px h-3 bg-gray-300 dark:bg-gray-600"></div>
+                            <span
+                              class="inline-flex items-center gap-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-full whitespace-nowrap font-medium">
+                              📊 Result
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Mermaid Flow Diagram Toggle -->
+                      <div class="flex justify-end">
+                        <button @click="showMermaidFlow = !showMermaidFlow"
+                          class="text-[10px] font-medium px-2 py-1 rounded-md transition-colors"
+                          :class="showMermaidFlow
+                            ? 'bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-purple-100 dark:hover:bg-purple-900/40'">
+                          {{ showMermaidFlow ? '▼ Hide Flow Diagram' : '▶ Show Flow Diagram' }}
+                        </button>
+                      </div>
+                      <div v-if="showMermaidFlow"
+                        class="rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-900 p-3">
+                        <div v-html="mermaidFlowSvg" class="flex justify-center [&>svg]:max-w-full [&>svg]:h-auto"></div>
+                      </div>
+
+                      <!-- Orchestrator Card -->
+                      <div v-if="agenticData.orchestrator"
+                        class="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10 p-3">
+                        <div class="flex items-center justify-between mb-2">
+                          <h5 class="text-xs font-semibold text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                            🎯 Orchestrator (Router)
+                          </h5>
+                          <div class="flex items-center gap-2 text-[10px] text-gray-500">
+                            <code
+                              class="bg-blue-100 dark:bg-blue-900/40 px-1 rounded">{{ agenticData.orchestrator.model }}</code>
+                            <span v-if="agenticData.orchestrator.routed_model" class="text-blue-500">
+                              → {{ agenticData.orchestrator.routed_model }}
+                            </span>
+                            <span>{{ agenticData.orchestrator.latency_ms?.toFixed(0) }}ms</span>
+                          </div>
+                        </div>
+                        <p class="text-[11px] text-gray-600 dark:text-gray-400">
+                          Selected {{ agenticData.agents.length }} candidate intents for parallel evaluation.
+                          <span v-if="agenticData.orchestrator.tokens">
+                            ({{ agenticData.orchestrator.tokens.total_tokens || 0 }} tokens)
+                          </span>
+                        </p>
+                      </div>
+
+                      <!-- Specialized Agent Cards -->
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div v-for="agent in agenticData.agents" :key="agent.intent"
+                          class="rounded-lg border p-3 transition-colors" :class="agent.confidence >= 0.7
+                            ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10'
+                            : agent.confidence >= 0.4
+                              ? 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10'
+                              : 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 opacity-60'">
+                          <div class="flex items-center justify-between mb-1">
+                            <h5 class="text-xs font-semibold flex items-center gap-1.5" :class="agent.confidence >= 0.7 ? 'text-green-800 dark:text-green-300' :
+                              agent.confidence >= 0.4 ? 'text-amber-800 dark:text-amber-300' :
+                                'text-gray-500 dark:text-gray-400'">
+                              {{ agent.confidence >= 0.7 ? '✅' : agent.confidence >= 0.4 ? '⚠️' : '❌' }}
+                              {{ agent.intent }}
+                              <span class="font-bold">{{ Math.round((agent.confidence || 0) * 100) }}%</span>
+                            </h5>
+                            <div class="flex items-center gap-2 text-[10px] text-gray-500">
+                              <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">{{ agent.model }}</code>
+                              <span>{{ agent.latency_ms?.toFixed(0) }}ms</span>
+                              <span v-if="agent.rag_hits" class="text-purple-500">📚 {{ agent.rag_hits }} refs</span>
+                              <span v-else-if="agent.tool_called" class="text-orange-500">📚 0 refs</span>
+                            </div>
+                          </div>
+                          <div v-if="agent.tool_called" class="text-[10px] text-purple-500 dark:text-purple-400">
+                            🔍 {{ agent.search_index }} ({{ agent.retrieval_mode }})
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Red Team Card -->
+                      <div v-if="agenticData.redTeam"
+                        class="rounded-lg border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10 p-3">
+                        <div class="flex items-center justify-between mb-2">
+                          <h5 class="text-xs font-semibold text-red-800 dark:text-red-300 flex items-center gap-1.5">
+                            🛡️ Red Team / Quality Gate
+                            <span :class="agenticData.redTeam.validated ? 'text-green-600' : 'text-red-600'"
+                              class="text-[10px]">
+                              {{ agenticData.redTeam.validated ? '✓ Validated' : '✗ Issues Found' }}
+                            </span>
+                          </h5>
+                          <div class="flex items-center gap-2 text-[10px] text-gray-500">
+                            <code
+                              class="bg-red-100 dark:bg-red-900/40 px-1 rounded">{{ agenticData.redTeam.model }}</code>
+                            <span>{{ agenticData.redTeam.latency_ms?.toFixed(0) }}ms</span>
+                          </div>
+                        </div>
+                        <p v-if="agenticData.redTeam.justification"
+                          class="text-[11px] text-gray-600 dark:text-gray-400 italic">
+                          "{{ agenticData.redTeam.justification }}"
+                        </p>
+                        <div v-if="agenticData.redTeam.missed_intents?.length"
+                          class="mt-1 text-[10px] text-red-600 dark:text-red-400">
+                          ⚠ Missed intents: {{ agenticData.redTeam.missed_intents.join(', ') }}
+                        </div>
+                      </div>
+
+                      <!-- Summary Stats -->
+                      <div
+                        class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-200 dark:border-gray-700">
+                        <span>⏱ Parallel: {{ agenticData.parallelMs?.toFixed(0) }}ms</span>
+                        <span>🔢 Total: {{ agenticData.totalTokens }} tokens</span>
+                        <span>🤖 {{ agenticData.agents.length }} agents</span>
+                        <span v-if="agenticData.redTeamTrace" class="text-red-500">🛡️ Red Team triggered</span>
+                        <span v-else class="text-green-500">✓ Red Team skipped</span>
+                      </div>
+
+                      <!-- Settings Snapshot -->
+                      <div v-if="agenticData.settings" class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <button @click="showAgenticSettings = !showAgenticSettings"
+                          class="flex items-center gap-1 mb-1.5 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                          <span class="text-[10px] font-medium text-gray-500 dark:text-gray-400">⚙️ Configuration used
+                            for this
+                            classification</span>
+                          <ChevronDownIcon v-if="!showAgenticSettings" class="h-3 w-3 text-gray-400" />
+                          <ChevronUpIcon v-else class="h-3 w-3 text-gray-400" />
+                        </button>
+                        <div v-show="showAgenticSettings" class="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
+                          <span class="text-gray-500">Orchestrator: <code
+                              class="bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-1 rounded">{{
+                                agenticData.settings.orchestrator_model }}</code></span>
+                          <span class="text-gray-500">T1: <code
+                              class="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-1 rounded">{{
+                                agenticData.settings.agent_tier1_model }}</code></span>
+                          <span class="text-gray-500">T2: <code
+                              class="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1 rounded">{{
+                                agenticData.settings.agent_tier2_model }}</code></span>
+                          <span class="text-gray-500">T3: <code
+                              class="bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1 rounded">{{
+                                agenticData.settings.agent_tier3_model }}</code></span>
+                          <span class="text-gray-500">Red Team: <code
+                              class="bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1 rounded">{{
+                                agenticData.settings.red_team_model }}</code></span>
+                          <span class="text-gray-500">RAG: <code
+                              class="bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-1 rounded">{{
+                                agenticData.settings.retrieval_mode }}</code></span>
+                          <span v-if="agenticData.settings.reasoning_effort !== 'none'" class="text-gray-500">Reasoning:
+                            <code
+                              class="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-1 rounded">{{
+                                agenticData.settings.reasoning_effort }}</code></span>
+                          <span class="text-gray-500">Threshold: {{ agenticData.settings.red_team_threshold }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <!-- Reason -->
                   <div>
                     <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Raison /
@@ -762,17 +1204,33 @@ watch(() => email.value, (val) => {
                   </div>
 
                   <!-- Actions -->
-                  <div class="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div class="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
                     <button class="text-red-600 hover:text-red-500 text-sm font-medium flex items-center"
                       @click="markAsInvalid">
                       <TrashIcon class="w-4 h-4 mr-1" />
-                      Mark as Garbage/Invalid
+                      {{ t('email_detail.mark_garbage') }}
                     </button>
-                    <button
-                      class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50"
-                      :disabled="selectedCategoryNames.length === 0" @click="saveIntents">
-                      Validate & Save
-                    </button>
+                    <div class="flex items-center gap-2">
+                      <!-- Reinforce as example (correct classification) -->
+                      <button v-if="email?.status === 'PROCESSED' && email?.classification?.detected_intents?.length"
+                        class="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors"
+                        :class="reinforced
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 cursor-default'
+                          : 'text-purple-600 dark:text-purple-400 border border-purple-300 dark:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/30'"
+                        :disabled="reinforcing || reinforced"
+                        :title="t('email_detail.reinforce_tooltip')"
+                        @click="reinforceAsExample">
+                        <CheckIcon v-if="reinforced" class="w-3.5 h-3.5" />
+                        <ArrowPathIcon v-else-if="reinforcing" class="w-3.5 h-3.5 animate-spin" />
+                        <ShieldExclamationIcon v-else class="w-3.5 h-3.5" />
+                        {{ reinforced ? t('email_detail.reinforced') : reinforcing ? t('email_detail.reinforcing') : t('email_detail.reinforce') }}
+                      </button>
+                      <button
+                        class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50"
+                        :disabled="selectedCategoryNames.length === 0" @click="saveIntents">
+                        {{ t('email_detail.validate_save') }}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -866,7 +1324,7 @@ watch(() => email.value, (val) => {
           <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ t('dashboard.reprocess.select_strategy') }}
           </p>
-          <label v-for="s in ['standard', 'reasoning', 'vision']" :key="s"
+          <label v-for="s in ['standard', 'reasoning', 'vision', 'agentic']" :key="s"
             class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all"
             :class="reprocessStrategy === s
               ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-400'

@@ -325,6 +325,62 @@ resource "azapi_resource" "deployment_gpt52_chat" {
   depends_on = [azapi_resource.deployment_embedding]
 }
 
+# --- Optional: Azure AI Search for Agentic Classification ---
+# Per-intent indexes with semantic ranking and human-reinforced labels
+# Enable via: deploy_ai_search = true
+variable "deploy_ai_search" {
+  type        = bool
+  description = "Deploy Azure AI Search for agentic classification per-intent indexes with semantic ranking."
+  default     = false
+}
+
+resource "azurerm_search_service" "classymail" {
+  count               = var.deploy_ai_search ? 1 : 0
+  name                = "${var.prefix}-search"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+  sku                 = "basic"
+  semantic_search_sku = "standard"
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  tags = local.common_tags
+}
+
+# Grant Managed Identity access to AI Search (Search Index Data Contributor)
+resource "azurerm_role_assignment" "search_data_contributor" {
+  count                = var.deploy_ai_search ? 1 : 0
+  scope                = azurerm_search_service.classymail[0].id
+  role_definition_name = "Search Index Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.aca.principal_id
+}
+
+# --- Optional: Model Router for Agentic Orchestration ---
+# Intelligent per-prompt model selection — requires East US 2 or Sweden Central
+# Enable via: deploy_model_router = true
+variable "deploy_model_router" {
+  type        = bool
+  description = "Deploy Azure AI Model Router for intelligent per-prompt model selection (agentic orchestrator). Requires East US 2 or Sweden Central."
+  default     = false
+}
+
+resource "azapi_resource" "deployment_model_router" {
+  count     = (var.deploy_model_router && var.enable_model_deployments) ? 1 : 0
+  type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
+  name      = "model-router"
+  parent_id = azapi_resource.ai_services.id
+
+  body = jsonencode({
+    sku = { name = "GlobalStandard", capacity = 250 }
+    properties = {
+      model = { format = "OpenAI", name = "model-router", version = "2025-11-18" }
+    }
+  })
+  depends_on = [azapi_resource.deployment_gpt52_chat]
+}
+
 # --- Optional: Azure AI Language Service for PII Detection ---
 # Provides native PII detection API as alternative to LLM-based detection
 # Enable via: deploy_language_service = true
@@ -831,6 +887,10 @@ resource "azurerm_container_app" "api" {
         name  = "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
         value = var.deploy_document_intelligence ? azurerm_cognitive_account.doc_intelligence[0].endpoint : ""
       }
+      env {
+        name  = "AZURE_SEARCH_ENDPOINT"
+        value = var.deploy_ai_search ? "https://${azurerm_search_service.classymail[0].name}.search.windows.net" : ""
+      }
 
       # --- Telemetry: Application Map + Agents View ---
       # service.name  → cloud role name on Application Map
@@ -1063,6 +1123,10 @@ resource "azurerm_container_app" "worker" {
       env {
         name  = "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
         value = var.deploy_document_intelligence ? azurerm_cognitive_account.doc_intelligence[0].endpoint : ""
+      }
+      env {
+        name  = "AZURE_SEARCH_ENDPOINT"
+        value = var.deploy_ai_search ? "https://${azurerm_search_service.classymail[0].name}.search.windows.net" : ""
       }
 
       # --- Telemetry: Application Map + Agents View ---

@@ -11,36 +11,36 @@ import {
   CpuChipIcon,
   AdjustmentsHorizontalIcon,
   QueueListIcon,
-  BanknotesIcon,
   ArrowPathIcon,
   QuestionMarkCircleIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   CommandLineIcon,
   InformationCircleIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  Cog6ToothIcon
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '../composables/useDialog'
 import { trackException } from '../services/telemetry'
+import AppearanceTab from '../components/settings/AppearanceTab.vue'
+import GeneralTab from '../components/settings/GeneralTab.vue'
+import FinetuningTab from '../components/settings/FinetuningTab.vue'
+import DangerZoneTab from '../components/settings/DangerZoneTab.vue'
 
 const { t, locale } = useI18n()
 const { confirm, alert: showAlert } = useDialog() // Rename alert because it conflicts with window.alert if not careful, though in setup scope it shadows it.
 
 // Tabs
-const activeTab = ref('classification')
+const activeTab = ref('general')
 const showStrategyHelp = ref(false)
 
 // Config Data
 const settings = ref({
   processing_strategy: 'standard',
-  ai_model: 'phi4', // Default
-  phi4_input_per_1k: null,
-  phi4_output_per_1k: null,
-  mistral_per_1k_pages: null,
+  ai_model: 'phi-4', // Default
   finetune_min_examples: 50,
   ocr_max_attempts: 3,
-  review_confidence_threshold: 0.85,
   categories: [],
   email_preprocessing: {
     enabled: true,
@@ -59,41 +59,34 @@ const settings = ref({
     show_time: true,
     show_ocr_provider: true
   },
-  ai_assessment_model: 'gpt-4.1-nano'
+  ai_assessment_model: 'gpt-4.1-nano',
+  data_generation_model: 'gpt-5.2-chat',
+  generation_reasoning_effort: 'none',
+  agentic: {
+    enabled: false,
+    orchestrator_model: 'gpt-4.1-nano',
+    orchestrator_routing_mode: 'balanced',
+    orchestrator_model_subset: [],
+    agent_tier1_model: 'gpt-4.1-nano',
+    agent_tier2_model: 'gpt-4.1-mini',
+    agent_tier3_model: 'gpt-4.1',
+    red_team_model: 'gpt-4.1',
+    red_team_threshold: 0.7,
+    red_team_conflict_delta: 0.15,
+    max_parallel_agents: 6,
+    retrieval_mode: 'semantic',
+    search_top_k: 5,
+    reasoning_effort: 'none',
+    enabled_indexes: {}
+  }
 })
 const defaults = ref({
-  phi4_input_per_1k: null,
-  phi4_output_per_1k: null,
-  mistral_per_1k_pages: null,
-  ocr_max_attempts: 3,
-  review_confidence_threshold: 0.85
+  ocr_max_attempts: 3
 })
 const loading = ref(false)
 const saved = ref(false)
 
-// Reset State
-const resetConfirm1 = ref(false)
-const resetConfirm2 = ref(false)
-const resetting = ref(false)
-const purgingDlq = ref(false)
-const reprocessingAll = ref(false)
-const reindexing = ref(false)
-
-// Connectivity Test State
-const connTestLoading = ref(false)
-const connTestResults = ref(null)
-
-// LLM Test State
-const llmTestLoading = ref(false)
-const llmTestResults = ref(null)
-
-// ACA Validation State
-const acaValidationLoading = ref(false)
-const acaValidationResults = ref(null)
-
-// Simulate Flow State
-const simulatingFlow = ref(false)
-const useAoaiEnhancement = ref(false)
+// --- Danger zone handled by DangerZoneTab component ---
 
 // ── Token & pricing hypothesis (mirrors MODEL_PRICING in costing.py) ──
 // Prices are per 1 K tokens (input, output) — Azure OpenAI / Foundry, 2025
@@ -119,23 +112,24 @@ const availableDeployments = ref([])
 const deploymentsLoaded = ref(false)
 const assessmentEnabled = ref(true)
 
-// Merged model options: real deployments first, then MODEL_PRICING keys as fallback
+// Merged model options: model-router first, then real deployments, then MODEL_PRICING keys as fallback
+const MODEL_ROUTER_OPTION = { value: 'model-router', label: 'Model Router (Auto)' }
 const modelOptions = computed(() => {
   if (availableDeployments.value.length > 0) {
-    return availableDeployments.value.map(d => {
-      // Match pricing by deployment id, model name, or model name prefix
+    const opts = availableDeployments.value.map(d => {
       const pricing = getModelPricing(d.id) || getModelPricing(d.model) || Object.values(MODEL_PRICING).find(p => d.id.toLowerCase().startsWith(p.label.toLowerCase().replace(/ /g, '-')))
       return {
         value: d.id,
         label: pricing ? `${pricing.label} (${d.model})` : `${d.id} (${d.model})`,
       }
     }).filter(d => !d.value.includes('embedding') && !d.value.includes('mistral'))
+    return [MODEL_ROUTER_OPTION, ...opts]
   }
   // Fallback: use hardcoded MODEL_PRICING keys
-  return Object.entries(MODEL_PRICING).map(([key, m]) => ({
+  return [MODEL_ROUTER_OPTION, ...Object.entries(MODEL_PRICING).map(([key, m]) => ({
     value: key,
     label: m.label,
-  }))
+  }))]
 })
 
 const loadDeployments = async () => {
@@ -157,18 +151,6 @@ const loadDeployments = async () => {
   }
 }
 
-// Hypothesis: tokens per email (classification only — single LLM call)
-const TOKEN_HYPOTHESIS = { inputLow: 800, inputHigh: 1500, outputLow: 200, outputHigh: 500 }
-
-const modelCostEstimates = computed(() => {
-  const n = 10_000
-  return Object.entries(MODEL_PRICING).map(([key, m]) => {
-    const costLow = n * ((m.input * TOKEN_HYPOTHESIS.inputLow / 1000) + (m.output * TOKEN_HYPOTHESIS.outputLow / 1000))
-    const costHigh = n * ((m.input * TOKEN_HYPOTHESIS.inputHigh / 1000) + (m.output * TOKEN_HYPOTHESIS.outputHigh / 1000))
-    return { key, ...m, costLow: Math.round(costLow * 100) / 100, costHigh: Math.round(costHigh * 100) / 100 }
-  })
-})
-
 // --- Category Management & Sanitization ---
 
 const expandedCategories = ref(new Set())
@@ -185,6 +167,163 @@ const assessmentModelLabel = computed(() => {
   const pricing = getModelPricing(key)
   return pricing ? pricing.label : key
 })
+
+// Toggle per-category AI Search index for agentic RAG
+const toggleCategoryIndex = (slug, enabled) => {
+  if (!settings.value.agentic.enabled_indexes) {
+    settings.value.agentic.enabled_indexes = {}
+  }
+  settings.value.agentic.enabled_indexes[slug] = enabled
+}
+
+// ── AI Search Index Management ──────────────────────────────────────
+const showAISearchInfo = ref(false)
+const aiSearchIndexes = ref({}) // { slug: { status, doc_count, loading } }
+const aiSearchExamples = ref({}) // { slug: { items: [], loading, expanded } }
+const newExample = ref({}) // { slug: { content, is_positive, correction_reason } }
+const addingExample = ref({}) // { slug: boolean }
+
+const loadAISearchIndexes = async () => {
+  try {
+    const res = await fetch('/api/admin/ai-search/indexes')
+    if (!res.ok) return
+    const data = await res.json()
+    if (!data.enabled) return
+    for (const ix of (data.indexes || [])) {
+      aiSearchIndexes.value[ix.slug] = { status: 'exists', doc_count: ix.doc_count, loading: false }
+    }
+  } catch { /* ignore */ }
+}
+
+const ensureCategoryIndex = async (slug) => {
+  aiSearchIndexes.value[slug] = { ...(aiSearchIndexes.value[slug] || {}), loading: true }
+  try {
+    const res = await fetch('/api/admin/ai-search/indexes/ensure', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug })
+    })
+    const data = await res.json()
+    aiSearchIndexes.value[slug] = { status: data.status, doc_count: aiSearchIndexes.value[slug]?.doc_count || 0, loading: false }
+  } catch (e) {
+    aiSearchIndexes.value[slug] = { status: 'error', doc_count: 0, loading: false }
+    trackException(e)
+  }
+}
+
+const toggleExamplesPanel = async (slug) => {
+  if (!aiSearchExamples.value[slug]) {
+    aiSearchExamples.value[slug] = { items: [], loading: true, expanded: true }
+  } else {
+    aiSearchExamples.value[slug].expanded = !aiSearchExamples.value[slug].expanded
+    if (!aiSearchExamples.value[slug].expanded) return
+  }
+  await loadExamples(slug)
+}
+
+const loadExamples = async (slug) => {
+  if (!aiSearchExamples.value[slug]) {
+    aiSearchExamples.value[slug] = { items: [], loading: true, expanded: true }
+  }
+  aiSearchExamples.value[slug].loading = true
+  try {
+    const res = await fetch(`/api/admin/ai-search/indexes/${encodeURIComponent(slug)}/examples?top=20`)
+    if (res.ok) {
+      const data = await res.json()
+      aiSearchExamples.value[slug].items = data.examples || []
+    }
+  } catch { /* ignore */ }
+  aiSearchExamples.value[slug].loading = false
+}
+
+const initNewExample = (slug) => {
+  if (!newExample.value[slug]) {
+    newExample.value[slug] = { content: '', is_positive: true, correction_reason: '' }
+  }
+}
+
+const addExample = async (slug) => {
+  const ex = newExample.value[slug]
+  if (!ex || !ex.content?.trim()) return
+  addingExample.value[slug] = true
+  try {
+    // Auto-ensure index first
+    await ensureCategoryIndex(slug)
+    const res = await fetch(`/api/admin/ai-search/indexes/${encodeURIComponent(slug)}/examples`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: ex.content.trim(),
+        is_positive: ex.is_positive,
+        correction_reason: ex.is_positive ? '' : (ex.correction_reason || '').trim(),
+        label_source: 'human_verified'
+      })
+    })
+    if (res.ok) {
+      newExample.value[slug] = { content: '', is_positive: true, correction_reason: '' }
+      await loadExamples(slug)
+      // Update doc count
+      if (aiSearchIndexes.value[slug]) {
+        aiSearchIndexes.value[slug].doc_count = (aiSearchIndexes.value[slug].doc_count || 0) + 1
+      }
+    }
+  } catch (e) {
+    trackException(e)
+  }
+  addingExample.value[slug] = false
+}
+
+const deleteExample = async (slug, docId) => {
+  try {
+    await fetch(`/api/admin/ai-search/indexes/${encodeURIComponent(slug)}/examples/${encodeURIComponent(docId)}`, { method: 'DELETE' })
+    await loadExamples(slug)
+    if (aiSearchIndexes.value[slug]) {
+      aiSearchIndexes.value[slug].doc_count = Math.max(0, (aiSearchIndexes.value[slug].doc_count || 1) - 1)
+    }
+  } catch (e) {
+    trackException(e)
+  }
+}
+
+// Orchestrator prompt preview (read-only)
+const showOrchestratorPrompt = ref(false)
+const orchestratorPromptData = ref(null)
+const loadingOrchestratorPrompt = ref(false)
+const activePromptTab = ref('orchestrator')
+
+const loadOrchestratorPrompt = async () => {
+  if (orchestratorPromptData.value) {
+    showOrchestratorPrompt.value = !showOrchestratorPrompt.value
+    return
+  }
+  loadingOrchestratorPrompt.value = true
+  try {
+    const res = await fetch('/api/settings/agentic-prompt')
+    if (res.ok) {
+      orchestratorPromptData.value = await res.json()
+      showOrchestratorPrompt.value = true
+    }
+  } catch (e) {
+    console.warn('Failed to load orchestrator prompt:', e)
+  } finally {
+    loadingOrchestratorPrompt.value = false
+  }
+}
+
+// Model advice dialog
+const showModelAdvice = ref(false)
+
+// Auto-populate enabled_indexes from categories when agentic is first activated
+const ensureIndexToggles = () => {
+  if (!settings.value.agentic.enabled_indexes) {
+    settings.value.agentic.enabled_indexes = {}
+  }
+  for (const cat of (settings.value.categories || [])) {
+    if (!(cat.slug in settings.value.agentic.enabled_indexes)) {
+      settings.value.agentic.enabled_indexes[cat.slug] = true
+    }
+  }
+}
 
 const sanitizeInput = (str, type) => {
   if (!str) return ''
@@ -229,6 +368,10 @@ const addNewCategory = () => {
   if (name && slug) {
     if (!settings.value.categories) settings.value.categories = []
     settings.value.categories.push({ name, slug, description: desc, exclusions: excl })
+    // Auto-enable AI Search index for new category
+    if (settings.value.agentic?.enabled_indexes) {
+      settings.value.agentic.enabled_indexes[slug] = true
+    }
     newCategory.value = { name: '', slug: '', description: '', exclusions: '' }
     newCategoryExpanded.value = false
     saveSettings()
@@ -237,7 +380,21 @@ const addNewCategory = () => {
 
 const removeCategory = async (index) => {
   if (await confirm(t('settings.categories.form.remove_confirm'))) {
+    const removedSlug = settings.value.categories[index]?.slug
     settings.value.categories.splice(index, 1)
+    if (removedSlug) {
+      // Remove AI Search index toggle
+      if (settings.value.agentic?.enabled_indexes) {
+        delete settings.value.agentic.enabled_indexes[removedSlug]
+      }
+      // Delete the AI Search index in the background
+      try {
+        await fetch(`/api/admin/ai-search/indexes/${encodeURIComponent(removedSlug)}`, { method: 'DELETE' })
+      } catch { /* best-effort */ }
+      delete aiSearchIndexes.value[removedSlug]
+      delete aiSearchExamples.value[removedSlug]
+      delete newExample.value[removedSlug]
+    }
     expandedCategories.value.delete(index)
     categoryAssessments.value.delete(index)
     saveSettings()
@@ -414,9 +571,14 @@ const loadSettings = async () => {
     if (res.ok) {
       const data = await res.json()
       settings.value = data
+      // Normalize model aliases to canonical deployment names
+      const modelAliases = { 'phi4': 'phi-4', 'gpt4o-mini': 'gpt-4o-mini', 'gpt4o_mini': 'gpt-4o-mini' }
+      if (settings.value.ai_model && modelAliases[settings.value.ai_model]) {
+        settings.value.ai_model = modelAliases[settings.value.ai_model]
+      }
       // Enforce default model if missing
       if (!settings.value.ai_model) {
-        settings.value.ai_model = 'phi4'
+        settings.value.ai_model = 'phi-4'
       }
       // Ensure csv_export defaults
       if (!settings.value.csv_export) {
@@ -447,15 +609,16 @@ const saveSettings = async () => {
     const payload = {
       processing_strategy: settings.value.processing_strategy,
       ai_model: settings.value.ai_model,
-      phi4_input_per_1k: settings.value.phi4_input_per_1k ? Number(settings.value.phi4_input_per_1k) : undefined,
-      phi4_output_per_1k: settings.value.phi4_output_per_1k ? Number(settings.value.phi4_output_per_1k) : undefined,
-      mistral_per_1k_pages: settings.value.mistral_per_1k_pages ? Number(settings.value.mistral_per_1k_pages) : undefined,
+      ai_assessment_model: settings.value.ai_assessment_model,
+      data_generation_model: settings.value.data_generation_model,
+      generation_reasoning_effort: settings.value.generation_reasoning_effort,
       finetune_min_examples: settings.value.finetune_min_examples ? Number(settings.value.finetune_min_examples) : 50,
       ocr_max_attempts: settings.value.ocr_max_attempts ? Number(settings.value.ocr_max_attempts) : 3,
-      review_confidence_threshold: settings.value.review_confidence_threshold ? Number(settings.value.review_confidence_threshold) : 0.85,
       categories: settings.value.categories,
       email_preprocessing: settings.value.email_preprocessing,  // FIX: Include email_preprocessing settings
-      csv_export: settings.value.csv_export  // CSV export customization
+      csv_export: settings.value.csv_export,  // CSV export customization
+      agentic: settings.value.agentic,  // Agentic classification config
+      default_locale: locale.value || 'en'  // Default language for classification output
     }
 
     const res = await fetch('/api/settings', {
@@ -487,302 +650,12 @@ const saveSettings = async () => {
   }
 }
 
-const performReset = async () => {
-  if (!resetConfirm1.value || !resetConfirm2.value) return
-  if (!await confirm('FINAL WARNING: This is irreversible. Proceed?')) return
-
-  resetting.value = true
-  try {
-    const res = await fetch('/api/admin/reset', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        confirm_1: resetConfirm1.value,
-        confirm_2: resetConfirm2.value
-      })
-    })
-    if (res.ok) {
-      const data = await res.json()
-      await showAlert(`Reset Successful.\nDeleted Blobs: ${data.deleted_blobs}\nDeleted Records: ${data.deleted_records}\nPurged DLQ: ${data.deleted_dlq}`)
-      window.location.reload()
-    } else {
-      showAlert('Reset Failed')
-    }
-  } catch (e) {
-    trackException(e)
-    showAlert(`Reset Error: ${e.message}`)
-  } finally {
-    resetting.value = false
-  }
-}
-
-const performDlqPurge = async () => {
-  if (!await confirm('Are you sure you want to purge the Service Bus Dead Letter Queue? This cannot be undone.')) return
-
-  purgingDlq.value = true
-  try {
-    const res = await fetch('/api/admin/purge-dlq', {
-      method: 'POST',
-    })
-    if (res.ok) {
-      const data = await res.json()
-      showAlert(`Purge Successful.\nDeleted Messages: ${data.deleted_dlq}`)
-    } else {
-      const err = await res.json()
-      showAlert(`Purge Failed: ${err.detail || 'Unknown error'}`)
-    }
-  } catch (e) {
-    trackException(e)
-    showAlert(`Purge Error: ${e.message}`)
-  } finally {
-    purgingDlq.value = false
-  }
-}
-
-const performReprocessAll = async () => {
-  // Step 1: First confirmation with details about what will happen
-  const model = settings.value?.ai_model || 'default'
-  const strategy = settings.value?.processing_strategy || 'standard'
-  const ok1 = await confirm(
-    `This will save your current settings and reprocess ALL emails (PROCESSED + REVIEW_REQUIRED) with:\n\n` +
-    `• Model: ${model}\n• Strategy: ${strategy}\n\n` +
-    `Existing classifications will be overwritten.\nDead Letter Queue messages will also be replayed.\n\nDo you want to continue?`,
-    'Reprocess All Emails'
-  )
-  if (!ok1) return
-
-  // Step 2: Second confirmation — final warning
-  const ok2 = await confirm(
-    'FINAL CONFIRMATION\n\nAll processed emails will be re-queued for classification. This cannot be undone.\n\nProceed?',
-    'Confirm Reprocess All'
-  )
-  if (!ok2) return
-
-  reprocessingAll.value = true
-  try {
-    // Auto-save settings first so the worker uses the new configuration
-    await saveSettings()
-
-    const res = await fetch('/api/admin/reprocess-all', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        processing_strategy: settings.value?.processing_strategy || null,
-      }),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      await showAlert(
-        `Reprocess All Complete\n\n` +
-        `• Emails enqueued: ${data.enqueued}\n` +
-        `• DLQ replayed: ${data.dlq_replayed}\n` +
-        `• Errors: ${data.errors?.length || 0}`
-      )
-    } else {
-      const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
-      await showAlert(`Reprocess All Failed: ${err.detail || 'Unknown error'}`)
-    }
-  } catch (e) {
-    trackException(e)
-    await showAlert(`Reprocess All Error: ${e.message}`)
-  } finally {
-    reprocessingAll.value = false
-  }
-}
-
-const performReindex = async () => {
-  const ok = await confirm(
-    'This will rebuild the vector search index for ALL emails.\n\n' +
-    '• All existing chunks will be deleted\n' +
-    '• New embeddings will be generated for every email\n' +
-    '• This may take several minutes and use API quota\n\n' +
-    'Proceed?',
-    'Rebuild Vector Index'
-  )
-  if (!ok) return
-
-  reindexing.value = true
-  try {
-    const res = await fetch('/api/admin/reindex-embeddings', { method: 'POST' })
-    if (res.ok) {
-      const data = await res.json()
-      await showAlert(
-        `Vector Index Rebuilt\n\n` +
-        `• Emails reindexed: ${data.emails_reindexed}\n` +
-        `• Old chunks deleted: ${data.chunks_deleted}\n` +
-        `• New chunks created: ${data.chunks_created}\n` +
-        `• Errors: ${data.errors?.length || 0}`
-      )
-    } else {
-      const err = await res.json().catch(() => ({ detail: 'Unknown error' }))
-      await showAlert(`Reindex Failed: ${err.detail || 'Unknown error'}`)
-    }
-  } catch (e) {
-    trackException(e)
-    await showAlert(`Reindex Error: ${e.message}`)
-  } finally {
-    reindexing.value = false
-  }
-}
-
-
-const runConnectivityTest = async () => {
-  connTestLoading.value = true
-  connTestResults.value = null
-  try {
-    const res = await fetch('/api/admin/debug/connectivity', { method: 'POST' })
-    if (res.ok) {
-      connTestResults.value = await res.json()
-      showAlert('Connectivity Test Complete. See results.')
-    } else {
-      const err = await res.json()
-      showAlert(`Connectivity Test Failed: ${err.detail || 'Request failed'}`)
-    }
-  } catch (e) {
-    trackException(e)
-    showAlert(`Connectivity Error: ${e.message}`)
-  } finally {
-    connTestLoading.value = false
-  }
-}
-
-
-const runLLMTests = async () => {
-  llmTestLoading.value = true
-  llmTestResults.value = null
-  try {
-    const chatModel = settings.value?.chat_model || 'gpt-5.2-chat'
-
-    const requests = [
-      fetch('/api/admin/test-phi4'),
-      fetch('/api/admin/test-mistral-ocr'),
-      fetch('/api/admin/test-gpt'),
-      fetch('/api/admin/test-language-service'),
-      fetch(`/api/admin/test-gpt?model=${encodeURIComponent(chatModel)}`)
-    ]
-
-    const responses = await Promise.all(requests)
-    const data = await Promise.all(responses.map(r => r.json()))
-
-    const [phi4Data, mistralData, gptData, languageData, chatData] = data
-
-    llmTestResults.value = {
-      phi4: phi4Data,
-      mistral: mistralData,
-      gpt: gptData,
-      language: languageData,
-      chat: chatData
-    }
-  } catch (e) {
-    trackException(e)
-    showAlert(`LLM Test Error: ${e.message}`)
-  } finally {
-    llmTestLoading.value = false
-  }
-}
-
-
-const validateACAConfig = async () => {
-  acaValidationLoading.value = true
-  acaValidationResults.value = null
-  try {
-    const res = await fetch('/api/admin/validate-aca-env')
-    if (res.ok) {
-      acaValidationResults.value = await res.json()
-      if (acaValidationResults.value.all_required_present) {
-        showAlert('✓ ACA Configuration Valid: All required variables are present')
-      } else {
-        const missing = acaValidationResults.value.missing_required || []
-        showAlert(`⚠ ACA Configuration Issue: Missing ${missing.length} required variable(s): ${missing.join(', ')}`)
-      }
-    } else {
-      const err = await res.json()
-      showAlert(`ACA Validation Failed: ${err.detail || 'Request failed'}`)
-    }
-  } catch (e) {
-    trackException(e)
-    showAlert(`ACA Validation Error: ${e.message}`)
-  } finally {
-    acaValidationLoading.value = false
-  }
-}
-
-
-const performSimulateFlow = async () => {
-  simulatingFlow.value = true
-  try {
-    const res = await fetch('/api/admin/debug/simulate-flow', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        use_aoai: useAoaiEnhancement.value
-      })
-    })
-    if (res.ok) {
-      const data = await res.json()
-      const aoaiNote = useAoaiEnhancement.value ? ' (with AOAI enhancement)' : ' (template-based)'
-      showAlert(`✓ E2E Simulation Complete${aoaiNote}\n\nBlob ID: ${data.item_id}\n\nYou can track this email in the Dashboard.`)
-    } else {
-      const err = await res.json()
-      showAlert(`Simulation Failed: ${err.detail || 'Unknown error'}`)
-    }
-  } catch (e) {
-    trackException(e)
-    showAlert(`Simulation Error: ${e.message}`)
-  } finally {
-    simulatingFlow.value = false
-  }
-}
-
-// --- Appearance & Init ---
-
-const isDark = ref(false)
-const currentTheme = ref('blue')
-const currentLocale = ref('en')
-
-const themes = [
-  { id: 'blue', name: 'Blue', class: 'bg-blue-600' },
-  { id: 'green', name: 'Green', class: 'bg-emerald-600' },
-  { id: 'indigo', name: 'Indigo', class: 'bg-indigo-600' },
-  { id: 'slate', name: 'Slate', class: 'bg-slate-600' },
-  { id: 'orange', name: 'Orange', class: 'bg-orange-600' },
-  { id: 'red', name: 'Red', class: 'bg-red-600' }
-]
-
-const toggleDarkMode = () => {
-  isDark.value = !isDark.value
-  document.documentElement.classList.toggle('dark', isDark.value)
-  localStorage.setItem('ClassyMail-dark', isDark.value)
-}
-
-const setTheme = (id) => {
-  currentTheme.value = id
-  document.documentElement.setAttribute('data-theme', id)
-  localStorage.setItem('ClassyMail-theme', id)
-}
-
-const setLocale = (l) => {
-  currentLocale.value = l
-  locale.value = l
-  localStorage.setItem('ClassyMail-locale', l)
-}
+// --- Danger zone + appearance functions moved to child components ---
 
 onMounted(() => {
   loadSettings()
   loadDeployments()
-
-  const savedDark = localStorage.getItem('ClassyMail-dark')
-  isDark.value = savedDark === 'true'
-  if (isDark.value) document.documentElement.classList.add('dark')
-
-  const savedTheme = localStorage.getItem('ClassyMail-theme')
-  if (savedTheme) setTheme(savedTheme)
-
-  const savedLocale = localStorage.getItem('ClassyMail-locale')
-  if (savedLocale) {
-    currentLocale.value = savedLocale
-    locale.value = savedLocale
-  }
+  loadAISearchIndexes()
 })
 </script>
 
@@ -801,6 +674,12 @@ onMounted(() => {
     <div class="border-b border-gray-200 dark:border-gray-700 overflow-x-auto overflow-y-hidden">
       <nav class="-mb-px flex space-x-8" aria-label="Tabs">
         <button
+          :class="[activeTab === 'general' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          @click="activeTab = 'general'">
+          <Cog6ToothIcon class="h-4 w-4" />
+          {{ t('settings.tabs.general') }}
+        </button>
+        <button
           :class="[activeTab === 'classification' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
           @click="activeTab = 'classification'">
           <QueueListIcon class="h-4 w-4" />
@@ -813,112 +692,31 @@ onMounted(() => {
           {{ t('settings.tabs.processing') }}
         </button>
         <button
-          :class="[activeTab === 'design' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
-          @click="activeTab = 'design'">
-          <SwatchIcon class="h-4 w-4" />
-          {{ t('settings.appearance') }}
-        </button>
-        <button
-          :class="[activeTab === 'general' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
-          @click="activeTab = 'general'">
-          <BanknotesIcon class="h-4 w-4" />
-          {{ t('settings.tabs.general') }}
-        </button>
-        <button
           :class="[activeTab === 'finetuning' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
           @click="activeTab = 'finetuning'">
           <AdjustmentsHorizontalIcon class="h-4 w-4" />
           {{ t('settings.tabs.finetuning') }}
         </button>
-
         <button
-          :class="[activeTab === 'danger' ? 'border-red-500 text-red-600 dark:text-red-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          :class="[activeTab === 'design' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
+          @click="activeTab = 'design'">
+          <SwatchIcon class="h-4 w-4" />
+          {{ t('settings.appearance') }}
+        </button>
+
+        <div class="flex-1"></div>
+        <button
+          :class="[activeTab === 'danger' ? 'border-red-500 text-red-600 dark:text-red-400' : 'border-transparent text-red-400/60 hover:border-red-300 hover:text-red-500 dark:text-red-500/50 dark:hover:text-red-400', 'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2']"
           @click="activeTab = 'danger'">
+          <ExclamationTriangleIcon class="h-4 w-4" />
           {{ t('settings.tabs.danger') }}
-          <ExclamationTriangleIcon class="h-4 w-4 text-red-500" />
         </button>
       </nav>
     </div>
 
     <!-- Design / Appearance Tab -->
-    <div v-show="activeTab === 'design'" class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-      <div class="px-4 py-5 sm:p-6">
-        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
-          {{ t('settings.appearance') }}
-        </h3>
-
-        <div class="mt-6 space-y-6">
-          <!-- Language -->
-          <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('settings.language')
-            }}</label>
-            <div class="mt-2 flex flex-wrap items-center gap-2">
-              <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-                :class="currentLocale === 'en' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
-                @click="setLocale('en')">
-                English
-              </button>
-              <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-                :class="currentLocale === 'fr' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
-                @click="setLocale('fr')">
-                Français
-              </button>
-              <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-                :class="currentLocale === 'es' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
-                @click="setLocale('es')">
-                Español
-              </button>
-              <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-                :class="currentLocale === 'de' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
-                @click="setLocale('de')">
-                Deutsch
-              </button>
-              <button class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-                :class="currentLocale === 'it' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
-                @click="setLocale('it')">
-                Italiano
-              </button>
-            </div>
-          </div>
-
-          <!-- Dark Mode -->
-          <div class="flex items-center justify-between">
-            <span class="flex-grow flex flex-col">
-              <span class="text-sm font-medium text-gray-900 dark:text-white">{{ t('settings.dark_mode') }}</span>
-            </span>
-            <button type="button"
-              class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2"
-              :class="isDark ? 'bg-primary-600' : 'bg-gray-200'" @click="toggleDarkMode">
-              <span
-                class="pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                :class="isDark ? 'translate-x-5' : 'translate-x-0'">
-                <span class="absolute inset-0 flex h-full w-full items-center justify-center transition-opacity"
-                  :class="isDark ? 'opacity-0 duration-100 ease-out' : 'opacity-100 duration-200 ease-in'">
-                  <SunIcon class="h-3 w-3 text-gray-400" />
-                </span>
-                <span class="absolute inset-0 flex h-full w-full items-center justify-center transition-opacity"
-                  :class="isDark ? 'opacity-100 duration-200 ease-in' : 'opacity-0 duration-100 ease-out'">
-                  <MoonIcon class="h-3 w-3 text-primary-600" />
-                </span>
-              </span>
-            </button>
-          </div>
-
-          <!-- Theme -->
-          <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">{{ t('settings.theme')
-            }}</label>
-            <div class="mt-2 flex items-center space-x-3">
-              <button v-for="theme in themes" :key="theme.id"
-                class="relative h-8 w-8 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800"
-                :class="[theme.class, currentTheme === theme.id ? 'ring-2 ring-primary-500 ring-offset-2' : '']"
-                :title="theme.name" @click="setTheme(theme.id)">
-                <CheckCircleIcon v-if="currentTheme === theme.id" class="absolute inset-0 m-auto h-5 w-5 text-white" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div v-show="activeTab === 'design'">
+      <AppearanceTab />
     </div>
 
     <!-- Processing Strategy Tab -->
@@ -931,100 +729,7 @@ onMounted(() => {
           {{ t('settings.processing.desc') }}
         </p>
 
-        <!-- Section: AI Model Selection -->
-        <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 mb-6 bg-gray-50/50 dark:bg-gray-900/20">
-          <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
-            <CpuChipIcon class="h-5 w-5 text-blue-500" />
-            {{ t('settings.processing.model_select') }}
-          </h4>
-          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{
-            t('settings.processing.model_select') }}</label>
-          <div class="mt-2">
-            <select v-model="settings.ai_model"
-              class="block w-full max-w-xs rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
-              <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          <div v-if="!['gpt-4o', 'gpt-4o-mini', 'gpt-4.1-nano'].includes(settings.ai_model)"
-            class="mt-2 flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm">
-            <ExclamationTriangleIcon class="h-4 w-4" />
-            <span>{{ t('settings.processing.finetuning_not_supported') }}</span>
-          </div>
-          <div v-else class="mt-2 flex items-center gap-2 text-green-600 dark:text-green-400 text-sm">
-            <CheckCircleIcon class="h-4 w-4" />
-            <span>{{ t('settings.processing.finetuning_available') }}</span>
-          </div>
-
-          <!-- Cost/Quality Trade-off Info (computed from MODEL_PRICING) -->
-          <div class="mt-3 rounded-md bg-blue-50 dark:bg-blue-900/20 p-3 border border-blue-200 dark:border-blue-800">
-            <div class="flex">
-              <div class="flex-shrink-0">
-                <QuestionMarkCircleIcon class="h-5 w-5 text-blue-400" aria-hidden="true" />
-              </div>
-              <div class="ml-3 flex-1 text-sm">
-                <p class="font-medium text-blue-800 dark:text-blue-300 mb-1">
-                  Model Comparison — Estimated Quality & Cost
-                </p>
-                <!-- Token hypothesis -->
-                <div
-                  class="text-[11px] text-blue-600 dark:text-blue-300 mb-2 bg-blue-100/50 dark:bg-blue-800/30 rounded p-2 space-y-1">
-                  <p class="font-semibold">
-                    📊 Hypothesis (classification only — single LLM call/email):
-                  </p>
-                  <p>
-                    Input: ~{{ TOKEN_HYPOTHESIS.inputLow }}–{{ TOKEN_HYPOTHESIS.inputHigh }} tokens/email
-                    (system prompt + categories + email content)
-                  </p>
-                  <p>
-                    Output: ~{{ TOKEN_HYPOTHESIS.outputLow }}–{{ TOKEN_HYPOTHESIS.outputHigh }} tokens/email
-                    (JSON response)
-                  </p>
-                  <p class="italic mt-1">
-                    💡 Prices vary by region, volume, and caching. Verify with the
-                    <a href="https://azure.microsoft.com/en-us/pricing/calculator/" target="_blank"
-                      class="underline font-semibold">Azure Pricing Calculator</a>.
-                  </p>
-                </div>
-                <!-- Dynamic model list -->
-                <div class="text-blue-700 dark:text-blue-200 space-y-1">
-                  <div v-for="m in modelCostEstimates" :key="m.key" class="flex items-center justify-between gap-2">
-                    <span>
-                      <strong>{{ m.label }}:</strong>
-                      Quality {{ m.quality.toFixed(2) }}
-                      <template v-if="m.quality >= 0.90"> ⭐⭐</template>
-                      <template v-else-if="m.quality >= 0.85"> ⭐</template>,
-                      Cost ~${{ m.costLow.toFixed(0) }}–{{ m.costHigh.toFixed(0) }}/10K emails
-                    </span>
-                    <div class="flex gap-2 shrink-0">
-                      <span v-if="settings.ai_model === m.key"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-                        ✓ Primary
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <!-- Cost multiplier warnings -->
-                <div
-                  class="mt-3 text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50/60 dark:bg-amber-900/20 rounded p-2 space-y-1 border border-amber-200/50 dark:border-amber-800/30">
-                  <p class="font-semibold">
-                    ⚠️ These estimates cover classification only. Actual costs increase with:
-                  </p>
-                  <ul class="list-disc pl-4 space-y-0.5">
-                    <li><strong>Entity extraction:</strong> +1 LLM call/email (~×1.3 cost)</li>
-                    <li><strong>PII detection (LLM mode):</strong> +1 LLM call/email (~×1.5 cost)</li>
-                    <li><strong>Email preprocessing:</strong> +1 LLM call/email (~×1.3 cost)</li>
-                    <li><strong>Reprocessing:</strong> multiplies ALL above by number of passes</li>
-                  </ul>
-                  <p class="italic mt-1">
-                    With all features enabled: expect ~×3–4 the base estimate.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div> <!-- Section: Processing Strategy -->
+        <!-- Section: Processing Strategy (FIRST — determines what's shown below) -->
         <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 mb-6 bg-gray-50/50 dark:bg-gray-900/20">
           <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
             <AdjustmentsHorizontalIcon class="h-5 w-5 text-purple-500" />
@@ -1062,7 +767,472 @@ onMounted(() => {
                 {{ t('settings.processing.strategy.vision') }}
               </label>
             </div>
+            <div class="flex items-center">
+              <input id="strategy-agentic" v-model="settings.processing_strategy" name="processing_strategy"
+                type="radio" value="agentic"
+                class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
+              <label for="strategy-agentic"
+                class="ml-3 block text-sm font-medium leading-6 text-gray-900 dark:text-white">
+                Agentic (Multi-Agent)
+              </label>
+            </div>
+            <p v-if="settings.processing_strategy === 'agentic'"
+              class="mt-2 text-xs text-purple-600 dark:text-purple-400">
+              Orchestrator selects top intents, specialized agents classify in parallel, optional Red Team quality gate.
+            </p>
           </div>
+        </div>
+
+        <!-- Section: AI Model Selection (hidden when Agentic — replaced by orchestrator model) -->
+        <div v-if="settings.processing_strategy !== 'agentic'"
+          class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 mb-6 bg-gray-50/50 dark:bg-gray-900/20">
+          <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+            <CpuChipIcon class="h-5 w-5 text-blue-500" />
+            {{ t('settings.processing.model_select') }}
+          </h4>
+          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">{{
+            t('settings.processing.model_select') }}</label>
+          <div class="mt-2">
+            <select v-model="settings.ai_model"
+              class="block w-full max-w-xs rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+              <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+          <div v-if="!['gpt-4o', 'gpt-4o-mini', 'gpt-4.1-nano'].includes(settings.ai_model)"
+            class="mt-2 flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm">
+            <ExclamationTriangleIcon class="h-4 w-4" />
+            <span>{{ t('settings.processing.finetuning_not_supported') }}</span>
+          </div>
+          <div v-else class="mt-2 flex items-center gap-2 text-green-600 dark:text-green-400 text-sm">
+            <CheckCircleIcon class="h-4 w-4" />
+            <span>{{ t('settings.processing.finetuning_available') }}</span>
+          </div>
+
+        </div> <!-- End AI Model Section -->
+
+        <!-- Section: Agentic Configuration (visible only when agentic strategy selected) -->
+        <div v-if="settings.processing_strategy === 'agentic'"
+          class="rounded-lg border border-purple-200 dark:border-purple-700 p-5 mb-6 bg-purple-50/30 dark:bg-purple-900/10"
+          @vue:mounted="ensureIndexToggles()">
+          <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+            <AdjustmentsHorizontalIcon class="h-5 w-5 text-purple-500" />
+            Agentic Pipeline Configuration
+            <button @click="showModelAdvice = true"
+              class="ml-auto inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-200 border border-purple-300 dark:border-purple-600 rounded-md px-2.5 py-1 hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors">
+              <QuestionMarkCircleIcon class="h-4 w-4" />
+              {{ t('settings.agentic.advice_button') }}
+            </button>
+          </h4>
+
+          <!-- Agent System Prompts Preview (read-only) -->
+          <div class="mb-4">
+            <button @click="loadOrchestratorPrompt"
+              class="flex items-center gap-2 text-xs font-medium text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-200 transition-colors">
+              <CommandLineIcon class="h-4 w-4" />
+              <span v-if="loadingOrchestratorPrompt">Loading prompts...</span>
+              <span v-else>{{ showOrchestratorPrompt ? 'Hide' : 'View' }} Agent System Prompts</span>
+              <span
+                class="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded">read-only</span>
+            </button>
+            <div v-if="showOrchestratorPrompt && orchestratorPromptData" class="mt-2">
+              <div class="flex items-center gap-3 mb-2 text-[10px] text-gray-500 dark:text-gray-400">
+                <span>Model: <code
+                    class="bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-1 rounded">{{
+                      orchestratorPromptData.model }}</code></span>
+                <span>Max agents: <strong>{{ orchestratorPromptData.max_agents }}</strong></span>
+                <span>Categories: <strong>{{ orchestratorPromptData.categories_count }}</strong></span>
+              </div>
+              <!-- Prompt Tabs -->
+              <div class="flex gap-1 mb-2">
+                <button v-for="tab in ['orchestrator', 'specialized', 'red_team']" :key="tab"
+                  @click="activePromptTab = tab"
+                  class="px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors" :class="activePromptTab === tab
+                    ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
+                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'">
+                  {{ tab === 'orchestrator' ? '🎯 Orchestrator' : tab === 'specialized' ? '🔍 Specialized Agent' : '🛡️ Red Team' }}
+                </button>
+              </div>
+              <pre
+                class="text-[11px] leading-relaxed text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap font-mono">
+        {{ orchestratorPromptData[activePromptTab]?.prompt || '' }}</pre>
+              <p class="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500 italic flex items-center gap-1">
+                <span v-if="orchestratorPromptData[activePromptTab]?.source === 'file'" class="text-green-500">📁</span>
+                <span v-else class="text-amber-500">⚠️ fallback</span>
+                {{ orchestratorPromptData[activePromptTab]?.template_file || '' }}
+                <span v-if="activePromptTab === 'orchestrator'">— Categories are injected at runtime from your configured categories.</span>
+                <span v-else-if="activePromptTab === 'specialized'">— Template: variables like intent_name,
+                  intent_description
+                  are resolved per category agent.</span>
+                <span v-else>— Red Team receives the agent results and all available intents for review.</span>
+              </p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Orchestrator Model -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Orchestrator Model</label>
+              <select v-model="settings.agentic.orchestrator_model"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option value="gpt-4.1-nano">GPT-4.1 Nano (fast, cheap)</option>
+                <option value="gpt-4.1-mini">GPT-4.1 Mini (balanced)</option>
+                <option value="gpt-4o-mini">GPT-4o Mini (legacy)</option>
+                <option value="gpt-5-nano">GPT-5 Nano (reasoning, cheapest)</option>
+                <option value="gpt-5-mini">GPT-5 Mini (reasoning, balanced)</option>
+                <option value="model-router">Model Router (auto-select)</option>
+              </select>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Fast routing model. Phi-4 not recommended here.
+              </p>
+              <!-- GPT-5 latency disclaimer -->
+              <div v-if="settings.agentic.orchestrator_model?.startsWith('gpt-5')"
+                class="mt-1.5 flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded p-2">
+                <span class="text-sm">⚠️</span>
+                <span>{{ t('settings.agentic.gpt5_warning') }}</span>
+              </div>
+            </div>
+
+            <!-- Routing Mode (model-router only) -->
+            <div v-if="settings.agentic.orchestrator_model === 'model-router'">
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Routing Mode</label>
+              <select v-model="settings.agentic.orchestrator_routing_mode"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option value="balanced">Balanced (quality/cost)</option>
+                <option value="cost">Cost (max savings)</option>
+                <option value="quality">Quality (best model)</option>
+              </select>
+            </div>
+
+            <!-- Agent Tier 1 -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                Agent Tier 1 (Simple)
+                <span class="relative group">
+                  <InformationCircleIcon class="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                  <span
+                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                    Orchestrator confidence &gt; 80%. Clear emails — cheap model is enough.
+                  </span>
+                </span>
+              </label>
+              <select v-model="settings.agentic.agent_tier1_model"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+
+            <!-- Agent Tier 2 -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                Agent Tier 2 (Ambiguous)
+                <span class="relative group">
+                  <InformationCircleIcon class="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                  <span
+                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                    Orchestrator confidence 50-80%. Subtle signals — a more capable model resolves ambiguity.
+                  </span>
+                </span>
+              </label>
+              <select v-model="settings.agentic.agent_tier2_model"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+
+            <!-- Agent Tier 3 -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                Agent Tier 3 (Critical)
+                <span class="relative group">
+                  <InformationCircleIcon class="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                  <span
+                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                    Orchestrator confidence &lt; 50%. Complex or business-critical — most robust model for accuracy.
+                  </span>
+                </span>
+              </label>
+              <select v-model="settings.agentic.agent_tier3_model"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+
+            <!-- Red Team Model -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Red Team Model</label>
+              <select v-model="settings.agentic.red_team_model"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+
+            <!-- Retrieval Mode -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">RAG Retrieval Mode</label>
+              <select v-model="settings.agentic.retrieval_mode"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option value="vector">Vector (fastest)</option>
+                <option value="hybrid">Hybrid (balanced)</option>
+                <option value="semantic">Semantic (highest quality)</option>
+              </select>
+            </div>
+
+            <!-- Max Parallel Agents -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Max Parallel Agents</label>
+              <input v-model.number="settings.agentic.max_parallel_agents" type="number" min="1" max="10"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+            </div>
+
+            <!-- Red Team Threshold -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Red Team Threshold: {{ settings.agentic.red_team_threshold }}
+              </label>
+              <input v-model.number="settings.agentic.red_team_threshold" type="range" min="0" max="1" step="0.05"
+                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700">
+              <p class="mt-1 text-xs text-gray-500">Quality gate triggered when max confidence is below this value</p>
+            </div>
+
+            <!-- Reasoning Effort (for gpt-5 family) -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
+                {{ t('settings.agentic.reasoning_effort_label') }}
+                <span class="relative group">
+                  <InformationCircleIcon class="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                  <span
+                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-56 p-2 text-[10px] bg-gray-900 text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none">
+                    {{ t('settings.agentic.reasoning_effort_help') }}
+                  </span>
+                </span>
+              </label>
+              <select v-model="settings.agentic.reasoning_effort"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+                <option value="none">None (no reasoning, fastest)</option>
+                <option value="low">Low (light reasoning)</option>
+                <option value="medium">Medium (balanced)</option>
+                <option value="high">High (deep reasoning, slowest)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Per-Category AI Search Index Toggles -->
+          <div v-if="settings.categories && settings.categories.length"
+            class="mt-5 border-t border-purple-200 dark:border-purple-700 pt-4">
+            <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+              <MagnifyingGlassIcon class="h-4 w-4 text-purple-500" />
+              {{ t('settings.agentic.ai_search.title') }}
+              <button @click="showAISearchInfo = true"
+                class="ml-1 text-purple-400 hover:text-purple-600 dark:hover:text-purple-300 transition-colors"
+                :title="t('settings.agentic.ai_search.info_tooltip')">
+                <InformationCircleIcon class="h-4 w-4" />
+              </button>
+            </h5>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              {{ t('settings.agentic.ai_search.desc') }}
+            </p>
+
+            <div class="space-y-2">
+              <div v-for="cat in settings.categories" :key="cat.slug"
+                class="rounded-lg border transition-colors" :class="settings.agentic.enabled_indexes[cat.slug] !== false
+                  ? 'border-purple-300 dark:border-purple-600 bg-purple-50/50 dark:bg-purple-900/20'
+                  : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 opacity-60'">
+                <!-- Category header row -->
+                <div class="flex items-start gap-3 p-3">
+                  <input :id="'idx-' + cat.slug" type="checkbox"
+                    :checked="settings.agentic.enabled_indexes[cat.slug] !== false"
+                    @change="toggleCategoryIndex(cat.slug, $event.target.checked)"
+                    class="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600">
+                  <div class="flex-1 min-w-0">
+                    <label :for="'idx-' + cat.slug" class="text-xs font-medium text-gray-800 dark:text-gray-200 block">
+                      {{ cat.name }}
+                    </label>
+                    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                      <code class="text-[10px] text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40 px-1 rounded">classymail-intent-{{ cat.slug }}</code>
+                      <code class="text-[10px] text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/40 px-1 rounded">search_{{ cat.slug.replaceAll('-', '_') }}()</code>
+                      <span v-if="aiSearchIndexes[cat.slug]?.doc_count > 0"
+                        class="text-[10px] text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/40 px-1.5 rounded font-medium">
+                        {{ aiSearchIndexes[cat.slug].doc_count }} {{ t('settings.agentic.ai_search.examples') }}
+                      </span>
+                      <span v-else-if="aiSearchIndexes[cat.slug]?.status === 'exists'"
+                        class="text-[10px] text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 rounded">
+                        0 {{ t('settings.agentic.ai_search.examples') }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <!-- Ensure Index button -->
+                    <button v-if="!aiSearchIndexes[cat.slug] || aiSearchIndexes[cat.slug]?.status === 'error'"
+                      @click="ensureCategoryIndex(cat.slug)"
+                      :disabled="aiSearchIndexes[cat.slug]?.loading"
+                      class="text-[10px] font-medium text-purple-600 dark:text-purple-400 border border-purple-300 dark:border-purple-600 rounded px-2 py-0.5 hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors disabled:opacity-50">
+                      <span v-if="aiSearchIndexes[cat.slug]?.loading">{{ t('settings.agentic.ai_search.creating') }}</span>
+                      <span v-else>{{ t('settings.agentic.ai_search.create_index') }}</span>
+                    </button>
+                    <span v-else-if="aiSearchIndexes[cat.slug]?.status === 'exists' || aiSearchIndexes[cat.slug]?.status === 'created'"
+                      class="text-[10px] text-green-600 dark:text-green-400">
+                      <CheckCircleIcon class="h-3.5 w-3.5 inline" />
+                    </span>
+                    <!-- Manage Examples toggle -->
+                    <button @click="toggleExamplesPanel(cat.slug); initNewExample(cat.slug)"
+                      class="text-[10px] font-medium text-indigo-600 dark:text-indigo-400 border border-indigo-300 dark:border-indigo-600 rounded px-2 py-0.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors">
+                      {{ aiSearchExamples[cat.slug]?.expanded ? t('settings.agentic.ai_search.hide') : t('settings.agentic.ai_search.examples') }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Manage Examples panel (expandable) -->
+                <div v-if="aiSearchExamples[cat.slug]?.expanded"
+                  class="border-t border-purple-200 dark:border-purple-700 px-3 pb-3 pt-2 space-y-2">
+                  <!-- Loading state -->
+                  <div v-if="aiSearchExamples[cat.slug]?.loading" class="text-xs text-gray-400 py-2 text-center">
+                    {{ t('settings.agentic.ai_search.loading') }}
+                  </div>
+
+                  <!-- Existing examples list -->
+                  <div v-if="aiSearchExamples[cat.slug]?.items?.length" class="space-y-1 max-h-48 overflow-y-auto">
+                    <div v-for="ex in aiSearchExamples[cat.slug].items" :key="ex.id"
+                      class="flex items-start gap-2 p-2 rounded text-[11px]"
+                      :class="ex.is_positive
+                        ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                        : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'">
+                      <span :class="ex.is_positive ? 'text-green-600' : 'text-red-600'" class="font-bold shrink-0 mt-0.5">
+                        {{ ex.is_positive ? '+' : '-' }}
+                      </span>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-gray-700 dark:text-gray-300 line-clamp-2">{{ ex.content }}</p>
+                        <p v-if="ex.correction_reason" class="text-red-500 dark:text-red-400 mt-0.5 italic">
+                          {{ t('settings.agentic.ai_search.reason') }}: {{ ex.correction_reason }}
+                        </p>
+                        <div class="flex items-center gap-2 mt-0.5 text-[10px] text-gray-400">
+                          <span>{{ ex.label_source }}</span>
+                          <span v-if="ex.created_at">{{ new Date(ex.created_at).toLocaleDateString() }}</span>
+                        </div>
+                      </div>
+                      <button @click="deleteExample(cat.slug, ex.id)"
+                        class="text-gray-400 hover:text-red-500 transition-colors shrink-0" title="Remove example">
+                        <TrashIcon class="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <div v-else-if="!aiSearchExamples[cat.slug]?.loading" class="text-xs text-gray-400 py-1">
+                    {{ t('settings.agentic.ai_search.no_examples') }}
+                  </div>
+
+                  <!-- Add new example form -->
+                  <div v-if="newExample[cat.slug]" class="border-t border-purple-100 dark:border-purple-800 pt-2 space-y-2">
+                    <div class="flex items-center gap-3">
+                      <label class="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                        <input type="radio" :name="'ex-type-' + cat.slug" :value="true"
+                          v-model="newExample[cat.slug].is_positive"
+                          class="h-3 w-3 text-green-600 focus:ring-green-500">
+                        <span class="text-green-700 dark:text-green-400 font-medium">{{ t('settings.agentic.ai_search.good_example') }}</span>
+                      </label>
+                      <label class="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                        <input type="radio" :name="'ex-type-' + cat.slug" :value="false"
+                          v-model="newExample[cat.slug].is_positive"
+                          class="h-3 w-3 text-red-600 focus:ring-red-500">
+                        <span class="text-red-700 dark:text-red-400 font-medium">{{ t('settings.agentic.ai_search.bad_example') }}</span>
+                      </label>
+                    </div>
+                    <textarea v-model="newExample[cat.slug].content"
+                      :placeholder="newExample[cat.slug].is_positive
+                        ? t('settings.agentic.ai_search.good_placeholder')
+                        : t('settings.agentic.ai_search.bad_placeholder')"
+                      rows="3"
+                      class="w-full text-xs rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-purple-500 focus:border-purple-500 resize-y" />
+                    <textarea v-if="!newExample[cat.slug].is_positive"
+                      v-model="newExample[cat.slug].correction_reason"
+                      :placeholder="t('settings.agentic.ai_search.reason_placeholder')"
+                      rows="1"
+                      class="w-full text-xs rounded-md border-red-300 dark:border-red-600 dark:bg-gray-700 dark:text-white focus:ring-red-500 focus:border-red-500 resize-y" />
+                    <button @click="addExample(cat.slug)"
+                      :disabled="!newExample[cat.slug]?.content?.trim() || addingExample[cat.slug]"
+                      class="inline-flex items-center gap-1 text-[11px] font-medium text-white bg-purple-600 hover:bg-purple-700 rounded px-3 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                      <PlusIcon class="h-3.5 w-3.5" />
+                      {{ addingExample[cat.slug] ? t('settings.agentic.ai_search.adding') : t('settings.agentic.ai_search.add_button') }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI Search Info Modal -->
+          <Teleport to="body">
+            <div v-if="showAISearchInfo" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" @click.self="showAISearchInfo = false">
+              <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6 space-y-4">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <MagnifyingGlassIcon class="h-5 w-5 text-purple-500" />
+                    {{ t('settings.agentic.ai_search.info_title') }}
+                  </h3>
+                  <button @click="showAISearchInfo = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <span class="text-lg">&times;</span>
+                  </button>
+                </div>
+
+                <div class="text-xs text-gray-600 dark:text-gray-300 space-y-3">
+                  <div>
+                    <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-1">{{ t('settings.agentic.ai_search.info_what_title') }}</h4>
+                    <p>{{ t('settings.agentic.ai_search.info_what_desc') }}</p>
+                  </div>
+
+                  <div>
+                    <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-1">{{ t('settings.agentic.ai_search.info_how_title') }}</h4>
+                    <ol class="list-decimal ml-4 space-y-1">
+                      <li v-html="t('settings.agentic.ai_search.info_step1')" />
+                      <li v-html="t('settings.agentic.ai_search.info_step2')" />
+                      <li v-html="t('settings.agentic.ai_search.info_step3')" />
+                      <li>{{ t('settings.agentic.ai_search.info_step4') }}</li>
+                    </ol>
+                  </div>
+
+                  <div>
+                    <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-1">{{ t('settings.agentic.ai_search.info_quality_title') }}</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div class="bg-green-50 dark:bg-green-900/20 rounded p-2 border border-green-200 dark:border-green-800">
+                        <p class="font-medium text-green-700 dark:text-green-400 mb-1">{{ t('settings.agentic.ai_search.info_works_well') }}</p>
+                        <ul class="text-green-600 dark:text-green-300 space-y-0.5">
+                          <li>{{ t('settings.agentic.ai_search.info_good1') }}</li>
+                          <li>{{ t('settings.agentic.ai_search.info_good2') }}</li>
+                          <li>{{ t('settings.agentic.ai_search.info_good3') }}</li>
+                          <li>{{ t('settings.agentic.ai_search.info_good4') }}</li>
+                        </ul>
+                      </div>
+                      <div class="bg-red-50 dark:bg-red-900/20 rounded p-2 border border-red-200 dark:border-red-800">
+                        <p class="font-medium text-red-700 dark:text-red-400 mb-1">{{ t('settings.agentic.ai_search.info_avoid') }}</p>
+                        <ul class="text-red-600 dark:text-red-300 space-y-0.5">
+                          <li>{{ t('settings.agentic.ai_search.info_bad1') }}</li>
+                          <li>{{ t('settings.agentic.ai_search.info_bad2') }}</li>
+                          <li>{{ t('settings.agentic.ai_search.info_bad3') }}</li>
+                          <li>{{ t('settings.agentic.ai_search.info_bad4') }}</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-1">{{ t('settings.agentic.ai_search.info_flow_title') }}</h4>
+                    <div class="bg-gray-50 dark:bg-gray-700 rounded p-2 font-mono text-[10px] leading-relaxed">
+                      Agent calls search_billing_inquiry("invoice discrepancy")<br/>
+                      &rarr; AI Search returns positive + negative examples<br/>
+                      &rarr; Agent sees: "POSITIVE: [human_verified] Invoice #INV-4782..."<br/>
+                      &rarr; Agent sees: "NEGATIVE: [human_corrected] Password reset... REASON: NOT billing"<br/>
+                      &rarr; Agent calibrates confidence based on similarity
+                    </div>
+                  </div>
+
+                  <div class="bg-purple-50 dark:bg-purple-900/20 rounded p-2 border border-purple-200 dark:border-purple-800">
+                    <p class="text-purple-700 dark:text-purple-300">
+                      <strong>{{ t('settings.agentic.ai_search.info_tip_label') }}</strong> {{ t('settings.agentic.ai_search.info_tip') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Teleport>
         </div>
 
         <!-- Section: OCR Configuration -->
@@ -1188,23 +1358,8 @@ onMounted(() => {
                   <option value="auto">
                     {{ t('settings.processing.pii_llm_model_auto') }}
                   </option>
-                  <option value="phi4">
-                    Phi-4
-                  </option>
-                  <option value="gpt-4o-mini">
-                    gpt-4o-mini
-                  </option>
-                  <option value="gpt-5-nano">
-                    gpt-5-nano
-                  </option>
-                  <option value="gpt-5-mini">
-                    gpt-5-mini
-                  </option>
-                  <option value="gpt-4.1-nano">
-                    gpt-4.1-nano
-                  </option>
-                  <option value="Kimi-K2.5">
-                    Kimi-K2.5 (Moonshot AI)
+                  <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
                   </option>
                 </select>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -1307,128 +1462,14 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Fine-tuning Tab -->
-    <div v-show="activeTab === 'finetuning'" class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-      <div class="px-4 py-5 sm:p-6">
-        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
-          {{ t('settings.finetuning.title') }}
-        </h3>
-        <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
-          <p>{{ t('settings.finetuning.desc') }}</p>
-        </div>
-
-        <!-- Info Box -->
-        <div class="mt-4 rounded-md bg-blue-50 dark:bg-blue-900/20 p-4 border border-blue-200 dark:border-blue-800">
-          <div class="flex">
-            <div class="flex-shrink-0">
-              <InformationCircleIcon class="h-5 w-5 text-blue-400" aria-hidden="true" />
-            </div>
-            <div class="ml-3 flex-1 md:flex md:justify-between">
-              <div class="text-sm text-blue-700 dark:text-blue-300">
-                <h4 class="font-bold">
-                  {{ t('settings.finetuning.info_title') }}
-                </h4>
-                <p class="mt-1">
-                  {{ t('settings.finetuning.info_desc') }}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div class="mt-3 ml-8">
-            <a href="https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning?view=foundry-classic&tabs=oai-sdk%2Cazure-openai&pivots=programming-language-python"
-              target="_blank"
-              class="text-sm font-medium text-blue-700 dark:text-blue-300 hover:text-blue-600 hover:underline flex items-center gap-1">
-              {{ t('settings.finetuning.learn_more') }}
-              <span aria-hidden="true"> &rarr;</span>
-            </a>
-          </div>
-        </div>
-
-        <div class="mt-6">
-          <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white">
-            {{ t('settings.finetuning.min_samples') }}
-          </label>
-          <div class="mt-2">
-            <input v-model="settings.finetune_min_examples" type="number" min="5" step="1"
-              class="block w-full max-w-xs rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
-            <p class="mt-1 text-xs text-gray-500">
-              {{ t('settings.finetuning.min_samples_help') }}
-            </p>
-          </div>
-        </div>
-      </div>
+    <!-- General Tab -->
+    <div v-show="activeTab === 'general'">
+      <GeneralTab :settings="settings" :model-options="modelOptions" :loading="loading" :saved="saved" @save="saveSettings" />
     </div>
 
-    <!-- General & Costs Tab -->
-    <div v-show="activeTab === 'general'" class="bg-white dark:bg-gray-800 shadow sm:rounded-lg">
-      <div class="px-4 py-5 sm:p-6">
-        <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
-          {{ t('settings.costs_title') }}
-        </h3>
-        <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
-          <p>{{ t('settings.costs_desc') }}</p>
-        </div>
-
-        <form class="mt-5 space-y-6" @submit.prevent="saveSettings">
-          <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Phi-4 Input Cost (€ /
-              1K tokens)</label>
-            <div class="mt-1">
-              <input v-model="settings.phi4_input_per_1k" :placeholder="defaults.phi4_input_per_1k ?? ''" type="number"
-                step="0.000001"
-                class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Review Confidence
-              Threshold (0-1)</label>
-            <div class="mt-1">
-              <input v-model="settings.review_confidence_threshold"
-                :placeholder="defaults.review_confidence_threshold ?? 0.85" type="number" min="0" max="1" step="0.01"
-                class="block w-full max-w-xs rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
-            </div>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Emails with any intent confidence below this threshold are flagged <strong>To Review</strong>.
-            </p>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Phi-4 Output Cost (€ /
-              1K tokens)</label>
-            <div class="mt-1">
-              <input v-model="settings.phi4_output_per_1k" :placeholder="defaults.phi4_output_per_1k ?? ''"
-                type="number" step="0.000001"
-                class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">Mistral OCR Cost (€ /
-              1K pages)</label>
-            <div class="mt-1">
-              <input v-model="settings.mistral_per_1k_pages" :placeholder="defaults.mistral_per_1k_pages ?? ''"
-                type="number" step="0.001"
-                class="block w-full rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
-            </div>
-          </div>
-
-          <div class="flex items-center gap-4">
-            <button type="submit" :disabled="loading"
-              class="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50">
-              {{ loading ? t('settings.saving') : t('settings.save') }}
-            </button>
-            <transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 translate-y-1"
-              enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-150"
-              leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 translate-y-1">
-              <div v-if="saved" class="flex items-center text-green-600 dark:text-green-400 text-sm font-medium">
-                <CheckCircleIcon class="h-5 w-5 mr-1" />
-                {{ t('settings.saved') }}
-              </div>
-            </transition>
-          </div>
-        </form>
-      </div>
+    <!-- Fine-tuning Tab -->
+    <div v-show="activeTab === 'finetuning'">
+      <FinetuningTab :settings="settings" :loading="loading" />
     </div>
 
     <!-- Classification Categories Tab -->
@@ -1459,20 +1500,6 @@ onMounted(() => {
             {{ t('settings.categories.managed_title') }}
           </h3>
           <div class="flex items-center gap-4">
-            <!-- AI Assessment Model Selector -->
-            <div class="flex items-center gap-2">
-              <label class="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                <CpuChipIcon class="inline h-4 w-4 -mt-0.5 mr-0.5" />
-                {{ t('settings.categories.assessment_model') }}
-              </label>
-              <select v-model="settings.ai_assessment_model"
-                class="block w-44 rounded-md border-0 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
-                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">
-                  {{ opt.label }}
-                </option>
-              </select>
-            </div>
-
             <!-- Save Button -->
             <button type="button" :disabled="loading"
               class="inline-flex items-center rounded-md bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
@@ -1758,248 +1785,8 @@ onMounted(() => {
 
 
     <!-- Danger Zone Tab -->
-    <div v-show="activeTab === 'danger'" class="space-y-6">
-
-      <!-- ═══════════════ Section 1: Maintenance & Diagnostics (Safe) ═══════════════ -->
-      <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg border border-blue-200 dark:border-blue-900">
-        <div class="px-4 py-5 sm:p-6">
-          <h3 class="text-base font-semibold leading-6 text-blue-600 dark:text-blue-400 flex items-center gap-2">
-            <CommandLineIcon class="h-5 w-5" />
-            {{ t('settings.danger.maintenance_title') }}
-          </h3>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('settings.danger.maintenance_desc') }}</p>
-
-          <!-- Diagnostics & Connectivity -->
-          <div class="mt-5">
-            <h4 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-              {{ t('settings.danger.diagnostics_title') }}
-            </h4>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('settings.danger.diagnostics_desc') }}</p>
-            <div class="mt-3 flex flex-wrap gap-2">
-              <button type="button"
-                class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50"
-                :disabled="llmTestLoading" @click="runLLMTests">
-                <ArrowPathIcon v-if="llmTestLoading" class="-ml-0.5 mr-1.5 h-4 w-4 animate-spin" />
-                Test LLM Models
-              </button>
-              <button type="button"
-                class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:ring-gray-600 dark:hover:bg-gray-600 disabled:opacity-50"
-                :disabled="connTestLoading" @click="runConnectivityTest">
-                <ArrowPathIcon v-if="connTestLoading" class="-ml-0.5 mr-1.5 h-4 w-4 animate-spin" />
-                Test Service Connectivity
-              </button>
-            </div>
-            <div class="mt-3 flex items-center gap-4">
-              <div class="flex items-center">
-                <input id="use-aoai" v-model="useAoaiEnhancement" type="checkbox"
-                  class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:bg-gray-700 dark:border-gray-600">
-                <label for="use-aoai" class="ml-2 block text-xs text-gray-700 dark:text-gray-300">Enhance with
-                  AOAI</label>
-              </div>
-              <button type="button"
-                class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-indigo-600 shadow-sm ring-1 ring-inset ring-indigo-300 hover:bg-indigo-50 dark:bg-gray-800 dark:text-indigo-400 dark:ring-indigo-900 dark:hover:bg-indigo-900/20 disabled:opacity-50"
-                :disabled="simulatingFlow" @click="performSimulateFlow">
-                <CpuChipIcon v-if="!simulatingFlow" class="-ml-0.5 mr-1.5 h-4 w-4" />
-                <ArrowPathIcon v-else class="-ml-0.5 mr-1.5 h-4 w-4 animate-spin" />
-                {{ simulatingFlow ? 'Simulating...' : 'Simulate E2E Flow' }}
-              </button>
-            </div>
-            <div v-if="connTestResults"
-              class="mt-3 p-3 bg-gray-50 dark:bg-gray-900 rounded text-xs font-mono overflow-auto max-h-40">
-              <pre>{{ JSON.stringify(connTestResults, null, 2) }}</pre>
-            </div>
-            <div v-if="llmTestResults"
-              class="mt-3 p-3 bg-gray-50 dark:bg-gray-900 rounded text-xs font-mono overflow-auto max-h-40">
-              <pre>{{ JSON.stringify(llmTestResults, null, 2) }}</pre>
-            </div>
-          </div>
-
-          <!-- ACA Environment Validation -->
-          <div class="mt-6 border-t border-gray-100 dark:border-gray-700 pt-5">
-            <h4 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-              {{ t('settings.danger.aca_title') }}
-            </h4>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('settings.danger.aca_desc') }}</p>
-            <div class="mt-3">
-              <button type="button"
-                class="inline-flex items-center rounded-md bg-gray-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-500 disabled:opacity-50"
-                :disabled="acaValidationLoading" @click="validateACAConfig">
-                <ArrowPathIcon v-if="acaValidationLoading" class="-ml-0.5 mr-1.5 h-4 w-4 animate-spin" />
-                Validate ACA Configuration
-              </button>
-            </div>
-            <div v-if="acaValidationResults" class="mt-4 bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
-              <div class="mb-3 pb-3 border-b border-gray-200 dark:border-gray-700">
-                <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  Status:
-                  <span
-                    :class="acaValidationResults.all_required_present ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                    {{ acaValidationResults.all_required_present ? '✓ All Required Variables Present' : '✗ Missing Required Variables' }}
-                  </span>
-                </p>
-                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                  Required: {{ acaValidationResults.summary?.required_present || 0 }}/{{
-                    acaValidationResults.summary?.required_count || 0 }} •
-                  Optional: {{ acaValidationResults.summary?.optional_present || 0 }}/{{
-                    acaValidationResults.summary?.optional_count || 0 }}
-                </p>
-              </div>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Required Variables</h5>
-                  <div class="space-y-1">
-                    <div v-for="item in acaValidationResults.required" :key="item.name"
-                      class="flex items-center text-xs font-mono">
-                      <span
-                        :class="item.present ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
-                        class="w-4">{{ item.present ? '✓' : '✗' }}</span>
-                      <span class="text-gray-700 dark:text-gray-300 flex-1">{{ item.name }}</span>
-                      <span v-if="item.present" class="text-gray-500 text-xs truncate max-w-[150px]">{{ item.value
-                      }}</span>
-                      <span v-else class="text-red-500 text-xs">NOT SET</span>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Optional Variables</h5>
-                  <div class="space-y-1">
-                    <div v-for="item in acaValidationResults.optional" :key="item.name"
-                      class="flex items-center text-xs font-mono">
-                      <span
-                        :class="item.present ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-400 dark:text-gray-600'"
-                        class="w-4">○</span>
-                      <span class="text-gray-700 dark:text-gray-300 flex-1">{{ item.name }}</span>
-                      <span v-if="item.present" class="text-gray-500 text-xs truncate max-w-[150px]">{{ item.value
-                      }}</span>
-                      <span v-else class="text-gray-500 text-xs">not configured</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═══════════════ Section 2: Bulk Operations (Warning) ═══════════════ -->
-      <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg border border-amber-200 dark:border-amber-900">
-        <div class="px-4 py-5 sm:p-6">
-          <h3 class="text-base font-semibold leading-6 text-amber-600 dark:text-amber-400 flex items-center gap-2">
-            <ArrowPathIcon class="h-5 w-5" />
-            {{ t('settings.danger.bulk_title') }}
-          </h3>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('settings.danger.bulk_desc') }}</p>
-
-          <!-- Grid: Reprocess + Reindex side by side -->
-          <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Batch Reprocessing -->
-            <div
-              class="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
-              <h4 class="text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center gap-2">
-                <ArrowPathIcon class="h-4 w-4" />
-                {{ t('settings.danger.reprocess_title') }}
-              </h4>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('settings.danger.reprocess_desc') }}</p>
-              <button type="button" :disabled="reprocessingAll"
-                class="mt-3 inline-flex items-center gap-2 rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-500 disabled:opacity-50"
-                @click="performReprocessAll">
-                <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': reprocessingAll }" />
-                {{ reprocessingAll ? 'Reprocessing...' : 'Reprocess All Emails' }}
-              </button>
-            </div>
-
-            <!-- Rebuild Vector Index -->
-            <div
-              class="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30">
-              <h4 class="text-sm font-medium text-purple-700 dark:text-purple-400 flex items-center gap-2">
-                <MagnifyingGlassIcon class="h-4 w-4" />
-                {{ t('settings.danger.reindex_title') }}
-              </h4>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('settings.danger.reindex_desc') }}</p>
-              <button type="button" :disabled="reindexing"
-                class="mt-3 inline-flex items-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-500 disabled:opacity-50"
-                @click="performReindex">
-                <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': reindexing }" />
-                {{ reindexing ? t('settings.danger.reindex_running') : t('settings.danger.reindex_button') }}
-              </button>
-            </div>
-          </div>
-
-          <!-- DLQ Management -->
-          <div class="mt-5 border-t border-gray-200 dark:border-gray-700 pt-5">
-            <h4 class="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-              <ExclamationTriangleIcon class="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-              {{ t('settings.danger.dlq_title') }}
-            </h4>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('settings.danger.dlq_desc') }}</p>
-            <div class="mt-3 flex gap-2">
-              <a href="/api/admin/deadletter" target="_blank"
-                class="inline-flex items-center rounded-md bg-yellow-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-yellow-500">
-                {{ t('settings.danger.view_dlq') }}
-              </a>
-              <button type="button"
-                class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-yellow-600 shadow-sm ring-1 ring-inset ring-yellow-300 hover:bg-yellow-50 dark:bg-gray-800 dark:text-yellow-400 dark:ring-yellow-900 dark:hover:bg-yellow-900/20 disabled:opacity-50"
-                :disabled="purgingDlq" @click="performDlqPurge">
-                <TrashIcon v-if="!purgingDlq" class="-ml-0.5 mr-1.5 h-4 w-4" />
-                <ArrowPathIcon v-else class="-ml-0.5 mr-1.5 h-4 w-4 animate-spin" />
-                {{ purgingDlq ? 'Purging DLQ...' : t('settings.danger.purge_dlq') }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═══════════════ Section 3: Destructive Operations (Danger) ═══════════════ -->
-      <div class="bg-white dark:bg-gray-800 shadow sm:rounded-lg border-2 border-red-300 dark:border-red-900">
-        <div class="px-4 py-5 sm:p-6">
-          <h3 class="text-base font-semibold leading-6 text-red-600 dark:text-red-400 flex items-center gap-2">
-            <ExclamationTriangleIcon class="h-5 w-5" />
-            {{ t('settings.danger.destructive_title') }}
-          </h3>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('settings.danger.destructive_desc') }}</p>
-
-          <!-- Atomic Reset -->
-          <div class="mt-5 bg-red-50 dark:bg-red-900/20 p-4 rounded-md">
-            <h4 class="text-sm font-medium text-red-800 dark:text-red-300 flex items-center gap-2">
-              <ExclamationTriangleIcon class="h-4 w-4" />
-              {{ t('settings.danger.reset_title') }}
-            </h4>
-            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">{{ t('settings.danger.reset_desc') }}</p>
-            <h5 class="mt-3 text-xs font-semibold text-red-700 dark:text-red-300">{{
-              t('settings.danger.reset_warning_title') }}</h5>
-            <ul class="list-disc list-inside mt-1 text-xs text-red-700 dark:text-red-200 space-y-0.5">
-              <li>Delete ALL emails and classification records from Database.</li>
-              <li>Delete ALL files (PDFs) from Input Storage Container.</li>
-              <li><strong>Purge</strong> the Service Bus Dead-letter Queue.</li>
-              <li>Reset the dashboard state completely.</li>
-              <li><strong>Preserve</strong> application settings (Categories, Costs, etc).</li>
-            </ul>
-
-            <div class="mt-4 space-y-3">
-              <div class="flex items-start">
-                <input id="confirm_1" v-model="resetConfirm1" type="checkbox"
-                  class="mt-1 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-600 dark:bg-gray-700 dark:border-gray-600">
-                <label for="confirm_1" class="ml-2 text-sm font-medium text-gray-900 dark:text-white">I understand this
-                  deletes all data permanently.</label>
-              </div>
-              <div class="flex items-start">
-                <input id="confirm_2" v-model="resetConfirm2" type="checkbox"
-                  class="mt-1 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-600 dark:bg-gray-700 dark:border-gray-600">
-                <label for="confirm_2" class="ml-2 text-sm font-medium text-gray-900 dark:text-white">I confirm I want
-                  to
-                  reset the environment.</label>
-              </div>
-              <button type="button"
-                class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                :disabled="!resetConfirm1 || !resetConfirm2 || resetting" @click="performReset">
-                <TrashIcon v-if="!resetting" class="-ml-0.5 mr-1.5 h-5 w-5" />
-                <ArrowPathIcon v-else class="-ml-0.5 mr-1.5 h-5 w-5 animate-spin" />
-                {{ resetting ? 'Nuking Environment...' : 'NUKE EVERYTHING' }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div v-show="activeTab === 'danger'">
+      <DangerZoneTab :settings="settings" :loading="loading" @save="saveSettings" />
     </div>
 
     <!-- Strategy Help Modal -->
@@ -2117,4 +1904,114 @@ onMounted(() => {
       </div>
     </div>
   </div>
+
+  <!-- Model Advice Dialog -->
+  <Teleport to="body">
+    <div v-if="showModelAdvice" class="fixed inset-0 z-50 overflow-y-auto" @click.self="showModelAdvice = false">
+      <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="fixed inset-0 bg-gray-900/75 transition-opacity" @click="showModelAdvice = false" />
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-3xl w-full mx-auto overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <QuestionMarkCircleIcon class="h-5 w-5 text-purple-500" />
+              {{ t('settings.agentic.advice_title') }}
+            </h3>
+            <button @click="showModelAdvice = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+              <span class="text-xl">&times;</span>
+            </button>
+          </div>
+          <div class="px-6 py-5 max-h-[75vh] overflow-y-auto space-y-5">
+            <!-- Orchestrator -->
+            <div class="rounded-lg border-2 border-blue-200 dark:border-blue-800 p-4 bg-blue-50/50 dark:bg-blue-900/10">
+              <h4 class="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">🎯 {{
+                t('settings.agentic.advice_orchestrator') }}</h4>
+              <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ t('settings.agentic.advice_orchestrator_desc')
+              }}</p>
+              <div class="grid grid-cols-2 gap-2 text-[11px]">
+                <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
+                  <strong class="text-green-600">✓ gpt-4.1-nano</strong>
+                  <p class="text-gray-500 mt-0.5">{{ t('settings.agentic.advice_orch_nano') }}</p>
+                </div>
+                <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
+                  <strong class="text-blue-600">✓ model-router</strong>
+                  <p class="text-gray-500 mt-0.5">{{ t('settings.agentic.advice_orch_router') }}</p>
+                </div>
+                <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
+                  <strong class="text-gray-500">○ gpt-4.1-mini</strong>
+                  <p class="text-gray-500 mt-0.5">{{ t('settings.agentic.advice_orch_mini') }}</p>
+                </div>
+                <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
+                  <strong class="text-green-600">✓ gpt-5-nano</strong>
+                  <p class="text-gray-500 mt-0.5">{{ t('settings.agentic.advice_orch_reasoning') }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Agent Tiers -->
+            <div
+              class="rounded-lg border-2 border-purple-200 dark:border-purple-800 p-4 bg-purple-50/50 dark:bg-purple-900/10">
+              <h4 class="text-sm font-semibold text-purple-800 dark:text-purple-300 mb-2">🔍 {{
+                t('settings.agentic.advice_agents') }}</h4>
+              <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ t('settings.agentic.advice_agents_desc') }}
+              </p>
+              <div class="space-y-2 text-[11px]">
+                <div
+                  class="flex items-center gap-3 bg-white dark:bg-gray-900 rounded p-2 border border-green-200 dark:border-green-900">
+                  <span
+                    class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white text-[10px] font-bold">1</span>
+                  <div class="flex-1">
+                    <strong class="text-green-700 dark:text-green-400">Tier 1 — gpt-4.1-nano</strong>
+                    <p class="text-gray-500">{{ t('settings.agentic.advice_tier1') }}</p>
+                  </div>
+                </div>
+                <div
+                  class="flex items-center gap-3 bg-white dark:bg-gray-900 rounded p-2 border border-amber-200 dark:border-amber-900">
+                  <span
+                    class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold">2</span>
+                  <div class="flex-1">
+                    <strong class="text-amber-700 dark:text-amber-400">Tier 2 — gpt-4.1-mini</strong>
+                    <p class="text-gray-500">{{ t('settings.agentic.advice_tier2') }}</p>
+                  </div>
+                </div>
+                <div
+                  class="flex items-center gap-3 bg-white dark:bg-gray-900 rounded p-2 border border-red-200 dark:border-red-900">
+                  <span
+                    class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold">3</span>
+                  <div class="flex-1">
+                    <strong class="text-red-700 dark:text-red-400">Tier 3 — gpt-4.1</strong>
+                    <p class="text-gray-500">{{ t('settings.agentic.advice_tier3') }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Red Team -->
+            <div class="rounded-lg border-2 border-red-200 dark:border-red-800 p-4 bg-red-50/50 dark:bg-red-900/10">
+              <h4 class="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">🛡️ {{
+                t('settings.agentic.advice_redteam') }}</h4>
+              <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ t('settings.agentic.advice_redteam_desc') }}
+              </p>
+              <div class="text-[11px] bg-white dark:bg-gray-900 rounded p-2 border border-red-100 dark:border-red-900">
+                <strong class="text-green-600">✓ gpt-4.1</strong>
+                <span class="text-gray-500 ml-1">{{ t('settings.agentic.advice_redteam_model') }}</span>
+              </div>
+            </div>
+
+            <!-- Key Insight -->
+            <div class="rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4">
+              <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">💡 {{
+                t('settings.agentic.advice_insight_title') }}</h4>
+              <p class="text-xs text-gray-600 dark:text-gray-300">{{ t('settings.agentic.advice_insight') }}</p>
+            </div>
+          </div>
+          <div class="bg-gray-50 dark:bg-gray-700 px-6 py-3 flex justify-end">
+            <button @click="showModelAdvice = false"
+              class="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-sm font-medium text-white hover:bg-purple-700 focus:outline-none">
+              {{ t('settings.agentic.advice_close') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
