@@ -18,13 +18,25 @@ import subprocess
 from datetime import datetime, timezone
 
 # ---------------------------------------------------------------------------
-# Config
+# Config — reads from environment or secrets.env, falls back to defaults
 # ---------------------------------------------------------------------------
-RG = "email-poc-rg"
-LOCATION = "swedencentral"
-SEARCH_NAME = "email-poc-search"
-AI_FOUNDRY_NAME = "email-poc-aifoundry"
-EMBEDDING_DEPLOYMENT = "text-embedding-3-small"
+import os
+from pathlib import Path
+
+# Load secrets.env if present
+_env_file = Path(__file__).parent.parent / "secrets.env"
+if _env_file.exists():
+    for line in _env_file.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, _, v = line.partition("=")
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+RG = os.getenv("AZURE_RESOURCE_GROUP", "email-poc-rg")
+LOCATION = os.getenv("AZURE_LOCATION", "swedencentral")
+SEARCH_NAME = os.getenv("AZURE_SEARCH_SERVICE_NAME", "")
+AI_FOUNDRY_NAME = os.getenv("AI_FOUNDRY_NAME", "")
+EMBEDDING_DEPLOYMENT = os.getenv("EMBEDDING_DEPLOYMENT", "text-embedding-3-small")
 EMBEDDING_DIMENSIONS = 1536
 
 CATEGORIES = [
@@ -919,9 +931,41 @@ async def get_embedding(text: str, endpoint: str, credential) -> list[float]:
 # Main
 # ---------------------------------------------------------------------------
 async def main():
+    global SEARCH_NAME, AI_FOUNDRY_NAME, RG  # noqa: PLW0603
+
     from azure.identity import AzureCliCredential
 
     credential = AzureCliCredential()
+
+    # ── Auto-discover resource names if not set ─────────────────────
+    if not SEARCH_NAME:
+        print("[auto-discover] Looking for AI Search services in RG:", RG)
+        try:
+            out = run_az(["search", "service", "list", "-g", RG, "-o", "json"], check=False)
+            services = json.loads(out) if out else []
+            if services:
+                SEARCH_NAME = services[0]["name"]
+                print(f"  Found: {SEARCH_NAME}")
+            else:
+                SEARCH_NAME = f"{RG.replace('-rg', '')}-search"
+                print(f"  None found, will create: {SEARCH_NAME}")
+        except Exception:
+            SEARCH_NAME = f"{RG.replace('-rg', '')}-search"
+
+    if not AI_FOUNDRY_NAME:
+        print("[auto-discover] Looking for Cognitive Services in RG:", RG)
+        try:
+            out = run_az(["cognitiveservices", "account", "list", "-g", RG, "-o", "json"], check=False)
+            accounts = json.loads(out) if out else []
+            ai_accounts = [a for a in accounts if a.get("kind") in ("AIServices", "OpenAI", "CognitiveServices")]
+            if ai_accounts:
+                AI_FOUNDRY_NAME = ai_accounts[0]["name"]
+                print(f"  Found: {AI_FOUNDRY_NAME}")
+            else:
+                AI_FOUNDRY_NAME = f"{RG.replace('-rg', '')}-aifoundry"
+                print(f"  None found, will use: {AI_FOUNDRY_NAME}")
+        except Exception:
+            AI_FOUNDRY_NAME = f"{RG.replace('-rg', '')}-aifoundry"
 
     # ── Step 1: Deploy AI Search ─────────────────────────────────────
     print("\n=== Step 1: Deploy Azure AI Search ===")
