@@ -78,7 +78,7 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   click
     #   pytest
     #   uvicorn
-cryptography==46.0.4
+cryptography==46.0.7
     # via
     #   azure-identity
     #   azure-storage-blob
