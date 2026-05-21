@@ -9,9 +9,13 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+from contextvars import ContextVar
 from typing import Annotated
 
 from azure.identity import DefaultAzureCredential
+from agent_framework import Agent, Message
+from agent_framework.openai import OpenAIChatClient
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from pydantic import Field
@@ -39,6 +43,13 @@ from classymail.services.settings_store import get_categories_prompt_text
 
 logger = logging.getLogger("ClassyMail.chatbot")
 tracer = trace.get_tracer(__name__)
+
+# Compiled once — used to extract the suggested-actions hidden marker.
+_ACTIONS_RE = re.compile(r"<!-- ACTIONS:\s*(.+?)\s*-->")
+
+# How many prior chat turns to replay into the LLM context (history bounded
+# to keep prompt size predictable and cost stable).
+_MAX_HISTORY_TURNS = 10
 
 
 # ── Handoff & Sequential review helpers ──────────────────────────────
@@ -128,14 +139,26 @@ def _enrich_list(items: list | None) -> list | None:
 
 
 # ── Tool functions (typed for agent-framework auto-dispatch) ─────────
-# Module-level _clients ref set before each agent.run() call
-_clients: Clients | None = None
+# Per-run Clients reference exposed to tool functions via ContextVar.
+# Set at the start of ClassyMailChatAgent.run() and read inside tools.
+# Using ContextVar (instead of a module global) makes the chat agent
+# concurrency-safe under FastAPI / asyncio multi-request workloads.
+_clients_ctx: ContextVar[Clients | None] = ContextVar(
+    "classymail_chat_clients", default=None
+)
 
 
-async def _ensure_clients():
-    """Ensure Cosmos container is initialized before tool calls."""
-    if _clients:
-        await _clients.ensure_cosmos_container()
+def _current_clients() -> Clients | None:
+    """Return the Clients bound to the current run context (if any)."""
+    return _clients_ctx.get()
+
+
+async def _ensure_clients() -> Clients | None:
+    """Ensure Cosmos container is initialized for the current run's Clients."""
+    c = _current_clients()
+    if c:
+        await c.ensure_cosmos_container()
+    return c
 
 
 async def search_emails(
@@ -143,7 +166,7 @@ async def search_emails(
 ) -> str:
     """Search emails by exact ID or subject line (metadata search)."""
     try:
-        await _ensure_clients()
+        _clients = await _ensure_clients()
         results = await search_email_records(query, limit=5, clients=_clients)
         return json.dumps(_enrich_list(results), default=str)
     except Exception as e:
@@ -156,7 +179,7 @@ async def get_email_by_id(
 ) -> str:
     """Get a full email record by ID."""
     try:
-        await _ensure_clients()
+        _clients = await _ensure_clients()
         result = await _get_email_by_id(id, clients=_clients)
         return json.dumps(_enrich_with_links(result), default=str)
     except Exception as e:
@@ -171,7 +194,7 @@ async def search_email_by_text(
 ) -> str:
     """Search full OCR content of emails for keyword or phrase match. Case-insensitive. Use days to filter by time range."""
     try:
-        await _ensure_clients()
+        _clients = await _ensure_clients()
         results = await _search_email_by_text(query, limit=limit, days=days, clients=_clients)
         return json.dumps(_enrich_list(results), default=str)
     except Exception as e:
@@ -186,7 +209,7 @@ async def search_similar_emails(
 ) -> str:
     """Semantic vector search — finds emails by meaning, not exact keywords. Use days to filter by time range."""
     try:
-        await _ensure_clients()
+        _clients = await _ensure_clients()
         results = await _search_similar_emails(query, limit=limit, days=days, clients=_clients)
         return json.dumps(_enrich_list(results), default=str)
     except Exception as e:
@@ -199,7 +222,7 @@ async def get_latest_errors(
 ) -> str:
     """List latest errored emails."""
     try:
-        await _ensure_clients()
+        _clients = await _ensure_clients()
         results = await _get_latest_errors(limit=limit, clients=_clients)
         return json.dumps(_enrich_list(results), default=str)
     except Exception as e:
@@ -210,7 +233,7 @@ async def get_latest_errors(
 async def get_stats_summary() -> str:
     """Get summary stats: total, pending, processed, error, avg confidence."""
     try:
-        await _ensure_clients()
+        _clients = await _ensure_clients()
         result = await _get_stats_summary(clients=_clients)
         return json.dumps(result, default=str)
     except Exception as e:
@@ -223,7 +246,7 @@ async def get_top_intents(
 ) -> str:
     """Get top classification intents with document counts."""
     try:
-        await _ensure_clients()
+        _clients = await _ensure_clients()
         result = await _get_top_intents(limit=limit, clients=_clients)
         return json.dumps(result, default=str)
     except Exception as e:
@@ -237,7 +260,7 @@ async def get_low_confidence_items(
 ) -> str:
     """Get lowest-confidence processed emails, optionally filtered by intent."""
     try:
-        await _ensure_clients()
+        _clients = await _ensure_clients()
         result = await _get_low_confidence_items(limit=limit, intent=intent, clients=_clients)
         return json.dumps(_enrich_list(result), default=str)
     except Exception as e:
@@ -250,7 +273,7 @@ async def get_processing_stats_by_day(
 ) -> str:
     """Get daily processing stats (count, avg/sum duration)."""
     try:
-        await _ensure_clients()
+        _clients = await _ensure_clients()
         result = await _get_processing_stats_by_day(days=days, clients=_clients)
         return json.dumps(result, default=str)
     except Exception as e:
@@ -268,7 +291,7 @@ async def reclassify_email(
         span.set_attribute("gen_ai.tool.email_id", email_id)
         span.set_attribute("gen_ai.tool.strategy", strategy)
         try:
-            await _ensure_clients()
+            _clients = await _ensure_clients()
             result = await _do_reclassify(email_id, strategy, _clients)
             span.set_attribute("gen_ai.tool.status", result.get("status", "error"))
             return json.dumps(result, default=str)
@@ -286,7 +309,7 @@ async def review_classification(
         span.set_attribute("gen_ai.tool.name", "review_classification")
         span.set_attribute("gen_ai.tool.email_id", email_id)
         try:
-            await _ensure_clients()
+            _clients = await _ensure_clients()
             result = await _do_review(email_id, _clients)
             span.set_attribute("gen_ai.tool.agreement", result.get("agreement", False))
             return json.dumps(result, default=str)
@@ -304,7 +327,7 @@ async def explain_email(
         span.set_attribute("gen_ai.tool.name", "explain_email")
         span.set_attribute("gen_ai.tool.email_id", email_id)
         try:
-            await _ensure_clients()
+            _clients = await _ensure_clients()
             container = _clients.cosmos_container if _clients else None
             if not container:
                 return json.dumps({"error": "Cosmos not available"})
@@ -418,50 +441,64 @@ class ClassyMailChatAgent:
     """Wraps agent-framework Agent with ClassyMail-specific RAG context."""
 
     def __init__(self):
-        self._agent = None
+        # One Agent per locale — avoids mutating ``agent.instructions``
+        # at runtime (which was not thread-safe under concurrent FastAPI
+        # requests). The underlying chat client is shared.
+        self._agents: dict[str, "Agent"] = {}
+        self._client: "OpenAIChatClient | None" = None
+        self._client_init_failed = False
 
-    def _get_or_create_agent(self):
-        """Lazy-init the agent-framework Agent."""
-        if self._agent is not None:
-            return self._agent
-
-        from agent_framework import Agent
-        from agent_framework.openai import OpenAIChatClient
+    def _get_or_create_client(self):
+        """Build (once) the shared OpenAIChatClient for Azure OpenAI."""
+        if self._client is not None or self._client_init_failed:
+            return self._client
 
         endpoint = (config.CHAT_ENDPOINT or "").rstrip("/")
         deployment = config.CHAT_DEPLOYMENT or "gpt-4o"
 
         if not endpoint:
+            self._client_init_failed = True
             return None
 
-        # Auth: Entra ID in production, API key in dev
+        # Auth: API key in dev (if provided and not production); Entra ID otherwise.
         azure_env = os.getenv("AZURE_ENV", "").lower()
         api_key = getattr(config, "AI_API_KEY", None)
 
-        # Determine API version (Kimi requires preview)
+        # Determine API version (Kimi requires a different preview version).
         api_version = getattr(config, "CHAT_API_VERSION", "2024-08-01-preview")
         if "kimi" in deployment.lower():
             api_version = "2024-05-01-preview"
 
-        client_kwargs = {
+        client_kwargs: dict = {
             "azure_endpoint": endpoint,
             "model": deployment,
             "api_version": api_version,
         }
-
         if api_key and azure_env != "production":
             client_kwargs["api_key"] = api_key
         else:
             client_kwargs["credential"] = DefaultAzureCredential()
 
-        client = OpenAIChatClient(**client_kwargs)
+        self._client = OpenAIChatClient(**client_kwargs)
+        return self._client
 
-        self._agent = Agent(
+    def _get_or_create_agent(self, locale: str):
+        """Lazy-init one Agent per locale (instructions are immutable at runtime)."""
+        agent = self._agents.get(locale)
+        if agent is not None:
+            return agent
+
+        client = self._get_or_create_client()
+        if client is None:
+            return None
+
+        agent = Agent(
             client=client,
-            instructions=_build_system_prompt("en"),
+            instructions=_build_system_prompt(locale),
             tools=ALL_TOOLS,
         )
-        return self._agent
+        self._agents[locale] = agent
+        return agent
 
     async def run(
         self,
@@ -470,124 +507,134 @@ class ClassyMailChatAgent:
         session_id: str | None = None,
         locale: str = "en",
     ) -> dict:
-        global _clients  # noqa: PLW0603
-        _clients = clients
+        # Bind Clients to the current async run context so tool functions can
+        # retrieve it via ``_current_clients()``. ContextVar is concurrency-safe
+        # under FastAPI / asyncio, unlike the previous module-level global.
+        ctx_token = _clients_ctx.set(clients)
+        try:
+            agent = self._get_or_create_agent(locale)
+            if agent is None:
+                return {"role": "assistant", "content": "Chatbot is not configured (missing CHAT_ENDPOINT)."}
 
-        agent = self._get_or_create_agent()
-        if agent is None:
-            return {"role": "assistant", "content": "Chatbot is not configured (missing CHAT_ENDPOINT)."}
+            with tracer.start_as_current_span("chat_agent.run") as span:
+                span.set_attribute("gen_ai.system", "azure_openai")
+                span.set_attribute("gen_ai.request.model", config.CHAT_DEPLOYMENT or "")
 
-        # Update agent instructions with current locale
-        if agent and hasattr(agent, 'instructions'):
-            agent.instructions = _build_system_prompt(locale)
+                # ── Pre-flight: history, cache, grounding ────────────
+                last_user = next((m for m in reversed(messages) if m.get("role") == "user"), None)
+                query_text = last_user.get("content", "") if last_user else ""
+                sources: list[dict] = []
+                query_vector: list[float] = []
+                hist_items: list[dict] = []
 
-        with tracer.start_as_current_span("chat_agent.run") as span:
-            span.set_attribute("gen_ai.system", "azure_openai")
-            span.set_attribute("gen_ai.request.model", config.CHAT_DEPLOYMENT or "")
-
-            # ── Pre-flight: history, cache, grounding ────────────
-            last_user = next((m for m in reversed(messages) if m.get("role") == "user"), None)
-            query_text = last_user.get("content", "") if last_user else ""
-            sources: list[dict] = []
-            query_vector: list[float] = []
-
-            # Chat history
-            if session_id:
-                try:
-                    hist_items = await get_chat_history(session_id, clients=clients)
-                    # History is used for context but agent-framework manages conversation internally
-                    logger.debug(f"Loaded {len(hist_items)} history entries for session {session_id}")
-                except Exception as ex:
-                    logger.warning(f"Chat history fetch failed: {ex}")
-
-            # Embedding + semantic cache
-            if query_text:
-                try:
-                    query_vector = await generate_embedding(query_text, clients=clients)
-                    logger.info("Chat embedding: dims=%d for query '%s'",
-                                len(query_vector), query_text[:80])
-                except Exception as ex:
-                    logger.warning("Chat embedding failed: %s", ex)
-
-                if query_vector:
+                # Chat history (now actually fed to the LLM — previously loaded but unused)
+                if session_id:
                     try:
-                        cache_hits = await get_cache_entry(query_vector, clients=clients)
-                        if cache_hits:
-                            cached = cache_hits[0]
-                            cached_response = cached.get("response")
-                            sources = cached.get("sources", [])
-                            if cached_response:
-                                logger.info("Chat cache hit for query '%s'", query_text[:80])
-                                if session_id:
-                                    await append_chat_history_entry(session_id, "user", query_text, clients=clients)
-                                    await append_chat_history_entry(
-                                        session_id, "assistant", cached_response, sources=sources, clients=clients
-                                    )
-                                span.set_status(Status(StatusCode.OK))
-                                return {"role": "assistant", "content": cached_response, "sources": sources}
+                        hist_items = await get_chat_history(session_id, clients=clients)
+                        logger.debug("Loaded %d history entries for session %s", len(hist_items), session_id)
                     except Exception as ex:
-                        logger.warning("Cache lookup failed: %s", ex)
-                else:
-                    logger.warning("Chat embedding returned empty — vector search will be skipped")
+                        logger.warning(f"Chat history fetch failed: {ex}")
 
-                # Chunk retrieval for grounding
+                # Embedding + semantic cache
+                if query_text:
+                    try:
+                        query_vector = await generate_embedding(query_text, clients=clients)
+                        logger.info("Chat embedding: dims=%d for query '%s'",
+                                    len(query_vector), query_text[:80])
+                    except Exception as ex:
+                        logger.warning("Chat embedding failed: %s", ex)
+
+                    if query_vector:
+                        try:
+                            cache_hits = await get_cache_entry(query_vector, clients=clients)
+                            if cache_hits:
+                                cached = cache_hits[0]
+                                cached_response = cached.get("response")
+                                sources = cached.get("sources", [])
+                                if cached_response:
+                                    logger.info("Chat cache hit for query '%s'", query_text[:80])
+                                    if session_id:
+                                        await append_chat_history_entry(session_id, "user", query_text, clients=clients)
+                                        await append_chat_history_entry(
+                                            session_id, "assistant", cached_response, sources=sources, clients=clients
+                                        )
+                                    span.set_status(Status(StatusCode.OK))
+                                    return {"role": "assistant", "content": cached_response, "sources": sources}
+                        except Exception as ex:
+                            logger.warning("Cache lookup failed: %s", ex)
+                    else:
+                        logger.warning("Chat embedding returned empty — vector search will be skipped")
+
+                    # Chunk retrieval for grounding
+                    try:
+                        chunk_results = await search_chunks_by_vector(query_text, limit=5, clients=clients)
+                        logger.info("Chat grounding: %d chunks retrieved", len(chunk_results))
+                        for r in chunk_results:
+                            sources.append({
+                                "parent_id": r.get("parent_id"),
+                                "subject": r.get("subject"),
+                                "chunk_index": r.get("chunk_index"),
+                                "content": r.get("content"),
+                                "distance": r.get("distance"),
+                            })
+                    except Exception as ex:
+                        logger.warning("Chunk retrieval failed: %s", ex)
+
+                # ── Build input for agent-framework ──────────────────
+                grounding = ""
+                if sources:
+                    grounding = f"\n\nGrounding context (use to answer): {json.dumps({'sources': sources}, ensure_ascii=False)}"
+
+                full_input = query_text + grounding
+
+                # Build a Message sequence: prior history + current grounded query.
+                # This actually feeds the conversation context to the LLM — the
+                # previous implementation loaded ``hist_items`` but threw it away.
+                run_messages: list = []
+                for h in hist_items[-_MAX_HISTORY_TURNS:]:
+                    role = h.get("role") or "user"
+                    content = h.get("content") or ""
+                    if content:
+                        run_messages.append(Message(role, [content]))
+                run_messages.append(Message("user", [full_input]))
+
+                # ── Run agent ────────────────────────────────────────
                 try:
-                    chunk_results = await search_chunks_by_vector(query_text, limit=5, clients=clients)
-                    logger.info("Chat grounding: %d chunks retrieved", len(chunk_results))
-                    for r in chunk_results:
-                        sources.append({
-                            "parent_id": r.get("parent_id"),
-                            "subject": r.get("subject"),
-                            "chunk_index": r.get("chunk_index"),
-                            "content": r.get("content"),
-                            "distance": r.get("distance"),
-                        })
+                    result = await agent.run(run_messages)
+                    content = str(result) if result else "No response generated."
                 except Exception as ex:
-                    logger.warning("Chunk retrieval failed: %s", ex)
+                    logger.error(f"Agent framework error: {ex}", exc_info=True)
+                    span.set_status(Status(StatusCode.ERROR, str(ex)))
+                    return {"role": "assistant", "content": f"Error: {ex}"}
 
-            # ── Build input for agent-framework ──────────────────
-            grounding = ""
-            if sources:
-                grounding = f"\n\nGrounding context (use to answer): {json.dumps({'sources': sources}, ensure_ascii=False)}"
+                # ── Post-flight: persist history + cache ─────────────
+                if session_id and query_text:
+                    try:
+                        await append_chat_history_entry(session_id, "user", query_text, clients=clients)
+                        await append_chat_history_entry(
+                            session_id, "assistant", content, sources=sources, clients=clients
+                        )
+                    except Exception as ex:
+                        logger.warning(f"Chat history append failed: {ex}")
 
-            full_input = query_text + grounding
+                if query_vector and query_text and content:
+                    try:
+                        await set_cache_entry(query_text, query_vector, content, sources=sources, clients=clients)
+                    except Exception as ex:
+                        logger.warning(f"Cache set failed: {ex}")
 
-            # ── Run agent ────────────────────────────────────────
-            try:
-                result = await agent.run(full_input)
-                content = str(result) if result else "No response generated."
-            except Exception as ex:
-                logger.error(f"Agent framework error: {ex}", exc_info=True)
-                span.set_status(Status(StatusCode.ERROR, str(ex)))
-                return {"role": "assistant", "content": f"Error: {ex}"}
+                # ── Parse suggested actions from agent response ────
+                suggested_actions = []
+                if "<!-- ACTIONS:" in content:
+                    match = _ACTIONS_RE.search(content)
+                    if match:
+                        suggested_actions = [a.strip() for a in match.group(1).split("|") if a.strip()]
+                        content = content[:content.index("<!-- ACTIONS:")].rstrip()
 
-            # ── Post-flight: persist history + cache ─────────────
-            if session_id and query_text:
-                try:
-                    await append_chat_history_entry(session_id, "user", query_text, clients=clients)
-                    await append_chat_history_entry(
-                        session_id, "assistant", content, sources=sources, clients=clients
-                    )
-                except Exception as ex:
-                    logger.warning(f"Chat history append failed: {ex}")
-
-            if query_vector and query_text and content:
-                try:
-                    await set_cache_entry(query_text, query_vector, content, sources=sources, clients=clients)
-                except Exception as ex:
-                    logger.warning(f"Cache set failed: {ex}")
-
-            # ── Parse suggested actions from agent response ────
-            suggested_actions = []
-            if "<!-- ACTIONS:" in content:
-                import re
-                match = re.search(r"<!-- ACTIONS:\s*(.+?)\s*-->", content)
-                if match:
-                    suggested_actions = [a.strip() for a in match.group(1).split("|") if a.strip()]
-                    content = content[:content.index("<!-- ACTIONS:")].rstrip()
-
-            span.set_status(Status(StatusCode.OK))
-            return {"role": "assistant", "content": content, "sources": sources, "suggested_actions": suggested_actions}
+                span.set_status(Status(StatusCode.OK))
+                return {"role": "assistant", "content": content, "sources": sources, "suggested_actions": suggested_actions}
+        finally:
+            _clients_ctx.reset(ctx_token)
 
 
 # Global singleton
