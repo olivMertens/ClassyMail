@@ -220,7 +220,7 @@ const showAgenticSettings = ref(false)
 const truncate = (text, max) => {
   if (!text) return ''
   // Strip all mermaid-unsafe characters
-  const clean = text.replace(/["\[\]|#{}();:&<>]/g, '').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
+  const clean = text.replace(/["[\]|#{}();:&<>]/g, '').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
   return clean.length > max ? clean.slice(0, max) + '...' : clean
 }
 
@@ -1018,7 +1018,7 @@ watch(() => email.value, (val) => {
 
                         <!-- Step 3: Agent candidates (wrapped grid) -->
                         <div class="flex flex-wrap items-center gap-1.5 py-1">
-                          <template v-for="(agent, idx) in agenticData.agents.filter(a => a.triggered_by !== 'red_team')" :key="'orch-' + agent.intent">
+                          <template v-for="agent in agenticData.agents.filter(a => a.triggered_by !== 'red_team')" :key="'orch-' + agent.intent">
                             <span
                               class="inline-flex items-center gap-1 px-2 py-1 rounded-full font-medium"
                               :class="agent.confidence >= 0.7 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :

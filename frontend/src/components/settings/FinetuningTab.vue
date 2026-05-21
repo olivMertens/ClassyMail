@@ -2,8 +2,8 @@
 import { useI18n } from 'vue-i18n'
 import { InformationCircleIcon } from '@heroicons/vue/24/outline'
 
-const props = defineProps({
-  settings: { type: Object, required: true },
+const settings = defineModel('settings', { type: Object, required: true })
+defineProps({
   loading: { type: Boolean, default: false }
 })
 

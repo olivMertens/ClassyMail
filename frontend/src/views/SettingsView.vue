@@ -1464,12 +1464,12 @@ onMounted(() => {
 
     <!-- General Tab -->
     <div v-show="activeTab === 'general'">
-      <GeneralTab :settings="settings" :model-options="modelOptions" :loading="loading" :saved="saved" @save="saveSettings" />
+      <GeneralTab v-model:settings="settings" :model-options="modelOptions" :loading="loading" :saved="saved" @save="saveSettings" />
     </div>
 
     <!-- Fine-tuning Tab -->
     <div v-show="activeTab === 'finetuning'">
-      <FinetuningTab :settings="settings" :loading="loading" />
+      <FinetuningTab v-model:settings="settings" :loading="loading" />
     </div>
 
     <!-- Classification Categories Tab -->
