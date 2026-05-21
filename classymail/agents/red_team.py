@@ -17,7 +17,7 @@ from opentelemetry import trace
 from classymail.agents.config import get_agentic_settings, resolve_agent_endpoint
 from classymail.agents.models import RedTeamVerdict, SpecializedAgentResult
 from classymail.agents.orchestrator import _load_prompt_template
-from classymail.core.llm_compat import build_chat_params, extract_message_content, supports_response_format
+from classymail.services.openai_client_factory import build_chat_params, extract_message_content, supports_response_format
 from classymail.services.azure_clients import Clients
 from classymail.services.openai_client_factory import get_chat_client
 from classymail.services.settings_store import get_categories_prompt_text, _build_categories_prompt

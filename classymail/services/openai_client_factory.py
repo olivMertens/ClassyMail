@@ -3,16 +3,25 @@
 Returns cached ``openai.AsyncAzureOpenAI`` instances per
 ``(endpoint, api_version)`` pair so that connection pools and credential
 refresh are reused across callers (orchestrator, specialized agents,
-red team, etc.).
+red team, anonymizer, PII detection, category assessment, etc.).
 
 Authentication priority:
 1. ``config.AI_API_KEY`` if set (dev / local with provided key).
 2. ``DefaultAzureCredential`` via ``clients.credential`` (managed identity
    in Container Apps, az-cli login locally).
 
-The factory is the canonical replacement for the
-``httpx.AsyncClient`` + ``auth_headers`` + manual URL construction
-pattern that previously appeared in every classification agent.
+This module also exposes the small set of model-aware parameter
+helpers (formerly in ``classymail.core.llm_compat``):
+
+- :func:`is_reasoning_model` - GPT-5 / o1 / o3 / o4 / Kimi family detection.
+- :func:`build_chat_params` - choose ``max_tokens`` vs ``max_completion_tokens``
+  and drop ``temperature`` for reasoning models.
+- :func:`extract_message_content` - prefer ``content`` then ``reasoning_content``.
+- :func:`supports_response_format` - ``response_format=json_object`` gate.
+
+Together with :func:`get_chat_client`, these form the canonical
+replacement for the ``httpx.AsyncClient`` + ``auth_headers`` + manual
+URL construction pattern that previously appeared in every LLM caller.
 """
 
 from __future__ import annotations
@@ -29,6 +38,91 @@ if TYPE_CHECKING:
     from classymail.services.azure_clients import Clients
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Model family detection + parameter helpers
+# ---------------------------------------------------------------------------
+
+# Model families that use reasoning and have restricted API parameters.
+# These models reject ``temperature`` / ``top_p`` and require
+# ``max_completion_tokens`` instead of the legacy ``max_tokens``.
+_REASONING_FAMILIES: tuple[str, ...] = ("o1", "o3", "o4", "gpt-5", "gpt5", "kimi")
+
+
+def is_reasoning_model(deployment: str | None) -> bool:
+    """Return ``True`` for reasoning models (GPT-5.x, o1, o3, o4, Kimi).
+
+    Reasoning models:
+    - Do **not** support ``temperature`` or ``top_p``
+    - Require ``max_completion_tokens`` instead of ``max_tokens``
+    - Do **not** support ``response_format: json_object``
+    """
+    if not deployment:
+        return False
+    d = deployment.lower().strip()
+    for family in _REASONING_FAMILIES:
+        if d == family or d.startswith(f"{family}-") or d.startswith(f"{family}."):
+            return True
+    return False
+
+
+def build_chat_params(
+    deployment: str | None,
+    *,
+    temperature: float | None = None,
+    max_output_tokens: int | None = None,
+) -> dict:
+    """Build model-aware chat completion parameters.
+
+    For **reasoning** models (GPT-5.x, o1, o3, o4):
+    - Uses ``max_completion_tokens`` instead of ``max_tokens``
+    - Omits ``temperature`` / ``top_p`` (unsupported)
+
+    For **classic** models (GPT-4o, Phi-4, Mistral, etc.):
+    - Uses ``max_tokens``
+    - Includes ``temperature`` when provided
+    """
+    params: dict = {}
+    reasoning = is_reasoning_model(deployment)
+    # model-router may route to a reasoning model; use max_completion_tokens
+    # (accepted by all modern Azure OpenAI models) for safety.
+    is_router = bool(deployment) and deployment.lower().strip() == "model-router"
+
+    if max_output_tokens is not None:
+        if reasoning or is_router:
+            params["max_completion_tokens"] = max_output_tokens
+        else:
+            params["max_tokens"] = max_output_tokens
+
+    if temperature is not None and not reasoning:
+        params["temperature"] = temperature
+
+    return params
+
+
+def extract_message_content(message: dict | None) -> str | None:
+    """Extract text content from a chat completion message.
+
+    Some reasoning models (Kimi-K2.5, certain o-series) return their
+    output in ``reasoning_content`` instead of ``content``.
+    """
+    if not message:
+        return None
+    return message.get("content") or message.get("reasoning_content")
+
+
+def supports_response_format(deployment: str | None) -> bool:
+    """Return ``True`` if the model supports ``response_format=json_object``."""
+    if not deployment:
+        return True
+    if deployment.lower().strip() == "model-router":
+        return False
+    return not is_reasoning_model(deployment)
+
+
+# ---------------------------------------------------------------------------
+# Async Azure OpenAI client factory
+# ---------------------------------------------------------------------------
 
 # (endpoint, api_version) -> client
 _clients_by_endpoint: dict[tuple[str, str], AsyncAzureOpenAI] = {}

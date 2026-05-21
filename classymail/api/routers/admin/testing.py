@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from classymail.core import config
-from classymail.core.llm_compat import build_chat_params
+from classymail.services.openai_client_factory import build_chat_params
 from classymail.services.azure_clients import Clients, get_clients, blob_id_from_url, get_cosmos_container as azure_get_cosmos_container
 from classymail.services.generator import generate_email_pdf
 from azure.servicebus import ServiceBusMessage
@@ -148,33 +148,35 @@ async def check_connectivity(clients: Clients = Depends(get_clients)):
 async def test_phi4_connection(clients: Clients = Depends(get_clients)):
     """Test Phi-4 model connection"""
     try:
-        import httpx
-        from classymail.services.azure_clients import auth_headers
+        import openai
+        from classymail.services.openai_client_factory import get_chat_client
 
         if not config.PHI_ENDPOINT:
             return {"status": "error", "error": "PHI_ENDPOINT not configured", "model": config.PHI_DEPLOYMENT}
 
-        headers = await auth_headers(clients, model_type="openai")
-        endpoint = f"{config.PHI_ENDPOINT.rstrip('/')}/openai/deployments/{config.PHI_DEPLOYMENT}/chat/completions?api-version={config.AI_API_VERSION}"
+        chat_client = await get_chat_client(config.PHI_ENDPOINT, config.AI_API_VERSION, clients=clients)
+        try:
+            completion = await chat_client.chat.completions.create(
+                model=config.PHI_DEPLOYMENT,
+                messages=[{"role": "user", "content": "Say 'Connection OK'"}],
+                timeout=30.0,
+                **build_chat_params(config.PHI_DEPLOYMENT, temperature=0, max_output_tokens=10),
+            )
+        except openai.APIStatusError as e:
+            err_body = ""
+            try:
+                err_body = (e.response.text or "")[:500] if e.response is not None else ""
+            except Exception:
+                err_body = str(e)[:500]
+            logger.error(f"Phi-4 error response: {err_body}")
+            return {"status": "error", "error": f"HTTP {e.status_code}: {err_body}", "model": config.PHI_DEPLOYMENT}
 
-        payload = {
-            "messages": [{"role": "user", "content": "Say 'Connection OK'"}],
-            **build_chat_params(config.PHI_DEPLOYMENT, temperature=0, max_output_tokens=10),
-        }
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(endpoint, json=payload, headers=headers)
-            if response.is_error:
-                error_detail = response.text
-                logger.error(f"Phi-4 error response: {error_detail}")
-                return {"status": "error", "error": f"HTTP {response.status_code}: {error_detail}", "model": config.PHI_DEPLOYMENT}
-            data = response.json()
-
+        data = completion.model_dump()
         return {
             "status": "success",
             "model": config.PHI_DEPLOYMENT,
             "response": data.get("choices", [{}])[0].get("message", {}).get("content", ""),
-            "status_code": response.status_code
+            "status_code": 200,
         }
     except Exception as e:
         logger.error(f"Phi-4 connection test failed: {e}")
@@ -253,8 +255,8 @@ async def test_mistral_ocr_connection(clients: Clients = Depends(get_clients)):
 async def test_gpt_connection(model: str | None = None, clients: Clients = Depends(get_clients)):
     """Test GPT connection (defaults to configured fallback, or specific model)."""
     try:
-        import httpx
-        from classymail.services.azure_clients import auth_headers
+        import openai
+        from classymail.services.openai_client_factory import get_chat_client
 
         gpt_endpoint = getattr(config, "GPT_ENDPOINT", config.PHI_ENDPOINT)
 
@@ -267,38 +269,40 @@ async def test_gpt_connection(model: str | None = None, clients: Clients = Depen
             gpt_deployment = getattr(config, "GPT_DEPLOYMENT", config.PHI_FALLBACK_DEPLOYMENT)
 
         api_version = config.AI_API_VERSION
+        logger.info(f"[TEST-GPT] Testing {gpt_deployment} at {gpt_endpoint}")
 
-        headers = await auth_headers(clients, model_type="openai")
-        endpoint = f"{gpt_endpoint.rstrip('/')}/openai/deployments/{gpt_deployment}/chat/completions?api-version={api_version}"
-
-        payload = {
-            "messages": [{"role": "user", "content": "Say 'GPT Connection OK'"}],
-            **build_chat_params(gpt_deployment, temperature=0, max_output_tokens=10),
-        }
-
-        logger.info(f"[TEST-GPT] Testing {gpt_deployment} at {endpoint}")
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(endpoint, json=payload, headers=headers)
-            if response.is_error:
-                error_detail = response.text
+        chat_client = await get_chat_client(gpt_endpoint, api_version, clients=clients)
+        try:
+            completion = await chat_client.chat.completions.create(
+                model=gpt_deployment,
+                messages=[{"role": "user", "content": "Say 'GPT Connection OK'"}],
+                timeout=30.0,
+                **build_chat_params(gpt_deployment, temperature=0, max_output_tokens=10),
+            )
+        except openai.APIStatusError as e:
+            err_body = ""
+            error_message = str(e)
+            try:
+                err_body = (e.response.text or "") if e.response is not None else ""
                 try:
-                    error_json = response.json()
-                    error_message = error_json.get("error", {}).get("message", error_detail)
+                    error_json = json.loads(err_body) if err_body else {}
+                    error_message = error_json.get("error", {}).get("message", err_body)
                 except Exception:
-                    error_message = error_detail
+                    error_message = err_body or str(e)
+            except Exception:
+                pass
 
-                logger.error(f"GPT error response for {gpt_deployment}: {error_message}")
-                return {
-                    "status": "error",
-                    "error": f"HTTP {response.status_code}: {error_message}",
-                    "model": gpt_deployment,
-                    "endpoint": gpt_endpoint,
-                    "deployment": gpt_deployment,
-                    "details": "Check if deployment exists in Microsoft AI Foundry and has proper RBAC permissions"
-                }
-            data = response.json()
+            logger.error(f"GPT error response for {gpt_deployment}: {error_message}")
+            return {
+                "status": "error",
+                "error": f"HTTP {e.status_code}: {error_message}",
+                "model": gpt_deployment,
+                "endpoint": gpt_endpoint,
+                "deployment": gpt_deployment,
+                "details": "Check if deployment exists in Microsoft AI Foundry and has proper RBAC permissions",
+            }
 
+        data = completion.model_dump()
         return {
             "status": "success",
             "model": gpt_deployment,
@@ -306,7 +310,7 @@ async def test_gpt_connection(model: str | None = None, clients: Clients = Depen
             "response": data.get("choices", [{}])[0].get("message", {}).get("content", ""),
             "usage": data.get("usage"),
             "api_version": api_version,
-            "status_code": response.status_code
+            "status_code": 200,
         }
     except Exception as e:
         logger.error(f"GPT connection test failed for {model}: {e}")

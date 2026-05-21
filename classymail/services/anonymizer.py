@@ -3,12 +3,11 @@ from __future__ import annotations
 import hashlib
 import re
 
-import httpx
 from opentelemetry import trace
 
 from classymail.core import config
-from classymail.core.llm_compat import build_chat_params, extract_message_content
-from classymail.services.azure_clients import auth_headers, Clients
+from classymail.services.openai_client_factory import build_chat_params, extract_message_content, get_chat_client
+from classymail.services.azure_clients import Clients
 
 
 tracer = trace.get_tracer(__name__)
@@ -54,21 +53,11 @@ async def anonymize_markdown_for_finetune(markdown: str, clients: Clients | None
     if not config.ANONYMIZER_ENDPOINT:
         raise RuntimeError("ANONYMIZER_ENDPOINT is not set")
 
-    headers = await auth_headers(clients=clients)
     user_content = basic_pii_scrub(markdown or "")
-
-    payload = {
-        "model": config.ANONYMIZER_DEPLOYMENT,
-        "messages": [
-            {"role": "system", "content": ANONYMIZER_SYSTEM_PROMPT},
-            {"role": "user", "content": user_content},
-        ],
-        **build_chat_params(config.ANONYMIZER_DEPLOYMENT, temperature=0, max_output_tokens=config.ANONYMIZER_MAX_TOKENS),
-    }
-
-    url = (
-        f"{config.ANONYMIZER_ENDPOINT}/openai/deployments/{config.ANONYMIZER_DEPLOYMENT}/chat/completions"
-        f"?api-version={config.ANONYMIZER_API_VERSION}"
+    chat_params = build_chat_params(
+        config.ANONYMIZER_DEPLOYMENT,
+        temperature=0,
+        max_output_tokens=config.ANONYMIZER_MAX_TOKENS,
     )
 
     with tracer.start_as_current_span("anonymize_markdown") as span:
@@ -77,10 +66,21 @@ async def anonymize_markdown_for_finetune(markdown: str, clients: Clients | None
         span.set_attribute("gen_ai.request.model", config.ANONYMIZER_DEPLOYMENT)
         span.set_attribute("app.anonymizer.prompt_version", config.ANONYMIZER_PROMPT_VERSION)
 
-        async with httpx.AsyncClient(timeout=90) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
+        chat_client = await get_chat_client(
+            config.ANONYMIZER_ENDPOINT,
+            config.ANONYMIZER_API_VERSION,
+            clients=clients,
+        )
+        completion = await chat_client.chat.completions.create(
+            model=config.ANONYMIZER_DEPLOYMENT,
+            messages=[
+                {"role": "system", "content": ANONYMIZER_SYSTEM_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+            timeout=90.0,
+            **chat_params,
+        )
+        data = completion.model_dump()
 
         content = extract_message_content(data.get("choices", [{}])[0].get("message", {})) or ""
         usage = data.get("usage")

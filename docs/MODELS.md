@@ -180,7 +180,7 @@ All LLM calls use `build_chat_params()` to produce the correct parameters automa
 
 ```python
 
-from classymail.core.llm_compat import build_chat_params
+from classymail.services.openai_client_factory import build_chat_params
 
 
 

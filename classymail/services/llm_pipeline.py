@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential, retry_if_exception, retry
 
 from classymail.core import config
-from classymail.core.llm_compat import build_chat_params, extract_message_content, supports_response_format, is_reasoning_model
+from classymail.services.openai_client_factory import build_chat_params, extract_message_content, supports_response_format, is_reasoning_model
 from classymail.models import OCRFailed, BusinessEntities, ContentFilterError
 from classymail.services.azure_clients import auth_headers, Clients
 from classymail.services.settings_store import get_categories_prompt_text, load_settings

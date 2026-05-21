@@ -21,13 +21,12 @@ import json
 import logging
 from typing import List
 
-import httpx
 from opentelemetry import trace
 from pydantic import BaseModel
 
 from classymail.core import config
-from classymail.core.llm_compat import build_chat_params, extract_message_content
-from classymail.services.azure_clients import auth_headers, Clients
+from classymail.services.openai_client_factory import build_chat_params, extract_message_content, get_chat_client
+from classymail.services.azure_clients import Clients
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -147,18 +146,7 @@ Example JSON output:
 
 Return the PII in JSON format as specified."""
 
-    headers = await auth_headers(clients=clients)
-    url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={config.AI_API_VERSION}"
-
-    payload = {
-        "model": deployment,
-        "response_format": {"type": "json_object"},  # Force JSON mode
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_content},
-        ],
-        **build_chat_params(deployment, temperature=0.0, max_output_tokens=2000),
-    }
+    chat_params = build_chat_params(deployment, temperature=0.0, max_output_tokens=2000)
 
     with tracer.start_as_current_span("detect_pii") as span:
         span.set_attribute("gen_ai.system", "azure_openai")
@@ -167,29 +155,37 @@ Return the PII in JSON format as specified."""
         span.set_attribute("pii.detection.enabled", True)
 
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                response = await client.post(url, headers=headers, json=payload)
-                response.raise_for_status()
-                data = response.json()
+            chat_client = await get_chat_client(endpoint, config.AI_API_VERSION, clients=clients)
+            completion = await chat_client.chat.completions.create(
+                model=deployment,
+                response_format={"type": "json_object"},  # Force JSON mode
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content},
+                ],
+                timeout=30.0,
+                **chat_params,
+            )
+            data = completion.model_dump()
 
-                # Extract JSON response
-                content = extract_message_content(data.get("choices", [{}])[0].get("message", {})) or "{}"
-                pii_data = json.loads(content)
+            # Extract JSON response
+            content = extract_message_content(data.get("choices", [{}])[0].get("message", {})) or "{}"
+            pii_data = json.loads(content)
 
-                # Parse into Pydantic model
-                result = PIIDetectionResult(**pii_data)
+            # Parse into Pydantic model
+            result = PIIDetectionResult(**pii_data)
 
-                # Add metrics to span
-                span.set_attribute("pii.detected", result.has_pii)
-                span.set_attribute("pii.total_count", result.total_count)
-                span.set_attribute("pii.types", ",".join(result.pii_types))
+            # Add metrics to span
+            span.set_attribute("pii.detected", result.has_pii)
+            span.set_attribute("pii.total_count", result.total_count)
+            span.set_attribute("pii.types", ",".join(result.pii_types))
 
-                logger.info(
-                    f"PII detection complete: {result.total_count} items found "
-                    f"({', '.join(result.pii_types) if result.pii_types else 'none'})"
-                )
+            logger.info(
+                f"PII detection complete: {result.total_count} items found "
+                f"({', '.join(result.pii_types) if result.pii_types else 'none'})"
+            )
 
-                return result
+            return result
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse PII JSON response: {e}")

@@ -15,13 +15,12 @@ import logging
 import re
 from typing import Tuple
 
-import httpx
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 
 from classymail.core import config
-from classymail.core.llm_compat import build_chat_params, extract_message_content
-from classymail.services.azure_clients import auth_headers, Clients
+from classymail.services.openai_client_factory import build_chat_params, extract_message_content, get_chat_client
+from classymail.services.azure_clients import Clients
 from classymail.services.settings_store import load_settings
 
 logger = logging.getLogger(__name__)
@@ -160,17 +159,7 @@ If the entire email is just boilerplate/signature with no real content, return "
 
 Return only the cleaned content."""
 
-    headers = await auth_headers(clients=clients)
-    url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={config.AI_API_VERSION}"
-
-    payload = {
-        "model": deployment,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_content},
-        ],
-        **build_chat_params(deployment, temperature=0.0, max_output_tokens=3000),
-    }
+    headers_chat_params = build_chat_params(deployment, temperature=0.0, max_output_tokens=3000)
 
     with tracer.start_as_current_span("extract_last_conversation") as span:
         span.set_attribute("gen_ai.system", "azure_openai")
@@ -178,21 +167,28 @@ Return only the cleaned content."""
         span.set_attribute("gen_ai.request.model", deployment)
 
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                response = await client.post(url, headers=headers, json=payload)
-                response.raise_for_status()
-                data = response.json()
+            chat_client = await get_chat_client(endpoint, config.AI_API_VERSION, clients=clients)
+            completion = await chat_client.chat.completions.create(
+                model=deployment,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content},
+                ],
+                timeout=30.0,
+                **headers_chat_params,
+            )
+            data = completion.model_dump()
 
-                # Extract response
-                extracted = (extract_message_content(data.get("choices", [{}])[0].get("message", {})) or "").strip()
+            # Extract response
+            extracted = (extract_message_content(data.get("choices", [{}])[0].get("message", {})) or "").strip()
 
-                # Check if LLM detected no real content
-                if extracted.upper() == "NO_CONTENT":
-                    logger.warning("LLM detected no meaningful content in email")
-                    return ""
+            # Check if LLM detected no real content
+            if extracted.upper() == "NO_CONTENT":
+                logger.warning("LLM detected no meaningful content in email")
+                return ""
 
-                span.set_status(Status(StatusCode.OK))
-                return extracted
+            span.set_status(Status(StatusCode.OK))
+            return extracted
 
         except Exception as e:
             logger.error(f"LLM preprocessing failed: {e}")

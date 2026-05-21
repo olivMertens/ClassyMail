@@ -1,8 +1,8 @@
-"""Tests for classymail.core.llm_compat – model-aware API parameter handling."""
+"""Tests for chat completion parameter helpers (openai_client_factory)."""
 
 import pytest
 
-from classymail.core.llm_compat import build_chat_params, is_reasoning_model
+from classymail.services.openai_client_factory import build_chat_params, is_reasoning_model
 
 
 # ---------------------------------------------------------------------------
