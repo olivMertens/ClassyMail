@@ -354,7 +354,7 @@ resource "azurerm_role_assignment" "search_data_contributor" {
   count                = var.deploy_ai_search ? 1 : 0
   scope                = azurerm_search_service.classymail[0].id
   role_definition_name = "Search Index Data Contributor"
-  principal_id         = azurerm_user_assigned_identity.aca.principal_id
+  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
 # --- Optional: Model Router for Agentic Orchestration ---
@@ -370,7 +370,7 @@ resource "azapi_resource" "deployment_model_router" {
   count     = (var.deploy_model_router && var.enable_model_deployments) ? 1 : 0
   type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
   name      = "model-router"
-  parent_id = azapi_resource.ai_services.id
+  parent_id = azapi_resource.ai_foundry.id
 
   body = jsonencode({
     sku = { name = "GlobalStandard", capacity = 250 }
