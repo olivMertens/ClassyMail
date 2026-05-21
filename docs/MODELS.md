@@ -509,4 +509,3 @@ Configuration reference:
 - Set pricing via env vars: `PHI4_COST_PER_1K_INPUT`, `PHI4_COST_PER_1K_OUTPUT`, `FALLBACK_COST_PER_1K_INPUT`, `FALLBACK_COST_PER_1K_OUTPUT`
 
 - Pricing varies by region/tenant; update env vars from your Azure portal to ensure accurate per-email cost tracking
-

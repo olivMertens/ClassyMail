@@ -1765,4 +1765,3 @@ For the full architecture, see `#docs/ARCHITECTURE.md`.
 | Run tests | `uv run pytest` |
 
 | Destroy all | `terraform -chdir=infra destroy -var "subscription_id=<S>"` |
-
