@@ -843,4 +843,3 @@ While Database-level scope (`/dbs/emailsdb`) is theoretically more secure, it br
 **Last Updated**: 2026-02-16
 
 **Maintained by**: ClassyMail Team
-
