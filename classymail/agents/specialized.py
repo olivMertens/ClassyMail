@@ -21,7 +21,7 @@ from classymail.agents.config import get_agentic_settings, resolve_agent_endpoin
 from classymail.agents.models import CandidateIntent, RAGGroundingRef, SpecializedAgentResult
 from classymail.agents.orchestrator import _load_prompt_template
 from classymail.agents.tools.ai_search_tool import search_intent_index
-from classymail.core.llm_compat import build_chat_params, extract_message_content, is_reasoning_model
+from classymail.services.openai_client_factory import build_chat_params, extract_message_content, is_reasoning_model
 from classymail.services.azure_clients import Clients
 from classymail.services.openai_client_factory import get_chat_client
 

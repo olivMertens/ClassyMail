@@ -7,14 +7,14 @@ import logging
 import re
 from typing import Any
 
-import httpx
+import openai
 from fastapi import APIRouter, HTTPException
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel, Field
 
-from classymail.core.llm_compat import build_chat_params, extract_message_content, is_reasoning_model, supports_response_format
-from classymail.services.azure_clients import auth_headers, Clients
+from classymail.services.openai_client_factory import build_chat_params, extract_message_content, get_chat_client, is_reasoning_model, supports_response_format
+from classymail.services.azure_clients import Clients
 from classymail.services.llm_pipeline import resolve_model_config
 from classymail.services.settings_store import load_settings
 
@@ -150,7 +150,7 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
 
             clients = Clients()
             try:
-                headers = await auth_headers(clients=clients)
+                chat_client = await get_chat_client(endpoint, api_version, clients=clients)
             except Exception as auth_err:
                 err_type = type(auth_err).__name__
                 err_msg = str(auth_err) or "(no details)"
@@ -159,8 +159,7 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
                     status_code=401,
                     detail=f"Azure authentication failed ({err_type}): {err_msg[:200]}"
                 )
-            url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
-            logger.debug("[assessment] Request URL: %s", url)
+            logger.debug("[assessment] Using endpoint=%s deployment=%s api_version=%s", endpoint, deployment, api_version)
 
             # Multilingual prompt with WHERE/HOW guidance
             lang = request.language or "en"
@@ -280,16 +279,13 @@ Assess quality and provide rewrites."""
                 token_budget = 3000
             else:
                 token_budget = 2000
-            payload = {
-                "model": deployment,
-                "messages": messages,
-                **build_chat_params(deployment, temperature=0.3, max_output_tokens=token_budget),
-            }
+            chat_params = build_chat_params(deployment, temperature=0.3, max_output_tokens=token_budget)
+            extra_kwargs: dict[str, Any] = {}
 
             # response_format=json_object: not supported by reasoning models,
             # model-router (may route to reasoning), or SLMs.
             if supports_response_format(deployment) and not _is_slm:
-                payload["response_format"] = {"type": "json_object"}
+                extra_kwargs["response_format"] = {"type": "json_object"}
 
             span.set_attribute("gen_ai.system", "azure_openai")
             span.set_attribute("gen_ai.request.model", deployment)
@@ -307,74 +303,83 @@ Assess quality and provide rewrites."""
                 timeout_s = 90
             else:
                 timeout_s = 30
-            async with httpx.AsyncClient(timeout=timeout_s) as client:
-                response = await client.post(url, headers=headers, json=payload)
-                response.raise_for_status()
-                data = response.json()
 
-                choices = data.get("choices", [])
-                if not choices:
-                    logger.error(f"[assessment] Invalid AI response: No choices returned. Data: {data}")
-                    raise HTTPException(status_code=502, detail="AI Model returned no Content Choices.")
+            completion = await chat_client.chat.completions.create(
+                model=deployment,
+                messages=messages,
+                timeout=float(timeout_s),
+                **chat_params,
+                **extra_kwargs,
+            )
+            data = completion.model_dump()
 
-                message = choices[0].get("message", {})
-                content = extract_message_content(message)
+            choices = data.get("choices", [])
+            if not choices:
+                logger.error(f"[assessment] Invalid AI response: No choices returned. Data: {data}")
+                raise HTTPException(status_code=502, detail="AI Model returned no Content Choices.")
 
-                if not content:
-                    logger.error(f"[assessment] Invalid AI response: Empty content. Finish reason: {choices[0].get('finish_reason')}. Data: {data}")
-                    detail_msg = f"AI Model returned empty content (Finish Reason: {choices[0].get('finish_reason', 'unknown')})."
-                    if choices[0].get('finish_reason') == 'length':
-                        detail_msg += f" The model exhausted its token limit ({token_budget}) while reasoning."
-                    raise HTTPException(status_code=502, detail=detail_msg)
+            message = choices[0].get("message", {})
+            content = extract_message_content(message)
 
-                # Parse JSON response – cleanup potential markdown or whitespace
-                cleaned = content.strip()
-                # Check for code fence first as it's cleaner
-                fence_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", cleaned, re.DOTALL)
-                if fence_match:
-                    cleaned = fence_match.group(1).strip()
-                elif re.search(r"^\{.*\}$", cleaned, re.DOTALL):
-                     pass # Already looks like JSON
-                else:
-                     # Try finding outermost JSON object
-                     json_match = re.search(r"(\{.*\})", cleaned, re.DOTALL)
-                     if json_match:
-                         cleaned = json_match.group(1).strip()
+            if not content:
+                logger.error(f"[assessment] Invalid AI response: Empty content. Finish reason: {choices[0].get('finish_reason')}. Data: {data}")
+                detail_msg = f"AI Model returned empty content (Finish Reason: {choices[0].get('finish_reason', 'unknown')})."
+                if choices[0].get('finish_reason') == 'length':
+                    detail_msg += f" The model exhausted its token limit ({token_budget}) while reasoning."
+                raise HTTPException(status_code=502, detail=detail_msg)
 
+            # Parse JSON response – cleanup potential markdown or whitespace
+            cleaned = content.strip()
+            # Check for code fence first as it's cleaner
+            fence_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", cleaned, re.DOTALL)
+            if fence_match:
+                cleaned = fence_match.group(1).strip()
+            elif re.search(r"^\{.*\}$", cleaned, re.DOTALL):
+                pass  # Already looks like JSON
+            else:
+                # Try finding outermost JSON object
+                json_match = re.search(r"(\{.*\})", cleaned, re.DOTALL)
+                if json_match:
+                    cleaned = json_match.group(1).strip()
+
+            try:
+                result = json.loads(cleaned)
+            except json.JSONDecodeError:
+                # Retry with raw content just in case extraction failed but it was valid
                 try:
-                    result = json.loads(cleaned)
+                    result = json.loads(content)
                 except json.JSONDecodeError:
-                    # Retry with raw content just in case extraction failed but it was valid
-                    try:
-                        result = json.loads(content)
-                    except json.JSONDecodeError:
-                         raise # Re-raise original error to be caught below
+                    raise  # Re-raise original error to be caught below
 
-                span.set_status(Status(StatusCode.OK))
-                logger.info(f"[assessment] Category '{request.name}' assessed with score: {result.get('quality_score', 'Unknown')}")
+            span.set_status(Status(StatusCode.OK))
+            logger.info(f"[assessment] Category '{request.name}' assessed with score: {result.get('quality_score', 'Unknown')}")
 
-                suggestions_raw = result.get("specific_suggestions", [])
-                # Ensure all suggestions are strings
-                suggestions = [str(s) if not isinstance(s, str) else s for s in suggestions_raw]
-                # Parse each suggestion server-side for robust multilingual Apply
-                parsed = [_parse_suggestion(s) for s in suggestions]
+            suggestions_raw = result.get("specific_suggestions", [])
+            # Ensure all suggestions are strings
+            suggestions = [str(s) if not isinstance(s, str) else s for s in suggestions_raw]
+            # Parse each suggestion server-side for robust multilingual Apply
+            parsed = [_parse_suggestion(s) for s in suggestions]
 
-                return CategoryAssessmentResponse(
-                    advice=result.get("advice", "Assessment completed."),
-                    quality_score=result.get("quality_score", "Unknown"),
-                    specific_suggestions=suggestions,
-                    parsed_suggestions=[
-                        SuggestionParsed(**p) for p in parsed
-                    ],
-                )
+            return CategoryAssessmentResponse(
+                advice=result.get("advice", "Assessment completed."),
+                quality_score=result.get("quality_score", "Unknown"),
+                specific_suggestions=suggestions,
+                parsed_suggestions=[
+                    SuggestionParsed(**p) for p in parsed
+                ],
+            )
 
-        except httpx.HTTPStatusError as e:
-            err_body = e.response.text[:500] if e.response.text else "(empty body)"
-            logger.error("[assessment] HTTP %s from LLM: %s", e.response.status_code, err_body)
+        except openai.APIStatusError as e:
+            err_body = ""
+            try:
+                err_body = (e.response.text or "")[:500] if e.response is not None else ""
+            except Exception:
+                err_body = str(e)[:500]
+            logger.error("[assessment] HTTP %s from LLM: %s", e.status_code, err_body)
             span.set_status(Status(StatusCode.ERROR, str(e)))
             raise HTTPException(
-                status_code=e.response.status_code,
-                detail=f"LLM assessment failed (HTTP {e.response.status_code}): {err_body[:200]}"
+                status_code=e.status_code,
+                detail=f"LLM assessment failed (HTTP {e.status_code}): {err_body[:200]}"
             )
         except json.JSONDecodeError as e:
             raw_snippet = content[:500] if 'content' in locals() and content else 'None'

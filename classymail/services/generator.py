@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Optional
 import httpx
 
-from classymail.core.llm_compat import build_chat_params, extract_message_content
+from classymail.services.openai_client_factory import build_chat_params, extract_message_content
 
 logger = logging.getLogger(__name__)
 

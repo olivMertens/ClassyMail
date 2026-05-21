@@ -8,7 +8,8 @@ and interaction with Azure OpenAI.
 import json
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-import httpx
+
+import openai
 
 from classymail.api.category_assessment import (
     assess_category,
@@ -209,14 +210,13 @@ async def test_assess_category_success():
     # Mock resolve_model_config
     with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve, \
          patch("classymail.api.category_assessment.Clients"), \
-         patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
+         patch("classymail.api.category_assessment.get_chat_client") as mock_get_client:
 
         mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
-        mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
         # Mock httpx response
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
+        mock_completion = MagicMock()
+        mock_completion.model_dump.return_value = {
             "choices": [
                 {
                     "message": {
@@ -235,21 +235,20 @@ async def test_assess_category_success():
             ]
         }
 
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_chat = AsyncMock()
+        mock_chat.chat.completions.create = AsyncMock(return_value=mock_completion)
+        mock_get_client.return_value = mock_chat
 
-            result = await assess_category(request)
+        result = await assess_category(request)
 
-            assert result.quality_score == "Needs Improvement"
-            assert "specific keywords" in result.advice.lower()
-            assert len(result.specific_suggestions) == 3
-            assert any("REWRITE" in s for s in result.specific_suggestions)
-            # Verify parsed_suggestions are returned
-            assert len(result.parsed_suggestions) == 3
-            assert result.parsed_suggestions[0].action in ("rewrite", "add")
-            assert result.parsed_suggestions[0].field in ("definition", "exclusions")
+        assert result.quality_score == "Needs Improvement"
+        assert "specific keywords" in result.advice.lower()
+        assert len(result.specific_suggestions) == 3
+        assert any("REWRITE" in s for s in result.specific_suggestions)
+        # Verify parsed_suggestions are returned
+        assert len(result.parsed_suggestions) == 3
+        assert result.parsed_suggestions[0].action in ("rewrite", "add")
+        assert result.parsed_suggestions[0].field in ("definition", "exclusions")
 
 
 @pytest.mark.asyncio
@@ -264,13 +263,12 @@ async def test_assess_category_good_quality():
 
     with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve, \
          patch("classymail.api.category_assessment.Clients"), \
-         patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
+         patch("classymail.api.category_assessment.get_chat_client") as mock_get_client:
 
         mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
-        mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
+        mock_completion = MagicMock()
+        mock_completion.model_dump.return_value = {
             "choices": [
                 {
                     "message": {
@@ -285,16 +283,15 @@ async def test_assess_category_good_quality():
             ]
         }
 
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_chat = AsyncMock()
+        mock_chat.chat.completions.create = AsyncMock(return_value=mock_completion)
+        mock_get_client.return_value = mock_chat
 
-            result = await assess_category(request)
+        result = await assess_category(request)
 
-            assert result.quality_score == "Good"
-            assert len(result.specific_suggestions) == 0
-            assert len(result.parsed_suggestions) == 0
+        assert result.quality_score == "Good"
+        assert len(result.specific_suggestions) == 0
+        assert len(result.parsed_suggestions) == 0
 
 
 @pytest.mark.asyncio
@@ -309,13 +306,12 @@ async def test_assess_category_none_exclusions():
 
     with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve, \
          patch("classymail.api.category_assessment.Clients"), \
-         patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
+         patch("classymail.api.category_assessment.get_chat_client") as mock_get_client:
 
         mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
-        mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
+        mock_completion = MagicMock()
+        mock_completion.model_dump.return_value = {
             "choices": [
                 {
                     "message": {
@@ -330,13 +326,12 @@ async def test_assess_category_none_exclusions():
             ]
         }
 
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_chat = AsyncMock()
+        mock_chat.chat.completions.create = AsyncMock(return_value=mock_completion)
+        mock_get_client.return_value = mock_chat
 
-            result = await assess_category(request)
-            assert result.quality_score == "Needs Improvement"
+        result = await assess_category(request)
+        assert result.quality_score == "Needs Improvement"
 
 
 @pytest.mark.asyncio
@@ -351,13 +346,12 @@ async def test_assess_category_none_description_and_exclusions():
 
     with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve, \
          patch("classymail.api.category_assessment.Clients"), \
-         patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
+         patch("classymail.api.category_assessment.get_chat_client") as mock_get_client:
 
         mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
-        mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
+        mock_completion = MagicMock()
+        mock_completion.model_dump.return_value = {
             "choices": [
                 {
                     "message": {
@@ -372,14 +366,13 @@ async def test_assess_category_none_description_and_exclusions():
             ]
         }
 
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_chat = AsyncMock()
+        mock_chat.chat.completions.create = AsyncMock(return_value=mock_completion)
+        mock_get_client.return_value = mock_chat
 
-            result = await assess_category(request)
-            assert result.quality_score == "Poor"
-            assert len(result.specific_suggestions) == 2
+        result = await assess_category(request)
+        assert result.quality_score == "Poor"
+        assert len(result.specific_suggestions) == 2
 
 
 @pytest.mark.asyncio
@@ -394,13 +387,12 @@ async def test_assess_category_empty_fields():
 
     with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve, \
          patch("classymail.api.category_assessment.Clients"), \
-         patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
+         patch("classymail.api.category_assessment.get_chat_client") as mock_get_client:
 
         mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
-        mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
+        mock_completion = MagicMock()
+        mock_completion.model_dump.return_value = {
             "choices": [
                 {
                     "message": {
@@ -419,15 +411,14 @@ async def test_assess_category_empty_fields():
             ]
         }
 
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_chat = AsyncMock()
+        mock_chat.chat.completions.create = AsyncMock(return_value=mock_completion)
+        mock_get_client.return_value = mock_chat
 
-            result = await assess_category(request)
+        result = await assess_category(request)
 
-            assert result.quality_score == "Poor"
-            assert len(result.specific_suggestions) == 3
+        assert result.quality_score == "Poor"
+        assert len(result.specific_suggestions) == 3
 
 
 @pytest.mark.asyncio
@@ -466,27 +457,27 @@ async def test_assess_category_http_error():
 
     with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve, \
          patch("classymail.api.category_assessment.Clients"), \
-         patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
+         patch("classymail.api.category_assessment.get_chat_client") as mock_get_client:
 
         mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
-        mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_response = MagicMock()
-            mock_response.status_code = 429
-            mock_response.text = "Rate limit exceeded"
-            mock_client.post = AsyncMock(side_effect=httpx.HTTPStatusError(
-                "Rate limit",
-                request=MagicMock(),
-                response=mock_response
-            ))
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_response_for_error = MagicMock()
+        mock_response_for_error.status_code = 429
+        mock_response_for_error.text = "Rate limit exceeded"
+        err = openai.APIStatusError(
+            "Rate limit",
+            response=mock_response_for_error,
+            body=None,
+        )
+        err.status_code = 429
+        mock_chat = AsyncMock()
+        mock_chat.chat.completions.create = AsyncMock(side_effect=err)
+        mock_get_client.return_value = mock_chat
 
-            with pytest.raises(HTTPException) as exc_info:
-                await assess_category(request)
+        with pytest.raises(HTTPException) as exc_info:
+            await assess_category(request)
 
-            assert exc_info.value.status_code == 429
+        assert exc_info.value.status_code == 429
 
 
 @pytest.mark.asyncio
@@ -503,13 +494,12 @@ async def test_assess_category_json_parse_error():
 
     with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve, \
          patch("classymail.api.category_assessment.Clients"), \
-         patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
+         patch("classymail.api.category_assessment.get_chat_client") as mock_get_client:
 
         mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
-        mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
+        mock_completion = MagicMock()
+        mock_completion.model_dump.return_value = {
             "choices": [
                 {
                     "message": {
@@ -520,16 +510,15 @@ async def test_assess_category_json_parse_error():
             ]
         }
 
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_chat = AsyncMock()
+        mock_chat.chat.completions.create = AsyncMock(return_value=mock_completion)
+        mock_get_client.return_value = mock_chat
 
-            with pytest.raises(HTTPException) as exc_info:
-                await assess_category(request)
+        with pytest.raises(HTTPException) as exc_info:
+            await assess_category(request)
 
-            assert exc_info.value.status_code == 500
-            assert "parse" in str(exc_info.value.detail).lower()
+        assert exc_info.value.status_code == 500
+        assert "parse" in str(exc_info.value.detail).lower()
 
 
 @pytest.mark.asyncio
@@ -546,25 +535,22 @@ async def test_assess_category_no_choices():
 
     with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve, \
          patch("classymail.api.category_assessment.Clients"), \
-         patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
+         patch("classymail.api.category_assessment.get_chat_client") as mock_get_client:
 
         mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
-        mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"choices": []}
+        mock_completion = MagicMock()
+        mock_completion.model_dump.return_value = {"choices": []}
 
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client_class.return_value.__aexit__ = AsyncMock(return_value=None)
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_chat = AsyncMock()
+        mock_chat.chat.completions.create = AsyncMock(return_value=mock_completion)
+        mock_get_client.return_value = mock_chat
 
-            with pytest.raises(HTTPException) as exc_info:
-                await assess_category(request)
+        with pytest.raises(HTTPException) as exc_info:
+            await assess_category(request)
 
-            assert exc_info.value.status_code == 502
-            assert "no" in str(exc_info.value.detail).lower()
+        assert exc_info.value.status_code == 502
+        assert "no" in str(exc_info.value.detail).lower()
 
 
 @pytest.mark.asyncio
@@ -581,13 +567,12 @@ async def test_assess_category_empty_content():
 
     with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve, \
          patch("classymail.api.category_assessment.Clients"), \
-         patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
+         patch("classymail.api.category_assessment.get_chat_client") as mock_get_client:
 
         mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
-        mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
+        mock_completion = MagicMock()
+        mock_completion.model_dump.return_value = {
             "choices": [
                 {
                     "message": {"content": ""},
@@ -596,16 +581,15 @@ async def test_assess_category_empty_content():
             ]
         }
 
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_chat = AsyncMock()
+        mock_chat.chat.completions.create = AsyncMock(return_value=mock_completion)
+        mock_get_client.return_value = mock_chat
 
-            with pytest.raises(HTTPException) as exc_info:
-                await assess_category(request)
+        with pytest.raises(HTTPException) as exc_info:
+            await assess_category(request)
 
-            assert exc_info.value.status_code == 502
-            assert "empty" in str(exc_info.value.detail).lower()
+        assert exc_info.value.status_code == 502
+        assert "empty" in str(exc_info.value.detail).lower()
 
 
 @pytest.mark.asyncio
@@ -620,10 +604,9 @@ async def test_assess_category_json_with_code_fence():
 
     with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve, \
          patch("classymail.api.category_assessment.Clients"), \
-         patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers:
+         patch("classymail.api.category_assessment.get_chat_client") as mock_get_client:
 
         mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-5-nano", "2024-08-01-preview")
-        mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
 
         # JSON wrapped in code fence
         json_content = {
@@ -633,8 +616,8 @@ async def test_assess_category_json_with_code_fence():
         }
         wrapped_content = f"```json\n{json.dumps(json_content)}\n```"
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
+        mock_completion = MagicMock()
+        mock_completion.model_dump.return_value = {
             "choices": [
                 {
                     "message": {"content": wrapped_content},
@@ -643,15 +626,14 @@ async def test_assess_category_json_with_code_fence():
             ]
         }
 
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_chat = AsyncMock()
+        mock_chat.chat.completions.create = AsyncMock(return_value=mock_completion)
+        mock_get_client.return_value = mock_chat
 
-            result = await assess_category(request)
+        result = await assess_category(request)
 
-            assert result.quality_score == "Good"
-            assert result.advice == "Well structured"
+        assert result.quality_score == "Good"
+        assert result.advice == "Well structured"
 
 
 @pytest.mark.asyncio
@@ -666,15 +648,14 @@ async def test_assess_category_reasoning_model():
 
     with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve, \
          patch("classymail.api.category_assessment.Clients"), \
-         patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers, \
+         patch("classymail.api.category_assessment.get_chat_client") as mock_get_client, \
          patch("classymail.api.category_assessment.is_reasoning_model") as mock_is_reasoning:
 
         mock_resolve.return_value = ("https://test.openai.azure.com", "o1-preview", "2024-08-01-preview")
-        mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
         mock_is_reasoning.return_value = True
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
+        mock_completion = MagicMock()
+        mock_completion.model_dump.return_value = {
             "choices": [
                 {
                     "message": {
@@ -689,19 +670,17 @@ async def test_assess_category_reasoning_model():
             ]
         }
 
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_chat = AsyncMock()
+        mock_chat.chat.completions.create = AsyncMock(return_value=mock_completion)
+        mock_get_client.return_value = mock_chat
 
-            result = await assess_category(request)
+        result = await assess_category(request)
 
-            assert result.quality_score == "Good"
-            # Verify that reasoning model uses single user message
-            call_args = mock_client.post.call_args
-            payload = call_args.kwargs.get("json", call_args.args[1] if len(call_args.args) > 1 else {})
-            assert len(payload["messages"]) == 1
-            assert payload["messages"][0]["role"] == "user"
+        assert result.quality_score == "Good"
+        # Verify that reasoning model uses single user message
+        call_kwargs = mock_chat.chat.completions.create.call_args.kwargs
+        assert len(call_kwargs["messages"]) == 1
+        assert call_kwargs["messages"][0]["role"] == "user"
 
 
 @pytest.mark.asyncio
@@ -716,15 +695,14 @@ async def test_assess_category_standard_model():
 
     with patch("classymail.api.category_assessment.resolve_model_config") as mock_resolve, \
          patch("classymail.api.category_assessment.Clients"), \
-         patch("classymail.api.category_assessment.auth_headers") as mock_auth_headers, \
+         patch("classymail.api.category_assessment.get_chat_client") as mock_get_client, \
          patch("classymail.api.category_assessment.is_reasoning_model") as mock_is_reasoning:
 
         mock_resolve.return_value = ("https://test.openai.azure.com", "gpt-4o", "2024-08-01-preview")
-        mock_auth_headers.return_value = {"Authorization": "Bearer test-token"}
         mock_is_reasoning.return_value = False
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
+        mock_completion = MagicMock()
+        mock_completion.model_dump.return_value = {
             "choices": [
                 {
                     "message": {
@@ -739,22 +717,20 @@ async def test_assess_category_standard_model():
             ]
         }
 
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_chat = AsyncMock()
+        mock_chat.chat.completions.create = AsyncMock(return_value=mock_completion)
+        mock_get_client.return_value = mock_chat
 
-            result = await assess_category(request)
+        result = await assess_category(request)
 
-            assert result.quality_score == "Good"
-            # Verify that standard model uses system + user messages
-            call_args = mock_client.post.call_args
-            payload = call_args.kwargs.get("json", call_args.args[1] if len(call_args.args) > 1 else {})
-            assert len(payload["messages"]) == 2
-            assert payload["messages"][0]["role"] == "system"
-            assert payload["messages"][1]["role"] == "user"
-            # Verify response_format is set for standard models
-            assert payload.get("response_format") == {"type": "json_object"}
+        assert result.quality_score == "Good"
+        # Verify that standard model uses system + user messages
+        call_kwargs = mock_chat.chat.completions.create.call_args.kwargs
+        assert len(call_kwargs["messages"]) == 2
+        assert call_kwargs["messages"][0]["role"] == "system"
+        assert call_kwargs["messages"][1]["role"] == "user"
+        # Verify response_format is set for standard models
+        assert call_kwargs.get("response_format") == {"type": "json_object"}
 
 
 if __name__ == "__main__":
