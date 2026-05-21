@@ -1714,7 +1714,9 @@ flowchart TD
 
     A --> C["Blob Storage: pdf-inputs"]
 
-    C --> D["Event Grid"] --> B
+    C --> D["Event Grid"]
+
+    D --> B
 
     B --> E["Worker - Container App"]
 

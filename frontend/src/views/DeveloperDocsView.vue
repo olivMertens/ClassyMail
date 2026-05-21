@@ -43,7 +43,7 @@ const initMermaid = async () => {
     }
   }
   // Clean up temp mermaid render containers
-  document.querySelectorAll('[id^=\"dref-fullscreen-\"]').forEach(el => el.remove())
+  document.querySelectorAll('[id^="dref-fullscreen-"]').forEach(el => el.remove())
 }
 
 onMounted(() => {

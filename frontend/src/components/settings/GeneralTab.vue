@@ -1,16 +1,13 @@
 <script setup>
-import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useDialog } from '../../composables/useDialog'
-import { trackException } from '../../services/telemetry'
 import {
   CheckCircleIcon,
   CpuChipIcon,
   ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline'
 
-const props = defineProps({
-  settings: { type: Object, required: true },
+const settings = defineModel('settings', { type: Object, required: true })
+defineProps({
   modelOptions: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
   saved: { type: Boolean, default: false }
