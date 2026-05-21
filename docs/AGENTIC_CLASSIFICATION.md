@@ -74,7 +74,7 @@ Final classification decision (traceable, explainable)
 
 ### Why Custom Routing (not GroupChat / Magentic)
 
-After analyzing the [Agent Framework GA 1.0 workflow samples](https://github.com/microsoft/agent-framework/tree/main/python/samples/03-workflows), the best pattern for ClassyMail is:
+After analyzing the [Agent Framework 1.5 workflow samples](https://github.com/microsoft/agent-framework/tree/main/python/samples/03-workflows), the best pattern for ClassyMail is:
 
 | Pattern | Fit | Reason |
 |---|---|---|
