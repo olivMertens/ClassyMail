@@ -11,13 +11,13 @@ import logging
 import time
 from pathlib import Path
 
-import httpx
 from opentelemetry import trace
 
 from classymail.agents.config import get_agentic_settings, resolve_agent_endpoint
 from classymail.agents.models import CandidateIntent, OrchestratorResult
 from classymail.core.llm_compat import build_chat_params, extract_message_content, supports_response_format
-from classymail.services.azure_clients import auth_headers, Clients
+from classymail.services.azure_clients import Clients
+from classymail.services.openai_client_factory import get_chat_client
 from classymail.services.settings_store import get_categories_prompt_text, _build_categories_prompt
 
 logger = logging.getLogger(__name__)
@@ -159,23 +159,13 @@ async def run_orchestrator(
     categories_text = _build_categories_prompt(cats) if cats else get_categories_prompt_text()
 
     system_prompt = _build_orchestrator_prompt(categories_text, max_agents, locale)
-    headers = await auth_headers(clients=clients)
-    url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
+    chat_client = await get_chat_client(endpoint, api_version, clients=clients)
 
-    payload: dict = {
-        "model": deployment,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": text_markdown[:12000]},  # cap for routing
-        ],
-        # model-router can route to reasoning models; use max_completion_tokens
-        # (accepted by all modern models) and omit response_format for safety.
-        **build_chat_params(deployment, temperature=0.1, max_output_tokens=800),
-    }
-    # response_format: json_object unsupported by reasoning models — model-router
-    # may route to one, so only include when we know the deployment supports it.
+    extra_body: dict = {}
     if supports_response_format(deployment):
-        payload["response_format"] = {"type": "json_object"}
+        extra_body["response_format"] = {"type": "json_object"}
+
+    chat_params = build_chat_params(deployment, temperature=0.1, max_output_tokens=800)
 
     with tracer.start_as_current_span("agentic.orchestrator") as span:
         span.set_attribute("gen_ai.system", "azure_openai")
@@ -183,14 +173,21 @@ async def run_orchestrator(
         span.set_attribute("agentic.routing_mode", routing_mode)
 
         t0 = time.perf_counter()
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
+        completion = await chat_client.chat.completions.create(
+            model=deployment,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text_markdown[:12000]},
+            ],
+            timeout=30.0,
+            **chat_params,
+            **extra_body,
+        )
 
         latency_ms = (time.perf_counter() - t0) * 1000
-        data = resp.json()
+        data = completion.model_dump()
         content = extract_message_content(data.get("choices", [{}])[0].get("message", {})) or "{}"
-        usage = data.get("usage", {})
+        usage = data.get("usage", {}) or {}
 
         parsed = json.loads(content)
         candidates = [

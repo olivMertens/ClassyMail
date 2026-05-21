@@ -15,7 +15,6 @@ import json
 import logging
 import time
 
-import httpx
 from opentelemetry import trace
 
 from classymail.agents.config import get_agentic_settings, resolve_agent_endpoint
@@ -23,7 +22,8 @@ from classymail.agents.models import CandidateIntent, RAGGroundingRef, Specializ
 from classymail.agents.orchestrator import _load_prompt_template
 from classymail.agents.tools.ai_search_tool import search_intent_index
 from classymail.core.llm_compat import build_chat_params, extract_message_content, is_reasoning_model
-from classymail.services.azure_clients import auth_headers, Clients
+from classymail.services.azure_clients import Clients
+from classymail.services.openai_client_factory import get_chat_client
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -202,10 +202,7 @@ async def run_specialized_agent(
             locale=locale,
         )
 
-        headers = await auth_headers(clients=clients)
-        url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
-
-        messages = [
+        messages: list[dict] = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": text_markdown[:8000]},
         ]
@@ -214,100 +211,109 @@ async def run_specialized_agent(
         tool_name = f"search_{candidate.slug.replace('-', '_')}"
         search_tool = _build_search_tool(candidate.slug, category.get("name", candidate.intent))
 
-        payload: dict = {
-            "model": deployment,
-            "messages": messages,
-            **build_chat_params(deployment, temperature=0.1, max_output_tokens=500),
-        }
-        # Add reasoning_effort for gpt-5 family models
-        if is_reasoning_model(deployment):
-            payload["reasoning_effort"] = agentic.get("reasoning_effort", "none")
+        chat_client = await get_chat_client(endpoint, api_version, clients=clients)
+        chat_params = build_chat_params(deployment, temperature=0.1, max_output_tokens=500)
 
-        # Only attach tool + json_object format if index is enabled
+        extra: dict = {}
+        if is_reasoning_model(deployment):
+            extra["reasoning_effort"] = agentic.get("reasoning_effort", "none")
+
+        first_extra = dict(extra)
         if index_enabled:
-            payload["tools"] = [search_tool]
+            first_extra["tools"] = [search_tool]
             # Force the LLM to call the search tool — mandatory RAG grounding
-            payload["tool_choice"] = {"type": "function", "function": {"name": tool_name}}
+            first_extra["tool_choice"] = {"type": "function", "function": {"name": tool_name}}
         else:
-            payload["response_format"] = {"type": "json_object"}
+            first_extra["response_format"] = {"type": "json_object"}
 
         t0 = time.perf_counter()
         rag_refs: list[RAGGroundingRef] = []
         total_usage: dict = {}
 
-        async with httpx.AsyncClient(timeout=60) as http:
-            # ── First LLM call (may produce tool_call or direct answer) ──
-            resp = await http.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
-            choice = data.get("choices", [{}])[0]
-            message = choice.get("message", {})
-            total_usage = data.get("usage", {})
+        # ── First LLM call (may produce tool_call or direct answer) ──
+        completion = await chat_client.chat.completions.create(
+            model=deployment,
+            messages=messages,
+            timeout=60.0,
+            **chat_params,
+            **first_extra,
+        )
+        data = completion.model_dump()
+        choice = data.get("choices", [{}])[0]
+        message = choice.get("message", {})
+        total_usage = data.get("usage", {}) or {}
 
-            # ── Handle tool call loop (max 1 round) ─────────────────
-            tool_calls = message.get("tool_calls", [])
-            if tool_calls and index_enabled:
-                span.add_event("tool_call", {"tool": tool_name, "index": f"classymail-intent-{candidate.slug}"})
+        # ── Handle tool call loop (max 1 round) ─────────────────
+        tool_calls = message.get("tool_calls") or []
+        if tool_calls and index_enabled:
+            span.add_event("tool_call", {"tool": tool_name, "index": f"classymail-intent-{candidate.slug}"})
 
-                for tc in tool_calls:
-                    fn_name = tc.get("function", {}).get("name", "")
-                    # Accept the contextual tool name (search_billing_inquiry)
-                    # or the generic fallback (search_reference_examples)
-                    if not fn_name.startswith("search_"):
-                        continue
+            for tc in tool_calls:
+                fn_name = (tc.get("function") or {}).get("name", "")
+                # Accept the contextual tool name (search_billing_inquiry)
+                # or the generic fallback (search_reference_examples)
+                if not fn_name.startswith("search_"):
+                    continue
 
-                    # Parse tool arguments
-                    try:
-                        args = json.loads(tc["function"].get("arguments", "{}"))
-                    except json.JSONDecodeError:
-                        args = {"query": text_markdown[:500]}
+                # Parse tool arguments
+                try:
+                    args = json.loads(tc["function"].get("arguments", "{}"))
+                except json.JSONDecodeError:
+                    args = {"query": text_markdown[:500]}
 
-                    query = args.get("query", text_markdown[:500])
+                query = args.get("query", text_markdown[:500])
 
-                    # Execute the actual AI Search retrieval
-                    rag_refs = await search_intent_index(
-                        query,
-                        candidate.slug,
-                        retrieval_mode=retrieval_mode,
-                        top_k=top_k,
-                        clients=clients,
-                    )
-
-                    tool_result = _format_tool_result(rag_refs)
-
-                    # Append assistant message + tool result, then re-call LLM
-                    messages.append(message)
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc["id"],
-                        "content": tool_result,
-                    })
-
-                # Second LLM call with tool results — no tools, force JSON
-                payload2 = {
-                    "model": deployment,
-                    "response_format": {"type": "json_object"},
-                    "messages": messages,
-                    **build_chat_params(deployment, temperature=0.1, max_output_tokens=500),
-                }
-                if is_reasoning_model(deployment):
-                    payload2["reasoning_effort"] = agentic.get("reasoning_effort", "none")
-                resp2 = await http.post(url, json=payload2, headers=headers)
-                resp2.raise_for_status()
-                data2 = resp2.json()
-                message = data2.get("choices", [{}])[0].get("message", {})
-
-                # Merge usage
-                usage2 = data2.get("usage", {})
-                for k in ("prompt_tokens", "completion_tokens", "total_tokens"):
-                    total_usage[k] = total_usage.get(k, 0) + usage2.get(k, 0)
-
-            elif index_enabled and not tool_calls:
-                logger.warning(
-                    "[agentic] Agent %s: tool_choice was required but LLM returned no tool call",
+                # Execute the actual AI Search retrieval
+                rag_refs = await search_intent_index(
+                    query,
                     candidate.slug,
+                    retrieval_mode=retrieval_mode,
+                    top_k=top_k,
+                    clients=clients,
                 )
-                span.add_event("tool_call_skipped", {"reason": "llm_ignored_required_tool"})
+
+                tool_result = _format_tool_result(rag_refs)
+
+                # Append assistant message + tool result, then re-call LLM.
+                # Strip None fields (refusal/audio/annotations) which Azure may
+                # reject when echoing the assistant message back.
+                assistant_msg = {
+                    "role": message.get("role", "assistant"),
+                    "content": message.get("content"),
+                    "tool_calls": message.get("tool_calls"),
+                }
+                assistant_msg = {k: v for k, v in assistant_msg.items() if v is not None}
+                messages.append(assistant_msg)
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": tool_result,
+                })
+
+            # Second LLM call with tool results — no tools, force JSON
+            second_extra = dict(extra)
+            second_extra["response_format"] = {"type": "json_object"}
+            completion2 = await chat_client.chat.completions.create(
+                model=deployment,
+                messages=messages,
+                timeout=60.0,
+                **chat_params,
+                **second_extra,
+            )
+            data2 = completion2.model_dump()
+            message = data2.get("choices", [{}])[0].get("message", {})
+
+            # Merge usage
+            usage2 = data2.get("usage", {}) or {}
+            for k in ("prompt_tokens", "completion_tokens", "total_tokens"):
+                total_usage[k] = total_usage.get(k, 0) + usage2.get(k, 0)
+
+        elif index_enabled and not tool_calls:
+            logger.warning(
+                "[agentic] Agent %s: tool_choice was required but LLM returned no tool call",
+                candidate.slug,
+            )
+            span.add_event("tool_call_skipped", {"reason": "llm_ignored_required_tool"})
 
         latency_ms = (time.perf_counter() - t0) * 1000
         content = extract_message_content(message) or "{}"
