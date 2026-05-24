@@ -36,8 +36,8 @@ dependencies = [
 	"slowapi==0.1.9",
 	"aiolimiter==1.1.0",
 	"openpyxl>=3.1.0",
-	"agent-framework-core>=1.5.0,<2.0.0",
-	"agent-framework-openai>=1.5.0,<2.0.0",
+	"agent-framework-core>=1.6.0,<2.0.0",
+	"agent-framework-openai>=1.6.0,<2.0.0",
 ]
 
 [project.optional-dependencies]
