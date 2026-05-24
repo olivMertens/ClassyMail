@@ -21,6 +21,22 @@ wheels = [
 ]
 
 [[package]]
+name = "agent-framework-devui"
+version = "1.0.0b260521"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "agent-framework-core" },
+    { name = "fastapi" },
+    { name = "openai" },
+    { name = "opentelemetry-sdk" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1a/21/f05ae03f51d0b14d701a90a5f7ca1c55677a64c456342bd0c5db3530bb1e/agent_framework_devui-1.0.0b260521.tar.gz", hash = "sha256:13e67ef5d928c65d68911ede8fa41818f080d085e8e666eda2e918cd34ef28f3", size = 359719, upload-time = "2026-05-22T02:23:38.183Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9a/00/69d1e944b0d12cefe62a536254d0ab32a0551132fde9b22fd06284270fb6/agent_framework_devui-1.0.0b260521-py3-none-any.whl", hash = "sha256:1e732582cef03b10c97bbd4a7e90408da81d746a380ec8b26aea142d4df963a0", size = 364462, upload-time = "2026-05-22T02:23:57.143Z" },
+]
+
+[[package]]
 name = "agent-framework-openai"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -491,6 +507,7 @@ dev = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "agent-framework-devui" },
     { name = "execnet" },
     { name = "pre-commit" },
     { name = "pytest-asyncio" },
@@ -541,6 +558,7 @@ provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "agent-framework-devui", specifier = ">=1.0.0b260521" },
     { name = "execnet", specifier = ">=2.1.2" },
     { name = "pre-commit", specifier = ">=3.7.0" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },

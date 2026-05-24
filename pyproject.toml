@@ -57,6 +57,7 @@ packages = ["classymail"]
 
 [dependency-groups]
 dev = [
+    "agent-framework-devui>=1.0.0b260521",
     "execnet>=2.1.2",
     "pre-commit>=3.7.0",
     "pytest-asyncio>=0.24.0",

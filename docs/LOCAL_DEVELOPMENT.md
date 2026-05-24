@@ -224,6 +224,26 @@ az containerapp registry set `
 
 ---
 
+## Debugging Agents (DevUI)
+
+[Microsoft Agent Framework DevUI](https://pypi.org/project/agent-framework-devui/) ships a local web UI to interactively exercise agents (tool calls, system prompt, history) without going through the FastAPI + Vue frontend.
+
+```powershell
+# Requires dev deps (already pinned in pyproject.toml [dependency-groups] dev)
+uv sync --group dev
+
+# Launches http://localhost:8080 with the production ClassyMailChatAgent wired in
+uv run python scripts/devui_launcher.py
+# Optional flags: --port 9000, --no-open
+```
+
+The launcher reuses the singleton `agent_framework.Agent` built by
+`classymail.services.chat_agent`, so it picks up the same system prompt,
+tools, and `Clients` wiring as the API path. No production code imports
+`agent-framework-devui` — it stays in the `dev` dependency group only.
+
+---
+
 ## Testing & Validation
 
 ### Lint & Format
