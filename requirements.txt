@@ -9,7 +9,7 @@ agent-framework-openai==1.7.0
     # via classymail
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.13.3
+aiohttp==3.13.4
     # via classymail
 aiolimiter==1.1.0
     # via classymail
