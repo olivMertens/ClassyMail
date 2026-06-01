@@ -360,3 +360,68 @@ class TestPipelineRouting:
     def test_import_classify_agentic(self):
         """classify_agentic is importable from pipeline."""
         from classymail.services.pipeline import classify_agentic  # noqa: F401
+
+
+class TestFanoutResilience:
+    """One specialized agent crash must not lose the other agents' results."""
+
+    @pytest.mark.asyncio
+    async def test_partial_failure_yields_placeholder(self):
+        orch_result = OrchestratorResult(
+            candidate_intents=[
+                CandidateIntent(intent="Billing", slug="billing", confidence=0.9),
+                CandidateIntent(intent="Tech", slug="tech", confidence=0.7),
+            ],
+            model="gpt-4.1-nano",
+            tokens={"total_tokens": 50},
+        )
+        good = SpecializedAgentResult(
+            intent="Billing", slug="billing", is_match=True, confidence=0.95,
+            model="gpt-4.1-nano", tokens={"total_tokens": 100},
+        )
+
+        async def _side_effect(text, candidate, **_):
+            if candidate.slug == "billing":
+                return good
+            raise RuntimeError("AI Search 503")
+
+        with (
+            patch("classymail.agents.workflow.run_orchestrator", new_callable=AsyncMock) as mock_orch,
+            patch("classymail.agents.workflow.run_specialized_agent", side_effect=_side_effect),
+            patch("classymail.agents.workflow.run_red_team", new_callable=AsyncMock) as mock_rt,
+        ):
+            mock_orch.return_value = orch_result
+            mock_rt.return_value = RedTeamVerdict(validated=True, model="gpt-4.1", tokens={"total_tokens": 0})
+
+            from classymail.agents.workflow import classify_agentic
+            result = await classify_agentic(
+                "Billing question with a broken tech agent",
+                settings={
+                    "agentic": {"enabled": True, "red_team_threshold": 0.7},
+                    "categories": [
+                        {"name": "Billing", "slug": "billing", "description": "x", "exclusions": ""},
+                        {"name": "Tech", "slug": "tech", "description": "y", "exclusions": ""},
+                    ],
+                },
+            )
+
+        # Surviving agent still drives the classification:
+        assert any(
+            d.get("intent") == "Billing" and d.get("confidence") == 0.95
+            for d in result["detected_intents"]
+        )
+        # Tech (failed) appears in traces as a specialized entry with confidence=0
+        tech_traces = [
+            t for t in result.get("agent_traces", [])
+            if t.get("agent_type") == "specialized" and t.get("intent") == "tech"
+        ]
+        assert tech_traces and tech_traces[0].get("confidence") == 0.0
+
+    def test_failure_placeholder_shape(self):
+        from classymail.agents.workflow import _failure_placeholder
+        cand = CandidateIntent(intent="Billing", slug="billing", confidence=0.9)
+        placeholder = _failure_placeholder(cand, RuntimeError("boom"))
+        assert placeholder.slug == "billing"
+        assert placeholder.is_match is False
+        assert placeholder.confidence == 0.0
+        assert placeholder.error == "RuntimeError: boom"

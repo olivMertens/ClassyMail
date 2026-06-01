@@ -60,6 +60,7 @@ class SpecializedAgentResult(BaseModel):
     search_index: Optional[str] = None
     retrieval_mode: Optional[str] = None
     tool_called: bool = False
+    error: Optional[str] = None  # Set when the agent run raised; placeholder result for UI trace continuity.
 
 
 class RedTeamVerdict(BaseModel):

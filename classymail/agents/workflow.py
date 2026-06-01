@@ -39,6 +39,54 @@ def _sum_tokens(usage: dict | None) -> int:
     return int(usage.get("total_tokens", 0))
 
 
+def _failure_placeholder(candidate: CandidateIntent, exc: BaseException) -> SpecializedAgentResult:
+    """Build a non-blocking placeholder result for a failed specialized agent.
+
+    Keeps the UI Mermaid trace continuous (per-slug entry preserved) while
+    surfacing the error inline. ``confidence=0.0`` + ``is_match=False`` means
+    downstream aggregation naturally drops the failed intent.
+    """
+    return SpecializedAgentResult(
+        intent=candidate.intent,
+        slug=candidate.slug,
+        is_match=False,
+        confidence=0.0,
+        explanation=None,
+        rag_grounding=[],
+        model=None,
+        tokens=None,
+        latency_ms=None,
+        search_index=None,
+        retrieval_mode=None,
+        tool_called=False,
+        error=f"{type(exc).__name__}: {exc}",
+    )
+
+
+def _settle_fanout(
+    candidates: list[CandidateIntent],
+    settled: list,
+) -> tuple[list[SpecializedAgentResult], int]:
+    """Convert gather(return_exceptions=True) output into results + failure count.
+
+    Logs each failure with full stack context so AppInsights / OTel keeps the
+    diagnostic signal.
+    """
+    results: list[SpecializedAgentResult] = []
+    failed = 0
+    for candidate, outcome in zip(candidates, settled, strict=True):
+        if isinstance(outcome, BaseException):
+            failed += 1
+            logger.exception(
+                "[agentic] specialized agent failed slug=%s: %s",
+                candidate.slug, outcome, exc_info=outcome,
+            )
+            results.append(_failure_placeholder(candidate, outcome))
+        else:
+            results.append(outcome)
+    return results, failed
+
+
 async def classify_agentic(
     text_markdown: str,
     *,
@@ -105,11 +153,13 @@ async def classify_agentic(
                     for candidate in candidates
                 ]
                 agent_results = await asyncio.gather(
-                    *tasks, return_exceptions=False
+                    *tasks, return_exceptions=True
                 )
+                agent_results, failed_count = _settle_fanout(candidates, agent_results)
 
                 parallel_ms = (time.perf_counter() - par_t0) * 1000
                 par_span.set_attribute("agentic.parallel.latency_ms", round(parallel_ms, 1))
+                par_span.set_attribute("agentic.parallel.failed_count", failed_count)
 
         for ar in agent_results:
             traces.append(AgentTrace(
@@ -192,9 +242,16 @@ async def classify_agentic(
                         )
                         for candidate in extra_candidates
                     ]
-                    extra_results: list[SpecializedAgentResult] = await asyncio.gather(
-                        *extra_tasks, return_exceptions=False
+                    extra_results_raw = await asyncio.gather(
+                        *extra_tasks, return_exceptions=True
                     )
+                    extra_results, extra_failed = _settle_fanout(
+                        extra_candidates, extra_results_raw
+                    )
+                    if extra_failed:
+                        root_span.set_attribute(
+                            "agentic.red_team.extra_failed_count", extra_failed
+                        )
                     for ar in extra_results:
                         traces.append(AgentTrace(
                             agent_type="specialized",
