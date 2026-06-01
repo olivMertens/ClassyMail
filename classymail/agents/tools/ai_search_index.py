@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -18,6 +19,24 @@ from classymail.services.azure_clients import Clients
 logger = logging.getLogger(__name__)
 
 EMBEDDING_DIMENSIONS = 1536
+
+
+@asynccontextmanager
+async def _http_ctx(clients: Clients | None):
+    """Use the shared httpx client when available; otherwise a short-lived one.
+
+    Keeps backwards compat for call sites that don't have a ``Clients`` in scope
+    (e.g. CLI tools, tests, ad-hoc scripts) while removing the per-call TLS
+    handshake / connection-pool churn on the hot path.
+    """
+    if clients is not None and getattr(clients, "http", None) is not None:
+        yield clients.http
+        return
+    import httpx
+
+    async with httpx.AsyncClient(timeout=30) as http:
+        yield http
+
 
 # ── Schema ───────────────────────────────────────────────────────────
 
@@ -92,20 +111,18 @@ async def ensure_index(slug: str, *, clients: Clients | None = None) -> dict:
     if not SEARCH_ENDPOINT:
         return {"status": "disabled", "index": _index_name(slug)}
 
-    import httpx
-
     index = _index_name(slug)
     headers = _auth_headers()
     api = f"{SEARCH_ENDPOINT}/indexes/{index}?api-version=2024-07-01"
 
-    async with httpx.AsyncClient(timeout=30) as http:
-        check = await http.get(api, headers=headers)
+    async with _http_ctx(clients) as http:
+        check = await http.get(api, headers=headers, timeout=30)
         if check.status_code == 200:
             logger.info("AI Search index '%s' already exists", index)
             return {"status": "exists", "index": index}
 
         schema = build_index_schema(slug)
-        resp = await http.put(api, headers=headers, json=schema)
+        resp = await http.put(api, headers=headers, json=schema, timeout=30)
         if resp.status_code in (200, 201):
             logger.info("AI Search index '%s' created", index)
             return {"status": "created", "index": index}
@@ -125,55 +142,49 @@ async def ensure_indexes_for_categories(categories: list[dict], *, clients: Clie
     return results
 
 
-async def delete_index(slug: str) -> dict:
+async def delete_index(slug: str, *, clients: Clients | None = None) -> dict:
     """Delete an AI Search index (used when removing a category)."""
     if not SEARCH_ENDPOINT:
         return {"status": "disabled"}
-
-    import httpx
 
     index = _index_name(slug)
     headers = _auth_headers()
     api = f"{SEARCH_ENDPOINT}/indexes/{index}?api-version=2024-07-01"
 
-    async with httpx.AsyncClient(timeout=30) as http:
-        resp = await http.delete(api, headers=headers)
+    async with _http_ctx(clients) as http:
+        resp = await http.delete(api, headers=headers, timeout=30)
         if resp.status_code in (200, 204, 404):
             return {"status": "deleted", "index": index}
         return {"status": "error", "detail": resp.text[:300]}
 
 
-async def list_indexes() -> list[dict]:
+async def list_indexes(*, clients: Clients | None = None) -> list[dict]:
     """List all classymail-intent-* indexes from AI Search."""
     if not SEARCH_ENDPOINT:
         return []
 
-    import httpx
-
     headers = _auth_headers()
     api = f"{SEARCH_ENDPOINT}/indexes?api-version=2024-07-01&$select=name"
 
-    async with httpx.AsyncClient(timeout=30) as http:
-        resp = await http.get(api, headers=headers)
+    async with _http_ctx(clients) as http:
+        resp = await http.get(api, headers=headers, timeout=30)
         if resp.status_code != 200:
             return []
         indexes = resp.json().get("value", [])
         return [ix for ix in indexes if ix.get("name", "").startswith("classymail-intent-")]
 
 
-async def get_index_doc_count(slug: str) -> int:
+async def get_index_doc_count(slug: str, *, clients: Clients | None = None) -> int:
     """Get document count for a category's AI Search index."""
     if not SEARCH_ENDPOINT:
         return 0
-
-    import httpx
 
     index = _index_name(slug)
     headers = _auth_headers()
     api = f"{SEARCH_ENDPOINT}/indexes/{index}/docs/$count?api-version=2024-07-01"
 
-    async with httpx.AsyncClient(timeout=15) as http:
-        resp = await http.get(api, headers=headers)
+    async with _http_ctx(clients) as http:
+        resp = await http.get(api, headers=headers, timeout=15)
         if resp.status_code == 200:
             try:
                 return int(resp.text.strip())
@@ -205,8 +216,6 @@ async def upsert_example(
     if not SEARCH_ENDPOINT:
         return {"status": "disabled"}
 
-    import httpx
-
     index = _index_name(slug)
     headers = _auth_headers()
 
@@ -236,8 +245,8 @@ async def upsert_example(
     }
 
     api = f"{SEARCH_ENDPOINT}/indexes/{index}/docs/index?api-version=2024-07-01"
-    async with httpx.AsyncClient(timeout=30) as http:
-        resp = await http.post(api, headers=headers, json={"value": [doc]})
+    async with _http_ctx(clients) as http:
+        resp = await http.post(api, headers=headers, json={"value": [doc]}, timeout=30)
         if resp.status_code in (200, 207):
             results = resp.json().get("value", [])
             ok = all(r.get("status") for r in results)
@@ -245,19 +254,17 @@ async def upsert_example(
         return {"status": "error", "detail": resp.text[:300]}
 
 
-async def list_examples(slug: str, *, top: int = 20) -> list[dict]:
+async def list_examples(slug: str, *, top: int = 20, clients: Clients | None = None) -> list[dict]:
     """List example documents from a category's AI Search index."""
     if not SEARCH_ENDPOINT:
         return []
-
-    import httpx
 
     index = _index_name(slug)
     headers = _auth_headers()
     api = f"{SEARCH_ENDPOINT}/indexes/{index}/docs?api-version=2024-07-01&$top={top}&$orderby=created_at desc&$select=id,email_id,content,label,label_source,is_positive,correction_reason,human_verified,created_at"
 
-    async with httpx.AsyncClient(timeout=15) as http:
-        resp = await http.get(api, headers=headers)
+    async with _http_ctx(clients) as http:
+        resp = await http.get(api, headers=headers, timeout=15)
         if resp.status_code != 200:
             return []
         docs = resp.json().get("value", [])
@@ -277,20 +284,18 @@ async def list_examples(slug: str, *, top: int = 20) -> list[dict]:
         ]
 
 
-async def delete_example(slug: str, doc_id: str) -> dict:
+async def delete_example(slug: str, doc_id: str, *, clients: Clients | None = None) -> dict:
     """Delete a specific example from a category's AI Search index."""
     if not SEARCH_ENDPOINT:
         return {"status": "disabled"}
-
-    import httpx
 
     index = _index_name(slug)
     headers = _auth_headers()
     api = f"{SEARCH_ENDPOINT}/indexes/{index}/docs/index?api-version=2024-07-01"
 
     payload = {"value": [{"@search.action": "delete", "id": doc_id}]}
-    async with httpx.AsyncClient(timeout=15) as http:
-        resp = await http.post(api, headers=headers, json=payload)
+    async with _http_ctx(clients) as http:
+        resp = await http.post(api, headers=headers, json=payload, timeout=15)
         if resp.status_code in (200, 207):
             return {"status": "deleted", "doc_id": doc_id}
         return {"status": "error", "detail": resp.text[:300]}

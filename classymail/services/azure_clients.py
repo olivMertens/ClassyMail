@@ -46,6 +46,15 @@ class Clients:
         self.cosmos_chat_container = None
         self.cosmos_cache_container = None
 
+        # Shared httpx client (TLS handshake + connection pool reused across calls).
+        # Per-call timeouts are still possible via request kwargs.
+        import httpx as _httpx
+
+        self.http: _httpx.AsyncClient = _httpx.AsyncClient(
+            timeout=_httpx.Timeout(30.0, connect=10.0),
+            limits=_httpx.Limits(max_keepalive_connections=20, max_connections=100),
+        )
+
     async def init(self) -> None:
         # Keep startup resilient: avoid network calls here.
         sb_conn_str = os.getenv("AZURE_SERVICE_BUS_CONNECTION_STRING")
@@ -69,6 +78,10 @@ class Clients:
             await self.cosmos_client.close()
         if self.blob_service_client:
             await self.blob_service_client.close()
+        try:
+            await self.http.aclose()
+        except Exception:
+            pass
 
     # Rate-limit health checks to avoid burning RUs on every call.
     # ensure_cosmos_container is called 5+ times per /api/emails request
