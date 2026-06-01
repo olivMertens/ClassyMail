@@ -57,7 +57,7 @@ packages = ["classymail"]
 
 [dependency-groups]
 dev = [
-    "agent-framework-devui>=1.0.0b260521",
+    "agent-framework-devui>=1.0.0b260528",
     "execnet>=2.1.2",
     "pre-commit>=3.7.0",
     "pytest-asyncio>=0.24.0",
@@ -77,3 +77,8 @@ exclude = ["main.py", ".venv"]
 addopts = "-p no:xdist"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore::DeprecationWarning:agent_framework",
+    "ignore:.*MemoryStore is experimental.*:UserWarning",
+    "ignore:.*SkillResource is experimental.*:UserWarning",
+]

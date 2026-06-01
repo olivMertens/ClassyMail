@@ -22,7 +22,7 @@ wheels = [
 
 [[package]]
 name = "agent-framework-devui"
-version = "1.0.0b260521"
+version = "1.0.0b260528"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "agent-framework-core" },
@@ -31,9 +31,9 @@ dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "uvicorn", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1a/21/f05ae03f51d0b14d701a90a5f7ca1c55677a64c456342bd0c5db3530bb1e/agent_framework_devui-1.0.0b260521.tar.gz", hash = "sha256:13e67ef5d928c65d68911ede8fa41818f080d085e8e666eda2e918cd34ef28f3", size = 359719, upload-time = "2026-05-22T02:23:38.183Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/38/ec/0a022ce4d7776441f00df064772f5826ffe1f96a29b06f254df73519f302/agent_framework_devui-1.0.0b260528.tar.gz", hash = "sha256:81a1503ec7d4c093a322416075fbbd2077cc229fac4a738413129bd6b9585c94", size = 359517, upload-time = "2026-05-28T10:53:51.28Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9a/00/69d1e944b0d12cefe62a536254d0ab32a0551132fde9b22fd06284270fb6/agent_framework_devui-1.0.0b260521-py3-none-any.whl", hash = "sha256:1e732582cef03b10c97bbd4a7e90408da81d746a380ec8b26aea142d4df963a0", size = 364462, upload-time = "2026-05-22T02:23:57.143Z" },
+    { url = "https://files.pythonhosted.org/packages/78/cd/2f233810f8e64aa05be922da81020da582044223f8edcb21d894ef08e8e6/agent_framework_devui-1.0.0b260528-py3-none-any.whl", hash = "sha256:8719132a2ec16ed01a1afc6fceb87969b19dd0fcfcdf97d52b81bcdcd996cf69", size = 364239, upload-time = "2026-05-28T10:54:07.173Z" },
 ]
 
 [[package]]
@@ -558,7 +558,7 @@ provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "agent-framework-devui", specifier = ">=1.0.0b260521" },
+    { name = "agent-framework-devui", specifier = ">=1.0.0b260528" },
     { name = "execnet", specifier = ">=2.1.2" },
     { name = "pre-commit", specifier = ">=3.7.0" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
