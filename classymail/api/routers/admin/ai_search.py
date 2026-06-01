@@ -30,12 +30,12 @@ async def list_ai_search_indexes(clients: Clients = Depends(get_clients)):
     if not SEARCH_ENDPOINT:
         return {"enabled": False, "indexes": []}
 
-    indexes = await list_indexes()
+    indexes = await list_indexes(clients=clients)
     result = []
     for ix in indexes:
         name = ix.get("name", "")
         slug = name.replace("classymail-intent-", "")
-        count = await get_index_doc_count(slug)
+        count = await get_index_doc_count(slug, clients=clients)
         result.append({"index": name, "slug": slug, "doc_count": count})
 
     return {"enabled": True, "indexes": result}
@@ -65,22 +65,22 @@ async def ensure_all_indexes(clients: Clients = Depends(get_clients)):
 
 
 @router.delete("/ai-search/indexes/{slug}")
-async def delete_ai_search_index(slug: str):
+async def delete_ai_search_index(slug: str, clients: Clients = Depends(get_clients)):
     """Delete a category's AI Search index."""
     from classymail.agents.tools.ai_search_index import delete_index
 
-    result = await delete_index(slug)
+    result = await delete_index(slug, clients=clients)
     if result.get("status") == "error":
         raise HTTPException(status_code=502, detail=result.get("detail", "Delete failed"))
     return result
 
 
 @router.get("/ai-search/indexes/{slug}/examples")
-async def list_ai_search_examples(slug: str, top: int = 20):
+async def list_ai_search_examples(slug: str, top: int = 20, clients: Clients = Depends(get_clients)):
     """List example documents in a category's AI Search index."""
     from classymail.agents.tools.ai_search_index import list_examples
 
-    return {"slug": slug, "examples": await list_examples(slug, top=top)}
+    return {"slug": slug, "examples": await list_examples(slug, top=top, clients=clients)}
 
 
 @router.post("/ai-search/indexes/{slug}/examples")
@@ -114,11 +114,11 @@ async def add_ai_search_example(
 
 
 @router.delete("/ai-search/indexes/{slug}/examples/{doc_id}")
-async def remove_ai_search_example(slug: str, doc_id: str):
+async def remove_ai_search_example(slug: str, doc_id: str, clients: Clients = Depends(get_clients)):
     """Delete a specific example from a category's index."""
     from classymail.agents.tools.ai_search_index import delete_example
 
-    result = await delete_example(slug, doc_id)
+    result = await delete_example(slug, doc_id, clients=clients)
     if result.get("status") == "error":
         raise HTTPException(status_code=502, detail=result.get("detail", "Delete failed"))
     return result
