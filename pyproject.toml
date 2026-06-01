@@ -23,7 +23,7 @@ dependencies = [
 	"opentelemetry-instrumentation-fastapi==0.60b0",
 	"opentelemetry-instrumentation-httpx==0.60b0",
 	"aiohttp==3.13.3",
-	"python-multipart==0.0.21",
+	"python-multipart==0.0.27",
 	"fpdf2==2.7.9",
 	"azure-ai-inference>=1.0.0b9",
 	"azure-search-documents>=11.5.0",
