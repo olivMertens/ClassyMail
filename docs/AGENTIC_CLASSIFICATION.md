@@ -1,10 +1,66 @@
 # ClassyMail – Agentic Classification Architecture
 
-> Microsoft Agent Framework GA 1.0 — Multi-agent email classification with orchestrator, specialized agents, per-intent AI Search indexes, and quality gate.
+> Microsoft Agent Framework 1.7 — Multi-agent email classification with orchestrator, tier-aware specialized agents, per-intent AI Search indexes, resilient fan-out, and adversarial Red Team quality gate.
 
 ## Architecture Overview
 
 ![Agentic Classification Pipeline — Architecture](assets/mermaidflow.png)
+
+### Agents + Orchestration (Mermaid)
+
+The diagram below shows the **runtime shape** of a single agentic classification — orchestrator, tiered specialized agents (selected per candidate based on the orchestrator's confidence), the resilient fan-in, and the red-team escalation path that can spawn extra specialized agents in a second resilient fan-out.
+
+```mermaid
+flowchart TD
+    Email[Email markdown + metadata] --> Orch["Orchestrator Inspector - UI-selectable model - gpt-4.1-nano default or model-router"]
+    Orch -->|"OrchestratorResult: candidate_intents with confidence"| TierGate{Tier dispatch per candidate intent}
+
+    TierGate -->|"confidence >= 0.8"| T1Group["Tier 1 - Simple intents"]
+    TierGate -->|"0.5 - 0.8 ambiguous"| T2Group["Tier 2 - Ambiguous intents"]
+    TierGate -->|"confidence < 0.5 critical"| T3Group["Tier 3 - Critical intents"]
+
+    T1Group --> T1A["Specialized Agent - gpt-4.1-nano"]
+    T2Group --> T2A["Specialized Agent - gpt-4.1-mini"]
+    T3Group --> T3A["Specialized Agent - gpt-4.1 or gpt-5-mini"]
+
+    T1A -->|"RAG"| AIS[("Azure AI Search - per-intent indexes - positive + negative examples")]
+    T2A -->|"RAG"| AIS
+    T3A -->|"RAG"| AIS
+
+    AIS -->|"top-K hybrid + semantic"| T1A
+    AIS -->|"top-K hybrid + semantic"| T2A
+    AIS -->|"top-K hybrid + semantic"| T3A
+
+    T1A --> FanIn["Resilient fan-in: asyncio.gather return_exceptions=True - placeholder for any failed agent - OTel agentic.parallel.failed_count"]
+    T2A --> FanIn
+    T3A --> FanIn
+
+    FanIn -->|"max_conf >= 0.7 and no top-2 conflict"| Final["Final Decision - traceable + explainable"]
+    FanIn -->|"max_conf < 0.7 - top-2 within 0.15 - or zero candidates"| RT["Red Team - Adversarial Quality Gate - UI-selectable model"]
+
+    RT -->|"Validated pass-through"| Final
+    RT -->|"Detects missed intents - requests extra specialized agents"| ExtraFan["Extra Specialized Agents - 2nd resilient fan-out - OTel agentic.red_team.extra_failed_count"]
+    ExtraFan --> Final
+
+    style Orch fill:#f3e5f5
+    style TierGate fill:#ede7f6
+    style T1A fill:#e8f5e9
+    style T2A fill:#fff9c4
+    style T3A fill:#ffe0b2
+    style AIS fill:#e8eaf6
+    style FanIn fill:#f3e5f5
+    style RT fill:#fce4ec
+    style ExtraFan fill:#fce4ec
+    style Final fill:#e1f5fe
+```
+
+**How tier dispatch works in practice** (`classymail/agents/specialized.py::_select_model_tier`): the same prompt template is used for every specialized agent — only the underlying model changes based on the candidate's orchestrator-assigned confidence. This keeps cost low for clear cases and dedicates the strongest models to the messy ones, without prompt drift.
+
+| Orchestrator confidence | Tier | Default model | Setting key |
+|---|---|---|---|
+| `>= 0.80` | 1 — Simple | `gpt-4.1-nano` | `agentic.agent_tier1_model` |
+| `0.50 – 0.79` | 2 — Ambiguous | `gpt-4.1-mini` | `agentic.agent_tier2_model` |
+| `< 0.50` | 3 — Critical | `gpt-4.1` (or `gpt-5-mini`) | `agentic.agent_tier3_model` |
 
 ## 1. Objective
 
@@ -74,7 +130,7 @@ Final classification decision (traceable, explainable)
 
 ### Why Custom Routing (not GroupChat / Magentic)
 
-After analyzing the [Agent Framework 1.5 workflow samples](https://github.com/microsoft/agent-framework/tree/main/python/samples/03-workflows), the best pattern for ClassyMail is:
+After analyzing the [Agent Framework 1.7 workflow samples](https://github.com/microsoft/agent-framework/tree/main/python/samples/03-workflows), the best pattern for ClassyMail is:
 
 | Pattern | Fit | Reason |
 |---|---|---|
@@ -420,6 +476,9 @@ pipeline.classification
   |     |
   |     +-- agentic.parallel_agents           # Fan-out parent span
   |     |     |
+  |     |     +-- agentic.parallel.failed_count: 0   # PR #47 — placeholder count
+  |     |     +-- agentic.parallel.agent_count: 3
+  |     |     |
   |     |     +-- agentic.agent.natural_event  # Per-agent spans (parallel)
   |     |     |     +-- gen_ai.request.model: gpt-4.1-nano
   |     |     |     +-- agentic.intent: natural_event
@@ -443,6 +502,7 @@ pipeline.classification
   |           +-- gen_ai.request.model: gpt-4.1
   |           +-- agentic.trigger_reason: low_confidence
   |           +-- agentic.additional_agents: ["liability"]
+  |           +-- agentic.red_team.extra_failed_count: 0  # PR #47 — only emitted when > 0
   |
   +-- pipeline.embedding
   +-- pipeline.entity_extraction
