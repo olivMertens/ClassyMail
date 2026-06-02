@@ -45,8 +45,42 @@ The entire pipeline is event-driven: Blob Storage → Event Grid → Service Bus
 
 - **Orchestrator Inspector**: A fast, cheap model (gpt-4.1-nano) scans the document and shortlists the top 3-5 candidate categories — cuts 80% of unnecessary computation
 - **Parallel Specialized Agents**: One agent per candidate category, each with its own RAG tool calling a dedicated Azure AI Search index for reference examples
-- **Red Team Quality Gate**: Adversarial reviewer activated when confidence is low or agents disagree
+- **Tier-aware model selection**: The orchestrator's per-candidate confidence drives the model used by each specialized agent — Tier 1 (`conf ≥ 0.8`, simple) uses cheap models; Tier 2 (`0.5 ≤ conf < 0.8`, ambiguous) uses balanced models; Tier 3 (`conf < 0.5`, critical) uses the most capable models. Same prompt, different muscle.
+- **Red Team Quality Gate**: Adversarial reviewer activated when confidence is low or agents disagree — can request **extra agents** which run in a second resilient fan-out
+- **Resilient fan-out**: One agent crashing (AI Search 503, OpenAI 429, etc.) no longer fails the whole batch — failed agents return a placeholder so the trace stays continuous and the surviving agents drive the decision (`agentic.parallel.failed_count` OTel attr)
 - **Per-Category AI Search Indexes**: Add good and bad examples via the Settings UI — agents use them to calibrate confidence
+
+```mermaid
+flowchart TD
+    Email[Email markdown] --> Orch["Orchestrator Inspector - gpt-4.1-nano or model-router"]
+    Orch -->|"Top 3-6 candidates with confidence"| Tier{Tier selection per candidate}
+    Tier -->|"conf >= 0.8 - simple"| T1["Tier 1 Specialized Agent - gpt-4.1-nano"]
+    Tier -->|"0.5 - 0.8 ambiguous"| T2["Tier 2 Specialized Agent - gpt-4.1-mini"]
+    Tier -->|"conf < 0.5 critical"| T3["Tier 3 Specialized Agent - gpt-4.1 or gpt-5-mini"]
+    T1 -->|"RAG"| AIS[("AI Search per-intent indexes")]
+    T2 -->|"RAG"| AIS
+    T3 -->|"RAG"| AIS
+    AIS -->|"Positive + negative examples"| T1
+    AIS -->|"Positive + negative examples"| T2
+    AIS -->|"Positive + negative examples"| T3
+    T1 --> Agg["Aggregation: fan-in + resilient placeholders"]
+    T2 --> Agg
+    T3 --> Agg
+    Agg -->|"max_conf < 0.7 or top-2 conflict"| RT["Red Team Quality Gate - gpt-4.1 or gpt-5-mini"]
+    RT -->|"Request missed intents"| Extra["Extra Specialized Agents - 2nd resilient fan-out"]
+    Extra --> Final["Final Decision - OTel agentic.parallel.failed_count"]
+    Agg -->|"max_conf >= 0.7"| Final
+    RT -->|"Validated"| Final
+
+    style Orch fill:#f3e5f5
+    style T1 fill:#e8f5e9
+    style T2 fill:#fff9c4
+    style T3 fill:#ffe0b2
+    style Agg fill:#f3e5f5
+    style RT fill:#fce4ec
+    style Extra fill:#fce4ec
+    style AIS fill:#e8eaf6
+```
 
 ![Agentic Pipeline Configuration — Settings UI](docs/assets/setttingsagenticpipeline.png)
 
@@ -79,7 +113,7 @@ Full documentation: [AGENTIC_CLASSIFICATION](docs/AGENTIC_CLASSIFICATION.md) | [
 - **Per-Category AI Search Indexes**: Each category gets its own Azure AI Search index with positive and negative reference examples — agents use RAG to calibrate confidence (see [AI_SEARCH_INDEXES](docs/AI_SEARCH_INDEXES.md))
 
 ### RAG Chatbot
-- **Chat with your emails**: GPT-5.2-chat with vector search over all processed documents, orchestrated by **Microsoft Agent Framework 1.5** (`agent-framework-core>=1.5` + `agent-framework-openai>=1.5`) — per-locale `Agent` cache, `ContextVar`-scoped dependency injection, and full chat history replay via `list[Message]`
+- **Chat with your emails**: GPT-5.2-chat with vector search over all processed documents, orchestrated by **Microsoft Agent Framework 1.7** (`agent-framework-core>=1.7` + `agent-framework-openai>=1.7`) — per-locale `Agent` cache, `ContextVar`-scoped dependency injection, and full chat history replay via `list[Message]`
 - **Agent-driven suggestions**: The LLM agent generates contextual follow-up action pills after each response — no hardcoded logic
 - **Ask AI button**: Click ✨ on any email card or table row to open the chatbot pre-filled with that email’s context
 - **12 agent tools**: Semantic search (with date filtering), keyword search (case-insensitive), reclassification handoff, sequential review, stats, error analysis, category explanation
@@ -144,7 +178,7 @@ See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for full setup or [do
 - **Backend**: FastAPI (Python 3.12) + uv
 - **Frontend**: Vue 3 + Vite + TailwindCSS + vue-i18n
 - **Infra**: Terraform (azurerm v4 + azapi)
-- **AI**: Microsoft AI Foundry (Mistral, Phi-4, GPT-4o-mini, GPT-5.2-chat) + Microsoft Agent Framework GA 1.0
+- **AI**: Microsoft AI Foundry (Mistral, Phi-4, GPT-4o-mini, GPT-5.2-chat) + Microsoft Agent Framework 1.7
 - **Storage**: Cosmos DB (serverless + vector search + composite indexes), Blob Storage
 - **Auth**: Managed Identity (zero secrets)
 - **CI/CD**: GitHub Actions with OIDC
@@ -174,7 +208,7 @@ See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for full setup or [do
 
 ### RAG Chatbot (Vector Search)
 
-The chatbot uses **semantic vector search** over all processed emails, powered by **Microsoft Agent Framework** GA 1.0:
+The chatbot uses **semantic vector search** over all processed emails, powered by **Microsoft Agent Framework** 1.7:
 
 1. **During processing**: Each email’s OCR markdown is embedded using `text-embedding-3-small` (1536 dimensions) and stored in Cosmos DB with `type: "email"`. Chunks are also embedded separately with `type: "chunk"`
 2. **During chat**: User queries are embedded, then Cosmos DB `VectorDistance()` finds the most semantically similar emails — with optional date filtering (`days` parameter for “last week” queries)
