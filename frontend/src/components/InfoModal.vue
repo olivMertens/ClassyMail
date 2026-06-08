@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 
@@ -21,7 +22,23 @@ const props = defineProps({
   }
 })
 const emit = defineEmits(['close', 'navigate'])
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+// Prefer the real build date (derived from BUILD_TIMESTAMP) so the header
+// never goes stale; fall back to the static localized `info.date` string.
+const headerDate = computed(() => {
+  if (props.buildTimestamp) {
+    const d = new Date(props.buildTimestamp)
+    if (!isNaN(d.getTime())) {
+      try {
+        return new Intl.DateTimeFormat(locale.value, { month: 'long', year: 'numeric' }).format(d)
+      } catch (e) {
+        return t('info.date')
+      }
+    }
+  }
+  return t('info.date')
+})
 </script>
 
 <template>
@@ -33,7 +50,7 @@ const { t } = useI18n()
           <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
             <div class="flex justify-between items-start">
               <h3 id="modal-title" class="text-xl font-semibold leading-6 text-gray-900 dark:text-white">
-                {{ t('info.poc_header', { org: props.organizationName, date: t('info.date') }) }}
+                {{ t('info.poc_header', { org: props.organizationName, date: headerDate }) }}
               </h3>
               <button class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-200" @click="emit('close')">
                 <XMarkIcon class="h-6 w-6" />
