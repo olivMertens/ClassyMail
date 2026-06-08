@@ -435,10 +435,34 @@ async def search_chunks_by_vector(q: str, limit: int = 5, clients: Clients | Non
             logger.info("search_chunks_by_vector: found %d chunks", len(items))
             return items
         except Exception as e:
-            logger.error("search_chunks_by_vector failed: %s", e, exc_info=True)
+            logger.warning(
+                "search_chunks_by_vector indexed query failed (%s); retrying brute-force scan", e
+            )
             span.set_attribute("error.type", type(e).__name__)
             span.set_attribute("error.message", str(e))
-            return []
+            span.set_attribute("db.cosmosdb.fallback", "vector_bruteforce")
+            try:
+                # Brute-force: no ORDER BY (which requires a healthy vector index).
+                # Drain all candidate chunks and sort by distance client-side.
+                bf_query = (
+                    "SELECT c.id, c.parent_id, c.subject, c.file_url, c.chunk_index, c.content, "
+                    "VectorDistance(c.vector, @vector) as distance "
+                    "FROM c WHERE c.type = 'chunk' AND IS_DEFINED(c.vector) AND ARRAY_LENGTH(c.vector) > 0"
+                )
+                rows = [
+                    x
+                    async for x in _query(
+                        clients.cosmos_container, bf_query, parameters=[{"name": "@vector", "value": vector}]
+                    )
+                ]
+                rows.sort(key=lambda d: d.get("distance") if d.get("distance") is not None else float("inf"))
+                rows = rows[:limit]
+                span.set_attribute("db.cosmosdb.result_count", len(rows))
+                logger.info("search_chunks_by_vector: found %d chunks via brute-force scan", len(rows))
+                return rows
+            except Exception as e2:
+                logger.error("search_chunks_by_vector brute-force failed: %s", e2, exc_info=True)
+                return []
 
 async def search_similar_emails(q: str, limit: int = 5, days: int | None = None, clients: Clients | None = None) -> list[dict]:
     with tracer.start_as_current_span("repository.search_similar_emails") as span:
@@ -483,11 +507,41 @@ async def search_similar_emails(q: str, limit: int = 5, days: int | None = None,
             logger.info("search_similar_emails: found %d results via vector search", len(items))
             return items
         except Exception as e:
-            logger.error("search_similar_emails vector query failed: %s", e, exc_info=True)
+            logger.warning(
+                "search_similar_emails indexed vector query failed (%s); retrying brute-force scan", e
+            )
             span.set_attribute("error.type", type(e).__name__)
             span.set_attribute("error.message", str(e))
-            span.set_attribute("db.cosmosdb.fallback", "vector_query_error")
-            return await search_email_by_text(q, limit, days=days, clients=clients)
+            span.set_attribute("db.cosmosdb.fallback", "vector_bruteforce")
+            try:
+                # Brute-force semantic search: VectorDistance in SELECT only (no
+                # ORDER BY, which requires a healthy vector index). Drain all
+                # matching email docs, then sort by distance client-side. The
+                # dataset is small, so a full scan is acceptable and robust even
+                # when the container's vector index is unusable.
+                bf_query = (
+                    "SELECT c.id, c.status, c.file_url, c.subject, c.sender, "
+                    "c.classification.detected_intents, c.error, c.updated_at, c.processing_time_ms, "
+                    "VectorDistance(c.vector, @vector) as distance "
+                    "FROM c "
+                    "WHERE c.type = 'email' AND IS_DEFINED(c.vector) AND ARRAY_LENGTH(c.vector) > 0 "
+                    f"{date_filter}"
+                )
+                bf_params = [{"name": "@vector", "value": vector}]
+                if days and days > 0:
+                    bf_params.append({"name": "@days", "value": min(days, 365)})
+                rows = [x async for x in _query(clients.cosmos_container, bf_query, parameters=bf_params)]
+                rows.sort(key=lambda d: d.get("distance") if d.get("distance") is not None else float("inf"))
+                rows = rows[:limit]
+                span.set_attribute("db.cosmosdb.result_count", len(rows))
+                logger.info("search_similar_emails: found %d results via brute-force vector scan", len(rows))
+                return rows
+            except Exception as e2:
+                logger.error(
+                    "search_similar_emails brute-force failed: %s; falling back to text search", e2, exc_info=True
+                )
+                span.set_attribute("db.cosmosdb.fallback", "text_search")
+                return await search_email_by_text(q, limit, days=days, clients=clients)
 
 
 
@@ -578,14 +632,22 @@ async def get_top_intents(limit: int = 5, clients: Clients | None = None) -> lis
             clients = clients or get_default_clients()
             await clients.ensure_cosmos_container()
             limit = _bound_limit(limit)
+            # GROUP BY combined with a JOIN over a sub-array is rejected by the
+            # Cosmos serverless query engine ("Query contains 1 or more
+            # unsupported features"), so fetch detected_intents per PROCESSED
+            # email and aggregate the counts client-side.
             query = (
-                "SELECT i.intent AS intent, COUNT(1) AS doc_count "
-                "FROM c JOIN i IN c.classification.detected_intents "
-                "WHERE c.status='PROCESSED' "
-                "GROUP BY i.intent"
+                "SELECT c.classification.detected_intents AS detected_intents "
+                "FROM c "
+                "WHERE c.status='PROCESSED' AND IS_DEFINED(c.classification.detected_intents)"
             )
-            # Fetch all groups then sort/limit client-side
-            items = [x async for x in _query(clients.cosmos_container, query)]
+            counts: dict[str, int] = {}
+            async for row in _query(clients.cosmos_container, query):
+                for di in (row.get("detected_intents") or []):
+                    name = (di or {}).get("intent")
+                    if name:
+                        counts[name] = counts.get(name, 0) + 1
+            items = [{"intent": k, "doc_count": v} for k, v in counts.items()]
             items.sort(key=lambda x: x.get("doc_count", 0), reverse=True)
             items = items[:limit]
             span.set_attribute("db.cosmosdb.result_count", len(items))
@@ -720,8 +782,14 @@ async def get_cache_entry(vector: list[float], similarity_score: float = 0.99, n
         {"name": "@num_results", "value": num_results},
         {"name": "@similarity_score", "value": similarity_score},
     ]
-    results = clients.cosmos_cache_container.query_items(query, parameters=params, populate_query_metrics=True)
-    return [x async for x in results]
+    try:
+        results = clients.cosmos_cache_container.query_items(query, parameters=params, populate_query_metrics=True)
+        return [x async for x in results]
+    except Exception as e:
+        # Semantic cache is best-effort; an unusable vector index must never
+        # break a chat request. Treat any failure as a cache miss.
+        logger.warning("get_cache_entry vector lookup failed (%s); treating as cache miss", e)
+        return []
 
 
 async def set_cache_entry(prompt: str, vector: list[float], response: str, sources: list[dict] | None = None, clients: Clients | None = None) -> None:

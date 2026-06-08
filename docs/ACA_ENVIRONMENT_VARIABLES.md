@@ -240,6 +240,16 @@ These variables provide additional functionality but are not required for core o
 
 
 
+- **`CHAT_API_VERSION`** - API version for the chat agent (RAG assistant)
+
+  - Example: `preview` (default)
+
+  - Used for: The chat agent talks to the Azure OpenAI **v1 surface** (`{endpoint}/openai/v1/`) via `agent_framework`'s `OpenAIChatClient`. This surface only accepts the literal value `preview` (or `v1`). Dated versions such as `2024-08-01-preview` return `400 "API version not supported"`.
+
+  - Note: Keep this **independent** from `AZURE_AI_API_VERSION` (`2024-08-01-preview`), which is used by the deployment-based clients (embeddings, Phi, vision) on the classic surface. Do not set `CHAT_API_VERSION` to a dated version.
+
+
+
 - **`GPT_DEPLOYMENT`** - The deployment name for GPT models
 
   - Example: `gpt-5.2`

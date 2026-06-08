@@ -464,10 +464,10 @@ class ClassyMailChatAgent:
         azure_env = os.getenv("AZURE_ENV", "").lower()
         api_key = getattr(config, "AI_API_KEY", None)
 
-        # Determine API version (Kimi requires a different preview version).
-        api_version = getattr(config, "CHAT_API_VERSION", "2024-08-01-preview")
-        if "kimi" in deployment.lower():
-            api_version = "2024-05-01-preview"
+        # Determine API version. The OpenAIChatClient targets the Azure OpenAI
+        # v1 surface, which only accepts the literal "preview" (dated versions
+        # return 400 "API version not supported").
+        api_version = getattr(config, "CHAT_API_VERSION", "preview") or "preview"
 
         client_kwargs: dict = {
             "azure_endpoint": endpoint,

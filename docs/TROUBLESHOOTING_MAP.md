@@ -14,6 +14,8 @@ This document maps the critical connections between Azure Container Apps, Servic
 | Worker crash loop (ProvisioningState: Failed) | [Scenario D](#scenario-d-worker-is-crashing-loop-provisioningstate-failed) |
 | OIDC login fails (AADSTS700213) | [Scenario E](#scenario-e-authenticationlogin-failures-aadsts700213) |
 | Cosmos DB 403 "IP through public internet" | [Scenario F](#scenario-f-cosmos-db-403-request-originated-from-ip--through-public-internet) |
+| Chat returns 400 "API version not supported" | [Scenario G](#scenario-g-chat-assistant-returns-400-api-version-not-supported) |
+| Chat / vector search returns no results | [Scenario H](#scenario-h-chat-assistant-finds-no-emails-vector-search--cache) |
 
 ---
 
@@ -402,3 +404,42 @@ Error: "Request originated from IP X.X.X.X through public internet"
   If "0.0.0.0" is present but your IP is not ? Add your IP
 
 ```
+
+---
+
+## Scenario G: Chat assistant returns 400 "API version not supported"
+
+**Symptom:** The RAG chat assistant fails; API logs show `400 API version not supported` from the chat model call.
+
+**Root cause:** The chat agent uses `agent_framework`'s `OpenAIChatClient`, which targets the Azure OpenAI **v1 surface** (`{endpoint}/openai/v1/`). That surface only accepts the literal api-version `preview` (or `v1`). A dated value such as `2024-08-01-preview` is rejected.
+
+**Fix:**
+
+1. Ensure `CHAT_API_VERSION=preview` on the `<prefix>-api` Container App.
+
+   ```
+   az containerapp update -g <prefix>-rg -n <prefix>-api --set-env-vars CHAT_API_VERSION=preview
+   ```
+
+2. Code default already resolves to `preview` (`classymail/core/config.py`). Do NOT reuse `AZURE_AI_API_VERSION` (`2024-08-01-preview`) for chat — that one stays for embeddings/Phi/vision on the classic deployment surface.
+
+---
+
+## Scenario H: Chat assistant finds no emails (vector search / cache)
+
+**Symptom:** Chat answers "I didn't find any emails related to X" even though matching emails exist.
+
+**Root causes & fixes (check in order):**
+
+1. **Stale response cache.** Chat answers are cached in the Cosmos `vector_cache` container keyed by query-embedding similarity. After changing chat behaviour, purge it so old "not found" answers stop short-circuiting the tools:
+
+   ```
+   # delete all docs in the vector_cache container, then re-test with a fresh query
+   ```
+
+2. **Vector `ORDER BY VectorDistance` returns BadRequest.** The deployed `emails` container's vector index can drift to a quantized form that rejects `ORDER BY VectorDistance` ("One of the input values is invalid"). The vector index is **immutable** after container creation (ARM PUT is accepted but never applied). The code handles this with a **brute-force fallback** (`SELECT VectorDistance(...)` without `ORDER BY`/`TOP`, drain all pages, sort client-side) in `repository.search_chunks_by_vector` / `search_similar_emails`. Keep that fallback; do not rely on recreating the container.
+
+3. **Exact phrases vs. concepts.** For literal terms (e.g. a French phrase like "dégât des eaux"), keyword search (`search_email_by_text`, `CONTAINS(LOWER(search_text), ...)`) is the reliable path; cross-language queries (EN "water damage" against FR content) genuinely require working vector search.
+
+4. **Cosmos `GROUP BY` + `JOIN` unsupported (top intents).** `get_top_intents` aggregates client-side in Python — the serverless account rejects `GROUP BY` combined with `JOIN ... IN <sub-array>`.
+
