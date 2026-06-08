@@ -65,7 +65,12 @@ VISION_API_VERSION = os.getenv("VISION_API_VERSION", AI_API_VERSION)
 # Chatbot model
 CHAT_ENDPOINT = os.getenv("CHAT_ENDPOINT") or PHI_ENDPOINT
 CHAT_DEPLOYMENT = os.getenv("CHAT_DEPLOYMENT", "gpt-5.2-chat")
-CHAT_API_VERSION = os.getenv("CHAT_API_VERSION", AI_API_VERSION)
+# The chat agent uses agent_framework's OpenAIChatClient against the Azure
+# OpenAI v1 surface ({endpoint}/openai/v1/), which only accepts the literal
+# api-version "preview" (dated preview versions return 400 "API version not
+# supported"). Keep this independent of AI_API_VERSION, which is used by the
+# deployment-based clients (embeddings, Phi, vision) on the classic surface.
+CHAT_API_VERSION = os.getenv("CHAT_API_VERSION", "preview")
 
 # Data Zone / Data Residency (EU Central, Global, etc)
 # Used to validate endpoints are in preferred region for compliance
