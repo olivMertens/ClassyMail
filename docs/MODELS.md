@@ -72,7 +72,7 @@ This repo uses a multi-step AI pipeline:
 
 - Embeddings: OpenAI Embeddings API (`2024-08-01-preview` or later)
 
-- Chatbot: OpenAI Chat Completions API (`2024-08-01-preview` or later)
+- Chatbot: Azure OpenAI **v1 surface** via `agent_framework` `OpenAIChatClient` — requires `CHAT_API_VERSION=preview` (dated versions like `2024-08-01-preview` return `400 "API version not supported"`)
 
 
 
