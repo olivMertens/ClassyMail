@@ -9,7 +9,7 @@ agent-framework-openai==1.7.0
     # via classymail
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.13.3
+aiohttp==3.14.0
     # via classymail
 aiolimiter==1.1.0
     # via classymail
@@ -88,7 +88,7 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   click
     #   tqdm
     #   uvicorn
-cryptography==46.0.4
+cryptography==49.0.0
     # via
     #   azure-identity
     #   azure-storage-blob
@@ -126,7 +126,7 @@ httpx==0.28.1
     # via
     #   classymail
     #   openai
-idna==3.11
+idna==3.18
     # via
     #   anyio
     #   httpx
@@ -147,7 +147,7 @@ jiter==0.13.0
     # via openai
 limits==5.7.0
     # via slowapi
-msal==1.34.0
+msal==1.38.0rc1
     # via
     #   azure-identity
     #   msal-extensions
@@ -274,7 +274,7 @@ packaging==26.0
     #   opentelemetry-instrumentation-flask
 pdf2image==1.17.0
     # via classymail
-pillow==12.1.0
+pillow==12.2.0
     # via
     #   classymail
     #   fpdf2
@@ -305,16 +305,16 @@ pyjwt==2.10.1
     # via msal
 pymupdf==1.26.7
     # via classymail
-python-dotenv==1.0.1
+python-dotenv==1.2.2
     # via
     #   agent-framework-core
     #   classymail
     #   uvicorn
-python-multipart==0.0.21
+python-multipart==0.0.27
     # via classymail
 pyyaml==6.0.3
     # via uvicorn
-requests==2.32.5
+requests==2.34.2
     # via
     #   azure-core
     #   msal
@@ -336,6 +336,7 @@ tqdm==4.67.3
 typing-extensions==4.15.0
     # via
     #   agent-framework-core
+    #   aiohttp
     #   aiosignal
     #   anyio
     #   azure-ai-inference
@@ -359,7 +360,7 @@ typing-extensions==4.15.0
     #   typing-inspection
 typing-inspection==0.4.2
     # via pydantic
-urllib3==2.6.3
+urllib3==2.7.0
     # via requests
 uvicorn==0.42.0
     # via classymail
