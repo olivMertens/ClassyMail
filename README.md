@@ -57,12 +57,9 @@ flowchart TD
     Tier -->|"conf >= 0.8 - simple"| T1["Tier 1 Specialized Agent - gpt-4.1-nano"]
     Tier -->|"0.5 - 0.8 ambiguous"| T2["Tier 2 Specialized Agent - gpt-4.1-mini"]
     Tier -->|"conf < 0.5 critical"| T3["Tier 3 Specialized Agent - gpt-4.1 or gpt-5-mini"]
-    T1 -->|"RAG"| AIS[("AI Search per-intent indexes")]
-    T2 -->|"RAG"| AIS
-    T3 -->|"RAG"| AIS
-    AIS -->|"Positive + negative examples"| T1
-    AIS -->|"Positive + negative examples"| T2
-    AIS -->|"Positive + negative examples"| T3
+    T1 <-->|"RAG - positive + negative examples"| AIS[("AI Search per-intent indexes")]
+    T2 <-->|"RAG - positive + negative examples"| AIS
+    T3 <-->|"RAG - positive + negative examples"| AIS
     T1 --> Agg["Aggregation: fan-in + resilient placeholders"]
     T2 --> Agg
     T3 --> Agg
