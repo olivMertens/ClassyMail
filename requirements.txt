@@ -310,7 +310,7 @@ python-dotenv==1.2.2
     #   agent-framework-core
     #   classymail
     #   uvicorn
-python-multipart==0.0.27
+python-multipart==0.0.31
     # via classymail
 pyyaml==6.0.3
     # via uvicorn
