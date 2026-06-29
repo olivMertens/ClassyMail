@@ -301,7 +301,7 @@ pydantic==2.13.0b2
     #   openai
 pydantic-core==2.42.0
     # via pydantic
-pyjwt==2.10.1
+pyjwt==2.13.0
     # via msal
 pymupdf==1.26.7
     # via classymail
