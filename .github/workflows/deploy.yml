@@ -548,7 +548,7 @@ jobs:
           # Test /health endpoint with retries
           echo "Testing /health endpoint..."
           for i in {1..12}; do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/health" 2>/dev/null || echo "000")
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 15 "$API_URL/health" 2>/dev/null || echo "000")
             if [ "$HTTP_CODE" == "200" ]; then
               echo "✅ Health check passed (HTTP $HTTP_CODE)"
               break
@@ -564,7 +564,7 @@ jobs:
           # Test /readyz endpoint
           echo ""
           echo "Testing /readyz endpoint..."
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/readyz" 2>/dev/null || echo "000")
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 15 "$API_URL/readyz" 2>/dev/null || echo "000")
           if [ "$HTTP_CODE" == "200" ]; then
             echo "✅ Readiness check passed (HTTP $HTTP_CODE)"
           else
