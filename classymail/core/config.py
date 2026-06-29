@@ -91,6 +91,22 @@ CHAT_API_VERSION = os.getenv("CHAT_API_VERSION", "preview")
 # When true, the frontend uses POST /api/chat/stream and renders incrementally.
 CHAT_STREAMING = os.getenv("CHAT_STREAMING", "false").lower() == "true"
 
+# ── Agent Framework 1.9 opt-in enhancements (default-off) ────────────
+# Reasoning effort for the chat agent. Empty string = OFF (no reasoning
+# option is sent — current behavior preserved byte-for-byte). When set to
+# one of: minimal | low | medium | high, it is forwarded to
+# agent.run(options={"reasoning": {"effort": ...}}) via OpenAIChatOptions.
+# Only meaningful for reasoning-capable deployments; invalid values are
+# ignored (logged) rather than sent.
+CHAT_REASONING_EFFORT = os.getenv("CHAT_REASONING_EFFORT", "").strip().lower()
+# Token-aware chat-history compaction via MAF ContextWindowCompactionStrategy.
+# OFF by default: history is fed using the legacy last-N-turns slice. When
+# true, prior turns are compacted to a token budget using the framework's
+# built-in CharacterEstimatorTokenizer (no extra dependency required).
+CHAT_HISTORY_COMPACTION = os.getenv("CHAT_HISTORY_COMPACTION", "false").lower() == "true"
+CHAT_COMPACTION_MAX_TOKENS = int(os.getenv("CHAT_COMPACTION_MAX_TOKENS", "12000"))
+CHAT_COMPACTION_MAX_OUTPUT_TOKENS = int(os.getenv("CHAT_COMPACTION_MAX_OUTPUT_TOKENS", "2000"))
+
 # Data Zone / Data Residency (EU Central, Global, etc)
 # Used to validate endpoints are in preferred region for compliance
 AZURE_PREFERRED_DATA_ZONE = os.getenv("AZURE_PREFERRED_DATA_ZONE", "eu-central")  # eu-central, eastus, etc

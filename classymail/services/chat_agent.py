@@ -16,7 +16,12 @@ from dataclasses import dataclass, field
 from typing import Annotated
 
 from azure.identity import DefaultAzureCredential
-from agent_framework import Agent, Message
+from agent_framework import (
+    Agent,
+    CharacterEstimatorTokenizer,
+    ContextWindowCompactionStrategy,
+    Message,
+)
 from agent_framework.openai import OpenAIChatClient
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
@@ -117,6 +122,51 @@ class _PreparedRun:
     sources: list[dict] = field(default_factory=list)
     run_messages: list = field(default_factory=list)
     cache_hit: str | None = None
+
+
+# ── Agent Framework 1.9 opt-in run tuning (default-off) ──────────────
+# Allowed OpenAI Responses reasoning-effort values (OpenAIChatOptions.reasoning).
+_VALID_REASONING_EFFORTS = frozenset({"minimal", "low", "medium", "high"})
+
+
+def _build_run_kwargs() -> dict:
+    """Assemble optional ``agent.run`` kwargs from default-off feature flags.
+
+    Returns an empty dict unless ``CHAT_REASONING_EFFORT`` and/or
+    ``CHAT_HISTORY_COMPACTION`` are configured, so the default chat code path
+    stays unchanged byte-for-byte when neither flag is set.
+
+    - reasoning effort   → ``options={"reasoning": {"effort": <effort>}}``
+      (typed by ``agent_framework.openai.OpenAIChatOptions.reasoning``).
+    - history compaction → ``compaction_strategy`` + ``tokenizer`` using the
+      framework's built-in ``CharacterEstimatorTokenizer`` (no new dependency).
+    """
+    kwargs: dict = {}
+
+    effort = (getattr(config, "CHAT_REASONING_EFFORT", "") or "").strip().lower()
+    if effort:
+        if effort in _VALID_REASONING_EFFORTS:
+            kwargs["options"] = {"reasoning": {"effort": effort}}
+        else:
+            logger.warning(
+                "Ignoring invalid CHAT_REASONING_EFFORT=%r (expected one of %s)",
+                effort,
+                sorted(_VALID_REASONING_EFFORTS),
+            )
+
+    if getattr(config, "CHAT_HISTORY_COMPACTION", False):
+        try:
+            tokenizer = CharacterEstimatorTokenizer()
+            kwargs["compaction_strategy"] = ContextWindowCompactionStrategy(
+                max_context_window_tokens=config.CHAT_COMPACTION_MAX_TOKENS,
+                max_output_tokens=config.CHAT_COMPACTION_MAX_OUTPUT_TOKENS,
+                tokenizer=tokenizer,
+            )
+            kwargs["tokenizer"] = tokenizer
+        except Exception as ex:  # pragma: no cover - defensive guard
+            logger.warning("Chat history compaction disabled (setup failed): %s", ex)
+
+    return kwargs
 
 
 # ── Handoff & Sequential review helpers ──────────────────────────────
@@ -651,8 +701,16 @@ class ClassyMailChatAgent:
         full_input = query_text + grounding
 
         # Build a Message sequence: prior history + current grounded query.
+        # With token-aware compaction enabled, feed the full history and let the
+        # MAF compaction strategy trim it to the configured token budget;
+        # otherwise keep the legacy fixed last-N-turns window.
+        history_window = (
+            hist_items
+            if getattr(config, "CHAT_HISTORY_COMPACTION", False)
+            else hist_items[-_MAX_HISTORY_TURNS:]
+        )
         run_messages: list = []
-        for h in hist_items[-_MAX_HISTORY_TURNS:]:
+        for h in history_window:
             role = h.get("role") or "user"
             content = h.get("content") or ""
             if content:
@@ -693,7 +751,7 @@ class ClassyMailChatAgent:
 
                 # ── Run agent ────────────────────────────────────────
                 try:
-                    result = await agent.run(prepared.run_messages)
+                    result = await agent.run(prepared.run_messages, **_build_run_kwargs())
                     content = str(result) if result else "No response generated."
                 except Exception as ex:
                     logger.error(f"Agent framework error: {ex}", exc_info=True)
@@ -784,7 +842,7 @@ class ClassyMailChatAgent:
                 buffer = ""
                 emitted = 0
                 try:
-                    stream = agent.run(prepared.run_messages, stream=True)
+                    stream = agent.run(prepared.run_messages, stream=True, **_build_run_kwargs())
                     async for update in stream:
                         piece = getattr(update, "text", "") or ""
                         if not piece:

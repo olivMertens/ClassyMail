@@ -238,6 +238,8 @@ The chatbot uses **semantic vector search** over all processed emails, powered b
 > The chat button is **automatically hidden** in the UI if `CHAT_DEPLOYMENT` or `EMBEDDING_DEPLOYMENT` are not configured. Deploy the optional models to enable it.
 > Category AI Assessment is also **automatically disabled** if the assessment model isn't deployed in your AI Foundry project.
 
+> **Opt-in Agent Framework 1.9 tuning (default-off):** Two flags let you tune the chat agent without changing default behavior. Set `CHAT_REASONING_EFFORT=minimal|low|medium|high` to forward a reasoning effort to the model (`OpenAIChatOptions.reasoning`), and set `CHAT_HISTORY_COMPACTION=true` to replace the fixed last-10-turns window with token-aware compaction (`ContextWindowCompactionStrategy` + the built-in `CharacterEstimatorTokenizer`, budgets via `CHAT_COMPACTION_MAX_TOKENS` / `CHAT_COMPACTION_MAX_OUTPUT_TOKENS`). Both are unset/off by default — see [ACA_ENVIRONMENT_VARIABLES](docs/ACA_ENVIRONMENT_VARIABLES.md).
+
 ---
 
 ## Documentation

@@ -290,6 +290,38 @@ These variables provide additional functionality but are not required for core o
 
 
 
+- **`CHAT_REASONING_EFFORT`** - Opt-in reasoning effort for the chat agent (Agent Framework 1.9)
+
+  - Example: `` (empty = **off**, default) · valid: `minimal` \| `low` \| `medium` \| `high`
+
+  - Used for: When set, forwarded to `agent.run(options={"reasoning": {"effort": ...}})` via `OpenAIChatOptions.reasoning`. Only meaningful for reasoning-capable deployments; invalid values are ignored (logged) rather than sent. Empty keeps the current behavior unchanged.
+
+
+
+- **`CHAT_HISTORY_COMPACTION`** - Opt-in token-aware chat-history compaction (Agent Framework 1.9)
+
+  - Example: `false` (default) · set `true` to enable
+
+  - Used for: When `true`, the full chat history is fed to the agent and the framework's `ContextWindowCompactionStrategy` trims it to a token budget using the built-in `CharacterEstimatorTokenizer` (no extra dependency). When `false`, the legacy fixed last-10-turns window is used.
+
+
+
+- **`CHAT_COMPACTION_MAX_TOKENS`** - Context-window token budget for history compaction
+
+  - Example: `12000` (default)
+
+  - Used for: `max_context_window_tokens` passed to `ContextWindowCompactionStrategy`. Only read when `CHAT_HISTORY_COMPACTION=true`.
+
+
+
+- **`CHAT_COMPACTION_MAX_OUTPUT_TOKENS`** - Reserved output-token budget for history compaction
+
+  - Example: `2000` (default)
+
+  - Used for: `max_output_tokens` passed to `ContextWindowCompactionStrategy`. Only read when `CHAT_HISTORY_COMPACTION=true`.
+
+
+
 - **`GPT_DEPLOYMENT`** - The deployment name for GPT models
 
   - Example: `gpt-5.2`
