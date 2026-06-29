@@ -8,10 +8,10 @@ from opentelemetry.trace import Status, StatusCode
 
 from classymail.models import EmailRecord, ClassificationResult
 from classymail.services.azure_clients import download_blob_as_base64, blob_id_from_url, Clients
-from classymail.services.llm_pipeline import ocr_with_mistral, ocr_with_document_intelligence, classify_with_phi4, process_agent_response, generate_embedding, extract_business_entities
+from classymail.services.llm_pipeline import ocr_with_mistral, ocr_with_document_intelligence, ocr_with_content_understanding, classify_with_phi4, process_agent_response, generate_embedding, extract_business_entities
 from classymail.agents.workflow import classify_agentic
-from classymail.services.circuit_breaker import mistral_ocr_breaker, doc_intelligence_breaker
-from classymail.services.costing import compute_cost_di, compute_cost_llm, compute_cost_mistral
+from classymail.services.circuit_breaker import mistral_ocr_breaker, doc_intelligence_breaker, content_understanding_breaker
+from classymail.services.costing import compute_cost_di, compute_cost_llm, compute_cost_mistral, compute_cost_content_understanding
 from classymail.models import ContentFilterError
 from classymail.core import config
 import logging
@@ -115,8 +115,32 @@ async def run_classification_pipeline(
         mistral_failed = False
         mistral_error = None
 
+        # Primary OCR provider selector (default "mistral" = current behavior).
+        # When OCR_PROVIDER="content_understanding", route the primary pass through CU;
+        # Document Intelligence remains the universal fallback below in either case.
+        primary_provider = (getattr(config, "OCR_PROVIDER", "mistral") or "mistral").strip().lower()
+
+        if primary_provider == "content_understanding":
+            ocr_provider = "content_understanding"
+            if content_understanding_breaker.current_state == "open":
+                log("ocr", "circuit_breaker", "Content Understanding circuit breaker is OPEN — skipping to fallback")
+                mistral_failed = True
+                mistral_error = "Content Understanding circuit breaker open"
+                ocr_detail["primary_skip_reason"] = "cu_circuit_breaker_open"
+            else:
+                try:
+                    ocr_result = await ocr_with_content_understanding(pdf_b64, clients=clients)
+                    content_understanding_breaker.success()
+                except Exception as cu_ex:
+                    mistral_failed = True
+                    mistral_error = f"{type(cu_ex).__name__}: {cu_ex}"
+                    ocr_detail["primary_error_type"] = type(cu_ex).__name__
+                    log("ocr", "primary_failed", mistral_error)
+                    from classymail.services.circuit_breaker import should_trip_on_exception
+                    if should_trip_on_exception(cu_ex):
+                        content_understanding_breaker.failure()
         # Check circuit breaker state before attempting Mistral
-        if mistral_ocr_breaker.current_state == "open":
+        elif mistral_ocr_breaker.current_state == "open":
             log("ocr", "circuit_breaker", "Mistral OCR circuit breaker is OPEN — skipping to fallback")
             mistral_failed = True
             mistral_error = "Circuit breaker open"
@@ -321,6 +345,13 @@ async def run_classification_pipeline(
             "annotations_count": len(mistral_images),
         }
         mistral_block = {"estimated_pages": 0, "cost_usd": 0.0, "annotations_count": 0}
+    elif ocr_provider == "content_understanding":
+        ocr_cost_block = {
+            "estimated_pages": pages,
+            "cost_usd": compute_cost_content_understanding(pages, overrides=final_overrides),
+            "annotations_count": len(mistral_images),
+        }
+        mistral_block = {"estimated_pages": 0, "cost_usd": 0.0, "annotations_count": 0}
     else:
         ocr_cost_block = {
             "estimated_pages": pages,
@@ -338,6 +369,7 @@ async def run_classification_pipeline(
         "extraction_usage": entities_usage, # detailed usage for extraction
         "mistral": mistral_block,
         "doc_intelligence": ocr_cost_block if ocr_provider == "document_intelligence" else None,
+        "content_understanding": ocr_cost_block if ocr_provider == "content_understanding" else None,
     }
 
     # Extract metadata from JSON response if present

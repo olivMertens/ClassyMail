@@ -56,6 +56,20 @@ DOC_INTELLIGENCE_ENDPOINT = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")  #
 DOC_INTELLIGENCE_API_VERSION = os.getenv("DOC_INTELLIGENCE_API_VERSION", "2024-11-30")
 DOC_INTELLIGENCE_KEY = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY")  # Optional key-based auth (prefer MI)
 
+# OCR provider selector (PoC, default-off). "mistral" keeps the current behavior
+# byte-for-byte; "content_understanding" routes the primary OCR pass through Azure
+# AI Content Understanding. Document Intelligence remains the universal fallback.
+OCR_PROVIDER = os.getenv("OCR_PROVIDER", "mistral")  # "mistral" | "content_understanding"
+
+# Azure AI Content Understanding (opt-in OCR provider; GA REST API)
+# Async analyze + poll returning markdown — same contract as the other OCR providers.
+# prebuilt-documentSearch extracts structured markdown from PDFs/images, optimized for RAG.
+# Ref: https://learn.microsoft.com/azure/ai-services/content-understanding/quickstart/use-rest-api
+CONTENT_UNDERSTANDING_ENDPOINT = os.getenv("CONTENT_UNDERSTANDING_ENDPOINT")  # https://xxx.cognitiveservices.azure.com/ (Foundry resource)
+CONTENT_UNDERSTANDING_API_VERSION = os.getenv("CONTENT_UNDERSTANDING_API_VERSION", "2025-11-01")
+CONTENT_UNDERSTANDING_ANALYZER_ID = os.getenv("CONTENT_UNDERSTANDING_ANALYZER_ID", "prebuilt-documentSearch")
+CONTENT_UNDERSTANDING_KEY = os.getenv("CONTENT_UNDERSTANDING_KEY")  # Optional key-based auth (prefer MI)
+
 
 # Vision model for image description (parallel flow with OCR)
 VISION_ENDPOINT = os.getenv("VISION_ENDPOINT") or PHI_ENDPOINT
@@ -94,6 +108,7 @@ PHI4_COST_PER_1K_INPUT = float(os.getenv("PHI4_COST_PER_1K_INPUT", "0.000107"))
 PHI4_COST_PER_1K_OUTPUT = float(os.getenv("PHI4_COST_PER_1K_OUTPUT", "0.00043"))
 MISTRAL_OCR_COST_PER_1K_PAGES = float(os.getenv("MISTRAL_OCR_COST_PER_1K_PAGES", "1.0"))
 DI_OCR_COST_PER_1K_PAGES = float(os.getenv("DI_OCR_COST_PER_1K_PAGES", "1.5"))
+CU_OCR_COST_PER_1K_PAGES = float(os.getenv("CU_OCR_COST_PER_1K_PAGES", "1.0"))
 MISTRAL_OCR_MAX_ATTEMPTS = int(os.getenv("MISTRAL_OCR_MAX_ATTEMPTS", "2"))
 REVIEW_CONFIDENCE_THRESHOLD = float(os.getenv("REVIEW_CONFIDENCE_THRESHOLD", "0.85"))
 

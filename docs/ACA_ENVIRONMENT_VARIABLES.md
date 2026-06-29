@@ -226,6 +226,34 @@ These variables provide additional functionality but are not required for core o
 
 
 
+### Azure AI Content Understanding (Opt-in OCR Provider — PoC, default-off)
+
+
+
+- **`OCR_PROVIDER`** - Selects the primary OCR provider
+
+  - Default: `mistral` (current behavior; Document Intelligence fallback unchanged)
+
+  - Set to `content_understanding` to route the primary OCR pass through Azure AI Content Understanding
+
+- **`CONTENT_UNDERSTANDING_ENDPOINT`** - Endpoint URL for the Content Understanding (Foundry) resource
+
+  - Example: `https://classymail-foundry.cognitiveservices.azure.com/`
+
+  - Used for: opt-in OCR via async analyze + poll → Markdown. Only read when `OCR_PROVIDER=content_understanding`.
+
+- **`CONTENT_UNDERSTANDING_ANALYZER_ID`** - Prebuilt or custom analyzer id
+
+  - Default: `prebuilt-documentSearch` (RAG-optimized markdown extraction)
+
+- **`CONTENT_UNDERSTANDING_API_VERSION`** - API version for the Content Understanding REST API
+
+  - Default: `2025-11-01`
+
+- **`CONTENT_UNDERSTANDING_KEY`** - Optional key-based auth (Managed Identity preferred)
+
+
+
 ### Chat & RAG
 
 

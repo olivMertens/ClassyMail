@@ -201,6 +201,24 @@ See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for full setup or [do
 
 > **Not all models are required.** The pipeline works with just Phi-4 + Mistral OCR. Optional models enable fallback classification and RAG chat. Deploy only what you need.
 
+> **Note on OCR 4:** the `mistral-document-ai-2512` deployment *is* Mistral OCR 4 — the pipeline already runs the latest Mistral OCR. Pin a specific dated version via the `MISTRAL_DEPLOYMENT` env var if needed (see `#classymail/core/config.py`).
+
+#### Experimental: Azure AI Content Understanding OCR (opt-in, default-off)
+
+An optional third OCR provider — [Azure AI Content Understanding](https://learn.microsoft.com/azure/ai-services/content-understanding/) — is available behind a feature flag as a PoC. It is **disabled by default**; the standard Mistral → Document Intelligence flow is unchanged unless you opt in.
+
+To try it, set `OCR_PROVIDER=content_understanding` and configure the endpoint:
+
+```bash
+OCR_PROVIDER=content_understanding            # default "mistral" keeps current behavior
+CONTENT_UNDERSTANDING_ENDPOINT=https://<your-foundry-resource>.cognitiveservices.azure.com/
+CONTENT_UNDERSTANDING_ANALYZER_ID=prebuilt-documentSearch   # RAG-optimized markdown extraction
+CONTENT_UNDERSTANDING_API_VERSION=2025-11-01
+# CONTENT_UNDERSTANDING_KEY=<key>             # optional; Managed Identity preferred
+```
+
+When enabled, Content Understanding becomes the primary OCR pass (async analyze + poll → Markdown) and **Azure Document Intelligence remains the universal fallback**. Implementation: `#classymail/services/llm_pipeline.py` (`ocr_with_content_understanding`), wired in `#classymail/services/pipeline.py`.
+
 > **Pricing in the Settings UI is hardcoded** (estimated Azure rates as of 2025-2026). Actual costs depend on your region and Azure agreement. The backend cost calculator uses the same hardcoded rates. See `classymail/services/costing.py` and `frontend/src/views/SettingsView.vue` for the pricing tables.
 
 ### RAG Chatbot (Vector Search)

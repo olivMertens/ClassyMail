@@ -63,6 +63,13 @@ doc_intelligence_breaker = ManagedCircuitBreaker(
     name="document_intelligence"
 )
 
+# Circuit breaker for Azure AI Content Understanding OCR provider (opt-in)
+content_understanding_breaker = ManagedCircuitBreaker(
+    fail_max=5,
+    reset_timeout=120,
+    name="content_understanding"
+)
+
 
 def should_trip_on_exception(exc: Exception) -> bool:
     """
