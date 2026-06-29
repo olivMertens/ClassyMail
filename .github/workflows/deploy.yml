@@ -6,6 +6,14 @@ on:
       - main
   workflow_dispatch: {}
 
+# Serialize deploys per branch so overlapping runs (e.g. several Dependabot
+# merges in quick succession) don't mutate the same Container Apps at once,
+# which previously caused ContainerAppOperationInProgress failures. The newest
+# run wins; in-progress older runs are cancelled.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   IMAGE_NAME: classymail-api
   WORKER_APP_NAME: classymail-worker
