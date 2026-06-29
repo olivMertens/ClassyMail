@@ -211,10 +211,6 @@ jobs:
           echo "::endgroup::"
           echo "ACR_LOGIN_SERVER=$LOGIN_SERVER" >> $GITHUB_ENV
 
-      - name: Fetch Vue runtime (UI)
-        run: |
-          bash ./scripts/fetch_vue_runtime.sh
-
       - name: Build & push image
         id: build
         run: |
