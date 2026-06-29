@@ -65,6 +65,7 @@ const diagnosticsError = ref(null)
 const currentTab = ref('dashboard')
 const chatOpen = ref(false)
 const chatEnabled = ref(true)
+const chatStreaming = ref(false)
 const chatExpanded = ref(false)
 const dlqModalOpen = ref(false)
 const selectedDlq = ref(null)
@@ -115,7 +116,10 @@ const contextualActions = computed(() => {
 })
 // Fetch feature flags for chat gating
 fetch('/api/admin/ui-config').then(r => r.ok ? r.json() : null).then(cfg => {
-  if (cfg) chatEnabled.value = cfg.chat_enabled !== false
+  if (cfg) {
+    chatEnabled.value = cfg.chat_enabled !== false
+    chatStreaming.value = cfg.chat_streaming === true
+  }
 }).catch(() => { })
 const md = new MarkdownIt({ linkify: true, breaks: false, html: false })
 
@@ -337,6 +341,87 @@ const openDlqDetails = (msg) => {
   dlqModalOpen.value = true
 }
 
+// Parse one SSE frame (the lines before a blank-line separator) into { event, data }.
+// Lines starting with ':' are comments and ignored; only `event:` and `data:` are used.
+const parseSseFrame = (frame) => {
+  let event = null
+  const dataLines = []
+  for (const line of frame.split('\n')) {
+    if (line.startsWith('event:')) event = line.slice(6).trim()
+    else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
+  }
+  if (!dataLines.length) return null
+  let data = null
+  try { data = JSON.parse(dataLines.join('\n')) } catch { data = null }
+  return { event, data }
+}
+
+// Streaming (SSE) chat turn. Returns true when it owns the turn (success, or an
+// error after content was already shown); returns false to let the caller fall
+// back to the single-shot /api/chat path (flag off OR failure before any delta).
+// EventSource cannot POST, so we use fetch + ReadableStream.
+const streamChatSearch = async (q) => {
+  let assistantIdx = -1
+  let receivedAnyDelta = false
+  const ensureAssistant = () => {
+    if (assistantIdx === -1) {
+      chatMessages.value.push({ role: 'assistant', content: '' })
+      assistantIdx = chatMessages.value.length - 1
+    }
+  }
+  try {
+    const res = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ role: 'user', content: q }], session_id: chatSessionId.value, locale: locale.value })
+    })
+    if (!res.ok || !res.body) return false
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    let streamDone = false
+    while (!streamDone) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      // SSE frames are separated by a blank line ("\n\n").
+      let sep
+      while ((sep = buf.indexOf('\n\n')) !== -1) {
+        const frame = buf.slice(0, sep)
+        buf = buf.slice(sep + 2)
+        const evt = parseSseFrame(frame)
+        if (!evt) continue
+        if (evt.event === 'error') {
+          throw new Error((evt.data && evt.data.error) || 'stream error')
+        } else if (evt.event === 'done') {
+          ensureAssistant()
+          if (evt.data) {
+            // The done event carries authoritative clean content + metadata.
+            if (typeof evt.data.content === 'string') chatMessages.value[assistantIdx].content = evt.data.content
+            chatSources.value = evt.data.sources || []
+            agentSuggestedActions.value = evt.data.suggested_actions || []
+          }
+          streamDone = true
+        } else if (evt.data && evt.data.delta) {
+          ensureAssistant()
+          chatMessages.value[assistantIdx].content += evt.data.delta
+          receivedAnyDelta = true
+        }
+      }
+    }
+    return true
+  } catch (e) {
+    // If anything was already rendered, surface the error instead of re-asking
+    // via /api/chat (which would duplicate the answer).
+    if (receivedAnyDelta || assistantIdx !== -1) {
+      chatError.value = e.message
+      return true
+    }
+    return false
+  }
+}
+
 const runChatSearch = async () => {
   chatLoading.value = true
   chatError.value = null
@@ -344,11 +429,14 @@ const runChatSearch = async () => {
     const q = chatQuery.value.trim()
     if (!q) return
 
-    // Add user message to conversation
+    // Add user message to conversation (once; both paths reuse it)
     chatMessages.value.push({ role: 'user', content: q })
 
     // Clear input immediately after capturing query
     chatQuery.value = ''
+
+    // Opt-in streaming path. Falls through to /api/chat when it returns false.
+    if (chatStreaming.value && await streamChatSearch(q)) return
 
     const res = await fetch('/api/chat', {
       method: 'POST',

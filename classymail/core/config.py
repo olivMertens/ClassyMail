@@ -72,6 +72,11 @@ CHAT_DEPLOYMENT = os.getenv("CHAT_DEPLOYMENT", "gpt-5.2-chat")
 # deployment-based clients (embeddings, Phi, vision) on the classic surface.
 CHAT_API_VERSION = os.getenv("CHAT_API_VERSION", "preview")
 
+# Opt-in token-by-token streaming for the RAG chat assistant (SSE).
+# Default OFF: the chat answer is returned as a single-shot JSON response.
+# When true, the frontend uses POST /api/chat/stream and renders incrementally.
+CHAT_STREAMING = os.getenv("CHAT_STREAMING", "false").lower() == "true"
+
 # Data Zone / Data Residency (EU Central, Global, etc)
 # Used to validate endpoints are in preferred region for compliance
 AZURE_PREFERRED_DATA_ZONE = os.getenv("AZURE_PREFERRED_DATA_ZONE", "eu-central")  # eu-central, eastus, etc

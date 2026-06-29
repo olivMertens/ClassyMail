@@ -215,6 +215,8 @@ The chatbot uses **semantic vector search** over all processed emails, powered b
 
 > **Rebuild embeddings**: If emails were processed before the embedding model was deployed, use **Settings → Danger Zone → Rebuild Vector Index** to regenerate all vectors.
 
+> **Opt-in streaming** (`CHAT_STREAMING`, default `false`): when enabled, chat answers stream token-by-token into the UI via Server-Sent Events (`POST /api/chat/stream`) for lower perceived latency. When off, the UI uses the single-shot `POST /api/chat` JSON response (unchanged default behavior). The flag is exposed through `/api/admin/ui-config` so the frontend only streams when it is on; both endpoints share the same grounding, history, and semantic cache. See [ACA_ENVIRONMENT_VARIABLES](docs/ACA_ENVIRONMENT_VARIABLES.md).
+
 > The chat button is **automatically hidden** in the UI if `CHAT_DEPLOYMENT` or `EMBEDDING_DEPLOYMENT` are not configured. Deploy the optional models to enable it.
 > Category AI Assessment is also **automatically disabled** if the assessment model isn't deployed in your AI Foundry project.
 
