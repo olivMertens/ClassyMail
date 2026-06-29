@@ -7,7 +7,7 @@ prerelease-mode = "allow"
 
 [[package]]
 name = "agent-framework-core"
-version = "1.7.0"
+version = "1.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "opentelemetry-api" },
@@ -15,9 +15,9 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/75/62/b0e85774b2d9b4060376e0b13444b958aa9bff98a6bd6cfd2d1827e53fdb/agent_framework_core-1.7.0.tar.gz", hash = "sha256:b8974ce59af89ef02148e5ba267a67cf1593c19ee9e6146b31528558938ddb2f", size = 391175, upload-time = "2026-05-28T10:54:14.751Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f1/38/5b4f1f69cfe62ecf0b66838a09d82678dfc0a90084e16b3f1c0f52aa53c3/agent_framework_core-1.9.0.tar.gz", hash = "sha256:09c5f18a43209f6db53dfe0da25d3dfbf1e5176a930a8ec3859091687d8f80a2", size = 449168, upload-time = "2026-06-18T09:42:48.308Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2b/84/e982fcd1e279b06014814f245d487da91e4de7f62cd90a426377bbadab8a/agent_framework_core-1.7.0-py3-none-any.whl", hash = "sha256:7c2e210846656b28875f79998350e6e2837e24d352cdcdae2ab5d48aecd997cd", size = 435474, upload-time = "2026-05-28T10:54:13.053Z" },
+    { url = "https://files.pythonhosted.org/packages/d9/4b/1c0140cfbb134c51d335274948bcbdcee837a3bdad86bea92ef6b7235d13/agent_framework_core-1.9.0-py3-none-any.whl", hash = "sha256:aa33c588ec839dc7fc8e4768f4ff3d3cd44d4b38d7aa9733f5ee0a37ff4de956", size = 496431, upload-time = "2026-06-18T09:42:46.613Z" },
 ]
 
 [[package]]
@@ -38,15 +38,15 @@ wheels = [
 
 [[package]]
 name = "agent-framework-openai"
-version = "1.7.0"
+version = "1.8.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "agent-framework-core" },
     { name = "openai" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5f/5f/760d3c265845a4046b6a3a694799891164d20f946c057861486c11be9936/agent_framework_openai-1.7.0.tar.gz", hash = "sha256:394f1ad1497b66bf8c56d36c568e1d37593c7ea22dc4578563a75f04fa944366", size = 50909, upload-time = "2026-05-28T10:54:05.84Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/b2/8441a2be9ff99a4ae4404d19d6ee0d2b7a8bddf1a0d12ad4f1dbc549039a/agent_framework_openai-1.8.2.tar.gz", hash = "sha256:2f8e99a194ffb4b27c19e8a3407798d01d8a5e9b2783cc1084e4772c4a44f100", size = 53318, upload-time = "2026-06-18T09:42:42.581Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a1/4b/768bbdf79b78f6dc27dd9a7689cdcff2474a025f543a6451488814c696c6/agent_framework_openai-1.7.0-py3-none-any.whl", hash = "sha256:8c1aff5ca67797ee1d19094422c7ff7938d90821fb7c8cba6a4d71fb6b91ee68", size = 55843, upload-time = "2026-05-28T10:54:17.138Z" },
+    { url = "https://files.pythonhosted.org/packages/80/bf/4185b88aad70f61947e19d4c94e85561282fd2310ea3ffb3cf4b4de22327/agent_framework_openai-1.8.2-py3-none-any.whl", hash = "sha256:02bb6b323d58dfeab48de4816ae1b0083202edaa93e4f4874d7054d39d9067a4", size = 58378, upload-time = "2026-06-18T09:42:56.459Z" },
 ]
 
 [[package]]
@@ -519,8 +519,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agent-framework-core", specifier = ">=1.7.0,<2.0.0" },
-    { name = "agent-framework-openai", specifier = ">=1.7.0,<2.0.0" },
+    { name = "agent-framework-core", specifier = ">=1.9.0,<2.0.0" },
+    { name = "agent-framework-openai", specifier = ">=1.8.2,<2.0.0" },
     { name = "aiohttp", specifier = "==3.14.1" },
     { name = "aiolimiter", specifier = "==1.1.0" },
     { name = "azure-ai-inference", specifier = ">=1.0.0b9" },
