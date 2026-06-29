@@ -22,7 +22,7 @@ dependencies = [
 	"opentelemetry-exporter-otlp-proto-http==1.39.0",
 	"opentelemetry-instrumentation-fastapi==0.60b0",
 	"opentelemetry-instrumentation-httpx==0.60b0",
-	"aiohttp==3.14.0",
+	"aiohttp==3.14.1",
 	"python-multipart==0.0.31",
 	"fpdf2==2.7.9",
 	"azure-ai-inference>=1.0.0b9",
