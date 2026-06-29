@@ -250,6 +250,18 @@ These variables provide additional functionality but are not required for core o
 
 
 
+- **`CHAT_STREAMING`** - Opt-in token-by-token streaming for the RAG chat assistant (SSE)
+
+  - Example: `false` (default)
+
+  - Values: `true` / `false` (parsed as `os.getenv("CHAT_STREAMING", "false").lower() == "true"`)
+
+  - Used for: When `true`, the frontend calls `POST /api/chat/stream` and renders the answer incrementally via Server-Sent Events for lower perceived latency. When `false` (default), the UI uses the single-shot `POST /api/chat` JSON response — byte-for-byte the current behavior.
+
+  - Note: Exposed through `/api/admin/ui-config` as `chat_streaming`; the streaming endpoint always exists but the frontend only uses it when the flag is on. Both paths share the same grounding, chat history, and semantic cache, so cached answers stay consistent across endpoints.
+
+
+
 - **`GPT_DEPLOYMENT`** - The deployment name for GPT models
 
   - Example: `gpt-5.2`

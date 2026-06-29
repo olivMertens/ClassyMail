@@ -10,7 +10,9 @@ import json
 import logging
 import os
 import re
+from collections.abc import AsyncIterator
 from contextvars import ContextVar
+from dataclasses import dataclass, field
 from typing import Annotated
 
 from azure.identity import DefaultAzureCredential
@@ -50,6 +52,71 @@ _ACTIONS_RE = re.compile(r"<!-- ACTIONS:\s*(.+?)\s*-->")
 # How many prior chat turns to replay into the LLM context (history bounded
 # to keep prompt size predictable and cost stable).
 _MAX_HISTORY_TURNS = 10
+
+# Hidden suggested-actions marker the model appends at the very end of a reply.
+_MARKER_START = "<!--"
+
+
+def _emit_visible(buffer: str, already_emitted: int) -> tuple[int, str]:
+    """Decide how much of an accumulating stream buffer is safe to show.
+
+    Freezes visible output at the first ``<!--`` (start of the hidden ACTIONS
+    marker). While no marker has appeared yet, holds back up to
+    ``len(_MARKER_START) - 1`` trailing characters so a marker forming across
+    delta boundaries (e.g. ``"<!"`` then ``"--"``) is never emitted.
+
+    Returns ``(new_emitted_index, delta_to_emit)``.
+    """
+    cut = buffer.find(_MARKER_START)
+    if cut != -1:
+        target = cut
+    else:
+        target = max(already_emitted, len(buffer) - (len(_MARKER_START) - 1))
+    if target <= already_emitted:
+        return already_emitted, ""
+    return target, buffer[already_emitted:target]
+
+
+def _finalize_stream_text(buffer: str) -> tuple[str, list[str]]:
+    """Split a full accumulated reply into clean content + suggested actions.
+
+    Cuts visible content at the first ``<!--`` — the same point where
+    :func:`_emit_visible` freezes streamed deltas — so the terminal ``done``
+    content can never contain a marker fragment (even a partial/malformed one).
+    Actions are parsed from the full buffer via the shared ``_ACTIONS_RE``.
+    """
+    actions: list[str] = []
+    content = buffer
+    match = _ACTIONS_RE.search(buffer)
+    if match:
+        actions = [a.strip() for a in match.group(1).split("|") if a.strip()]
+    cut = buffer.find(_MARKER_START)
+    if cut != -1:
+        content = buffer[:cut].rstrip()
+    return content, actions
+
+
+def _chunk_text(text: str, size: int = 24) -> list[str]:
+    """Split text into fixed-size chunks (used to replay a cache hit as a stream)."""
+    if not text:
+        return []
+    return [text[i : i + size] for i in range(0, len(text), size)]
+
+
+@dataclass
+class _PreparedRun:
+    """Read-only pre-flight result shared by ``run`` and ``run_stream``.
+
+    The only writes performed during preparation are the chat-history appends on
+    a cache hit (kept here so both paths reproduce ``run``'s exact behaviour).
+    The post-LLM writes (history append, cache set) stay in the callers.
+    """
+
+    query_text: str = ""
+    query_vector: list[float] = field(default_factory=list)
+    sources: list[dict] = field(default_factory=list)
+    run_messages: list = field(default_factory=list)
+    cache_hit: str | None = None
 
 
 # ── Handoff & Sequential review helpers ──────────────────────────────
@@ -500,6 +567,100 @@ class ClassyMailChatAgent:
         self._agents[locale] = agent
         return agent
 
+    async def _prepare(
+        self,
+        messages: list[dict],
+        clients: Clients,
+        session_id: str | None,
+        locale: str,
+    ) -> _PreparedRun:
+        """Read-only pre-flight shared by ``run`` and ``run_stream``.
+
+        Loads chat history, embeds the query, checks the semantic cache, retrieves
+        grounding chunks and builds the agent-framework message sequence. On a
+        cache hit it appends the user/assistant turns to history (matching the
+        original ``run`` behaviour exactly) and returns early with ``cache_hit``
+        set. The post-LLM writes (history append, cache set) stay in the callers.
+        """
+        prepared = _PreparedRun()
+
+        last_user = next((m for m in reversed(messages) if m.get("role") == "user"), None)
+        prepared.query_text = last_user.get("content", "") if last_user else ""
+        query_text = prepared.query_text
+        hist_items: list[dict] = []
+
+        # Chat history (fed to the LLM as conversation context).
+        if session_id:
+            try:
+                hist_items = await get_chat_history(session_id, clients=clients)
+                logger.debug("Loaded %d history entries for session %s", len(hist_items), session_id)
+            except Exception as ex:
+                logger.warning(f"Chat history fetch failed: {ex}")
+
+        # Embedding + semantic cache
+        if query_text:
+            try:
+                prepared.query_vector = await generate_embedding(query_text, clients=clients)
+                logger.info("Chat embedding: dims=%d for query '%s'",
+                            len(prepared.query_vector), query_text[:80])
+            except Exception as ex:
+                logger.warning("Chat embedding failed: %s", ex)
+
+            if prepared.query_vector:
+                try:
+                    cache_hits = await get_cache_entry(prepared.query_vector, clients=clients)
+                    if cache_hits:
+                        cached = cache_hits[0]
+                        cached_response = cached.get("response")
+                        prepared.sources = cached.get("sources", [])
+                        if cached_response:
+                            logger.info("Chat cache hit for query '%s'", query_text[:80])
+                            if session_id:
+                                await append_chat_history_entry(session_id, "user", query_text, clients=clients)
+                                await append_chat_history_entry(
+                                    session_id, "assistant", cached_response,
+                                    sources=prepared.sources, clients=clients,
+                                )
+                            prepared.cache_hit = cached_response
+                            return prepared
+                except Exception as ex:
+                    logger.warning("Cache lookup failed: %s", ex)
+            else:
+                logger.warning("Chat embedding returned empty — vector search will be skipped")
+
+            # Chunk retrieval for grounding
+            try:
+                chunk_results = await search_chunks_by_vector(query_text, limit=5, clients=clients)
+                logger.info("Chat grounding: %d chunks retrieved", len(chunk_results))
+                for r in chunk_results:
+                    prepared.sources.append({
+                        "parent_id": r.get("parent_id"),
+                        "subject": r.get("subject"),
+                        "chunk_index": r.get("chunk_index"),
+                        "content": r.get("content"),
+                        "distance": r.get("distance"),
+                    })
+            except Exception as ex:
+                logger.warning("Chunk retrieval failed: %s", ex)
+
+        # ── Build input for agent-framework ──────────────────
+        grounding = ""
+        if prepared.sources:
+            grounding = f"\n\nGrounding context (use to answer): {json.dumps({'sources': prepared.sources}, ensure_ascii=False)}"
+
+        full_input = query_text + grounding
+
+        # Build a Message sequence: prior history + current grounded query.
+        run_messages: list = []
+        for h in hist_items[-_MAX_HISTORY_TURNS:]:
+            role = h.get("role") or "user"
+            content = h.get("content") or ""
+            if content:
+                run_messages.append(Message(role, [content]))
+        run_messages.append(Message("user", [full_input]))
+        prepared.run_messages = run_messages
+        return prepared
+
     async def run(
         self,
         messages: list[dict],
@@ -520,87 +681,19 @@ class ClassyMailChatAgent:
                 span.set_attribute("gen_ai.system", "azure_openai")
                 span.set_attribute("gen_ai.request.model", config.CHAT_DEPLOYMENT or "")
 
-                # ── Pre-flight: history, cache, grounding ────────────
-                last_user = next((m for m in reversed(messages) if m.get("role") == "user"), None)
-                query_text = last_user.get("content", "") if last_user else ""
-                sources: list[dict] = []
-                query_vector: list[float] = []
-                hist_items: list[dict] = []
+                prepared = await self._prepare(messages, clients, session_id, locale)
+                query_text = prepared.query_text
+                query_vector = prepared.query_vector
+                sources = prepared.sources
 
-                # Chat history (now actually fed to the LLM — previously loaded but unused)
-                if session_id:
-                    try:
-                        hist_items = await get_chat_history(session_id, clients=clients)
-                        logger.debug("Loaded %d history entries for session %s", len(hist_items), session_id)
-                    except Exception as ex:
-                        logger.warning(f"Chat history fetch failed: {ex}")
-
-                # Embedding + semantic cache
-                if query_text:
-                    try:
-                        query_vector = await generate_embedding(query_text, clients=clients)
-                        logger.info("Chat embedding: dims=%d for query '%s'",
-                                    len(query_vector), query_text[:80])
-                    except Exception as ex:
-                        logger.warning("Chat embedding failed: %s", ex)
-
-                    if query_vector:
-                        try:
-                            cache_hits = await get_cache_entry(query_vector, clients=clients)
-                            if cache_hits:
-                                cached = cache_hits[0]
-                                cached_response = cached.get("response")
-                                sources = cached.get("sources", [])
-                                if cached_response:
-                                    logger.info("Chat cache hit for query '%s'", query_text[:80])
-                                    if session_id:
-                                        await append_chat_history_entry(session_id, "user", query_text, clients=clients)
-                                        await append_chat_history_entry(
-                                            session_id, "assistant", cached_response, sources=sources, clients=clients
-                                        )
-                                    span.set_status(Status(StatusCode.OK))
-                                    return {"role": "assistant", "content": cached_response, "sources": sources}
-                        except Exception as ex:
-                            logger.warning("Cache lookup failed: %s", ex)
-                    else:
-                        logger.warning("Chat embedding returned empty — vector search will be skipped")
-
-                    # Chunk retrieval for grounding
-                    try:
-                        chunk_results = await search_chunks_by_vector(query_text, limit=5, clients=clients)
-                        logger.info("Chat grounding: %d chunks retrieved", len(chunk_results))
-                        for r in chunk_results:
-                            sources.append({
-                                "parent_id": r.get("parent_id"),
-                                "subject": r.get("subject"),
-                                "chunk_index": r.get("chunk_index"),
-                                "content": r.get("content"),
-                                "distance": r.get("distance"),
-                            })
-                    except Exception as ex:
-                        logger.warning("Chunk retrieval failed: %s", ex)
-
-                # ── Build input for agent-framework ──────────────────
-                grounding = ""
-                if sources:
-                    grounding = f"\n\nGrounding context (use to answer): {json.dumps({'sources': sources}, ensure_ascii=False)}"
-
-                full_input = query_text + grounding
-
-                # Build a Message sequence: prior history + current grounded query.
-                # This actually feeds the conversation context to the LLM — the
-                # previous implementation loaded ``hist_items`` but threw it away.
-                run_messages: list = []
-                for h in hist_items[-_MAX_HISTORY_TURNS:]:
-                    role = h.get("role") or "user"
-                    content = h.get("content") or ""
-                    if content:
-                        run_messages.append(Message(role, [content]))
-                run_messages.append(Message("user", [full_input]))
+                # ── Semantic cache hit — replay without invoking the LLM ──
+                if prepared.cache_hit is not None:
+                    span.set_status(Status(StatusCode.OK))
+                    return {"role": "assistant", "content": prepared.cache_hit, "sources": sources}
 
                 # ── Run agent ────────────────────────────────────────
                 try:
-                    result = await agent.run(run_messages)
+                    result = await agent.run(prepared.run_messages)
                     content = str(result) if result else "No response generated."
                 except Exception as ex:
                     logger.error(f"Agent framework error: {ex}", exc_info=True)
@@ -633,6 +726,110 @@ class ClassyMailChatAgent:
 
                 span.set_status(Status(StatusCode.OK))
                 return {"role": "assistant", "content": content, "sources": sources, "suggested_actions": suggested_actions}
+        finally:
+            _clients_ctx.reset(ctx_token)
+
+    async def run_stream(
+        self,
+        messages: list[dict],
+        clients: Clients,
+        session_id: str | None = None,
+        locale: str = "en",
+    ) -> AsyncIterator[dict]:
+        """Streaming counterpart of :meth:`run` — yields transport-agnostic events.
+
+        Yields dicts of shape:
+        - ``{"type": "delta", "text": str}`` — incremental visible text
+        - ``{"type": "done", "content": str, "sources": list, "suggested_actions": list}``
+        - ``{"type": "error", "message": str}``
+
+        The hidden ``<!-- ACTIONS ... -->`` marker is never emitted in deltas
+        (see :func:`_emit_visible`). History + semantic cache are persisted with
+        the same raw content ``run`` stores, so the cache stays consistent across
+        the ``/api/chat`` and ``/api/chat/stream`` endpoints.
+        """
+        ctx_token = _clients_ctx.set(clients)
+        try:
+            agent = self._get_or_create_agent(locale)
+            if agent is None:
+                yield {
+                    "type": "done",
+                    "content": "Chatbot is not configured (missing CHAT_ENDPOINT).",
+                    "sources": [],
+                    "suggested_actions": [],
+                }
+                return
+
+            with tracer.start_as_current_span("chat_agent.run_stream") as span:
+                span.set_attribute("gen_ai.system", "azure_openai")
+                span.set_attribute("gen_ai.request.model", config.CHAT_DEPLOYMENT or "")
+
+                prepared = await self._prepare(messages, clients, session_id, locale)
+
+                # ── Semantic cache hit — replay cached answer as a stream ──
+                if prepared.cache_hit is not None:
+                    content, suggested_actions = _finalize_stream_text(prepared.cache_hit)
+                    for chunk in _chunk_text(content):
+                        yield {"type": "delta", "text": chunk}
+                    span.set_status(Status(StatusCode.OK))
+                    yield {
+                        "type": "done",
+                        "content": content,
+                        "sources": prepared.sources,
+                        "suggested_actions": suggested_actions,
+                    }
+                    return
+
+                # ── Stream the agent response ────────────────────────
+                buffer = ""
+                emitted = 0
+                try:
+                    stream = agent.run(prepared.run_messages, stream=True)
+                    async for update in stream:
+                        piece = getattr(update, "text", "") or ""
+                        if not piece:
+                            continue
+                        buffer += piece
+                        emitted, delta = _emit_visible(buffer, emitted)
+                        if delta:
+                            yield {"type": "delta", "text": delta}
+                except Exception as ex:
+                    logger.error(f"Agent framework streaming error: {ex}", exc_info=True)
+                    span.set_status(Status(StatusCode.ERROR, str(ex)))
+                    yield {"type": "error", "message": f"Error: {ex}"}
+                    return
+
+                content, suggested_actions = _finalize_stream_text(buffer)
+                # Flush any visible text held back behind the marker tail-buffer.
+                if emitted < len(content):
+                    yield {"type": "delta", "text": content[emitted:]}
+
+                # ── Post-flight: persist raw content + cache (parity with run) ──
+                if session_id and prepared.query_text:
+                    try:
+                        await append_chat_history_entry(session_id, "user", prepared.query_text, clients=clients)
+                        await append_chat_history_entry(
+                            session_id, "assistant", buffer, sources=prepared.sources, clients=clients
+                        )
+                    except Exception as ex:
+                        logger.warning(f"Chat history append failed: {ex}")
+
+                if prepared.query_vector and prepared.query_text and buffer:
+                    try:
+                        await set_cache_entry(
+                            prepared.query_text, prepared.query_vector, buffer,
+                            sources=prepared.sources, clients=clients,
+                        )
+                    except Exception as ex:
+                        logger.warning(f"Cache set failed: {ex}")
+
+                span.set_status(Status(StatusCode.OK))
+                yield {
+                    "type": "done",
+                    "content": content,
+                    "sources": prepared.sources,
+                    "suggested_actions": suggested_actions,
+                }
         finally:
             _clients_ctx.reset(ctx_token)
 

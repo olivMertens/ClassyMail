@@ -19,6 +19,7 @@ class UIConfigResponse(BaseModel):
     organization_name: str | None = None
     environment: str | None = None
     chat_enabled: bool = False
+    chat_streaming: bool = False
     assessment_enabled: bool = False
     commit_sha: str | None = None
     build_timestamp: str | None = None
@@ -58,6 +59,7 @@ async def get_ui_config():
         organization_name=getattr(config, "ORGANIZATION_NAME", None),
         environment=getattr(config, "AZURE_ENV", None),
         chat_enabled=bool(getattr(config, "CHAT_DEPLOYMENT", None) and getattr(config, "EMBEDDING_DEPLOYMENT", None)),
+        chat_streaming=bool(getattr(config, "CHAT_STREAMING", False)),
         assessment_enabled=bool(getattr(config, "PHI_ENDPOINT", None)),
         commit_sha=os.getenv("COMMIT_SHA"),
         build_timestamp=os.getenv("BUILD_TIMESTAMP"),
