@@ -442,4 +442,3 @@ Error: "Request originated from IP X.X.X.X through public internet"
 3. **Exact phrases vs. concepts.** For literal terms (e.g. a French phrase like "dégât des eaux"), keyword search (`search_email_by_text`, `CONTAINS(LOWER(search_text), ...)`) is the reliable path; cross-language queries (EN "water damage" against FR content) genuinely require working vector search.
 
 4. **Cosmos `GROUP BY` + `JOIN` unsupported (top intents).** `get_top_intents` aggregates client-side in Python — the serverless account rejects `GROUP BY` combined with `JOIN ... IN <sub-array>`.
-
