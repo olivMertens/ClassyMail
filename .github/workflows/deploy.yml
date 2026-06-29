@@ -292,38 +292,6 @@ jobs:
             sleep 10
           done
 
-      - name: Assign managed identity to API Container App
-        run: |
-          IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
-          IDENTITY_ID=$(az identity show -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "$IDENTITY_NAME" --query id -o tsv)
-
-          # Check if identity is already assigned (idempotent)
-          CURRENT_IDENTITIES=$(az containerapp identity show \
-            --name "${{ env.IMAGE_NAME }}" \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --query "userAssignedIdentities | keys(@)" -o tsv 2>/dev/null || echo "")
-
-          if echo "$CURRENT_IDENTITIES" | grep -qi "$IDENTITY_ID"; then
-            echo "Identity already assigned - skipping"
-          else
-            echo "Assigning identity..."
-            az containerapp identity assign \
-              --name "${{ env.IMAGE_NAME }}" \
-              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-              --user-assigned "$IDENTITY_ID"
-          fi
-
-      - name: Configure ACR pull (API)
-        run: |
-          set -euo pipefail
-          REGISTRY="${{ vars.ACR_NAME }}.azurecr.io"
-          IDENTITY_ID=$(az identity show -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "${{ vars.AZURE_IDENTITY_NAME }}" --query id -o tsv)
-          az containerapp registry set \
-            --name "${{ env.IMAGE_NAME }}" \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --server "$REGISTRY" \
-            --identity "$IDENTITY_ID"
-
       - name: Deploy API to Azure Container Apps
         run: |
           set -euo pipefail
@@ -337,12 +305,16 @@ jobs:
           fi
           echo "Deploying API image: $IMAGE"
 
-          # Only update the image tag. Environment variables, identity, and scale rules
-          # are now managed by Terraform resources in infra/main.tf
-          az containerapp update \
-            -n "$APP" \
-            -g "$RG" \
-            --image "$IMAGE"
+          # Only update the image tag. Identity, ACR pull, env vars, and scale rules
+          # are managed by Terraform (infra/main.tf). Retry to ride out transient
+          # 'ContainerAppOperationInProgress' errors while a revision settles.
+          ok=""
+          for attempt in $(seq 1 10); do
+            if az containerapp update -n "$APP" -g "$RG" --image "$IMAGE"; then ok=1; break; fi
+            echo "containerapp update attempt $attempt/10 failed (app busy?); waiting 15s..."
+            sleep 15
+          done
+          [ -n "$ok" ] || { echo "::error::containerapp update failed after retries"; exit 1; }
 
   deploy-worker:
     runs-on: ubuntu-latest
@@ -421,41 +393,6 @@ jobs:
             sleep 10
           done
 
-      - name: Assign managed identity to Worker Container App
-        run: |
-          set -euo pipefail
-          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
-          APP="${{ env.WORKER_APP_NAME }}"
-          IDENTITY_NAME="${{ vars.AZURE_IDENTITY_NAME }}"
-          IDENTITY_ID=$(az identity show -g "$RG" -n "$IDENTITY_NAME" --query id -o tsv)
-
-          # Check if identity is already assigned (idempotent)
-          CURRENT_IDENTITIES=$(az containerapp identity show \
-            --name "$APP" \
-            --resource-group "$RG" \
-            --query "userAssignedIdentities | keys(@)" -o tsv 2>/dev/null || echo "")
-
-          if echo "$CURRENT_IDENTITIES" | grep -qi "$IDENTITY_ID"; then
-            echo "Identity already assigned - skipping"
-          else
-            echo "Assigning identity..."
-            az containerapp identity assign \
-              --name "$APP" \
-              --resource-group "$RG" \
-              --user-assigned "$IDENTITY_ID"
-          fi
-
-      - name: Configure ACR pull (Worker)
-        run: |
-          set -euo pipefail
-          REGISTRY="${{ vars.ACR_NAME }}.azurecr.io"
-          IDENTITY_ID=$(az identity show -g "${{ vars.AZURE_RESOURCE_GROUP }}" -n "${{ vars.AZURE_IDENTITY_NAME }}" --query id -o tsv)
-          az containerapp registry set \
-            --name "${{ env.WORKER_APP_NAME }}" \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --server "$REGISTRY" \
-            --identity "$IDENTITY_ID"
-
       - name: Deploy Worker Container App
         run: |
           set -euo pipefail
@@ -469,12 +406,16 @@ jobs:
           fi
           echo "Deploying worker image: $IMAGE"
 
-          # Only update the image tag. Environment variables, identity, and scale rules
-          # are now managed by Terraform resources in infra/main.tf
-          az containerapp update \
-            -n "$APP" \
-            -g "$RG" \
-            --image "$IMAGE"
+          # Only update the image tag. Identity, ACR pull, env vars, and scale rules
+          # are managed by Terraform (infra/main.tf). Retry to ride out transient
+          # 'ContainerAppOperationInProgress' errors while a revision settles.
+          ok=""
+          for attempt in $(seq 1 10); do
+            if az containerapp update -n "$APP" -g "$RG" --image "$IMAGE"; then ok=1; break; fi
+            echo "containerapp update attempt $attempt/10 failed (app busy?); waiting 15s..."
+            sleep 15
+          done
+          [ -n "$ok" ] || { echo "::error::containerapp update failed after retries"; exit 1; }
 
   post-deploy-verify-fix:
     name: Post-Deployment Verification & Auto-Fix
