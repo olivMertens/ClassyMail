@@ -576,6 +576,21 @@ resource "azurerm_role_assignment" "storage_reader" {
 
 
 
+> **Automated verify & repair:** `infra/deploy.ps1` / `infra/deploy.sh` discover
+> the app managed identity and **add only the missing** role assignments. Run them
+> standalone against an existing resource group to double-check a deployment:
+>
+> ```powershell
+> ./infra/deploy.ps1 -VerifyOnly -ResourceGroup <prefix>-rg
+> ```
+> ```bash
+> bash infra/deploy.sh --verify-only --resource-group <prefix>-rg
+> ```
+>
+> This runs automatically after every successful deploy (skip with
+> `-SkipRoleVerification` / `--skip-role-verification`). The manual script below
+> remains available for a read-only check.
+
 Use this script to validate all role assignments at deployment time:
 
 

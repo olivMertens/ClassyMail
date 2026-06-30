@@ -173,6 +173,33 @@ Target specific tenant/subscription:
 .\infra\deploy.ps1 -TenantId <TENANT_ID> -SubscriptionId <SUBSCRIPTION_ID>
 ```
 
+### Quick Start (Linux/macOS)
+
+```bash
+bash infra/deploy.sh
+# Target tenant/subscription:
+bash infra/deploy.sh --tenant-id <TENANT_ID> --subscription-id <SUBSCRIPTION_ID>
+```
+
+### Verify / Repair Role Assignments
+
+Both deploy scripts discover the app managed identity and **add only the missing**
+RBAC role assignments (idempotent). This runs automatically after a successful
+apply, and can be run standalone to double-check an existing resource group
+without touching Terraform:
+
+```powershell
+.\infra\deploy.ps1 -VerifyOnly -ResourceGroup <prefix>-rg
+```
+
+```bash
+bash infra/deploy.sh --verify-only --resource-group <prefix>-rg
+```
+
+The Cosmos DB data-plane access uses a Terraform-managed custom SQL role — it is
+verified and reported (warn) rather than recreated. See
+[RBAC_AUDIT.md](RBAC_AUDIT.md) for the full role matrix.
+
 ### Manual Deployment
 
 ```powershell
@@ -203,6 +230,7 @@ Some AzureRM provider versions don't auto-detect subscription from Azure CLI. Th
 - `main.tf`
 - `.terraform.lock.hcl`
 - `deploy.ps1`
+- `deploy.sh`
 - `terraform.tfvars.example`
 
 **Do NOT commit:**
