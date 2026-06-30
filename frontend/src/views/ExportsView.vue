@@ -113,8 +113,8 @@ const generateSyntheticData = async () => {
 const fetchStats = async () => {
   loading.value = true
   try {
-    // Use /api/emails/stats which returns proper finetune fields
-    const res = await fetch('/api/emails/stats')
+    // Use /api/stats which returns total + finetune readiness fields
+    const res = await fetch('/api/stats')
     if (res.ok) {
       const data = await res.json()
       stats.value = {

@@ -866,6 +866,136 @@ async def ocr_with_document_intelligence(
         return {"markdown": content, "usage": usage_info, "images": []}
 
 
+async def ocr_with_content_understanding(
+    base64_pdf: str,
+    clients: Clients | None = None,
+) -> dict:
+    """
+    Opt-in OCR via Azure AI Content Understanding (async analyze + poll).
+
+    Returns the same dict contract as ocr_with_mistral / ocr_with_document_intelligence
+    ({"markdown", "usage", "images"}). Active only when config.OCR_PROVIDER ==
+    "content_understanding"; Document Intelligence stays the universal fallback if this fails.
+
+    REST (api-version 2025-11-01):
+      POST {endpoint}/contentunderstanding/analyzers/{analyzerId}:analyze
+        -> 202 + Operation-Location header -> poll GET until status "Succeeded"
+        -> result.contents[].markdown
+    Ref: https://learn.microsoft.com/azure/ai-services/content-understanding/quickstart/use-rest-api
+    """
+    if not config.CONTENT_UNDERSTANDING_ENDPOINT:
+        raise RuntimeError(
+            "CONTENT_UNDERSTANDING_ENDPOINT not configured — cannot use Content Understanding OCR."
+        )
+
+    # Auth: prefer Managed Identity, fall back to key (mirrors Document Intelligence).
+    if config.CONTENT_UNDERSTANDING_KEY:
+        headers = {
+            "Content-Type": "application/json",
+            "Ocp-Apim-Subscription-Key": config.CONTENT_UNDERSTANDING_KEY,
+        }
+    else:
+        clients_ref = clients or __import__(
+            "classymail.services.azure_clients", fromlist=["get_default_clients"]
+        ).get_default_clients()
+        token = await clients_ref.credential.get_token("https://cognitiveservices.azure.com/.default")
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token.token}",
+        }
+
+    base_url = config.CONTENT_UNDERSTANDING_ENDPOINT.rstrip("/")
+    api_version = config.CONTENT_UNDERSTANDING_API_VERSION
+    analyzer_id = config.CONTENT_UNDERSTANDING_ANALYZER_ID
+    url = f"{base_url}/contentunderstanding/analyzers/{analyzer_id}:analyze?api-version={api_version}"
+
+    # Inline the PDF as a data URI (self-contained; a blob SAS URL is the production alternative).
+    request_body = {"inputs": [{"url": f"data:application/pdf;base64,{base64_pdf}"}]}
+    pdf_size_estimate = len(base64_pdf) * 3 // 4
+
+    with tracer.start_as_current_span("content_understanding_ocr") as span:
+        span.set_attribute("gen_ai.system", "azure_content_understanding")
+        span.set_attribute("gen_ai.operation", "document.analyze")
+        span.set_attribute("app.pdf_size_bytes", pdf_size_estimate)
+        span.set_attribute("app.cu_analyzer_id", analyzer_id)
+
+        async with httpx.AsyncClient(timeout=180) as client:
+            logger.info(f"[metrics] Content Understanding OCR: submitting ~{pdf_size_estimate} bytes to {url}")
+            resp = await client.post(url, json=request_body, headers=headers)
+
+            if resp.status_code not in (200, 202):
+                error_text = resp.text[:500]
+                logger.error(f"[metrics] Content Understanding submit failed: {resp.status_code} - {error_text}")
+                raise OCRFailed(
+                    f"Content Understanding submit failed: {resp.status_code} - {error_text}",
+                    retryable=resp.status_code in (429, 500, 502, 503, 504),
+                )
+
+            # 202 = async operation: poll Operation-Location until terminal status.
+            if resp.status_code == 202:
+                operation_url = resp.headers.get("Operation-Location")
+                if not operation_url:
+                    raise OCRFailed("Content Understanding: missing Operation-Location header")
+
+                poll_headers = {k: v for k, v in headers.items() if k != "Content-Type"}
+                max_polls = 60  # 60 * 3s = 3 minutes max
+                result = {}
+                for poll_idx in range(max_polls):
+                    await asyncio.sleep(3)
+                    poll_resp = await client.get(operation_url, headers=poll_headers)
+                    poll_resp.raise_for_status()
+                    poll_data = poll_resp.json()
+                    status = str(poll_data.get("status", "")).lower()
+
+                    if status == "succeeded":
+                        result = poll_data.get("result", {})
+                        break
+                    elif status == "failed":
+                        error_detail = poll_data.get("error", {}).get("message", "Unknown error")
+                        raise OCRFailed(f"Content Understanding analysis failed: {error_detail}")
+                    elif status in ("running", "notstarted"):
+                        logger.debug(f"[metrics] Content Understanding polling ({poll_idx + 1}/{max_polls}): {status}")
+                        continue
+                    else:
+                        raise OCRFailed(f"Content Understanding unexpected status: {status}")
+                else:
+                    raise OCRFailed("Content Understanding analysis timed out after polling")
+            else:
+                # Synchronous response (200)
+                result = resp.json().get("result", {})
+
+        # Extract markdown from contents[] (one entry per document/segment).
+        contents = result.get("contents", []) or []
+        markdown = "\n\n".join(
+            c.get("markdown", "") for c in contents if c.get("markdown")
+        ).strip()
+
+        page_count = 0
+        for c in contents:
+            pages = c.get("pages")
+            if isinstance(pages, list):
+                page_count += len(pages)
+            elif isinstance(pages, int):
+                page_count += pages
+        if not page_count:
+            page_count = len(contents)
+
+        if not markdown:
+            raise OCRFailed("Content Understanding returned empty content")
+
+        logger.info(
+            f"[metrics] Content Understanding OCR Success: {page_count} pages, {len(markdown)} chars"
+        )
+        span.set_attribute("app.pages_processed", page_count)
+        span.set_attribute("app.content_length", len(markdown))
+
+        usage_info = {
+            "pages_processed": page_count,
+            "provider": "content_understanding",
+        }
+        return {"markdown": markdown, "usage": usage_info, "images": []}
+
+
 # Language names for locale-aware LLM output
 _LOCALE_NAMES = {
     "en": "English", "fr": "French", "es": "Spanish",

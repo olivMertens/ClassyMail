@@ -35,6 +35,19 @@ plus (for history) a data-migration strategy.
 
 ## Part A — Orchestrations: replace `asyncio.gather` with `ConcurrentBuilder`
 
+> **Update — verified against installed MAF 1.9.0 (June 2026):** orchestrations
+> were promoted to **GA/stable (`agent-framework-orchestrations` 1.0.0)**, but this
+> is a **separate distribution that is NOT installed under the current pin** —
+> `from agent_framework.orchestrations import ConcurrentBuilder` raises
+> `ModuleNotFoundError` until you `pip install agent-framework-orchestrations`
+> (the `agent_framework.orchestrations` name in core is only a lazy re-export
+> shim). **PR-A1's "add the dependency" step below is therefore still required.**
+> Once installed it also exposes `SequentialBuilder`, `HandoffBuilder`,
+> `MagenticBuilder`, and `GroupChatBuilder`; MAF `Agent` instances satisfy
+> `SupportsAgentRun` structurally, so they are valid participants. **Caveat
+> unchanged:** `ConcurrentBuilder` still has **no per-participant timeout** in
+> 1.9.0 — keep the per-agent `asyncio.wait_for`.
+
 ### Current code
 
 `#classymail/agents/workflow.py` contains the only two `asyncio.gather`
@@ -50,7 +63,7 @@ Each "agent" is a Python coroutine produced by
 returns a `SpecializedAgentResult` Pydantic model defined in
 `#classymail/agents/models.py`.
 
-### Target API (MAF 1.6)
+### Target API (`agent-framework-orchestrations`, now GA/stable in 1.9)
 
 ```python
 from agent_framework.orchestrations import ConcurrentBuilder
@@ -140,6 +153,19 @@ PR-A2 (~300 LOC):
 ---
 
 ## Part B — Chat history: replace manual Cosmos with `CosmosHistoryProvider`
+
+> **Update — verified against installed MAF 1.9.0 (June 2026):** `HistoryProvider`,
+> `AgentSession`, and `SessionContext` are now **in-core** (`agent-framework-core==1.9.0`),
+> with built-in `InMemoryHistoryProvider` / `FileHistoryProvider`. The **`sources`
+> "no native equivalent" blocker below is resolved**: `Message` exposes
+> `additional_properties` (a `MutableMapping`) — a clean, first-class carrier for the
+> `sources` round-trip (no need to overload `Message.metadata`). `CosmosHistoryProvider`
+> (`agent-framework-azure-cosmos`) remains **Beta** — mind the `allowed_checkpoint_types=`
+> pickle guard (added 1.1.0) if custom types land in `session.state`. Note also:
+> `OpenAIChatClient` sets `STORES_BY_DEFAULT=True`, so the Azure OpenAI Responses API
+> already persists turn state server-side (via `previous_response_id`) when you pass
+> `session=` — a transient-multi-turn alternative to Cosmos, though it won't carry
+> `sources` for the UI, so the dual-store rationale still holds.
 
 ### Current schema (DO NOT CHANGE under existing container)
 

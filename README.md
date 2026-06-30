@@ -110,7 +110,7 @@ Full documentation: [AGENTIC_CLASSIFICATION](docs/AGENTIC_CLASSIFICATION.md) | [
 - **Per-Category AI Search Indexes**: Each category gets its own Azure AI Search index with positive and negative reference examples — agents use RAG to calibrate confidence (see [AI_SEARCH_INDEXES](docs/AI_SEARCH_INDEXES.md))
 
 ### RAG Chatbot
-- **Chat with your emails**: GPT-5.2-chat with vector search over all processed documents, orchestrated by **Microsoft Agent Framework 1.7** (`agent-framework-core>=1.7` + `agent-framework-openai>=1.7`) — per-locale `Agent` cache, `ContextVar`-scoped dependency injection, and full chat history replay via `list[Message]`
+- **Chat with your emails**: GPT-5.2-chat with vector search over all processed documents, orchestrated by **Microsoft Agent Framework 1.9** (`agent-framework-core>=1.9` + `agent-framework-openai>=1.8`) — per-locale `Agent` cache, `ContextVar`-scoped dependency injection, and full chat history replay via `list[Message]`
 - **Agent-driven suggestions**: The LLM agent generates contextual follow-up action pills after each response — no hardcoded logic
 - **Ask AI button**: Click ✨ on any email card or table row to open the chatbot pre-filled with that email’s context
 - **12 agent tools**: Semantic search (with date filtering), keyword search (case-insensitive), reclassification handoff, sequential review, stats, error analysis, category explanation
@@ -175,7 +175,7 @@ See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for full setup or [do
 - **Backend**: FastAPI (Python 3.12) + uv
 - **Frontend**: Vue 3 + Vite + TailwindCSS + vue-i18n
 - **Infra**: Terraform (azurerm v4 + azapi)
-- **AI**: Microsoft AI Foundry (Mistral, Phi-4, GPT-4o-mini, GPT-5.2-chat) + Microsoft Agent Framework 1.7
+- **AI**: Microsoft AI Foundry (Mistral, Phi-4, GPT-4o-mini, GPT-5.2-chat) + Microsoft Agent Framework 1.9
 - **Storage**: Cosmos DB (serverless + vector search + composite indexes), Blob Storage
 - **Auth**: Managed Identity (zero secrets)
 - **CI/CD**: GitHub Actions with OIDC
@@ -201,11 +201,29 @@ See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for full setup or [do
 
 > **Not all models are required.** The pipeline works with just Phi-4 + Mistral OCR. Optional models enable fallback classification and RAG chat. Deploy only what you need.
 
+> **Note on OCR 4:** the `mistral-document-ai-2512` deployment *is* Mistral OCR 4 — the pipeline already runs the latest Mistral OCR. Pin a specific dated version via the `MISTRAL_DEPLOYMENT` env var if needed (see `#classymail/core/config.py`).
+
+#### Experimental: Azure AI Content Understanding OCR (opt-in, default-off)
+
+An optional third OCR provider — [Azure AI Content Understanding](https://learn.microsoft.com/azure/ai-services/content-understanding/) — is available behind a feature flag as a PoC. It is **disabled by default**; the standard Mistral → Document Intelligence flow is unchanged unless you opt in.
+
+To try it, set `OCR_PROVIDER=content_understanding` and configure the endpoint:
+
+```bash
+OCR_PROVIDER=content_understanding            # default "mistral" keeps current behavior
+CONTENT_UNDERSTANDING_ENDPOINT=https://<your-foundry-resource>.cognitiveservices.azure.com/
+CONTENT_UNDERSTANDING_ANALYZER_ID=prebuilt-documentSearch   # RAG-optimized markdown extraction
+CONTENT_UNDERSTANDING_API_VERSION=2025-11-01
+# CONTENT_UNDERSTANDING_KEY=<key>             # optional; Managed Identity preferred
+```
+
+When enabled, Content Understanding becomes the primary OCR pass (async analyze + poll → Markdown) and **Azure Document Intelligence remains the universal fallback**. Implementation: `#classymail/services/llm_pipeline.py` (`ocr_with_content_understanding`), wired in `#classymail/services/pipeline.py`.
+
 > **Pricing in the Settings UI is hardcoded** (estimated Azure rates as of 2025-2026). Actual costs depend on your region and Azure agreement. The backend cost calculator uses the same hardcoded rates. See `classymail/services/costing.py` and `frontend/src/views/SettingsView.vue` for the pricing tables.
 
 ### RAG Chatbot (Vector Search)
 
-The chatbot uses **semantic vector search** over all processed emails, powered by **Microsoft Agent Framework** 1.7:
+The chatbot uses **semantic vector search** over all processed emails, powered by **Microsoft Agent Framework** 1.9:
 
 1. **During processing**: Each email’s OCR markdown is embedded using `text-embedding-3-small` (1536 dimensions) and stored in Cosmos DB with `type: "email"`. Chunks are also embedded separately with `type: "chunk"`
 2. **During chat**: User queries are embedded, then Cosmos DB `VectorDistance()` finds the most semantically similar emails — with optional date filtering (`days` parameter for “last week” queries). If the container's vector index rejects `ORDER BY VectorDistance` (a known Cosmos quantized-index drift), the repository automatically falls back to a brute-force scan (compute distances in `SELECT`, sort client-side) so search keeps working
@@ -219,6 +237,8 @@ The chatbot uses **semantic vector search** over all processed emails, powered b
 
 > The chat button is **automatically hidden** in the UI if `CHAT_DEPLOYMENT` or `EMBEDDING_DEPLOYMENT` are not configured. Deploy the optional models to enable it.
 > Category AI Assessment is also **automatically disabled** if the assessment model isn't deployed in your AI Foundry project.
+
+> **Opt-in Agent Framework 1.9 tuning (default-off):** Two flags let you tune the chat agent without changing default behavior. Set `CHAT_REASONING_EFFORT=minimal|low|medium|high` to forward a reasoning effort to the model (`OpenAIChatOptions.reasoning`), and set `CHAT_HISTORY_COMPACTION=true` to replace the fixed last-10-turns window with token-aware compaction (`ContextWindowCompactionStrategy` + the built-in `CharacterEstimatorTokenizer`, budgets via `CHAT_COMPACTION_MAX_TOKENS` / `CHAT_COMPACTION_MAX_OUTPUT_TOKENS`). Both are unset/off by default — see [ACA_ENVIRONMENT_VARIABLES](docs/ACA_ENVIRONMENT_VARIABLES.md).
 
 ---
 
