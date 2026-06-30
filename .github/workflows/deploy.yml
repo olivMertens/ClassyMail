@@ -313,12 +313,36 @@ jobs:
           fi
           echo "Deploying API image: $IMAGE"
 
-          # Only update the image tag. Identity, ACR pull, env vars, and scale rules
-          # are managed by Terraform (infra/main.tf). Retry to ride out transient
-          # 'ContainerAppOperationInProgress' errors while a revision settles.
+          # Inject runtime configuration alongside the image update.
+          # The app's lifespan (classymail/app.py) hard-fails on startup if any of
+          # AZURE_SERVICE_BUS_FQDN / AZURE_STORAGE_ACCOUNT_URL / AZURE_COSMOS_ENDPOINT /
+          # MISTRAL_ENDPOINT / PHI_ENDPOINT are unset, leaving the revision in
+          # ActivationFailed with 0 replicas (ingress returns 504). Terraform
+          # (infra/main.tf) defines these, but CI does NOT run `terraform apply`, so we
+          # set them here from repo variables to keep the deployed app self-sufficient.
+          # PHI_ENDPOINT/MISTRAL_ENDPOINT reuse the shared AI Foundry endpoint.
+          ENV_VARS=(
+            "AZURE_CLIENT_ID=${{ vars.AZURE_APP_CLIENT_ID }}"
+            "AZURE_SERVICE_BUS_FQDN=${{ vars.AZURE_SERVICE_BUS_FQDN }}"
+            "AZURE_SERVICE_BUS_QUEUE=${{ vars.AZURE_SERVICE_BUS_QUEUE }}"
+            "AZURE_STORAGE_ACCOUNT_URL=${{ vars.AZURE_STORAGE_ACCOUNT_URL }}"
+            "AZURE_STORAGE_CONTAINER=${{ vars.AZURE_STORAGE_CONTAINER }}"
+            "AZURE_COSMOS_ENDPOINT=${{ vars.AZURE_COSMOS_ENDPOINT }}"
+            "AZURE_COSMOS_DB=${{ vars.AZURE_COSMOS_DB }}"
+            "AZURE_COSMOS_CONTAINER=${{ vars.AZURE_COSMOS_CONTAINER }}"
+            "AZURE_AI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }}"
+            "PHI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }}"
+            "PHI_DEPLOYMENT=${{ vars.PHI_DEPLOYMENT }}"
+            "MISTRAL_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }}"
+            "MISTRAL_DEPLOYMENT=${{ vars.MISTRAL_DEPLOYMENT }}"
+            "MISTRAL_MODE=${{ vars.MISTRAL_MODE }}"
+          )
+
+          # Retry to ride out transient 'ContainerAppOperationInProgress' errors
+          # while a revision settles.
           ok=""
           for attempt in $(seq 1 10); do
-            if az containerapp update -n "$APP" -g "$RG" --image "$IMAGE"; then ok=1; break; fi
+            if az containerapp update -n "$APP" -g "$RG" --image "$IMAGE" --set-env-vars "${ENV_VARS[@]}"; then ok=1; break; fi
             echo "containerapp update attempt $attempt/10 failed (app busy?); waiting 15s..."
             sleep 15
           done
@@ -414,12 +438,33 @@ jobs:
           fi
           echo "Deploying worker image: $IMAGE"
 
-          # Only update the image tag. Identity, ACR pull, env vars, and scale rules
-          # are managed by Terraform (infra/main.tf). Retry to ride out transient
-          # 'ContainerAppOperationInProgress' errors while a revision settles.
+          # The worker runs the SAME image as the API but overrides the entrypoint to
+          # the worker loop. The no-space '-m<module>' form avoids the az CLI parsing
+          # '-m' as a flag. Env vars are injected for the same reason as the API (CI
+          # does not run `terraform apply`); ENABLE_WORKER=true is worker-specific.
+          ENV_VARS=(
+            "ENABLE_WORKER=true"
+            "AZURE_CLIENT_ID=${{ vars.AZURE_APP_CLIENT_ID }}"
+            "AZURE_SERVICE_BUS_FQDN=${{ vars.AZURE_SERVICE_BUS_FQDN }}"
+            "AZURE_SERVICE_BUS_QUEUE=${{ vars.AZURE_SERVICE_BUS_QUEUE }}"
+            "AZURE_STORAGE_ACCOUNT_URL=${{ vars.AZURE_STORAGE_ACCOUNT_URL }}"
+            "AZURE_STORAGE_CONTAINER=${{ vars.AZURE_STORAGE_CONTAINER }}"
+            "AZURE_COSMOS_ENDPOINT=${{ vars.AZURE_COSMOS_ENDPOINT }}"
+            "AZURE_COSMOS_DB=${{ vars.AZURE_COSMOS_DB }}"
+            "AZURE_COSMOS_CONTAINER=${{ vars.AZURE_COSMOS_CONTAINER }}"
+            "AZURE_AI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }}"
+            "PHI_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }}"
+            "PHI_DEPLOYMENT=${{ vars.PHI_DEPLOYMENT }}"
+            "MISTRAL_ENDPOINT=${{ vars.AZURE_AI_ENDPOINT }}"
+            "MISTRAL_DEPLOYMENT=${{ vars.MISTRAL_DEPLOYMENT }}"
+            "MISTRAL_MODE=${{ vars.MISTRAL_MODE }}"
+          )
+
           ok=""
           for attempt in $(seq 1 10); do
-            if az containerapp update -n "$APP" -g "$RG" --image "$IMAGE"; then ok=1; break; fi
+            if az containerapp update -n "$APP" -g "$RG" --image "$IMAGE" \
+                 --command="python" --args="-mclassymail.worker_main" \
+                 --set-env-vars "${ENV_VARS[@]}"; then ok=1; break; fi
             echo "containerapp update attempt $attempt/10 failed (app busy?); waiting 15s..."
             sleep 15
           done
