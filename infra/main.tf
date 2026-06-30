@@ -448,15 +448,14 @@ resource "azurerm_role_assignment" "aca_storage_contrib" {
   principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
-resource "azurerm_role_assignment" "aca_sb_receiver" {
+# Azure Service Bus Data Owner is a superset of Data Sender + Data Receiver and
+# additionally grants the management operations required by the app's queue-stats
+# monitoring (ServiceBusAdministrationClient.get_queue_runtime_properties), which
+# is used by classymail/core/monitoring.py and classymail/services/azure_clients.py.
+# Sender/Receiver alone return 401 on those management calls over Entra auth.
+resource "azurerm_role_assignment" "aca_sb_owner" {
   scope                = azurerm_servicebus_namespace.sb.id
-  role_definition_name = "Azure Service Bus Data Receiver"
-  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
-}
-
-resource "azurerm_role_assignment" "aca_sb_sender" {
-  scope                = azurerm_servicebus_namespace.sb.id
-  role_definition_name = "Azure Service Bus Data Sender"
+  role_definition_name = "Azure Service Bus Data Owner"
   principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
@@ -1001,8 +1000,7 @@ resource "azurerm_container_app" "api" {
   # start before Azure AD propagates the role assignments, causing 403 errors.
   depends_on = [
     azurerm_role_assignment.aca_storage_contrib,
-    azurerm_role_assignment.aca_sb_receiver,
-    azurerm_role_assignment.aca_sb_sender,
+    azurerm_role_assignment.aca_sb_owner,
     azurerm_role_assignment.rbac_ai,
     azurerm_cosmosdb_sql_role_assignment.aca_cosmos_sql_contrib,
   ]
@@ -1204,8 +1202,7 @@ resource "azurerm_container_app" "worker" {
   # Ensure RBAC roles are provisioned before first boot.
   depends_on = [
     azurerm_role_assignment.aca_storage_contrib,
-    azurerm_role_assignment.aca_sb_receiver,
-    azurerm_role_assignment.aca_sb_sender,
+    azurerm_role_assignment.aca_sb_owner,
     azurerm_role_assignment.rbac_ai,
     azurerm_cosmosdb_sql_role_assignment.aca_cosmos_sql_contrib,
   ]

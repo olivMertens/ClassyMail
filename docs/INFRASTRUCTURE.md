@@ -374,8 +374,7 @@ The Container Apps use a **User-Assigned Managed Identity** with the following r
 | Azure Resource | Role Name | Terraform Resource | Scope | Conditional |
 |----------------|-----------|-------------------|-------|-------------|
 | **Blob Storage** | Storage Blob Data Contributor | `aca_storage_contrib` | Storage Account | Always |
-| **Service Bus** | Azure Service Bus Data Receiver | `aca_sb_receiver` | Namespace | Always |
-| **Service Bus** | Azure Service Bus Data Sender | `aca_sb_sender` | Namespace | Always |
+| **Service Bus** | Azure Service Bus Data Owner | `aca_sb_owner` | Namespace | Always |
 | **Cosmos DB** | Custom App Role (readMetadata + CRUD) | `app_role` + `aca_cosmos_sql_contrib` | Account Scope | `cosmos_use_rbac` |
 | **AI Foundry** | Cognitive Services User | `rbac_ai` | AI Foundry Account | Always |
 | **Container Registry** | AcrPull | `acr_pull` | ACR | `acr_name != ""` |
@@ -394,17 +393,10 @@ resource "azurerm_role_assignment" "aca_storage_contrib" {
   principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
-# Service Bus Sender
-resource "azurerm_role_assignment" "aca_sb_sender" {
+# Service Bus Data Owner (send + receive + read queue runtime properties for monitoring)
+resource "azurerm_role_assignment" "aca_sb_owner" {
   scope                = azurerm_servicebus_namespace.sb.id
-  role_definition_name = "Azure Service Bus Data Sender"
-  principal_id         = azurerm_user_assigned_identity.app_id.principal_id
-}
-
-# Service Bus Receiver
-resource "azurerm_role_assignment" "aca_sb_receiver" {
-  scope                = azurerm_servicebus_namespace.sb.id
-  role_definition_name = "Azure Service Bus Data Receiver"
+  role_definition_name = "Azure Service Bus Data Owner"
   principal_id         = azurerm_user_assigned_identity.app_id.principal_id
 }
 
@@ -553,7 +545,7 @@ az servicebus namespace update \
 **Causes:**
 1. `ENABLE_WORKER` not set to `true`
 2. KEDA scaler not configured
-3. Managed Identity missing "Azure Service Bus Data Receiver" role
+3. Managed Identity missing "Azure Service Bus Data Owner" role
 
 **Fix:**
 ```bash
