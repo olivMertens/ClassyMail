@@ -346,15 +346,23 @@ The script will:
 
 2. **Set `ARM_USE_MSI=false`** (Fortinet/corporate firewall workaround — prevents IMDS calls)
 
-3. Run `terraform init -upgrade`
+3. Register the required Azure resource providers (idempotent)
 
-4. Run `terraform plan` and show the plan
+4. Run `terraform init -upgrade`
 
-5. Ask for confirmation before `terraform apply`
+5. Run `terraform plan` and show the plan
+
+6. Ask for confirmation before `terraform apply`
+
+7. After apply, **discover the app managed identity and add only the missing RBAC role assignments** (idempotent verify step)
 
 
 
 > **Linux/macOS**: `bash infra/deploy.sh --tenant-id <TENANT_ID> --subscription-id <SUBSCRIPTION_ID>`
+
+> **Verify only** (double-check / repair roles on an existing RG, no Terraform):
+> `.\infra\deploy.ps1 -VerifyOnly -ResourceGroup <prefix>-rg`
+> (Linux/macOS: `bash infra/deploy.sh --verify-only --resource-group <prefix>-rg`)
 
 
 
