@@ -65,15 +65,21 @@ tar -czf build-context.tar.gz \
 mkdir -p .tmp && tar -xzf build-context.tar.gz -C .tmp
 
 # 3. Cloud build via ACR Tasks (~2-3 min)
+# Pass build args so the About dialog + /api/admin/version show real metadata
+# (Dockerfile bakes COMMIT_SHA/BUILD_TIMESTAMP; defaults are "unknown" otherwise).
 az acr build --registry <ACR_NAME> \
   --image classymail:latest --image classymail:<COMMIT_SHA> \
+  --build-arg COMMIT_SHA=<COMMIT_SHA> \
+  --build-arg BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
   --platform linux/amd64 .tmp
 
-# 4. Update Container Apps
+# 4. Update Container Apps (also set APP_VERSION so /api/admin/version != "unknown")
 az containerapp update --name <PREFIX>-api --resource-group <PREFIX>-rg \
-  --image <ACR_LOGIN_SERVER>/classymail:<COMMIT_SHA>
+  --image <ACR_LOGIN_SERVER>/classymail:<COMMIT_SHA> \
+  --set-env-vars APP_VERSION=<COMMIT_SHA>
 az containerapp update --name <PREFIX>-worker --resource-group <PREFIX>-rg \
-  --image <ACR_LOGIN_SERVER>/classymail:<COMMIT_SHA>
+  --image <ACR_LOGIN_SERVER>/classymail:<COMMIT_SHA> \
+  --set-env-vars APP_VERSION=<COMMIT_SHA>
 
 # 5. Verify health
 curl https://<API_FQDN>/healthz

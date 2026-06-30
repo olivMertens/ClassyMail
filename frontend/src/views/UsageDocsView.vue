@@ -75,7 +75,7 @@ flowchart LR
 
     subgraph OCR ["OCR - Content Extraction"]
         direction TB
-        Mistral["Mistral OCR"] -.->|Fallback| DI["Doc Intelligence"]
+        Mistral["Primary OCR - Mistral 2512 or Content Understanding"] -.->|Fallback| DI["Doc Intelligence"]
         Mistral --> MD["Markdown + Images"]
         DI --> MD
     end

@@ -116,9 +116,11 @@ async def run_classification_pipeline(
         mistral_error = None
 
         # Primary OCR provider selector (default "mistral" = current behavior).
-        # When OCR_PROVIDER="content_understanding", route the primary pass through CU;
+        # UI setting (settings.ocr_provider) wins so it's switchable without a
+        # redeploy; falls back to the OCR_PROVIDER env var, then "mistral".
+        # When "content_understanding", route the primary pass through CU;
         # Document Intelligence remains the universal fallback below in either case.
-        primary_provider = (getattr(config, "OCR_PROVIDER", "mistral") or "mistral").strip().lower()
+        primary_provider = ((settings or {}).get("ocr_provider") or getattr(config, "OCR_PROVIDER", "mistral") or "mistral").strip().lower()
 
         if primary_provider == "content_understanding":
             ocr_provider = "content_understanding"

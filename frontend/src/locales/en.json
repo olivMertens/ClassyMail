@@ -52,6 +52,10 @@
                 "reasoning": "Reasoning (CoT / Deep Analysis)",
                 "vision": "Vision (Visual Analysis - Experimental)"
             },
+            "ocr_title": "OCR Configuration",
+            "ocr_provider": "OCR Provider",
+            "ocr_provider_help": "Primary OCR engine for scanned PDFs and images. Mistral Document AI (mistral-document-ai-2512) or Azure AI Content Understanding. Azure Document Intelligence remains the automatic fallback. Content Understanding requires CONTENT_UNDERSTANDING_ENDPOINT to be configured.",
+            "ocr_provider_cu_warning": "Content Understanding endpoint is not configured on the server. OCR will fall back to Document Intelligence until CONTENT_UNDERSTANDING_ENDPOINT is set.",
             "ocr_retries": "Max OCR Attempts",
             "ocr_retries_help": "Number of OCR retry attempts (exponential backoff on network errors).",
             "pii_detection_method": "PII Detection Method",
@@ -475,7 +479,7 @@
         "tagline": "GenAI that knows exactly where every email belongs.",
         "contact": "Contact",
         "target_title": "Target & Scope",
-        "target_desc": "This Proof of Concept showcases a production-ready email intelligence pipeline: semantic vector search with cache, queue health scoring, and zero-secret managed identity—optimized for low latency at scale.",
+        "target_desc": "This Proof of Concept showcases a production-ready email intelligence pipeline: multi-agent (agentic) classification with a red-team validation gate, multimodal OCR, semantic vector search with cache, queue health scoring, and zero-secret managed identity—optimized for low latency at scale.",
         "resources_title": "Deployed Resources",
         "guide_prompt": "For detailed instructions and architecture, see the",
         "guide_link": "Application Guide",
@@ -496,9 +500,12 @@
         "disclaimer": "*Indicative rates, dependent on region and actual usage.",
         "features": {
             "title": "Highlights",
-            "dark_mode": "Semantic cache + vector search with Cosmos",
-            "retail_prices": "Health-scored pipeline: queue metrics, readiness probes, managed identity",
-            "error_handling": "Full Observability & Error Recovery (DLQ)"
+            "agentic": "Multi-agent (agentic) classification with a red-team validation gate",
+            "ocr": "Pluggable OCR: Mistral Document AI 2512 or Azure AI Content Understanding (Document Intelligence fallback)",
+            "dynamic_models": "Dynamic model resolution from the Azure AI Foundry project",
+            "chat": "Conversational chat over your classified data (with live streaming)",
+            "pii": "GDPR PII detection & anonymization",
+            "observability": "Semantic cache, health-scored pipeline & full observability (DLQ recovery)"
         },
         "close": "Close"
     },
@@ -507,16 +514,16 @@
         "subtitle": "Complete guide to ClassyMail: AI-powered email classification, privacy controls, and data exports.",
         "highlights": {
             "ai_models": "Hybrid AI Models",
-            "ai_models_desc": "Phi-4 primary, GPT-4o-mini fallback",
+            "ai_models_desc": "Phi-4 primary with dynamic model resolution from Foundry; optional agentic multi-agent classification",
             "pii": "GDPR Privacy",
             "pii_desc": "Automatic PII detection & anonymization",
             "vision": "Smart Vision OCR",
-            "vision_desc": "Mistral Document AI with image captions",
+            "vision_desc": "Pluggable OCR (Mistral Document AI 2512 or Content Understanding) with image captions; Document Intelligence fallback",
             "exports": "Data Exports",
             "exports_desc": "CSV reporting & JSONL fine-tuning"
         },
         "flow_title": "End-to-End Processing Flow",
-        "flow_desc": "Every uploaded PDF follows this pipeline: ingestion via Blob Storage, queuing through Service Bus, OCR extraction with Mistral (or Doc Intelligence fallback), PII detection, AI classification, and storage in Cosmos DB.",
+        "flow_desc": "Every uploaded PDF follows this pipeline: ingestion via Blob Storage, queuing through Service Bus, OCR extraction with the selected provider (Mistral Document AI 2512 or Content Understanding, with Document Intelligence fallback), PII detection, AI classification (standard or agentic multi-agent), and storage in Cosmos DB.",
         "legend": {
             "upload": "Upload & Ingestion",
             "ocr": "OCR & Extraction",

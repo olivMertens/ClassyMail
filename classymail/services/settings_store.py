@@ -1,8 +1,13 @@
 import json
+import os
 from pathlib import Path
 from classymail.core.paths import project_root
 
 DATA_FILE = Path(project_root()) / "data" / "settings.json"
+
+# OCR providers selectable from the UI as the *primary* engine. Document
+# Intelligence is intentionally excluded — it remains the universal fallback.
+VALID_OCR_PROVIDERS = ("mistral", "content_understanding")
 
 DEFAULT_CATEGORIES = [
     {
@@ -45,6 +50,7 @@ DEFAULT_SETTINGS = {
     "ai_model": "phi-4",
     "finetune_min_examples": 5,
     "ocr_max_attempts": 3,
+    "ocr_provider": os.getenv("OCR_PROVIDER", "mistral"),  # mistral | content_understanding (DI = fallback)
     "email_preprocessing": {
         "enabled": True,
         "include_subject": True,
@@ -94,6 +100,13 @@ def _sanitize_ocr_attempts(val) -> int:
     if v > 10:
         v = 10
     return v
+
+def _sanitize_ocr_provider(val) -> str:
+    v = str(val or "").strip().lower()
+    if v in VALID_OCR_PROVIDERS:
+        return v
+    env = os.getenv("OCR_PROVIDER", "mistral").strip().lower()
+    return env if env in VALID_OCR_PROVIDERS else "mistral"
 
 def _apply_env_overrides(settings: dict) -> dict:
     import os
@@ -149,6 +162,7 @@ def load_settings() -> dict:
             data["ocr_max_attempts"] = 3
         else:
             data["ocr_max_attempts"] = _sanitize_ocr_attempts(data["ocr_max_attempts"])
+        data["ocr_provider"] = _sanitize_ocr_provider(data.get("ocr_provider"))
         if "email_preprocessing" not in data or not isinstance(data["email_preprocessing"], dict):
             data["email_preprocessing"] = DEFAULT_SETTINGS["email_preprocessing"].copy()
         if "csv_export" not in data or not isinstance(data["csv_export"], dict):
@@ -244,6 +258,8 @@ def save_settings(settings: dict):
 
     if "ocr_max_attempts" in settings:
         settings["ocr_max_attempts"] = _sanitize_ocr_attempts(settings["ocr_max_attempts"])
+
+    settings["ocr_provider"] = _sanitize_ocr_provider(settings.get("ocr_provider"))
 
     # Sanitize email_preprocessing
     if "email_preprocessing" not in settings:

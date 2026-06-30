@@ -39,6 +39,22 @@ const headerDate = computed(() => {
   }
   return t('info.date')
 })
+
+// Human-readable build timestamp for the footer; falls back to the raw value
+// (or nothing) when it isn't a valid ISO date.
+const buildDateLabel = computed(() => {
+  if (!props.buildTimestamp) return ''
+  const d = new Date(props.buildTimestamp)
+  if (isNaN(d.getTime())) return props.buildTimestamp
+  try {
+    return new Intl.DateTimeFormat(locale.value, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', timeZone: 'UTC'
+    }).format(d) + ' UTC'
+  } catch (e) {
+    return props.buildTimestamp
+  }
+})
 </script>
 
 <template>
@@ -96,9 +112,12 @@ const headerDate = computed(() => {
                   {{ t('info.features.title') }}
                 </div>
                 <ul class="list-disc list-inside space-y-1 ml-1 text-gray-600 dark:text-gray-300">
-                  <li>{{ t('info.features.dark_mode') }}</li>
-                  <li>{{ t('info.features.retail_prices') }}</li>
-                  <li>{{ t('info.features.error_handling') }}</li>
+                  <li>{{ t('info.features.agentic') }}</li>
+                  <li>{{ t('info.features.ocr') }}</li>
+                  <li>{{ t('info.features.dynamic_models') }}</li>
+                  <li>{{ t('info.features.chat') }}</li>
+                  <li>{{ t('info.features.pii') }}</li>
+                  <li>{{ t('info.features.observability') }}</li>
                 </ul>
 
                 <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -119,7 +138,7 @@ const headerDate = computed(() => {
         <div v-if="commitSha || buildTimestamp" class="text-xs text-gray-400 dark:text-gray-500 font-mono mb-2 sm:mb-0">
           <span v-if="commitSha">Build: {{ commitSha.slice(-5) }}</span>
           <span v-if="commitSha && buildTimestamp"> · </span>
-          <span v-if="buildTimestamp">{{ buildTimestamp }}</span>
+          <span v-if="buildTimestamp">{{ buildDateLabel }}</span>
         </div>
         <button type="button"
           class="inline-flex w-full justify-center rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-500 sm:w-auto"
