@@ -1244,7 +1244,7 @@ onMounted(() => {
           </label>
           <select v-model="settings.ocr_provider"
             class="block w-full max-w-xs rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
-            <option value="mistral">Mistral Document AI (mistral-document-ai-2512)</option>
+            <option value="mistral">Mistral OCR 4 — latest (mistral-document-ai-2512)</option>
             <option value="content_understanding">Azure AI Content Understanding</option>
           </select>
           <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">

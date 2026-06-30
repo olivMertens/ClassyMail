@@ -54,7 +54,7 @@
             },
             "ocr_title": "Configuration OCR",
             "ocr_provider": "Moteur OCR",
-            "ocr_provider_help": "Moteur OCR principal pour les PDF numérisés et les images. Mistral Document AI (mistral-document-ai-2512) ou Azure AI Content Understanding. Azure Document Intelligence reste le repli automatique. Content Understanding nécessite la configuration de CONTENT_UNDERSTANDING_ENDPOINT.",
+            "ocr_provider_help": "Moteur OCR principal pour les PDF numérisés et les images. Mistral OCR 4 (mistral-document-ai-2512, le dernier modèle Mistral OCR) ou Azure AI Content Understanding. Azure Document Intelligence reste le repli automatique. Content Understanding nécessite la configuration de CONTENT_UNDERSTANDING_ENDPOINT.",
             "ocr_provider_cu_warning": "Le point de terminaison Content Understanding n'est pas configuré sur le serveur. L'OCR basculera vers Document Intelligence tant que CONTENT_UNDERSTANDING_ENDPOINT n'est pas défini.",
             "ocr_retries": "Tentatives Max OCR",
             "ocr_retries_help": "Nombre de tentatives OCR (retry exponentiel sur erreur réseau).",

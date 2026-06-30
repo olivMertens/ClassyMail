@@ -141,9 +141,6 @@ const navigation = computed(() => {
               <p v-if="!sidebarCollapsed" class="text-xs font-medium text-gray-500 dark:text-gray-400">
                 {{ organizationName }}
               </p>
-              <p v-if="!sidebarCollapsed" class="text-xs font-medium text-gray-400 dark:text-gray-500">
-                {{ t('info.date') }}
-              </p>
             </div>
           </div>
         </div>
