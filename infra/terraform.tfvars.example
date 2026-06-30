@@ -24,10 +24,19 @@
 # subscription_id = "00000000-0000-0000-0000-000000000000"
 
 # --- PREFIX & LOCATION ---
-# All resource names derive from this prefix (e.g. email-poc-rg, email-poc-cosmos...)
+# Most resource names derive from this prefix (e.g. classymail-rg, classymail-cosmos...).
 # Change this to avoid naming collisions across tenants.
+# NOTE: The two Container Apps (API + worker) do NOT use this prefix — they use
+# app_name (below) so they stay aligned with the names CI/CD deploys to.
 # prefix = "classymail"
 # location = "swedencentral"  # Must support AI Foundry, Phi-4, Container Apps
+
+# --- CONTAINER APP NAMES ---
+# Base name for the two Container Apps: <app_name>-api and <app_name>-worker.
+# Decoupled from prefix on purpose so Terraform and GitHub Actions
+# (.github/workflows/deploy.yml: IMAGE_NAME / WORKER_APP_NAME) target the SAME
+# apps. Leave as the default unless you also change those workflow values.
+# app_name = "classymail"
 
 # --- CONTAINER IMAGE (REQUIRED) ---
 # First deploy: use a placeholder, then re-apply after building your real image.
