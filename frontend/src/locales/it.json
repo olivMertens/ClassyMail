@@ -52,6 +52,10 @@
                 "reasoning": "Ragionamento (CoT / Analisi Approfondita)",
                 "vision": "Vision (Analisi Visiva - Sperimentale)"
             },
+            "ocr_title": "Configurazione OCR",
+            "ocr_provider": "Provider OCR",
+            "ocr_provider_help": "Motore OCR principale per PDF scansionati e immagini. Mistral Document AI (mistral-document-ai-2512) o Azure AI Content Understanding. Azure Document Intelligence resta il fallback automatico. Content Understanding richiede la configurazione di CONTENT_UNDERSTANDING_ENDPOINT.",
+            "ocr_provider_cu_warning": "L'endpoint di Content Understanding non è configurato sul server. L'OCR userà Document Intelligence come fallback finché CONTENT_UNDERSTANDING_ENDPOINT non viene impostato.",
             "ocr_retries": "Tentativi Max OCR",
             "ocr_retries_help": "Numero di tentativi OCR (backoff esponenziale su errore di rete).",
             "pii_detection_method": "Metodo di Rilevamento PII",
@@ -491,15 +495,18 @@
         "disclaimer": "*Tariffe indicative, dipendenti dalla regione e dall'uso effettivo.",
         "close": "OK",
         "target_title": "Obiettivo",
-        "target_desc": "Questo POC dimostra una pipeline intelligente pronta per la produzione: ricerca vettoriale con cache, scoring di salute delle code e identità gestita senza segreti — ottimizzato per bassa latenza su larga scala.",
+        "target_desc": "Questo POC dimostra una pipeline intelligente pronta per la produzione: classificazione multi-agente (agentica) con fase di validazione red-team, OCR multimodale, ricerca vettoriale con cache, scoring di salute delle code e identità gestita senza segreti — ottimizzato per bassa latenza su larga scala.",
         "resources_title": "Architettura Azure/Foundry",
         "guide_prompt": "Per maggiori dettagli, consultare la",
         "guide_link": "Guida Utente / Documentazione",
         "features": {
             "title": "Punti chiave",
-            "dark_mode": "Cache semantica + ricerca vettoriale Cosmos",
-            "retail_prices": "Pipeline con scoring: metriche di coda, sonde di salute, identità gestita",
-            "error_handling": "Osservabilità completa e Recupero errori (DLQ)"
+            "agentic": "Classificazione multi-agente (agentica) con fase di validazione red-team",
+            "ocr": "OCR modulare: Mistral Document AI 2512 o Azure AI Content Understanding (fallback Document Intelligence)",
+            "dynamic_models": "Risoluzione dinamica dei modelli dal progetto Azure AI Foundry",
+            "chat": "Chat conversazionale sui dati classificati (con streaming in tempo reale)",
+            "pii": "Rilevamento e anonimizzazione PII (GDPR)",
+            "observability": "Cache semantica, pipeline con scoring e osservabilità completa (recupero DLQ)"
         }
     },
     "guide": {
@@ -507,16 +514,16 @@
         "subtitle": "Guida completa a ClassyMail: classificazione email con IA, controlli sulla privacy ed esportazione dati.",
         "highlights": {
             "ai_models": "Modelli IA Ibridi",
-            "ai_models_desc": "Phi-4 primario, GPT-4o-mini di riserva",
+            "ai_models_desc": "Phi-4 primario con risoluzione dinamica dei modelli da Foundry; classificazione agentica multi-agente opzionale",
             "pii": "Privacy GDPR",
             "pii_desc": "Rilevamento e anonimizzazione automatica PII",
             "vision": "Vision OCR Intelligente",
-            "vision_desc": "Mistral Document AI con descrizione immagini",
+            "vision_desc": "OCR modulare (Mistral Document AI 2512 o Content Understanding) con descrizione immagini; fallback Document Intelligence",
             "exports": "Esportazioni Dati",
             "exports_desc": "Reporting CSV e Fine-Tuning JSONL"
         },
         "flow_title": "Flusso di Elaborazione End-to-End",
-        "flow_desc": "Ogni PDF caricato percorre questa pipeline: acquisizione tramite Blob Storage, accodamento tramite Service Bus, estrazione OCR con Mistral (o Document Intelligence di riserva), rilevamento PII, classificazione IA e archiviazione in Cosmos DB.",
+        "flow_desc": "Ogni PDF caricato percorre questa pipeline: acquisizione tramite Blob Storage, accodamento tramite Service Bus, estrazione OCR con il provider selezionato (Mistral Document AI 2512 o Content Understanding, fallback Document Intelligence), rilevamento PII, classificazione IA (standard o agentica multi-agente) e archiviazione in Cosmos DB.",
         "legend": {
             "upload": "Caricamento e Acquisizione",
             "ocr": "OCR ed Estrazione",

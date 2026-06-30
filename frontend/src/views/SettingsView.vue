@@ -41,6 +41,7 @@ const settings = ref({
   ai_model: 'phi-4', // Default
   finetune_min_examples: 50,
   ocr_max_attempts: 3,
+  ocr_provider: 'mistral',
   categories: [],
   email_preprocessing: {
     enabled: true,
@@ -614,6 +615,7 @@ const saveSettings = async () => {
       generation_reasoning_effort: settings.value.generation_reasoning_effort,
       finetune_min_examples: settings.value.finetune_min_examples ? Number(settings.value.finetune_min_examples) : 50,
       ocr_max_attempts: settings.value.ocr_max_attempts ? Number(settings.value.ocr_max_attempts) : 3,
+      ocr_provider: settings.value.ocr_provider || 'mistral',
       categories: settings.value.categories,
       email_preprocessing: settings.value.email_preprocessing,  // FIX: Include email_preprocessing settings
       csv_export: settings.value.csv_export,  // CSV export customization
@@ -876,12 +878,7 @@ onMounted(() => {
               <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Orchestrator Model</label>
               <select v-model="settings.agentic.orchestrator_model"
                 class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm dark:bg-gray-700 dark:text-white dark:ring-gray-600">
-                <option value="gpt-4.1-nano">GPT-4.1 Nano (fast, cheap)</option>
-                <option value="gpt-4.1-mini">GPT-4.1 Mini (balanced)</option>
-                <option value="gpt-4o-mini">GPT-4o Mini (legacy)</option>
-                <option value="gpt-5-nano">GPT-5 Nano (reasoning, cheapest)</option>
-                <option value="gpt-5-mini">GPT-5 Mini (reasoning, balanced)</option>
-                <option value="model-router">Model Router (auto-select)</option>
+                <option v-for="opt in modelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Fast routing model. Phi-4 not recommended here.
               </p>
@@ -1239,8 +1236,29 @@ onMounted(() => {
         <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-5 mb-6 bg-gray-50/50 dark:bg-gray-900/20">
           <h4 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
             <ArrowPathIcon class="h-5 w-5 text-amber-500" />
-            {{ t('settings.processing.ocr_retries') }}
+            {{ t('settings.processing.ocr_title') }}
           </h4>
+
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {{ t('settings.processing.ocr_provider') }}
+          </label>
+          <select v-model="settings.ocr_provider"
+            class="block w-full max-w-xs rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600">
+            <option value="mistral">Mistral Document AI (mistral-document-ai-2512)</option>
+            <option value="content_understanding">Azure AI Content Understanding</option>
+          </select>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('settings.processing.ocr_provider_help') }}
+          </p>
+          <p v-if="settings.ocr_provider === 'content_understanding' && defaults.content_understanding_configured === false"
+            class="mt-1 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+            <ExclamationTriangleIcon class="h-4 w-4 flex-shrink-0" />
+            {{ t('settings.processing.ocr_provider_cu_warning') }}
+          </p>
+
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mt-4 mb-1">
+            {{ t('settings.processing.ocr_retries') }}
+          </label>
           <input v-model="settings.ocr_max_attempts" type="number" min="1" max="10"
             class="block w-full max-w-xs rounded-md border-0 py-2.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
             :placeholder="defaults.ocr_max_attempts ?? 3">

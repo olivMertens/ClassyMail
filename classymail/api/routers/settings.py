@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter, Depends
 from classymail.services.settings_store import load_settings, save_settings, save_settings_async
 from classymail.core import config
@@ -20,6 +22,8 @@ async def get_settings_defaults():
         "phi4_output_per_1k": config.PHI4_COST_PER_1K_OUTPUT,
         "mistral_per_1k_pages": config.MISTRAL_OCR_COST_PER_1K_PAGES,
         "ocr_max_attempts": getattr(config, "MISTRAL_OCR_MAX_ATTEMPTS", 3),
+        "ocr_provider": os.getenv("OCR_PROVIDER", "mistral"),
+        "content_understanding_configured": bool(getattr(config, "CONTENT_UNDERSTANDING_ENDPOINT", None)),
     }
 
 

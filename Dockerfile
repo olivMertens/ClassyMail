@@ -52,6 +52,7 @@ ARG COMMIT_SHA=unknown
 ARG BUILD_TIMESTAMP=unknown
 ENV COMMIT_SHA=${COMMIT_SHA} \
     BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
+    APP_VERSION=${COMMIT_SHA} \
     PATH="/app/.venv/bin:${PATH}"
 
 RUN chown -R app:app /app
