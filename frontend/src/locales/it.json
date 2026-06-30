@@ -54,7 +54,7 @@
             },
             "ocr_title": "Configurazione OCR",
             "ocr_provider": "Provider OCR",
-            "ocr_provider_help": "Motore OCR principale per PDF scansionati e immagini. Mistral Document AI (mistral-document-ai-2512) o Azure AI Content Understanding. Azure Document Intelligence resta il fallback automatico. Content Understanding richiede la configurazione di CONTENT_UNDERSTANDING_ENDPOINT.",
+            "ocr_provider_help": "Motore OCR principale per PDF scansionati e immagini. Mistral OCR 4 (mistral-document-ai-2512, il più recente modello Mistral OCR) o Azure AI Content Understanding. Azure Document Intelligence resta il fallback automatico. Content Understanding richiede la configurazione di CONTENT_UNDERSTANDING_ENDPOINT.",
             "ocr_provider_cu_warning": "L'endpoint di Content Understanding non è configurato sul server. L'OCR userà Document Intelligence come fallback finché CONTENT_UNDERSTANDING_ENDPOINT non viene impostato.",
             "ocr_retries": "Tentativi Max OCR",
             "ocr_retries_help": "Numero di tentativi OCR (backoff esponenziale su errore di rete).",
