@@ -570,6 +570,7 @@ jobs:
           done
 
       - name: Verify API Health Endpoints
+        id: health
         run: |
           echo ""
           echo "========================================"
@@ -615,6 +616,45 @@ jobs:
           else
             echo "⚠️ Readiness: HTTP $HTTP_CODE (API might still be initializing connections)"
           fi
+
+      - name: Dump Container Logs on Health Failure
+        if: failure() && steps.health.outcome == 'failure'
+        continue-on-error: true
+        run: |
+          echo ""
+          echo "========================================"
+          echo "Health check failed - dumping recent container logs"
+          echo "========================================"
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          API_APP="${{ env.IMAGE_NAME }}"
+          WORKER_APP="${{ env.WORKER_APP_NAME }}"
+          ENV_NAME="${{ env.CONTAINERAPPS_ENV }}"
+
+          # Surface the most common failure cause first: a crash-looping revision
+          # with 0 replicas (e.g. missing env vars => RuntimeError on startup).
+          echo ""
+          echo "--- Active revisions ---"
+          for APP in "$API_APP" "$WORKER_APP"; do
+            echo "App: $APP"
+            az containerapp revision list -n "$APP" -g "$RG" \
+              --query "[?properties.active].{name:name,running:properties.runningState,replicas:properties.replicas}" \
+              -o table 2>/dev/null || echo "  (could not list revisions)"
+          done
+
+          # Pull recent console logs from Log Analytics (env is wired to a workspace).
+          # Best-effort: requires the deploy identity to have Log Analytics read access.
+          WS_ID=$(az containerapp env show -n "$ENV_NAME" -g "$RG" \
+            --query "properties.appLogsConfiguration.logAnalyticsConfiguration.customerId" -o tsv 2>/dev/null || echo "")
+          if [ -z "$WS_ID" ]; then
+            echo "⚠️ No Log Analytics workspace wired to environment '$ENV_NAME' - cannot fetch console logs."
+            exit 0
+          fi
+
+          echo ""
+          echo "--- Recent console logs (last 15m) ---"
+          az monitor log-analytics query --workspace "$WS_ID" \
+            --analytics-query "ContainerAppConsoleLogs_CL | where TimeGenerated > ago(15m) | where ContainerAppName_s in ('$API_APP','$WORKER_APP') | project TimeGenerated, ContainerAppName_s, Log_s | order by TimeGenerated desc | take 60" \
+            -o table 2>/dev/null || echo "⚠️ Could not query Log Analytics (deploy identity may lack 'Log Analytics Reader')."
 
       - name: Audit RBAC Roles (Report Only)
         continue-on-error: true
