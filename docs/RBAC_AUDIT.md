@@ -50,17 +50,15 @@ The Terraform configuration (`infra/main.tf`) assigns the following roles to the
 
 | 1 | `aca_storage_contrib` | **Storage Blob Data Contributor** | Storage Account | Upload/download PDFs, results, logs | Always |
 
-| 2 | `aca_sb_receiver` | **Azure Service Bus Data Receiver** | Service Bus Namespace | Consume messages from pdf-processing-queue | Always |
+| 2 | `aca_sb_owner` | **Azure Service Bus Data Owner** | Service Bus Namespace | Send + receive messages AND read queue runtime properties (queue-stats monitoring via `ServiceBusAdministrationClient.get_queue_runtime_properties`) | Always |
 
-| 3 | `aca_sb_sender` | **Azure Service Bus Data Sender** | Service Bus Namespace | Send messages (retry, async comparison) | Always |
+| 3 | `app_role` | **Custom Cosmos DB Role** | Cosmos DB Account | `readMetadata` + CRUD + Query (see §9) | Assignment gated by `cosmos_use_rbac` |
 
-| 4 | `app_role` | **Custom Cosmos DB Role** | Cosmos DB Account | `readMetadata` + CRUD + Query (see §9) | Assignment gated by `cosmos_use_rbac` |
+| 4 | `rbac_ai` | **Cognitive Services User** | AI Foundry Account | Inference (Chat, Embeddings, OCR) | Always |
 
-| 5 | `rbac_ai` | **Cognitive Services User** | AI Foundry Account | Inference (Chat, Embeddings, OCR) | Always |
+| 5 | `acr_pull` | **AcrPull** | Container Registry | Pull Docker images | Only if `acr_name` is set |
 
-| 6 | `acr_pull` | **AcrPull** | Container Registry | Pull Docker images | Only if `acr_name` is set |
-
-| 7 | `aca_language_reader` | **Cognitive Services Language Reader** | Language Service | PII detection / NER | Only if `deploy_language_service` is true |
+| 6 | `aca_language_reader` | **Cognitive Services Language Reader** | Language Service | PII detection / NER | Only if `deploy_language_service` is true |
 
 
 
@@ -146,9 +144,7 @@ Role                                          Scope
 
 Storage Blob Data Contributor                 /subscriptions/.../resourceGroups/<prefix>-rg/providers/Microsoft.Storage/storageAccounts/<prefix>sto...
 
-Azure Service Bus Data Receiver               /subscriptions/.../resourceGroups/<prefix>-rg/providers/Microsoft.ServiceBus/namespaces/<prefix>-sbus
-
-Azure Service Bus Data Sender                 /subscriptions/.../resourceGroups/<prefix>-rg/providers/Microsoft.ServiceBus/namespaces/<prefix>-sbus
+Azure Service Bus Data Owner                  /subscriptions/.../resourceGroups/<prefix>-rg/providers/Microsoft.ServiceBus/namespaces/<prefix>-sbus
 
 Cognitive Services User                       /subscriptions/.../resourceGroups/<prefix>-rg/providers/Microsoft.CognitiveServices/accounts/<prefix>-aifoundry
 
@@ -326,9 +322,7 @@ az role assignment create \
 
 
 
-**Cause**: Missing `Service Bus Data Receiver` or endpoint misconfiguration
-
-
+**Cause**: Missing `Azure Service Bus Data Owner` (or legacy `Data Receiver`) or endpoint misconfiguration
 
 **Solution**:
 
@@ -340,7 +334,7 @@ az role assignment list \
 
   --assignee $IDENTITY_ID \
 
-  --role "Service Bus Data Receiver" \
+  --role "Azure Service Bus Data Owner" \
 
   --output table
 
@@ -629,9 +623,7 @@ ROLES=(
 
   "Storage Blob Data Contributor"
 
-  "Azure Service Bus Data Receiver"
-
-  "Azure Service Bus Data Sender"
+  "Azure Service Bus Data Owner"
 
   "Cognitive Services User"
 

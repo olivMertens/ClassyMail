@@ -172,7 +172,7 @@ $env:PREFIX="<prefix>"
 
 **What it does:**
 - Verifies presence of Resource Group, Storage, Service Bus, Cosmos, AI account, Container Apps
-- Ensures Managed Identity has roles: Cognitive Services User, Storage Blob Data Contributor, Service Bus Data Sender/Receiver, Custom App Role Cosmos (readMetadata + CRUD) at Account scope (and AcrPull if ACR exists)
+- Ensures Managed Identity has roles: Cognitive Services User, Storage Blob Data Contributor, Service Bus Data Owner, Custom App Role Cosmos (readMetadata + CRUD) at Account scope (and AcrPull if ACR exists)
 - Connectivity checks to Cosmos/Storage/Service Bus
 
 ---

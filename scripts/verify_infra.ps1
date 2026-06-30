@@ -105,7 +105,7 @@ az containerapp show -g $ResourceGroup -n $ContainerAppWorker *> $null; if ($LAS
 
 if ($aiId){ Ensure-Role $aiId "Cognitive Services User" "Cognitive Services" }
 if ($storageId){ Ensure-Role $storageId "Storage Blob Data Contributor" "Storage" }
-if ($sbId){ Ensure-Role $sbId "Azure Service Bus Data Sender" "Service Bus"; Ensure-Role $sbId "Azure Service Bus Data Receiver" "Service Bus" }
+if ($sbId){ Ensure-Role $sbId "Azure Service Bus Data Owner" "Service Bus" }
 if ($cosmosId){
   Info "Checking Cosmos DB SQL Role Assignments..."
   $cosmosAssignments = az cosmosdb sql role assignment list --account-name $CosmosAccount --resource-group $ResourceGroup 2>$null | ConvertFrom-Json
@@ -158,8 +158,7 @@ foreach ($caName in @($ContainerAppApi, $ContainerAppWorker)) {
 Info "Checking for unexpected extra roles on managed identity..."
 $expectedRoles = @(
   "Storage Blob Data Contributor",
-  "Azure Service Bus Data Receiver",
-  "Azure Service Bus Data Sender",
+  "Azure Service Bus Data Owner",
   "Cognitive Services User",
   "AcrPull",
   "Cognitive Services Language Reader"  # optional but expected when Language service deployed

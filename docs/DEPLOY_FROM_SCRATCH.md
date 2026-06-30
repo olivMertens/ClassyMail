@@ -452,9 +452,9 @@ After `terraform apply`, you should see ~25 resources:
 
 
 
-> **RBAC**: Terraform assigns exactly 7 roles to the managed identity (Storage Blob Data Contributor,
+> **RBAC**: Terraform assigns exactly 6 roles to the managed identity (Storage Blob Data Contributor,
 
-> Service Bus Data Sender + Receiver, Custom Cosmos App Role, Cognitive Services User, AcrPull,
+> Service Bus Data Owner, Custom Cosmos App Role, Cognitive Services User, AcrPull,
 
 > and optionally Cognitive Services Language Reader). **No extra manual roles are needed.**
 

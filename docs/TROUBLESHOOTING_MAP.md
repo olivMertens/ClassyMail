@@ -49,7 +49,7 @@ Both Container Apps use the **same User Assigned Managed Identity** (`<prefix>-i
 
 |:--- |:--- |:--- |
 
-| **Service Bus** | `Azure Service Bus Data Sender` + `Data Receiver` | Send messages (API, DLQ retry) + consume tasks (Worker). |
+| **Service Bus** | `Azure Service Bus Data Owner` | Send messages (API, DLQ retry), consume tasks (Worker), and read queue runtime properties (monitoring). |
 
 | **Storage Account** | `Storage Blob Data Contributor` | Read PDF content. |
 

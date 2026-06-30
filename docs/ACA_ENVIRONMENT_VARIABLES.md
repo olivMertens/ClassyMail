@@ -678,7 +678,7 @@ az containerapp show \
 
    - Verify `AZURE_SERVICE_BUS_FQDN` format (must end with `.servicebus.windows.net`)
 
-   - Ensure managed identity has `Azure Service Bus Data Receiver` and `Azure Service Bus Data Sender` roles
+   - Ensure managed identity has the `Azure Service Bus Data Owner` role
 
    - Check `AZURE_SERVICE_BUS_QUEUE` exists in Service Bus namespace
 

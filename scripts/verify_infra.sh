@@ -84,7 +84,7 @@ az containerapp show -g "$RESOURCE_GROUP" -n "$CONTAINER_APP_WORKER" >/dev/null 
 # Role assignments
 if [[ -n "$AI_ID" ]]; then assign_role "$AI_ID" "Cognitive Services User" "Cognitive Services"; fi
 if [[ -n "$STORAGE_ID" ]]; then assign_role "$STORAGE_ID" "Storage Blob Data Contributor" "Storage"; fi
-if [[ -n "$SB_ID" ]]; then assign_role "$SB_ID" "Azure Service Bus Data Sender" "Service Bus"; assign_role "$SB_ID" "Azure Service Bus Data Receiver" "Service Bus"; fi
+if [[ -n "$SB_ID" ]]; then assign_role "$SB_ID" "Azure Service Bus Data Owner" "Service Bus"; fi
 if [[ -n "$COSMOS_ID" ]]; then
   info "Checking Cosmos DB SQL Role Assignments..."
   if az cosmosdb sql role assignment list --account-name "$COSMOS_ACCOUNT" --resource-group "$RESOURCE_GROUP" --query "[?principalId=='$PRINCIPAL_ID']" -o tsv | grep -q "$PRINCIPAL_ID"; then

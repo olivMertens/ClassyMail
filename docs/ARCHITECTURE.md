@@ -123,8 +123,7 @@ The managed identity assigned to Container Apps (`api` and `worker`) must have t
 |:--- |:--- |:--- |:--- |
 | **Storage Account** | `Storage Blob Data Contributor` | `ba92f5b4-2d11-453d-a403-e96b0029c9fe` | **Write**: Upload incoming PDFs, write logs. |
 | **Storage Account** | `Storage Blob Data Reader` | `2a2b9908-6ea1-4ae2-8e65-a410df84e7d1` | **Read**: Worker downloads PDFs, API streams PDFs to the browser for viewing. |
-| **Service Bus** | `Azure Service Bus Data Receiver` | `4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0` | Allows the `worker` to consume messages from the queue. |
-| **Service Bus** | `Azure Service Bus Data Sender` | `69a216fc-b8fb-44d8-bc22-1f3c2cd27a39` | Allows the API (and DLQ retry) to send messages. |
+| **Service Bus** | `Azure Service Bus Data Owner` | `090c5cfd-751d-490a-894a-3ce6f1109419` | Allows the API to send messages, the `worker` to consume them, and queue-stats monitoring to read queue runtime properties. |
 | **Cosmos DB (SQL)** | Custom App Role (`readMetadata` + CRUD) | Terraform-managed (`app_role`) | **Data Plane RBAC** at **Account** scope. Read/Write JSON documents. *Note: This is not a standard Azure IAM role, but a Cosmos native SQL role. See [RBAC_AUDIT.md](RBAC_AUDIT.md).* |
 | **AI Foundry Project** | `Cognitive Services User` | `a97b65f3-24c7-4388-baec-2e87135dc908` | **Deployed Models**: Phi-4 (Primary classification), Mistral Document AI 2512 (OCR + Vision), GPT-5-nano (Category Assessment, reasoning), GPT-5.2-chat (Conversational AI), GPT-4o-mini (Fallback + PII), text-embedding-3-small (Embeddings) |
 | **Azure AI Language** ⚙️ | `Cognitive Services Language Reader` | `36e80216-4058-40c5-bf25-3b30a0199a10` | **Native PII Detection API** (optional, `deploy_language_service=true`). TextAnalytics service with 43+ predefined PII categories. |
@@ -383,4 +382,4 @@ flowchart LR
 - API exposes `/healthz` + `/readyz` (aliases `/health`, `/ready`).
 - Worker scales with KEDA (azure-servicebus scaler, min=1, max=10).
 - Same Docker image for both; worker runs: `python -m classymail.worker_main`.
-- Managed Identity has roles: Storage Blob Data Contributor, Azure Service Bus Data Receiver/Sender, Custom Cosmos App Role (readMetadata + CRUD), Cognitive Services User, Cognitive Services Language Reader.
+- Managed Identity has roles: Storage Blob Data Contributor, Azure Service Bus Data Owner, Custom Cosmos App Role (readMetadata + CRUD), Cognitive Services User, Cognitive Services Language Reader.
