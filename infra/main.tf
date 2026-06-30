@@ -122,6 +122,17 @@ variable "organization_name" {
 variable "location" { default = "swedencentral" } # Région recommandée pour disponibilité Mistral/Phi
 variable "prefix" { default = "classymail" }
 
+# Container App names are intentionally DECOUPLED from var.prefix.
+# CI/CD (.github/workflows/deploy.yml) targets fixed Container App names, so
+# Terraform must use the SAME fixed names — otherwise `terraform apply` creates a
+# second, parallel set of apps next to the CI-managed ones (the duplicate-app bug).
+# Only the two ACAs (api + worker) use this; every other resource still uses prefix.
+variable "app_name" {
+  description = "Base name for the API and worker Container Apps, named <app_name>-api / <app_name>-worker. Decoupled from var.prefix so Terraform and CI/CD agree on the app names."
+  type        = string
+  default     = "classymail"
+}
+
 resource "azurerm_resource_group" "rg" {
   name     = "${var.prefix}-rg"
   location = var.location
@@ -785,7 +796,7 @@ resource "azurerm_container_app_environment" "env" {
 }
 
 resource "azurerm_container_app" "api" {
-  name                         = "${var.prefix}-api"
+  name                         = "${var.app_name}-api"
   resource_group_name          = azurerm_resource_group.rg.name
   container_app_environment_id = azurerm_container_app_environment.env.id
   revision_mode                = "Single"
@@ -1013,7 +1024,7 @@ resource "azurerm_container_app" "api" {
 }
 
 resource "azurerm_container_app" "worker" {
-  name                         = "${var.prefix}-worker"
+  name                         = "${var.app_name}-worker"
   resource_group_name          = azurerm_resource_group.rg.name
   container_app_environment_id = azurerm_container_app_environment.env.id
   revision_mode                = "Single"

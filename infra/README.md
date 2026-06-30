@@ -9,6 +9,7 @@ Terraform and deployment documentation lives in [docs/INFRASTRUCTURE.md](../docs
 - **Required Models**: See [docs/MODELS.md](../docs/MODELS.md#required-models-for-poc)
 - **Model Deployments**: Must be created manually in Microsoft AI Foundry after Terraform provisioning
 - **Custom Tags**: Configurable via `custom_tags_enabled` variable (see [CUSTOMIZATION.md](../docs/CUSTOMIZATION.md#classymail-mandatory-tags))
+- **State drift / Container App names**: The two ACAs are named `${app_name}-api` / `${app_name}-worker` (default `classymail`), **decoupled from `prefix`** so Terraform and CI/CD agree. To realign Terraform state with the live apps, see [docs/INFRA_STATE_RECONCILE.md](../docs/INFRA_STATE_RECONCILE.md).
 
 **Mandatory AI Model Deployments for POC:**
 1. `mistral-document-ai-2512` - OCR + Vision extraction
