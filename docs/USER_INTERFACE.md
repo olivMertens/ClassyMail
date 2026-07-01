@@ -103,6 +103,7 @@ The application settings allow customization of the classification engine and en
     - Prices in € per 1K tokens (input/output)
     - Links to [Microsoft Azure OpenAI Pricing](https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/)
 - **Processing Strategy**: Switch between "Standard" (Fast), "Reasoning" (CoT), "Vision" (Multimodal), or "Agentic" (Multi-Agent) modes.
+- **OCR Provider**: Choose the primary OCR engine — **Mistral OCR 4** (`mistral-document-ai-2512`) or **Azure AI Content Understanding**. Azure Document Intelligence stays the automatic fallback. Content Understanding requires `CONTENT_UNDERSTANDING_ENDPOINT`; the UI warns if it is selected but not configured.
 - **Email Preprocessing**: Advanced settings for subject extraction, PII detection, conversation isolation
 - **Model Selection**: Primary model auto-discovered from AI Foundry deployments
 
@@ -110,7 +111,7 @@ The application settings allow customization of the classification engine and en
 Visible only when "Agentic (Multi-Agent)" strategy is selected. Provides full control over the multi-agent classification pipeline:
 
 **Model Selection** (per role):
-- **Orchestrator Model**: Dropdown with `gpt-4.1-nano` (default), `gpt-4.1-mini`, `gpt-4o-mini`, `gpt-5-nano`, `model-router`
+- **Orchestrator Model**: Dropdown **auto-discovered from your AI Foundry deployments** (same dynamic list as the tier and General model selectors), with `gpt-4.1-nano` recommended as a fast, cheap default and `model-router` available for automatic routing
   - When `model-router` is selected, an additional **Routing Mode** dropdown appears: `Balanced` (default), `Cost`, `Quality`
 - **Agent Tier 1 (Simple)**: Model for clear, unambiguous intents
 - **Agent Tier 2 (Ambiguous)**: Model for emails with subtle signals
