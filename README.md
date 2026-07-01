@@ -41,8 +41,6 @@ The entire pipeline is event-driven: Blob Storage → Event Grid → Service Bus
 
 ### Agentic Classification (Multi-Agent Pipeline)
 
-![Agentic Pipeline Architecture](docs/assets/mermaidflow.png)
-
 - **Orchestrator Inspector**: A fast, cheap model (gpt-4.1-nano) scans the document and shortlists the top 3-5 candidate categories — cuts 80% of unnecessary computation
 - **Parallel Specialized Agents**: One agent per candidate category, each with its own RAG tool calling a dedicated Azure AI Search index for reference examples
 - **Tier-aware model selection**: The orchestrator's per-candidate confidence drives the model used by each specialized agent — Tier 1 (`conf ≥ 0.8`, simple) uses cheap models; Tier 2 (`0.5 ≤ conf < 0.8`, ambiguous) uses balanced models; Tier 3 (`conf < 0.5`, critical) uses the most capable models. Same prompt, different muscle.

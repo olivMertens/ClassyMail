@@ -4,7 +4,7 @@
 >
 > 📌 **Note**: This project originated as a POC but has evolved into a production-ready MVP with enterprise-grade features including vector search, PII detection, multi-model classification, and comprehensive monitoring.
 >
-> 📝 **Naming convention**: `<prefix>` refers to your Terraform `prefix` variable (default: `classymail`). All Azure resource names are derived from it.
+> 📝 **Naming convention**: `<prefix>` refers to your Terraform `prefix` variable (default: `classymail`). Most Azure resource names are derived from it. The two Container Apps are named from a separate `app_name` variable (default: `classymail`), so they stay `classymail-api` / `classymail-worker` even if `prefix` differs. If Terraform state and the live Container Apps drift apart, see [INFRA_STATE_RECONCILE](INFRA_STATE_RECONCILE.md).
 
 ## Table of Contents
 
@@ -393,7 +393,7 @@ resource "azurerm_servicebus_namespace" "sb" {
 - **Client ID**: set as `AZURE_CLIENT_ID` env var on both Container Apps
 - **Principal ID**: used for all RBAC role assignments
 - **Resource Group**: `<prefix>-rg`
-- **Attached to**: both `<prefix>-api` and `<prefix>-worker` Container Apps
+- **Attached to**: both `classymail-api` and `classymail-worker` Container Apps (names from the `app_name` variable, default `classymail`)
 
 ### Role Assignment Matrix (Verified)
 

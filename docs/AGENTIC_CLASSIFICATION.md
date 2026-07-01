@@ -4,8 +4,6 @@
 
 ## Architecture Overview
 
-![Agentic Classification Pipeline — Architecture](assets/mermaidflow.png)
-
 ### Agents + Orchestration (Mermaid)
 
 The diagram below shows the **runtime shape** of a single agentic classification — orchestrator, tiered specialized agents (selected per candidate based on the orchestrator's confidence), the resilient fan-in, and the red-team escalation path that can spawn extra specialized agents in a second resilient fan-out.
