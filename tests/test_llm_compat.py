@@ -15,7 +15,7 @@ from classymail.services.openai_client_factory import build_chat_params, is_reas
         "gpt-5",
         "gpt-5-mini",
         "gpt-5-nano",
-        "gpt-5.2-chat",
+        "gpt-5.1",
         "gpt5-nano",
         "o1",
         "o1-mini",
@@ -88,7 +88,7 @@ def test_build_reasoning_tokens_only():
 
 
 def test_build_reasoning_temperature_silently_ignored():
-    params = build_chat_params("gpt-5.2-chat", temperature=0.0)
+    params = build_chat_params("gpt-5.1", temperature=0.0)
     assert params == {}
 
 

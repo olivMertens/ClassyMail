@@ -78,10 +78,10 @@ Worker Layer:
 â””â”€ Message Handler #classymail/services/worker.py
 
 AI Processing Layer:
-â”œâ”€ Mistral Document AI 2505 (OCR) #classymail/services/pipeline.py
+â”œâ”€ Mistral Document AI 2512 (OCR) #classymail/services/pipeline.py
 â”œâ”€ Phi-4 (Classification, 8K context) #classymail/services/llm_pipeline.py
-â”œâ”€ GPT-4o-mini (Fallback, 120K context)
-â””â”€ GPT-5.2-chat (Chatbot) #classymail/services/chat_agent.py
+â”œâ”€ GPT-4.1-mini (Fallback, 1M context)
+â””â”€ GPT-5.1 (Chatbot) #classymail/services/chat_agent.py
 
 Data Layer:
 â”œâ”€ Azure Blob Storage (PDFs, images) #azure_clients.py
@@ -136,7 +136,7 @@ Based on verified deployment from MCP Azure:
 - Client â†’ API (HTTPS)
 - API â†’ Service Bus (Queue message)
 - Service Bus â†’ Worker (KEDA scaling configuration from MCP)
-- Worker â†’ AI Models (Mistral/Phi-4/GPT-4o-mini - verify deployed models via MCP)
+- Worker â†’ AI Models (Mistral/Phi-4/GPT-4.1-mini - verify deployed models via MCP)
 
 ### STEP 4: Code Linking Pattern
 
@@ -288,7 +288,7 @@ mcp **CRITICAL**: Generating diagrams WITHOUT calling MCP Azure first
 2. **Update AI Layer**
 ```
 
-@azure-drawio-architect update diagram to show Mistral Document AI 2505 and GPT-5.2-chat models
+@azure-drawio-architect update diagram to show Mistral Document AI 2512 and GPT-5.1 models
 
 ```
 

@@ -13,7 +13,7 @@
 This document explains how the ClassyMail MVP protects personal information (PII) in fine-tuning datasets and how user corrections are tracked for quality improvement.
 
 **Key Points**:
-- ✅ **Two-level PII protection**: Regex scrubbing + GPT-4o-mini contextual anonymization
+- ✅ **Two-level PII protection**: Regex scrubbing + GPT-4.1-mini contextual anonymization
 - ✅ **Fail-safe design**: Skips examples if anonymization fails (never exports PII)
 - ✅ **Default behavior**: Anonymization always ON (requires explicit opt-out)
 - ✅ **User corrections tracked**: Complete history with AI-generated feedback
@@ -28,7 +28,7 @@ This document explains how the ClassyMail MVP protects personal information (PII
 The system uses **two-level protection** to ensure no personal information leaks into fine-tuning datasets:
 
 1. **Level 1: Basic Regex Scrubbing** - Fast removal of common PII patterns
-2. **Level 2: LLM Contextual Anonymization** - GPT-4o-mini removes names, companies, contract IDs while preserving markdown structure
+2. **Level 2: LLM Contextual Anonymization** - GPT-4.1-mini removes names, companies, contract IDs while preserving markdown structure
 
 ### Implementation Details
 
@@ -45,7 +45,7 @@ The system uses **two-level protection** to ensure no personal information leaks
 
 2. anonymize_markdown_for_finetune(markdown: str, clients) -> dict
    - Removes: Names, companies, addresses, contract IDs, sensitive context
-   - Uses: GPT-4o-mini with ~1800 char English system prompt
+   - Uses: GPT-4.1-mini with ~1800 char English system prompt
    - Preserves: Markdown structure, formatting, links, tables
    - Speed: ~2-5s per document (async)
    - Applied to: Email body (markdown) only
@@ -88,7 +88,7 @@ Environment variables:
 
 ```bash
 ANONYMIZER_ENDPOINT=https://<your-aoai>.openai.azure.com/  # Falls back to PHI_ENDPOINT
-ANONYMIZER_DEPLOYMENT=gpt-4o-mini         # Model name (default)
+ANONYMIZER_DEPLOYMENT=gpt-4.1-mini        # Model name (default)
 ANONYMIZER_API_VERSION=2024-08-01-preview # Falls back to AZURE_AI_API_VERSION
 ANONYMIZER_MAX_TOKENS=6000                # Output limit
 ANONYMIZER_PROMPT_VERSION=v1              # Tracking
@@ -786,7 +786,7 @@ for item in items:
 
 **A**: Recommended minimums:
 
-- **GPT-4o/GPT-4**: 50-100 corrections for meaningful improvement
+- **GPT-4.1/GPT-4 family**: 50-100 corrections for meaningful improvement
 - **GPT-3.5-turbo**: 200-500 corrections (less capable base model)
 - **Small models (Phi-4)**: 500-1000 corrections (requires more data)
 
@@ -814,7 +814,7 @@ corrected_lines = [
 | Model | Fine-Tuning Support | Notes |
 |-------|-------------------|-------|
 | Phi-4 | Yes | Primary target for domain-specific tuning |
-| GPT-4o-mini | Yes | Higher quality baseline |
+| GPT-4.1-mini | Yes | Higher quality baseline |
 | GPT-4.1-nano | Yes | Cost-effective option |
 
 ### Minimum Dataset Size

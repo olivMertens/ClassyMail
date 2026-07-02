@@ -44,7 +44,7 @@ curl "http://localhost:8000/api/emails/export-finetune-jsonl?split=train&anonymi
 All exports are anonymized by default using a two-layer approach:
 
 1. **Regex layer** (<1ms): Removes emails, phone numbers, IPs, IBANs
-2. **LLM layer** (GPT-4o-mini): Contextual anonymization of names, companies, addresses, amounts
+2. **LLM layer** (GPT-4.1-mini): Contextual anonymization of names, companies, addresses, amounts
 
 The LLM anonymizer never sees raw PII -- it only processes content already scrubbed by the regex layer. If anonymization fails for any example, that example is skipped (fail-safe: never leak PII).
 

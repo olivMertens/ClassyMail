@@ -16,7 +16,7 @@ Pattern: Event-Driven + Container Apps + AI Foundry (Mistral OCR & Phi-4)
    *   **Case 2 (Portal/FTP Upload)**: Azure Event Grid detects the file (`BlobCreated`) and publishes a message to Service Bus (visible after worker processing).
 3. **OCR (Extraction):** The worker (FastAPI) downloads the PDF and sends it to the OCR model (Mistral) to extract Markdown. On failure (timeout, quota, open circuit breaker), the pipeline automatically falls back to **Azure Document Intelligence** (prebuilt-layout, text only).
 4. **Intelligence (Classification):**
-   *   **Standard Mode**: Markdown sent to Primary LLM (Phi-4). Fallback to GPT-4o-mini if token budget exceeded.
+   *   **Standard Mode**: Markdown sent to Primary LLM (Phi-4). Fallback to GPT-4.1-mini if token budget exceeded.
    *   **Agentic Mode** (NEW): Multi-agent pipeline with expert orchestrator inspector, parallel specialized agents (per-intent RAG via AI Search), adversarial Red Team quality gate that can request extra agents for missed intents. See [AGENTIC_CLASSIFICATION.md](AGENTIC_CLASSIFICATION.md).
 5. **Storage:** The result (JSON + usage/cost) is stored in Cosmos DB (with CSV export available from the app).
 
@@ -33,9 +33,9 @@ flowchart TD
     DI -.->|Markdown| Check
     OCR --> Check{"Token Budget Decision"}
     Check -->|"less than 8K"| Phi["Phi-4 Primary"]
-    Check -->|"8K or more"| GPT["gpt-4o-mini Fallback"]
+    Check -->|"8K or more"| GPT["gpt-4.1-mini Fallback"]
     OCR --> PII{"PII Detection?"}
-    PII -->|LLM| GPT_PII["GPT-4o-mini PII"]
+    PII -->|LLM| GPT_PII["GPT-4.1-mini PII"]
     PII -->|Azure| Lang["Azure AI Language"]
     PII -->|Both| Hybrid["LLM + Azure Hybrid"]
     Phi -->|JSON| API
@@ -43,7 +43,7 @@ flowchart TD
     GPT_PII -->|PII Data| API
     Lang -->|PII Data| API
     Hybrid -->|Merged PII| API
-    API -->|"Category Assessment"| Nano["gpt-5-nano Reasoning"]
+    API -->|"Category Assessment"| Nano["gpt-4.1-nano Category Assessment"]
     Nano -->|"Advice JSON"| API
 
     Check -->|"Agentic Strategy"| Orch["Orchestrator Inspector"]
@@ -125,7 +125,7 @@ The managed identity assigned to Container Apps (`api` and `worker`) must have t
 | **Storage Account** | `Storage Blob Data Reader` | `2a2b9908-6ea1-4ae2-8e65-a410df84e7d1` | **Read**: Worker downloads PDFs, API streams PDFs to the browser for viewing. |
 | **Service Bus** | `Azure Service Bus Data Owner` | `090c5cfd-751d-490a-894a-3ce6f1109419` | Allows the API to send messages, the `worker` to consume them, and queue-stats monitoring to read queue runtime properties. |
 | **Cosmos DB (SQL)** | Custom App Role (`readMetadata` + CRUD) | Terraform-managed (`app_role`) | **Data Plane RBAC** at **Account** scope. Read/Write JSON documents. *Note: This is not a standard Azure IAM role, but a Cosmos native SQL role. See [RBAC_AUDIT.md](RBAC_AUDIT.md).* |
-| **AI Foundry Project** | `Cognitive Services User` | `a97b65f3-24c7-4388-baec-2e87135dc908` | **Deployed Models**: Phi-4 (Primary classification), Mistral Document AI 2512 (OCR + Vision), GPT-5-nano (Category Assessment, reasoning), GPT-5.2-chat (Conversational AI), GPT-4o-mini (Fallback + PII), text-embedding-3-small (Embeddings) |
+| **AI Foundry Project** | `Cognitive Services User` | `a97b65f3-24c7-4388-baec-2e87135dc908` | **Deployed Models**: Phi-4 (Primary classification), Mistral Document AI 2512 (OCR + Vision), GPT-4.1-nano (Category Assessment + agentic defaults), GPT-5.1 (Conversational reasoning AI), GPT-4.1-mini (Fallback + PII/anonymization/vision), text-embedding-3-small (Embeddings) |
 | **Azure AI Language** ⚙️ | `Cognitive Services Language Reader` | `36e80216-4058-40c5-bf25-3b30a0199a10` | **Native PII Detection API** (optional, `deploy_language_service=true`). TextAnalytics service with 43+ predefined PII categories. |
 | **Document Intelligence** (via AI Foundry) | `Cognitive Services User` | `a97b65f3-24c7-4388-baec-2e87135dc908` | **OCR Fallback** — uses the AI Foundry endpoint by default (`Cognitive Services User` on AI Foundry covers DI access). Optionally deployable as standalone resource (`deploy_document_intelligence=true`). |
 | **Azure AI Search** | `Search Index Data Contributor` | `8ebe5a00-799e-43f5-93ac-243d3dce84a7` | **Agentic RAG** — per-intent indexes for specialized agent grounding (`deploy_ai_search=true`). Read/write documents in search indexes. |
@@ -171,7 +171,7 @@ To fully isolate the system from the Internet (VNet Injection), the target archi
 
 Three configurable PII detection methods (Settings > Processing):
 
-1. **LLM-based (default)**: GPT-4o-mini JSON mode. Contextual (~$0.002/email).
+1. **LLM-based (default)**: GPT-4.1-mini JSON mode. Contextual (~$0.002/email).
 2. **Azure AI Language**: Native service with 40+ categories (SSN, cards, passports). ~$0.001/email. Terraform: `deploy_language_service=true`.
 3. **Hybrid**: Combines LLM + Azure Language, deduplicates results.
 
@@ -253,7 +253,7 @@ These are set via `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` environment
 
 [Agents View](https://learn.microsoft.com/en-us/azure/azure-monitor/app/agents-view) provides GenAI-specific monitoring in **Application Insights > Agents (Preview)**:
 
-- **Token usage & costs** per model (Phi-4, Mistral OCR, GPT-4o-mini)
+- **Token usage & costs** per model (Phi-4, Mistral OCR, GPT-4.1-mini, GPT-5.1)
 - **Tool calls** and model invocation patterns
 - **End-to-end transaction details** with GenAI-aware simple view
 - **Error analysis** for LLM pipeline failures
@@ -286,7 +286,7 @@ The LLM pipeline (`#classymail/services/llm_pipeline.py`) and anonymizer (`#clas
 
 ## 7. Terraform (Foundry)
 
-- `azapi_resource` AIServices (Foundry) + Project + Deployments (Phi‑4, Mistral OCR, GPT-5-nano)
+- `azapi_resource` AIServices (Foundry) + Project + Deployments (Phi‑4, Mistral OCR, GPT-4.1-nano, GPT-4.1-mini, GPT-5.1)
 - RBAC `Cognitive Services User` for the ACA identity
 - Application Insights + Log Analytics Workspace (telemetry, Live Metrics)
 - KEDA scaler azure-servicebus for the worker

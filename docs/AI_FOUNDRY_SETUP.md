@@ -86,7 +86,7 @@ The ClassyMail MVP requires the following model deployments in Microsoft AI Foun
 
 - **Model**: `Phi-4` (Microsoft)
 
-- **Deployment Name** (recommended): `phi-4-document-classification`
+- **Deployment Name** (recommended): `phi-4`
 
 - **Purpose**: Primary email classification model
 
@@ -96,13 +96,13 @@ The ClassyMail MVP requires the following model deployments in Microsoft AI Foun
 
 
 
-### 2. **Phi-4 Fallback** (Optional but recommended)
+### 2. **GPT-4.1-mini Fallback / Anonymizer / Vision** (Optional but recommended)
 
-- **Model**: `Phi-4` (Microsoft)
+- **Model**: `gpt-4.1-mini` (OpenAI, GA, retires 2027-10-14)
 
-- **Deployment Name** (recommended): `phi-4-generic`
+- **Deployment Name** (recommended): `gpt-4.1-mini`
 
-- **Purpose**: Fallback when primary deployment is unavailable
+- **Purpose**: Fallback classification, anonymization, and vision tasks
 
 - **TPM**: 25,000+
 
@@ -142,9 +142,9 @@ The ClassyMail MVP requires the following model deployments in Microsoft AI Foun
 
 ### 5. **GPT Model (Chat & Advanced Classification)**
 
-- **Model**: `gpt-5.2-chat` or `gpt-4o`
+- **Model**: `gpt-5.1` (reasoning model, GA, retires 2027-05-15)
 
-- **Deployment Name** (recommended): `gpt-5.2-chat` or `gpt-4o`
+- **Deployment Name** (recommended): `gpt-5.1`
 
 - **Purpose**: Advanced reasoning, RAG chat
 
@@ -154,11 +154,11 @@ The ClassyMail MVP requires the following model deployments in Microsoft AI Foun
 
 
 
-### 6. **GPT-5-nano (Category Assessment)** — Optional
+### 6. **GPT-4.1-nano (Category Assessment)** — Optional
 
-- **Model**: `gpt-5-nano` (reasoning model)
+- **Model**: `gpt-4.1-nano` (GA, retires 2027-10-14)
 
-- **Deployment Name** (recommended): `gpt-5-nano`
+- **Deployment Name** (recommended): `gpt-4.1-nano`
 
 - **Purpose**: AI-powered category quality analysis and advice
 
@@ -204,7 +204,7 @@ The ClassyMail MVP requires the following model deployments in Microsoft AI Foun
 
 3. Configure deployment:
 
-   - **Deployment name**: `phi-4-document-classification`
+   - **Deployment name**: `phi-4`
 
    - **Deployment type**: Standard
 
@@ -218,13 +218,17 @@ The ClassyMail MVP requires the following model deployments in Microsoft AI Foun
 
 
 
-### Step 3: Deploy Phi-4 Fallback
+### Step 3: Deploy GPT-4.1-mini Fallback / Anonymizer / Vision
 
 
 
-Repeat Step 2 with:
+Create an Azure OpenAI deployment with:
 
-- **Deployment name**: `phi-4-generic`
+- **Model**: `gpt-4.1-mini`
+
+- **Version**: `2025-04-14`
+
+- **Deployment name**: `gpt-4.1-mini`
 
 - **TPM**: 25,000
 
@@ -266,13 +270,13 @@ Repeat Step 2 with:
 
    - **Model family**: GPT
 
-   - **Model**: `gpt-5.2-chat` or `gpt-4o`
+   - **Model**: `gpt-5.1`
 
-   - **Version**: Latest stable (e.g., `2024-11-20`)
+   - **Version**: `2025-11-13`
 
 3. Configure:
 
-   - **Deployment name**: `gpt-5.2-chat`
+   - **Deployment name**: `gpt-5.1`
 
    - **TPM**: 30,000
 
@@ -318,17 +322,17 @@ After deploying models, configure these environment variables in Azure Container
 
 | `AI_API_VERSION` | API version | `2024-08-01-preview` |
 
-| `PHI_DEPLOYMENT` | Primary Phi-4 deployment name | `phi-4-document-classification` |
+| `PHI_DEPLOYMENT` | Primary Phi-4 deployment name | `phi-4` |
 
-| `PHI_FALLBACK_DEPLOYMENT` | Fallback Phi-4 deployment name | `phi-4-generic` |
+| `PHI_FALLBACK_DEPLOYMENT` | Fallback/anonymizer/vision deployment name | `gpt-4.1-mini` |
 
 | `MISTRAL_DEPLOYMENT` | Mistral deployment name | `mistral-document-ai-2512` |
 
 | `MISTRAL_MODE` | Deployment mode | `maas` (for serverless MaaS) |
 
-| `CHAT_DEPLOYMENT` | (Optional) Chat model deployment | `gpt-5.2-chat` |
+| `CHAT_DEPLOYMENT` | (Optional) Chat reasoning model deployment | `gpt-5.1` |
 
-| `GPT_DEPLOYMENT` | (Optional) GPT deployment for advanced classification | `gpt-5.2-chat` |
+| `GPT_DEPLOYMENT` | (Optional) GPT deployment for advanced classification | `gpt-4.1` |
 
 
 
@@ -382,13 +386,13 @@ Name                           Model              Version
 
 -----------------------------  -----------------  ------------
 
-phi-4-document-classification  Phi-4              2024-12-12
+phi-4                          Phi-4              2024-10-01
 
-phi-4-generic                  Phi-4              2024-12-12
+gpt-4.1-mini                   gpt-4.1-mini       2025-04-14
 
 mistral-document-ai-2512       Mistral-Large      2505
 
-gpt-5.2-chat                   gpt-5.2-chat       2024-11-20
+gpt-5.1                        gpt-5.1            2025-11-13
 
 ```
 
@@ -422,15 +426,15 @@ ai_api_version      = "2024-08-01-preview"
 
 # Model Deployments
 
-phi_deployment          = "phi-4-document-classification"
+phi_deployment          = "phi-4"
 
-phi_fallback_deployment = "phi-4-generic"
+phi_fallback_deployment = "gpt-4.1-mini"
 
 mistral_deployment      = "mistral-document-ai-2512"
 
 mistral_mode            = "maas"
 
-chat_deployment         = "gpt-5.2-chat"
+chat_deployment         = "gpt-5.1"
 
 ```
 
@@ -470,15 +474,16 @@ az containerapp update \
 
     AI_API_VERSION="2024-08-01-preview" \
 
-    PHI_DEPLOYMENT="phi-4-document-classification" \
+    PHI_DEPLOYMENT="phi-4" \
 
-    PHI_FALLBACK_DEPLOYMENT="phi-4-generic" \
+    PHI_FALLBACK_DEPLOYMENT="gpt-4.1-mini" \
 
     MISTRAL_DEPLOYMENT="mistral-document-ai-2512" \
 
     MISTRAL_MODE="maas" \
 
-    CHAT_DEPLOYMENT="gpt-5.2-chat"
+    CHAT_DEPLOYMENT="gpt-5.1" \
+    CHAT_API_VERSION="preview"
 
 ```
 
@@ -500,9 +505,9 @@ az containerapp update \
 
     AI_API_VERSION="2024-08-01-preview" \
 
-    PHI_DEPLOYMENT="phi-4-document-classification" \
+    PHI_DEPLOYMENT="phi-4" \
 
-    PHI_FALLBACK_DEPLOYMENT="phi-4-generic" \
+    PHI_FALLBACK_DEPLOYMENT="gpt-4.1-mini" \
 
     MISTRAL_DEPLOYMENT="mistral-document-ai-2512" \
 
@@ -612,7 +617,7 @@ curl "https://<your-api-url>/api/admin/test-gpt"
 
 # Test specific model
 
-curl "https://<your-api-url>/api/admin/test-gpt?model=gpt-5.2-chat"
+curl "https://<your-api-url>/api/admin/test-gpt?model=gpt-5.1"
 
 ```
 
@@ -626,7 +631,7 @@ Expected response (success):
 
   "status": "success",
 
-  "model": "phi-4-document-classification",
+  "model": "phi-4",
 
   "response": "Classification model is operational",
 
@@ -1002,7 +1007,7 @@ Supported API versions:
 
 - `2024-08-01-preview` (recommended for Phi-4 + Mistral)
 
-- `2024-06-01` (stable for GPT-4o)
+- `2024-06-01` (legacy stable version; prefer `2024-08-01-preview` or newer for current GPT-4.1 deployments)
 
 - `2023-12-01-preview` (legacy, not recommended)
 
@@ -1120,17 +1125,17 @@ Run with:
 
 - [ ] Microsoft AI Foundry resource deployed
 
-- [ ] Phi-4 deployment created (`phi-4-document-classification`)
+- [ ] Phi-4 deployment created (`phi-4`)
 
-- [ ] Phi-4 fallback created (`phi-4-generic`) or GPT-4o-mini fallback
+- [ ] GPT-4.1-mini fallback/anonymizer/vision deployment created (`gpt-4.1-mini`)
 
 - [ ] Mistral Document AI MaaS deployment created (`mistral-document-ai-2512`)
 
 - [ ] text-embedding-3-small deployment created
 
-- [ ] GPT deployment created (optional, `gpt-5.2-chat`)
+- [ ] GPT deployment created (optional, `gpt-5.1`)
 
-- [ ] GPT-5-nano deployment created (optional, for category assessment)
+- [ ] GPT-4.1-nano deployment created (optional, for category assessment)
 
 - [ ] `AI_ENDPOINT` configured in Container Apps
 

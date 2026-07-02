@@ -330,7 +330,7 @@ async def run_classification_pipeline(
     fallback_used = bool(classification_raw.get("fallback_used")) if isinstance(classification_raw, dict) else False
     model_name = classification_raw.get("model") if isinstance(classification_raw, dict) else None
     if fallback_used:
-        stage_timings["classify_detail"] = {"fallback_model": model_name or "gpt-4o-mini"}
+        stage_timings["classify_detail"] = {"fallback_model": model_name or "gpt-4.1-mini"}
 
     # Calculate costs with model-aware pricing
     llm_cost = compute_cost_llm(llm_usage, fallback_used=fallback_used, model_name=model_name, overrides=final_overrides)

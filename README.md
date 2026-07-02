@@ -30,12 +30,12 @@ The entire pipeline is event-driven: Blob Storage → Event Grid → Service Bus
 
 ### AI Classification Pipeline
 - **Hybrid OCR**: Mistral Document AI 2512 as primary, Azure Document Intelligence as automatic fallback with circuit breaker pattern. When Document Intelligence is used, a **📄 amber badge** appears on the email in the dashboard and detail modal so reviewers can see which OCR engine was used.
-- **Multi-Model Classification**: Phi-4 (8K context) as primary, GPT-4o-mini (120K) as fallback — switch models from the Settings UI at any time
+- **Multi-Model Classification**: Phi-4 (8K context) as primary, GPT-4.1-mini as fallback — switch models from the Settings UI at any time
 - **Multi-Intent Detection**: A single email can match multiple categories, each with its own confidence score (0.0–1.0) and text justification
 
 ### Configurable Categories & Settings
 - **Custom Category Taxonomy**: Define your own business categories with name, slug, description, and exclusion rules — all editable from the Settings UI
-- **Model Selection**: Switch classification model (Phi-4, GPT-4o-mini, GPT-5-mini, Kimi-K2.5, etc.) from Settings — **models are auto-discovered from your AI Foundry project deployments** with a hardcoded fallback list
+- **Model Selection**: Switch classification model (Phi-4, GPT-4.1-mini, GPT-5-mini, Kimi-K2.5, etc.) from Settings — **models are auto-discovered from your AI Foundry project deployments** with a hardcoded fallback list
 - **Processing Strategies**: Choose between Standard (fast), Deep Reasoning (Chain-of-Thought), Vision (image-aware), or **Agentic (Multi-Agent)** per processing run
 - **Batch Reprocessing**: Reprocess all emails with a different model or strategy for A/B testing
 
@@ -102,13 +102,13 @@ Full documentation: [AGENTIC_CLASSIFICATION](docs/AGENTIC_CLASSIFICATION.md) | [
 - **AI Feedback**: Each correction generates an LLM feedback message explaining what the model missed, used for prompt improvement
 - **Auto-Feed to AI Search**: When a user corrects a classification, the email is automatically pushed as a negative example to the old (wrong) category and a positive example to the new (correct) category in the per-category AI Search indexes
 - **One-Click Reinforcement**: Click "Reinforce" on any correctly classified email to push it as a `human_reinforced` positive example into its category's AI Search index — teaches the agentic pipeline "this is right"
-- **Fine-Tuning Export**: Export anonymized JSONL datasets (train/test split) matching the production system prompt format — ready for Microsoft AI Foundry (Phi-4 LoRA, GPT-4o-mini)
+- **Fine-Tuning Export**: Export anonymized JSONL datasets (train/test split) matching the production system prompt format — ready for Microsoft AI Foundry (Phi-4 LoRA, GPT-4.1-mini)
 - **Human Reinforcement**: Corrected examples are weighted higher in training data, closing the feedback loop between human reviewers and model quality
 - **Category AI Assessment**: GPT-4.1-nano analyzes your category definitions and suggests improvements based on classification patterns
 - **Per-Category AI Search Indexes**: Each category gets its own Azure AI Search index with positive and negative reference examples — agents use RAG to calibrate confidence (see [AI_SEARCH_INDEXES](docs/AI_SEARCH_INDEXES.md))
 
 ### RAG Chatbot
-- **Chat with your emails**: GPT-5.2-chat with vector search over all processed documents, orchestrated by **Microsoft Agent Framework 1.9** (`agent-framework-core>=1.9` + `agent-framework-openai>=1.8`) — per-locale `Agent` cache, `ContextVar`-scoped dependency injection, and full chat history replay via `list[Message]`
+- **Chat with your emails**: GPT-5.1 reasoning model with vector search over all processed documents, orchestrated by **Microsoft Agent Framework 1.9** (`agent-framework-core>=1.9` + `agent-framework-openai>=1.8`) — per-locale `Agent` cache, `ContextVar`-scoped dependency injection, and full chat history replay via `list[Message]`
 - **Agent-driven suggestions**: The LLM agent generates contextual follow-up action pills after each response — no hardcoded logic
 - **Ask AI button**: Click ✨ on any email card or table row to open the chatbot pre-filled with that email’s context
 - **12 agent tools**: Semantic search (with date filtering), keyword search (case-insensitive), reclassification handoff, sequential review, stats, error analysis, category explanation
@@ -138,7 +138,7 @@ flowchart TD
     worker -->|OCR| ocr["Mistral Document AI 2512"]
     ocr -.->|Fallback| di["Doc Intelligence"]
     worker -->|Classify| phi4["Phi-4"]
-    phi4 -.->|Fallback| gpt["GPT-4o-mini"]
+    phi4 -.->|Fallback| gpt["GPT-4.1-mini"]
     worker -->|Save| cosmos[("Cosmos DB")]
     cosmos --> api
     api --> ui
@@ -173,7 +173,7 @@ See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for full setup or [do
 - **Backend**: FastAPI (Python 3.12) + uv
 - **Frontend**: Vue 3 + Vite + TailwindCSS + vue-i18n
 - **Infra**: Terraform (azurerm v4 + azapi)
-- **AI**: Microsoft AI Foundry (Mistral, Phi-4, GPT-4o-mini, GPT-5.2-chat) + Microsoft Agent Framework 1.9
+- **AI**: Microsoft AI Foundry (Mistral, Phi-4, GPT-4.1-mini, GPT-4.1-nano, GPT-5.1) + Microsoft Agent Framework 1.9
 - **Storage**: Cosmos DB (serverless + vector search + composite indexes), Blob Storage
 - **Auth**: Managed Identity (zero secrets)
 - **CI/CD**: GitHub Actions with OIDC
@@ -193,9 +193,9 @@ See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for full setup or [do
 
 | Model | Deployment Name | Purpose | Required for |
 |-------|----------------|---------|-------------|
-| GPT-4o-mini | `gpt-4o-mini` | Fallback classifier, PII detection | Large emails (>8K tokens) |
+| GPT-4.1-mini | `gpt-4.1-mini` | Fallback classifier, PII detection/anonymization, vision | Large emails (>8K tokens) |
 | text-embedding-3-small | `text-embedding-3-small` | Vector embeddings for RAG chatbot | Chat / semantic search |
-| GPT-5.2-chat | `gpt-5.2-chat` | RAG chatbot conversations | Chat feature |
+| GPT-5.1 | `gpt-5.1` | RAG chatbot reasoning model | Chat feature |
 
 > **Not all models are required.** The pipeline works with just Phi-4 + Mistral OCR. Optional models enable fallback classification and RAG chat. Deploy only what you need.
 
@@ -225,7 +225,7 @@ The chatbot uses **semantic vector search** over all processed emails, powered b
 
 1. **During processing**: Each email’s OCR markdown is embedded using `text-embedding-3-small` (1536 dimensions) and stored in Cosmos DB with `type: "email"`. Chunks are also embedded separately with `type: "chunk"`
 2. **During chat**: User queries are embedded, then Cosmos DB `VectorDistance()` finds the most semantically similar emails — with optional date filtering (`days` parameter for “last week” queries). If the container's vector index rejects `ORDER BY VectorDistance` (a known Cosmos quantized-index drift), the repository automatically falls back to a brute-force scan (compute distances in `SELECT`, sort client-side) so search keeps working
-3. **Chat model** (GPT-5.2-chat) generates answers grounded in retrieved context, with source citations. The chat agent targets the Azure OpenAI **v1 surface**, which requires `CHAT_API_VERSION=preview` (see [ACA_ENVIRONMENT_VARIABLES](docs/ACA_ENVIRONMENT_VARIABLES.md))
+3. **Chat model** (GPT-5.1 reasoning model) generates answers grounded in retrieved context, with source citations. The chat agent targets the Azure OpenAI **v1 surface**, which requires `CHAT_API_VERSION=preview` (see [ACA_ENVIRONMENT_VARIABLES](docs/ACA_ENVIRONMENT_VARIABLES.md))
 4. **Semantic cache**: Similar questions (>99% cosine similarity) return cached responses instantly
 5. **Agent-driven actions**: The LLM appends contextual follow-up suggestions (hidden `<!-- ACTIONS -->` block) that appear as clickable pills in the UI
 

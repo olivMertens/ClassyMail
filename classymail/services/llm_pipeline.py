@@ -1388,7 +1388,7 @@ def resolve_model_config(model_key: str) -> tuple[str, str, str]:
     # Aliases
     if k in ("phi-4", "phi4", "standard", "primary"):
         return config.PHI_ENDPOINT, config.PHI_DEPLOYMENT, default_api_version
-    if k in ("gpt-4o-mini", "gpt4o-mini", "gpt4o_mini", "fallback", "audit"):
+    if k in ("gpt-4.1-mini", "gpt4.1-mini", "gpt-4o-mini", "gpt4o-mini", "gpt4o_mini", "fallback", "audit"):
         return config.PHI_FALLBACK_ENDPOINT, config.PHI_FALLBACK_DEPLOYMENT, default_api_version
 
     # Kimi K2.5 (Moonshot AI via Foundry) – deployed on the primary endpoint

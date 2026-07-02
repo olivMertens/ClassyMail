@@ -73,9 +73,10 @@ MISTRAL_DEPLOYMENT=mistral-document-ai-2512  # ⚠️ CRITICAL: Must be EXACTLY 
 MISTRAL_MODE=maas
 PHI_ENDPOINT=${AZURE_AI_ENDPOINT}
 PHI_DEPLOYMENT=Phi-4
-PHI_FALLBACK_DEPLOYMENT=gpt-4o-mini
+PHI_FALLBACK_DEPLOYMENT=gpt-4.1-mini
 EMBEDDING_DEPLOYMENT=text-embedding-3-small
-CHAT_DEPLOYMENT=gpt-5.2-chat
+CHAT_DEPLOYMENT=gpt-5.1
+CHAT_API_VERSION=preview
 
 # Observability (Azure)
 APPLICATIONINSIGHTS_CONNECTION_STRING=InstrumentationKey=...;IngestionEndpoint=https://...
@@ -89,7 +90,7 @@ ORGANIZATION_NAME=ClassyMail  # or ClassyMail, ClassyMail (default)
 MAX_UPLOAD_SIZE=10  # MB
 
 # Optional: Anonymization
-ANONYMIZER_DEPLOYMENT=gpt-4o
+ANONYMIZER_DEPLOYMENT=gpt-4.1-mini
 ANONYMIZER_MAX_TOKENS=6000
 
 # Security Note: Do NOT set AZURE_AI_KEY or AZURE_COSMOS_KEY in production

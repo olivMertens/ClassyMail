@@ -8,14 +8,16 @@
 # Microsoft.CognitiveServices/accounts/deployments   2025-06-01   AVM Bicep (GA)
 # Microsoft.DocumentDB/.../containers                2025-04-15   AVM Bicep / Learn docs
 #
-# AVM modules available (future migration path):
-#   - Azure/avm-res-cognitiveservices-account/azurerm v0.11.0  (requires azapi ~> 2.5)
+# AVM modules available (future migration path — deferred, see below):
+#   - Azure/avm-res-cognitiveservices-account/azurerm v0.11.1  (requires azapi ~> 2.5, still pre-1.0)
 #   - Azure/avm-res-documentdb-databaseaccount/azurerm
 #   - Azure/avm-ptn-aiml-ai-foundry/azurerm  (pattern module)
 #
-# azapi provider note: AVM v0.11.0 requires azapi ~> 2.5 (body uses native HCL
-# instead of jsonencode). Current config uses azapi ~> 1.13 with jsonencode().
-# Upgrade to azapi v2.x is a breaking syntax change; plan and test thoroughly.
+# azapi provider note: AVM v0.11.1 requires azapi ~> 2.5 (body uses native HCL
+# instead of jsonencode). Current config stays on azapi ~> 1.13 with jsonencode().
+# Upgrade to azapi v2.x / AVM is a breaking change; deferred as a documented
+# follow-up. MaaS model deployments are consolidated into a data-driven for_each
+# map (see local.model_deployments) — latest GA / highest-LTS model set.
 #
 # Agent Service / Capability Hosts:
 #   capabilityHosts requires preview API (2025-07-01-preview) via AzAPI only.
@@ -79,7 +81,7 @@ variable "enable_model_deployments" {
 
 variable "deploy_optional_models" {
   type        = bool
-  description = "Deploy optional models (gpt-4o-mini fallback, text-embedding-3-small, gpt-5.2-chat). Requires enable_model_deployments = true. These models are NOT required — the pipeline works with just Phi-4 + Mistral OCR."
+  description = "Deploy optional models (gpt-4.1-nano assessment/orchestrator, gpt-4.1-mini fallback/vision/anonymizer, gpt-4.1 agentic, text-embedding-3-small, gpt-5.1 chat/RAG). Requires enable_model_deployments = true. These models are NOT required — the pipeline works with just Phi-4 + Mistral OCR."
   default     = false
 }
 
@@ -263,77 +265,80 @@ resource "azapi_resource" "ai_project" {
   })
 }
 
-# Deployments (MaaS models)
-resource "azapi_resource" "deployment_phi4" {
-  count     = var.enable_model_deployments ? 1 : 0
+# ── MaaS model deployments (data-driven) ──────────────────────────────
+# Consolidated from 6 near-duplicate azapi_resource blocks into a single
+# for_each map. Latest GA / highest-LTS model set (verified on Microsoft Learn,
+# all available in swedencentral GlobalStandard):
+#   gpt-5.1                   2025-11-13  GA  retires 2027-05-15  (chat/RAG; replaces invalid gpt-5.2-chat)
+#   gpt-4.1                   2025-04-14  GA  retires 2027-10-14  (agentic tier3 / red-team)
+#   gpt-4.1-mini              2025-04-14  GA  retires 2027-10-14  (fallback/anonymizer/vision/tier2; replaces deprecated gpt-4o-mini)
+#   gpt-4.1-nano              2025-04-14  GA  retires 2027-10-14  (category assessment + agentic orchestrator/tier1; fast/low-cost)
+#   text-embedding-3-small    1           GA  retires 2027-04-15
+#   phi-4                     2024-10-01  (primary classification)
+#   mistral-document-ai-2512  25.12       (OCR)
+#   model-router              2025-11-18  (optional agentic orchestration)
+#
+# tier: "core"     → phi-4 + mistral (minimum viable pipeline; enable_model_deployments)
+#       "optional" → chat/RAG + fallback + embeddings + agentic (deploy_optional_models)
+#       "router"   → model-router (deploy_model_router)
+locals {
+  model_deployments = {
+    "phi-4"                    = { format = "OpenAI", version = "2024-10-01", sku = "GlobalStandard", capacity = 1, tier = "core" }
+    "mistral-document-ai-2512" = { format = "Mistral", version = "25.12", sku = "GlobalStandard", capacity = 1, tier = "core" }
+    "gpt-4.1-mini"             = { format = "OpenAI", version = "2025-04-14", sku = "GlobalStandard", capacity = 1, tier = "optional" }
+    "gpt-4.1"                  = { format = "OpenAI", version = "2025-04-14", sku = "GlobalStandard", capacity = 1, tier = "optional" }
+    "gpt-4.1-nano"             = { format = "OpenAI", version = "2025-04-14", sku = "GlobalStandard", capacity = 1, tier = "optional" }
+    "text-embedding-3-small"   = { format = "OpenAI", version = "1", sku = "GlobalStandard", capacity = 1, tier = "optional" }
+    "gpt-5.1"                  = { format = "OpenAI", version = "2025-11-13", sku = "GlobalStandard", capacity = 1, tier = "optional" }
+    "model-router"             = { format = "OpenAI", version = "2025-11-18", sku = "GlobalStandard", capacity = 250, tier = "router" }
+  }
+
+  # Filter the catalog by the existing feature flags.
+  enabled_model_deployments = var.enable_model_deployments ? {
+    for name, cfg in local.model_deployments : name => cfg
+    if cfg.tier == "core" ||
+    (cfg.tier == "optional" && var.deploy_optional_models) ||
+    (cfg.tier == "router" && var.deploy_model_router)
+  } : {}
+}
+
+# NOTE: for_each deploys models in parallel (the previous code serialized them via
+# depends_on to avoid same-account 409 conflicts). Low impact because
+# enable_model_deployments defaults to false (models are usually created manually in
+# the Foundry portal). Re-introduce ordering only if apply-time 409s surface.
+resource "azapi_resource" "model_deployment" {
+  for_each  = local.enabled_model_deployments
   type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
-  name      = "phi-4"
+  name      = each.key
   parent_id = azapi_resource.ai_foundry.id
   body = jsonencode({
-    sku = { name = "GlobalStandard", capacity = 1 }
+    sku = { name = each.value.sku, capacity = each.value.capacity }
     properties = {
-      model = { format = "OpenAI", name = "phi-4", version = "2024-10-01" }
+      model = { format = each.value.format, name = each.key, version = each.value.version }
     }
   })
 }
 
-resource "azapi_resource" "deployment_mistral_ocr" {
-  count     = var.enable_model_deployments ? 1 : 0
-  type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
-  name      = "mistral-document-ai-2512"
-  parent_id = azapi_resource.ai_foundry.id
-  body = jsonencode({
-    sku = { name = "GlobalStandard", capacity = 1 }
-    properties = {
-      model = { format = "Mistral", name = "mistral-document-ai-2512", version = "25.12" }
-    }
-  })
+# State migration: consolidating the 6 hardcoded deployments into the for_each map
+# above changes their resource addresses. `moved` blocks re-key state (no destroy/
+# recreate) for deployments whose NAME is unchanged. Renamed deployments
+# (gpt-4o-mini → gpt-4.1-mini, gpt-5.2-chat → gpt-5.1) are genuinely new Azure
+# deployments and are intentionally NOT moved (recreation is expected/correct).
+moved {
+  from = azapi_resource.deployment_phi4[0]
+  to   = azapi_resource.model_deployment["phi-4"]
 }
-
-# --- Optional models (fallback, embeddings, chat) ---
-# These are NOT required for the core pipeline (Phi-4 + Mistral OCR is sufficient).
-# Enable via: deploy_optional_models = true (also requires enable_model_deployments = true)
-
-resource "azapi_resource" "deployment_gpt4o_mini" {
-  count     = var.enable_model_deployments && var.deploy_optional_models ? 1 : 0
-  type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
-  name      = "gpt-4o-mini"
-  parent_id = azapi_resource.ai_foundry.id
-  body = jsonencode({
-    sku = { name = "GlobalStandard", capacity = 1 }
-    properties = {
-      model = { format = "OpenAI", name = "gpt-4o-mini", version = "2024-07-18" }
-    }
-  })
-  depends_on = [azapi_resource.deployment_phi4]
+moved {
+  from = azapi_resource.deployment_mistral_ocr[0]
+  to   = azapi_resource.model_deployment["mistral-document-ai-2512"]
 }
-
-resource "azapi_resource" "deployment_embedding" {
-  count     = var.enable_model_deployments && var.deploy_optional_models ? 1 : 0
-  type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
-  name      = "text-embedding-3-small"
-  parent_id = azapi_resource.ai_foundry.id
-  body = jsonencode({
-    sku = { name = "GlobalStandard", capacity = 1 }
-    properties = {
-      model = { format = "OpenAI", name = "text-embedding-3-small", version = "1" }
-    }
-  })
-  depends_on = [azapi_resource.deployment_gpt4o_mini]
+moved {
+  from = azapi_resource.deployment_embedding[0]
+  to   = azapi_resource.model_deployment["text-embedding-3-small"]
 }
-
-resource "azapi_resource" "deployment_gpt52_chat" {
-  count     = var.enable_model_deployments && var.deploy_optional_models ? 1 : 0
-  type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
-  name      = "gpt-5.2-chat"
-  parent_id = azapi_resource.ai_foundry.id
-  body = jsonencode({
-    sku = { name = "GlobalStandard", capacity = 1 }
-    properties = {
-      model = { format = "OpenAI", name = "gpt-5.2-chat", version = "2025-03-01" }
-    }
-  })
-  depends_on = [azapi_resource.deployment_embedding]
+moved {
+  from = azapi_resource.deployment_model_router[0]
+  to   = azapi_resource.model_deployment["model-router"]
 }
 
 # --- Optional: Azure AI Search for Agentic Classification ---
@@ -377,20 +382,9 @@ variable "deploy_model_router" {
   default     = false
 }
 
-resource "azapi_resource" "deployment_model_router" {
-  count     = (var.deploy_model_router && var.enable_model_deployments) ? 1 : 0
-  type      = "Microsoft.CognitiveServices/accounts/deployments@2025-06-01"
-  name      = "model-router"
-  parent_id = azapi_resource.ai_foundry.id
-
-  body = jsonencode({
-    sku = { name = "GlobalStandard", capacity = 250 }
-    properties = {
-      model = { format = "OpenAI", name = "model-router", version = "2025-11-18" }
-    }
-  })
-  depends_on = [azapi_resource.deployment_gpt52_chat]
-}
+# model-router is deployed via the data-driven `local.model_deployments` map above
+# (tier = "router", gated on deploy_model_router). Its state is re-keyed by the
+# moved{} block, so no destroy/recreate on upgrade.
 
 # --- Optional: Azure AI Language Service for PII Detection ---
 # Provides native PII detection API as alternative to LLM-based detection
@@ -953,7 +947,7 @@ resource "azurerm_container_app" "api" {
       # Secondary models (explicitly defined)
       env {
         name  = "CHAT_DEPLOYMENT"
-        value = "gpt-5.2-chat"
+        value = "gpt-5.1"
       }
       env {
         name  = "EMBEDDING_DEPLOYMENT"
@@ -961,15 +955,15 @@ resource "azurerm_container_app" "api" {
       }
       env {
         name  = "PHI_FALLBACK_DEPLOYMENT"
-        value = "gpt-4o-mini"
+        value = "gpt-4.1-mini"
       }
       env {
         name  = "ANONYMIZER_DEPLOYMENT"
-        value = "gpt-4o-mini"
+        value = "gpt-4.1-mini"
       }
       env {
         name  = "VISION_DEPLOYMENT"
-        value = "gpt-4o-mini"
+        value = "gpt-4.1-mini"
       }
 
       liveness_probe {
@@ -1167,7 +1161,7 @@ resource "azurerm_container_app" "worker" {
       # Secondary models (explicitly defined)
       env {
         name  = "CHAT_DEPLOYMENT"
-        value = "gpt-5.2-chat"
+        value = "gpt-5.1"
       }
       env {
         name  = "EMBEDDING_DEPLOYMENT"
@@ -1175,15 +1169,15 @@ resource "azurerm_container_app" "worker" {
       }
       env {
         name  = "PHI_FALLBACK_DEPLOYMENT"
-        value = "gpt-4o-mini"
+        value = "gpt-4.1-mini"
       }
       env {
         name  = "ANONYMIZER_DEPLOYMENT"
-        value = "gpt-4o-mini"
+        value = "gpt-4.1-mini"
       }
       env {
         name  = "VISION_DEPLOYMENT"
-        value = "gpt-4o-mini"
+        value = "gpt-4.1-mini"
       }
     }
 

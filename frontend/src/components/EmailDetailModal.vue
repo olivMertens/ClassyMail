@@ -429,7 +429,7 @@ const durationTooltip = (email) => {
   if (st.ocr_detail?.fallback_provider) reasons.push(t('dashboard.time.reason_ocr_fallback', { provider: st.ocr_detail.fallback_provider }))
   if (st.ocr_detail?.mistral_skip_reason === 'circuit_breaker_open') reasons.push(t('dashboard.time.reason_circuit_breaker'))
   if (st.ocr_detail?.mistral_error_type) reasons.push(t('dashboard.time.reason_mistral_error', { error: st.ocr_detail.mistral_error_type }))
-  if (st.classify_detail?.fallback_used) reasons.push(t('dashboard.time.reason_llm_fallback', { model: st.classify_detail.model || 'gpt-4o-mini' }))
+  if (st.classify_detail?.fallback_used) reasons.push(t('dashboard.time.reason_llm_fallback', { model: st.classify_detail.model || 'gpt-4.1-mini' }))
   if (reasons.length) {
     lines.push('')
     lines.push(`⚠️ ${t('dashboard.time.slow_reasons')}:`)

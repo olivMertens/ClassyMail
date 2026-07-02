@@ -8,11 +8,11 @@ This repo uses a multi-step AI pipeline:
 
 1) **OCR**: Mistral Document AI → Markdown
 
-2) **Classification**: LLM (Phi-4 / GPT-4o-mini fallback) → strict JSON multi-intents
+2) **Classification**: LLM (Phi-4 / GPT-4.1-mini fallback) → strict JSON multi-intents
 
 3) **Vector Search**: Text Embedding for RAG (Chatbot)
 
-4) **Category Assessment**: GPT-5-nano (reasoning model) → AI-powered category quality analysis
+4) **Category Assessment**: GPT-4.1-nano → AI-powered category quality analysis
 
 
 
@@ -46,13 +46,13 @@ This repo uses a multi-step AI pipeline:
 
 |-------|----------------|---------|------------|----------|
 
-| **GPT-4o-mini** | `gpt-4o-mini` | Fallback classification (120K context) | 120,000 | ⚠️ For large emails |
+| **GPT-4.1-mini** | `gpt-4.1-mini` | Fallback classification, anonymization, vision (GA, retires 2027-10-14) | 1,000,000 | ⚠️ For large emails |
 
 | **text-embedding-3-small** | `text-embedding-3-small` | Vector embeddings for RAG chatbot | N/A (embeddings) | ⚠️ For chat feature |
 
-| **GPT-5.2-chat** or **GPT-5-mini** | `gpt-5.2-chat` or `gpt-5-mini` | Chatbot (RAG conversational AI) | 200,000 | ⚠️ For chat feature |
+| **GPT-5.1** | `gpt-5.1` | Chatbot reasoning model (RAG conversational AI; GA, retires 2027-05-15) | 200,000 | ⚠️ For chat feature |
 
-| **GPT-5-nano** | `gpt-5-nano` | Category assessment (reasoning model) | 200,000 | ⚠️ For category AI analysis |
+| **GPT-4.1-nano** | `gpt-4.1-nano` | Category assessment + agentic orchestration (GA, retires 2027-10-14) | 1,000,000 | ⚠️ For category AI analysis |
 
 
 
@@ -82,7 +82,7 @@ This repo uses a multi-step AI pipeline:
 
 - **Classification**: ~0.11 €/1M input tokens (Phi-4), ~0.43 €/1M output tokens
 
-- **Fallback**: ~0.15 €/1M input tokens (GPT-4o-mini), ~0.60 €/1M output tokens
+- **Fallback**: ~0.40 €/1M input tokens (GPT-4.1-mini), ~1.60 €/1M output tokens
 
 - **Embeddings**: ~0.02 €/1M tokens (text-embedding-3-small)
 
@@ -102,7 +102,7 @@ This repo uses a multi-step AI pipeline:
 
 
 
-### Standard Models (GPT-4o, GPT-4o-mini, GPT-4.1, Phi-4)
+### Standard Models (GPT-4.1, GPT-4.1-mini, GPT-4.1-nano, Phi-4)
 
 
 
@@ -112,7 +112,7 @@ This repo uses a multi-step AI pipeline:
 
 {
 
-  "model": "gpt-4o-mini",
+  "model": "gpt-4.1-mini",
 
   "messages": [...],
 
@@ -140,7 +140,7 @@ This repo uses a multi-step AI pipeline:
 
 {
 
-  "model": "gpt-5-nano",
+  "model": "gpt-5.1",
 
   "messages": [...],
 
@@ -312,7 +312,7 @@ The app includes a **fallback model** designed for:
 
 
 
-Recommended default fallback: **gpt-4o-mini** (configure as an Azure OpenAI deployment).
+Recommended default fallback: **gpt-4.1-mini** (configure as an Azure OpenAI deployment; GA, retires 2027-10-14).
 
 
 
@@ -330,7 +330,7 @@ Primary (fine-tunable):
 
 - `PHI_ENDPOINT`
 
-- `PHI_DEPLOYMENT` (supports `phi-4`, `gpt-4o`, `gpt-4.1-nano`)
+- `PHI_DEPLOYMENT` (supports `phi-4`, `gpt-4.1-nano`)
 
 
 
@@ -338,7 +338,7 @@ Fallback/Audit (high quality):
 
 - `PHI_FALLBACK_ENDPOINT` (defaults to `PHI_ENDPOINT`)
 
-- `PHI_FALLBACK_DEPLOYMENT` (recommended: `gpt-4o-mini` for fallback classification)
+- `PHI_FALLBACK_DEPLOYMENT` (recommended: `gpt-4.1-mini` for fallback classification)
 
 
 
@@ -346,7 +346,7 @@ Context sizing:
 
 - `PHI_PRIMARY_MAX_INPUT_TOKENS` (default: `8000` for Phi-4)
 
-- `PHI_FALLBACK_MAX_INPUT_TOKENS` (default: `120000` for gpt-4o-mini; set to `200000` when using gpt-5-mini)
+- `PHI_FALLBACK_MAX_INPUT_TOKENS` (default: `120000` for gpt-4.1-mini; set higher only after validating quota)
 
 - `PHI_RESERVED_OUTPUT_TOKENS` (default: `1000`)
 
@@ -368,7 +368,7 @@ The following models support fine-tuning for custom classification tasks:
 
 - ✅ **Phi-3** family (LoRA via Microsoft AI Foundry, all variants)
 
-- ✅ **gpt-4o-mini** (Azure OpenAI fine-tuning API, 128K context, cost-effective)
+- ✅ **gpt-4.1-mini** (Azure OpenAI fine-tuning API, 1M context, cost-effective)
 
 - ✅ **GPT-4.1 Nano** (Microsoft AI Foundry fine-tuning, 1M+ context, optimized throughput)
 
@@ -392,7 +392,7 @@ The following models support fine-tuning for custom classification tasks:
 
 3. Create fine-tuning job with LoRA adapters (Foundry UI or Azure OpenAI CLI/SDK)
 
-4. Deploy custom model (e.g., `phi-4-custom`, `gpt-4o-mini-custom`, `gpt-4_1-nano-custom`)
+4. Deploy custom model (e.g., `phi-4-custom`, `gpt-4.1-mini-custom`, `gpt-4_1-nano-custom`)
 
 5. Update `PHI_DEPLOYMENT` or `PHI_FALLBACK_DEPLOYMENT` to use the custom deployment
 
@@ -402,7 +402,7 @@ The following models support fine-tuning for custom classification tasks:
 
 - **Primary (Recommended)**: Fine-tune **Phi-4** with LoRA (fast iteration, lower cost, good results)
 
-- **Cost-Optimized Alternative**: Fine-tune **gpt-4o-mini** (training cost: $0.69/1M tokens, best supported)
+- **Cost-Optimized Alternative**: Fine-tune **gpt-4.1-mini** (training cost varies by region, cost-effective)
 
 - **Performance-Optimized**: Fine-tune **GPT-4.1 Nano** (training cost: $0.17/1M tokens, highest throughput)
 
@@ -416,7 +416,7 @@ The following models support fine-tuning for custom classification tasks:
 
 - Always test custom models with the fallback mechanism enabled
 
-- gpt-4o-mini has the most mature fine-tuning pipeline as of Feb 2026
+- gpt-4.1-mini is the recommended Azure OpenAI fallback/anonymizer model for this project
 
 
 
@@ -430,17 +430,17 @@ The following models support fine-tuning for custom classification tasks:
 
 
 
-## Future Models (Preview)
+## Current GPT Family Options
 
 
 
-The system is ready for next-gen models. You can configure `PHI_DEPLOYMENT` or `PHI_FALLBACK_DEPLOYMENT` env vars to point to these deployments if available in your region:
+The system is ready for current GPT deployments. You can configure `PHI_DEPLOYMENT`, `PHI_FALLBACK_DEPLOYMENT`, or agentic settings to point to these deployments if available in your region:
 
 
 
-- **GPT-4.1** (`gpt-4.1-preview`): High intelligence, fast reasoning.
+- **GPT-4.1** (`gpt-4.1`): Agentic tier3 and red-team model (GA, retires 2027-10-14).
 
-- **GPT-5** (`gpt-5-preview`): Theoretical placeholder for next-gen reasoning capabilities.
+- **GPT-5.1** (`gpt-5.1`): RAG chat reasoning model (GA, retires 2027-05-15; use `CHAT_API_VERSION=preview`).
 
 
 

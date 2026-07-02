@@ -32,11 +32,11 @@ AI_API_KEY = os.getenv("AZURE_AI_KEY")
 
 # Fallback model (for long contexts / safety net).
 PHI_FALLBACK_ENDPOINT = os.getenv("PHI_FALLBACK_ENDPOINT") or PHI_ENDPOINT
-PHI_FALLBACK_DEPLOYMENT = os.getenv("PHI_FALLBACK_DEPLOYMENT", "gpt-4o-mini")
+PHI_FALLBACK_DEPLOYMENT = os.getenv("PHI_FALLBACK_DEPLOYMENT", "gpt-4.1-mini")
 
 # Anonymization model (used to create fine-tuning datasets without PII).
 ANONYMIZER_ENDPOINT = os.getenv("ANONYMIZER_ENDPOINT") or PHI_ENDPOINT
-ANONYMIZER_DEPLOYMENT = os.getenv("ANONYMIZER_DEPLOYMENT", "gpt-4o-mini")
+ANONYMIZER_DEPLOYMENT = os.getenv("ANONYMIZER_DEPLOYMENT", "gpt-4.1-mini")
 ANONYMIZER_API_VERSION = os.getenv("ANONYMIZER_API_VERSION", AI_API_VERSION)
 ANONYMIZER_PROMPT_VERSION = os.getenv("ANONYMIZER_PROMPT_VERSION", "v1")
 ANONYMIZER_MAX_TOKENS = int(os.getenv("ANONYMIZER_MAX_TOKENS", "6000"))
@@ -73,12 +73,12 @@ CONTENT_UNDERSTANDING_KEY = os.getenv("CONTENT_UNDERSTANDING_KEY")  # Optional k
 
 # Vision model for image description (parallel flow with OCR)
 VISION_ENDPOINT = os.getenv("VISION_ENDPOINT") or PHI_ENDPOINT
-VISION_DEPLOYMENT = os.getenv("VISION_DEPLOYMENT", "gpt-4o-mini")
+VISION_DEPLOYMENT = os.getenv("VISION_DEPLOYMENT", "gpt-4.1-mini")
 VISION_API_VERSION = os.getenv("VISION_API_VERSION", AI_API_VERSION)
 
 # Chatbot model
 CHAT_ENDPOINT = os.getenv("CHAT_ENDPOINT") or PHI_ENDPOINT
-CHAT_DEPLOYMENT = os.getenv("CHAT_DEPLOYMENT", "gpt-5.2-chat")
+CHAT_DEPLOYMENT = os.getenv("CHAT_DEPLOYMENT", "gpt-5.1")
 # The chat agent uses agent_framework's OpenAIChatClient against the Azure
 # OpenAI v1 surface ({endpoint}/openai/v1/), which only accepts the literal
 # api-version "preview" (dated preview versions return 400 "API version not

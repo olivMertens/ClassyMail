@@ -57,7 +57,7 @@ DEFAULT_SETTINGS = {
         "extract_last_conversation": True,
         "detect_pii": True,  # Enable PII detection by default (name, email, phone, address extraction)
         "pii_detection_method": "llm",  # llm | azure_language | both
-        "pii_llm_model": "auto",  # auto (reuse ai_model) | gpt-4o-mini | gpt-5-nano | ...
+        "pii_llm_model": "auto",  # auto (reuse ai_model) | gpt-4.1-mini | gpt-5-nano | ...
     },
     "csv_export": {
         "unclassified_label": "unclassified",  # Label shown in CSV when no category matches

@@ -14,10 +14,10 @@ Terraform and deployment documentation lives in [docs/INFRASTRUCTURE.md](../docs
 **Mandatory AI Model Deployments for POC:**
 1. `mistral-document-ai-2512` - OCR + Vision extraction
 2. `Phi-4` - Primary classification (8K context)
-3. `gpt-4o-mini` - Fallback classification (120K context)
+3. `gpt-4.1-mini` - Fallback classification, anonymization, and vision
 4. `text-embedding-3-small` - Vector embeddings for RAG chatbot
-5. `gpt-5.2-chat` or `gpt-5-mini` - Chatbot (recommended)
-6. `gpt-5-nano` - Category assessment AI (recommended)
+5. `gpt-5.1` - Chatbot reasoning model (recommended)
+6. `gpt-4.1-nano` - Category assessment AI (recommended)
 
 See [docs/INFRASTRUCTURE.md#required-ai-model-deployments](../docs/INFRASTRUCTURE.md#required-ai-model-deployments) for deployment instructions.
 
