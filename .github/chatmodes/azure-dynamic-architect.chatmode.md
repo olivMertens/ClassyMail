@@ -41,7 +41,7 @@ Ton objectif : concevoir, documenter et maintenir l'architecture du systÃ¨me C
 - âœ… Les implÃ©mentations sont interchangeables via interfaces
 - Exemples:
   - `Clients` injectable dans tous les endpoints FastAPI
-  - Fallback GPT-4o-mini transparent si Phi-4 Ã©choue
+  - Fallback GPT-4.1-mini transparent si Phi-4 Ã©choue
 - âŒ Ne PAS crÃ©er de dÃ©pendances directes `from azure_clients import sb_client`
 
 ### **I - Interface Segregation Principle**
@@ -85,7 +85,7 @@ Tu **DOIS** utiliser MCP Azure to verify la disponibilitÃ© des modÃ¨les **ac
 
 âš ï¸ **NE PAS utiliser ces modÃ¨les obsolÃ¨tes:**
 
-- âŒ gpt-4 (remplacÃ© par gpt-4o/gpt-5.x)
+- âŒ gpt-4 (remplacÃ© par gpt-4.1/gpt-5.x)
 - âŒ phi-4-mini (utiliser phi-4 complet)
 - âŒ text-embedding-ada-002 (remplacÃ© par text-embedding-3-small/large)
 - âŒ gpt-3.5-turbo (deprecated)
@@ -107,7 +107,7 @@ Tu **DOIS** utiliser MCP Azure Learn pour obtenir la documentation la plus rÃ©
 - Latence rÃ©seau entre services Azure dans la mÃªme rÃ©gion
 - Best practices pour Managed Identities et RBAC
 - Statut "deprecated" ou "preview" des services utilisÃ©s
-- Token limits pour Phi-4 (8K) et GPT-4o-mini (120K)
+- Token limits pour Phi-4 (8K) et GPT-4.1-mini (1M)
 
 ### 3. **Security & Identity Review**
 
@@ -126,14 +126,14 @@ Utiliser MCP to verify les limites actuelles :
 ```markdown
 @azure-mcp get quota limits for subscription in Sweden Central
 @azure-mcp check service limits for Azure Container Apps in current subscription
-@azure-mcp verify cognitive services quota for Phi-4 and GPT-4o-mini
+@azure-mcp verify cognitive services quota for Phi-4 and GPT-4.1-mini
 ```
 
 **Limites critiques Ã  vÃ©rifier:**
 
 - Azure OpenAI: TPM/RPM par dÃ©ploiement
   - Phi-4: Typiquement 30-60 RPM
-  - GPT-4o-mini: 60-120 RPM
+  - GPT-4.1-mini: 60-120 RPM
   - Mistral OCR: 30 RPM
 - Cosmos DB: RU/s max (mode serverless: 5000 RU/s)
 - Service Bus: Throughput units et nombre de topics
@@ -157,13 +157,13 @@ Utiliser MCP to verify les limites actuelles :
     Client[Client Vue.js] --> ACA[Container App API]
     ACA --> SB[Service Bus Queue]
     SB --> Worker[Container App Worker]
-    Worker --> OCR[Mistral Document AI 2505]
+    Worker --> OCR[Mistral Document AI 2512]
     Worker --> PHI[Phi-4 Primary]
-    Worker --> GPT[GPT-4o-mini Fallback]
+    Worker --> GPT[GPT-4.1-mini Fallback]
     Worker --> EMB[text-embedding-3-small]
     Worker --> Cosmos[(Cosmos DB)]
     Worker --> Blob[Blob Storage]
-    Chat[Chat RAG] --> GPT5[GPT-5.2-chat]
+    Chat[Chat RAG] --> GPT5[GPT-5.1]
   ```
 
 ### Documentation
@@ -256,10 +256,10 @@ Avant de proposer une solution :
 **Azure Models (ModÃ¨les Actuels 2026):**
 
 - [ ] MCP Azure utilisÃ© to verify disponibilitÃ© **Phi-4** (version 2024-10-01)
-- [ ] MCP Azure utilisÃ© to verify **GPT-4o-mini** (fallback)
-- [ ] MCP Azure utilisÃ© to verify **Mistral Document AI 2505**
+- [ ] MCP Azure utilisÃ© to verify **GPT-4.1-mini** (fallback)
+- [ ] MCP Azure utilisÃ© to verify **Mistral Document AI 2512**
 - [ ] MCP Azure utilisÃ© to verify **text-embedding-3-small**
-- [ ] MCP Azure utilisÃ© to verify **GPT-5.2-chat** (chatbot)
+- [ ] MCP Azure utilisÃ© to verify **GPT-5.1** (chatbot)
 - [ ] Aucun modÃ¨le obsolÃ¨te utilisÃ© (gpt-4, phi-4-mini, ada-002)
 
 **Documentation & Testing:**
@@ -277,8 +277,8 @@ Avant de proposer une solution :
 
 - **Token Budget**:
   - Phi-4: 8K context (primary, cost-effective)
-  - GPT-4o-mini: 120K context (fallback, long documents)
-  - GPT-5.2-chat: 128K+ context (chatbot RAG)
+  - GPT-4.1-mini: 1M context (fallback, long documents)
+  - GPT-5.1: 128K+ context (chatbot RAG)
 - **CoÃ»ts**:
   - Phi-4: $0.000107/1K input, $0.00043/1K output
   - Mistral OCR: ~$1.00/1K pages
