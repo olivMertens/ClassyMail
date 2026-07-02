@@ -146,7 +146,7 @@ def _aoai_enhance_body(body: str, category: str) -> Optional[str]:
     Returns enhanced body, or None if AOAI unavailable.
     """
     endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-    deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini")
+    deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1-mini")
 
     if not endpoint:
         return None
@@ -213,10 +213,10 @@ async def generate_synthetic_from_seeds(seed_examples: list[dict], count: int = 
         return []
 
     endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-    deployment = os.getenv("CHAT_DEPLOYMENT", "gpt-5.2-chat") # User requested gpt5-2 chat specifically
-    # Fallback if CHAT_DEPLOYMENT not set or incorrect, try GPT_DEPLOYMENT or just hardcode what we saw in context
+    deployment = os.getenv("CHAT_DEPLOYMENT", "gpt-5.1")
+    # Fallback if CHAT_DEPLOYMENT not set or incorrect, try GPT_DEPLOYMENT.
     if not deployment:
-         deployment = os.getenv("GPT_DEPLOYMENT", "gpt-4o")
+         deployment = os.getenv("GPT_DEPLOYMENT", "gpt-4.1")
 
     if not endpoint:
         logger.error("Cannot generate synthetic data: AZURE_OPENAI_ENDPOINT not set.")

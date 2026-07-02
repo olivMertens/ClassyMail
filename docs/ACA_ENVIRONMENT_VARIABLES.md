@@ -126,17 +126,17 @@ These variables **must** be configured for the application to function correctly
 
 - **`PHI_DEPLOYMENT`** - The deployment name for Phi-4 model
 
-  - Example: `phi-4-document-classification`
+  - Example: `phi-4`
 
   - Used for: Primary classification model
 
 
 
-- **`PHI_FALLBACK_DEPLOYMENT`** - The deployment name for fallback Phi-4 model
+- **`PHI_FALLBACK_DEPLOYMENT`** - The deployment name for fallback/anonymizer/vision model
 
-  - Example: `phi-4-generic`
+  - Example: `gpt-4.1-mini`
 
-  - Used for: Fallback when primary deployment is unavailable
+  - Used for: Fallback classification, anonymization, and vision requests
 
 
 
@@ -260,9 +260,9 @@ These variables provide additional functionality but are not required for core o
 
 - **`CHAT_DEPLOYMENT`** - The deployment name for the chat model
 
-  - Example: `gpt-5.2-chat`
+  - Example: `gpt-5.1`
 
-  - Used for: RAG-based chat interface
+  - Used for: RAG-based chat interface with the GPT-5.1 reasoning model (GA, retires 2027-05-15)
 
   - Fallback: Uses `PHI_FALLBACK_DEPLOYMENT` if not configured
 
@@ -324,7 +324,7 @@ These variables provide additional functionality but are not required for core o
 
 - **`GPT_DEPLOYMENT`** - The deployment name for GPT models
 
-  - Example: `gpt-5.2`
+  - Example: `gpt-4.1`
 
   - Used for: Advanced GPT-based classification
 

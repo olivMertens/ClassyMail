@@ -185,7 +185,7 @@ workflow = (
 |---|---|---|
 | `gpt-4.1-nano` | Default — fast, cheap, good for clear routing | Lowest |
 | `gpt-4.1-mini` | Better for ambiguous emails with subtle signals | Medium |
-| `gpt-4o-mini` | Legacy — good quality/cost balance | Medium |
+| `gpt-4.1` | Highest quality for tier3/red-team review | High |
 | `gpt-5-nano` | Reasoning-capable routing (complex multi-intent) | Low-Medium |
 | **`model-router`** | Azure AI Model Router — auto-selects optimal LLM per prompt | Variable (FinOps-optimized) |
 
@@ -218,7 +218,7 @@ Restrict the router to a subset of underlying models. Example for ClassyMail orc
 This prevents routing to expensive models (gpt-5, claude-opus) for simple routing tasks.
 
 **Supported underlying models** (v2025-11-18):
-`gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, `o4-mini`, `gpt-5-nano`, `gpt-5-mini`, `gpt-5`, `gpt-5-chat`, `gpt-5.2`, `gpt-5.2-chat`, `DeepSeek-V3.1`, `DeepSeek-V3.2`, `gpt-oss-120b`, `llama4-maverick`, `grok-4`, `grok-4-fast`, `claude-haiku-4-5`, `claude-sonnet-4-5`, `claude-opus-4-1`, `claude-opus-4-6`
+`gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, `o4-mini`, `gpt-5-nano`, `gpt-5-mini`, `gpt-5`, `gpt-5-chat`, `gpt-5.1`, `DeepSeek-V3.1`, `DeepSeek-V3.2`, `gpt-oss-120b`, `llama4-maverick`, `grok-4`, `grok-4-fast`, `claude-haiku-4-5`, `claude-sonnet-4-5`, `claude-opus-4-1`, `claude-opus-4-6`
 
 **Region requirement**: East US 2 or Sweden Central (Global Standard or Data Zone Standard).
 
@@ -524,11 +524,11 @@ pipeline.classification
 
 | Role | Default Model | Alternatives (UI dropdown) | Objective |
 |---|---|---|---|
-| Orchestrator | `gpt-4.1-nano` | `gpt-4.1-mini`, `gpt-4o-mini`, `gpt-5-nano`, **`model-router`** (Balanced/Cost/Quality) | Fast routing, minimal cost |
-| Agent Tier 1 (simple) | `gpt-4.1-nano` | `gpt-4o-mini`, `phi-4` | Clear cases, high volume |
-| Agent Tier 2 (ambiguous) | `gpt-4.1-mini` | `gpt-4o-mini`, `gpt-4.1` | Ambiguities |
-| Agent Tier 3 (critical) | `gpt-4.1` | `gpt-5-mini`, `gpt-5.2-chat` | Business sensitivity |
-| Red Team | `gpt-4.1` | `gpt-5-mini`, `gpt-5.2-chat`, `kimi-k2.5` | Blind spot detection |
+| Orchestrator | `gpt-4.1-nano` | `gpt-4.1-mini`, `gpt-5-nano`, **`model-router`** (Balanced/Cost/Quality) | Fast routing, minimal cost |
+| Agent Tier 1 (simple) | `gpt-4.1-nano` | `gpt-4.1-mini`, `phi-4` | Clear cases, high volume |
+| Agent Tier 2 (ambiguous) | `gpt-4.1-mini` | `gpt-4.1-nano`, `gpt-4.1` | Ambiguities |
+| Agent Tier 3 (critical) | `gpt-4.1` | `gpt-5-mini`, `gpt-5.1` | Business sensitivity |
+| Red Team | `gpt-4.1` | `gpt-5-mini`, `gpt-5.1`, `kimi-k2.5` | Blind spot detection |
 
 ### Settings Integration
 
@@ -564,7 +564,7 @@ New value: **`agentic`** — activates the multi-agent workflow.
 
 | Strategy | Pipeline |
 |---|---|
-| `standard` | Existing `classify_with_phi4()` — single LLM call (Phi-4 primary, gpt-4o-mini fallback) |
+| `standard` | Existing `classify_with_phi4()` — single LLM call (Phi-4 primary, gpt-4.1-mini fallback) |
 | `reasoning` | Existing — step-by-step prompt variant |
 | `vision` | Existing — includes image descriptions |
 | **`agentic`** | **New** — orchestrator → parallel agents → optional red team |

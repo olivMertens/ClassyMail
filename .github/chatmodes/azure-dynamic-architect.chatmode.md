@@ -67,16 +67,18 @@ Tu **DOIS** utiliser MCP Azure to verify la disponibilitÃ© des modÃ¨les **ac
 
 ```markdown
 @azure-mcp list models in azure openai service for Sweden Central region
-@azure-mcp verify deployment availability for phi-4, gpt-4o-mini, gpt-5.2-chat, text-embedding-3-small
+@azure-mcp verify deployment availability for phi-4, gpt-4.1-mini, gpt-4.1, gpt-4.1-nano, gpt-5.1, text-embedding-3-small
 @azure-mcp check mistral-document-ai-2512 availability in AI Foundry
 ````
 
 **Checklist Models (Configuration Actuelle - FÃ©vrier 2026):**
 
 - [ ] **Phi-4** (version 2024-10-01) - Primary SLM (8K context)
-- [ ] **GPT-4o-mini** (Fallback, 120K context)
-- [ ] **GPT-5.2-chat** (Chatbot RAG, avancÃ©)
-- [ ] **Mistral Document AI 2505** (OCR spÃ©cialisÃ©)
+- [ ] **GPT-4.1-mini** (Fallback / anonymizer / vision, GA - retires 2027-10-14)
+- [ ] **GPT-4.1** (Agentic tier3 / red-team, GA - retires 2027-10-14)
+- [ ] **GPT-4.1-nano** (Category assessment + agentic orchestrator / tier1, GA - retires 2027-10-14)
+- [ ] **GPT-5.1** (Chatbot RAG, reasoning; GA - retires 2027-05-15)
+- [ ] **Mistral Document AI 2512** (OCR spÃ©cialisÃ©)
 - [ ] **text-embedding-3-small** (Vector search)
 - [ ] Confirmer les quotas TPM (Tokens Per Minute) et RPM (Requests Per Minute)
 - [ ] VÃ©rifier coÃ»ts par 1K tokens (Phi-4: $0.000107 input, $0.00043 output)

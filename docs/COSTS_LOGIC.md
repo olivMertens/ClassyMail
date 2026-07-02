@@ -46,7 +46,7 @@ projected_ai_usd = avg_ai_usd_per_email * emails_per_month
 ##### AI Cost Breakdown by Component
 
 **LLM-based PII Detection** (optional):
-- Model: GPT-4o-mini JSON mode
+- Model: GPT-4.1-mini JSON mode
 - Average cost: ~€0.002/email (~0.500 tokens input + 100 tokens output)
 - Included in `avg_ai_usd_per_email` when enabled
 
@@ -207,8 +207,11 @@ The current logic is **correct and relevant** for an MVP:
 |--------|-----------|-----------|------------------|
 | **Phi-4** | $2-5 | 0.82 | MVP, predictable costs |
 | **gpt-4o-mini** | $2-4 | 0.84 | Cost-conscious production |
+| **gpt-4.1-nano** | ~$1 | 0.72 | Extreme budget / agent tier1 |
+| **gpt-4.1-mini** | ~$4-8 | 0.86 | Current fallback/anonymizer/vision default |
+| **gpt-4.1** | ~$20-40 | 0.92 | Agentic tier3 + red-team |
+| **gpt-5.1** | ~$25-50 | 0.91 | RAG chat reasoning |
 | **gpt-5-nano** | $1-2 | 0.79 | Ultra low-cost |
-| **gpt-4.1-nano** | $1-2 | 0.72 | Extreme budget |
 | **gpt-5-mini** | $8-12 | 0.89 | Complex categories |
 | **gpt-4o** | $30-60 | 0.92 | Critical accuracy |
 
@@ -216,8 +219,8 @@ The current logic is **correct and relevant** for an MVP:
 ```bash
 PHI4_COST_PER_1K_INPUT=0.0004  # Example for gpt-5-mini
 PHI4_COST_PER_1K_OUTPUT=0.0016
-FALLBACK_COST_PER_1K_INPUT=0.00015  # gpt-4o-mini
-FALLBACK_COST_PER_1K_OUTPUT=0.0006
+FALLBACK_COST_PER_1K_INPUT=0.0004  # gpt-4.1-mini
+FALLBACK_COST_PER_1K_OUTPUT=0.0016
 ```
 
 #### Reasoning Mode (Chain-of-Thought)

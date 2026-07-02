@@ -143,7 +143,7 @@ Navigate to **Settings → Classification Tab**:
 
 ### Overview
 
-Email preprocessing uses **GPT-4o-mini** to intelligently extract relevant content before classification:
+Email preprocessing uses **GPT-4.1-mini** to intelligently extract relevant content before classification:
 
 1. **Subject Extraction**: Identifies email subject from markdown
 2. **Conversation Extraction**: Removes history, signatures, boilerplate
@@ -235,7 +235,7 @@ Extract Personal Identifiable Information for GDPR compliance audits.
 
 ### LLM Integration
 
-**Model:** GPT-4o-mini (JSON mode)
+**Model:** GPT-4.1-mini (JSON mode)
 **Cost:** ~€0.002 per email
 **Latency:** +200-500ms
 
@@ -468,7 +468,7 @@ The system maintains backward compatibility through:
 **Check:**
 1. Settings → Processing → Email Preprocessing enabled
 2. Check logs for LLM preprocessing errors
-3. Verify GPT-4o-mini deployment exists
+3. Verify GPT-4.1-mini deployment exists
 
 ### Issue: PII detection returning empty results
 

@@ -626,7 +626,7 @@ async def reclassify_email(
 
     Payload:
     {
-        "model": "phi-4" | "gpt-4o-mini",  # Optional: specific model override
+        "model": "phi-4" | "gpt-4.1-mini",  # Optional: specific model override
         "locale": "en"  # Optional: output language
     }
 

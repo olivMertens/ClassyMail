@@ -650,7 +650,7 @@ Deploy them as **Global Standard** (Azure OpenAI) or **Serverless API** (partner
 
 |-------|----------------|------|:---------:|----------------------|---------|
 
-| GPT-4o-mini | `gpt-4o-mini` | Global Standard | ✅ | 20+ regions (all major) ¹ | Fallback classifier, vision, anonymization |
+| GPT-4.1-mini | `gpt-4.1-mini` | Global Standard | ✅ | 20+ regions (all major) ¹ | Fallback classifier, vision, anonymization (GA, retires 2027-10-14) |
 
 | GPT-4.1-nano | `gpt-4.1-nano` | Global Standard | ✅ | 20+ regions (all major) ¹ | Category assessment (fast, default) |
 
@@ -658,11 +658,11 @@ Deploy them as **Global Standard** (Azure OpenAI) or **Serverless API** (partner
 
 | GPT-5-mini | `gpt-5-mini` | Global Standard | ✅ | 20+ regions (all major) ¹ | Higher-quality classification |
 
-| GPT-5.2-chat | `gpt-5.2-chat` | Global Standard | ✅ | eastus2, swedencentral + more ¹ | RAG chat model (preview) |
+| GPT-5.1 | `gpt-5.1` | Global Standard | ✅ | eastus2, swedencentral + more ¹ | RAG chat reasoning model (GA, retires 2027-05-15; use `CHAT_API_VERSION=preview`) |
 
 | Kimi-K2.5 | `Kimi-K2.5` | Serverless (Moonshot AI) | ❌ | See Foundry model catalog ² | Multilingual classification |
 
-| GPT-4o | `gpt-4o` | Global Standard | ✅ | 20+ regions (all major) ¹ | Premium classification (high cost) |
+| GPT-4.1 | `gpt-4.1` | Global Standard | ✅ | 20+ regions (all major) ¹ | Agentic tier3 + red-team (GA, retires 2027-10-14) |
 
 
 
@@ -676,7 +676,7 @@ Deploy them as **Global Standard** (Azure OpenAI) or **Serverless API** (partner
 
 > Models not deployed will still appear as selectable options (from a hardcoded fallback list)
 
-> but will fail at inference time. Deploy at minimum **GPT-4o-mini** and **GPT-4.1-nano**.
+> but will fail at inference time. Deploy at minimum **GPT-4.1-mini** and **GPT-4.1-nano**.
 
 
 

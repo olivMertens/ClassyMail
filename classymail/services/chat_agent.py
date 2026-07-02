@@ -215,7 +215,7 @@ async def _do_review(email_id: str, clients: Clients | None) -> dict:
         return {"error": f"Email {email_id} has no markdown content"}
     if not intents:
         return {"error": f"Email {email_id} has no classification to review"}
-    endpoint, deployment, api_ver = resolve_model_config("gpt-4o-mini")
+    endpoint, deployment, api_ver = resolve_model_config("gpt-4.1-mini")
     review_result = await _classify_with_single_model(
         markdown[:6000], endpoint=endpoint, deployment=deployment,
         strategy="standard", api_version=api_ver, clients=clients, locale="en",
@@ -571,7 +571,7 @@ class ClassyMailChatAgent:
             return self._client
 
         endpoint = (config.CHAT_ENDPOINT or "").rstrip("/")
-        deployment = config.CHAT_DEPLOYMENT or "gpt-4o"
+        deployment = config.CHAT_DEPLOYMENT or "gpt-5.1"
 
         if not endpoint:
             self._client_init_failed = True
