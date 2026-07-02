@@ -390,7 +390,7 @@ phi-4                          Phi-4              2024-10-01
 
 gpt-4.1-mini                   gpt-4.1-mini       2025-04-14
 
-mistral-document-ai-2512       Mistral-Large      2505
+mistral-document-ai-2512       mistral-document-ai   2512
 
 gpt-5.1                        gpt-5.1            2025-11-13
 

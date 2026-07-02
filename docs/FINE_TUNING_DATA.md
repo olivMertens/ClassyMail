@@ -9,8 +9,9 @@ ClassyMail supports exporting classification data in JSONL format for fine-tunin
 | Model | Fine-Tuning Support | Notes |
 |-------|-------------------|-------|
 | Phi-4 | Yes | Primary target for domain-specific tuning |
-| GPT-4o-mini | Yes | Higher quality baseline |
-| GPT-4.1-nano | Yes | Cost-effective option |
+| GPT-4.1-mini | Yes | Higher quality baseline (GA, cost-effective) |
+| GPT-4.1-nano | Yes | Lowest-cost option |
+| GPT-4.1 | Yes | Highest-quality tuning target |
 
 ## Export Format
 

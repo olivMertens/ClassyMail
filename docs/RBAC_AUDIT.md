@@ -514,7 +514,7 @@ az storage account show \
 
 | gpt-4.1-mini | ? | ? | ? |
 
-| Mistral OCR (2505) | ? | ? | ? |
+| Mistral OCR (2512) | ? | ? | ? |
 
 
 
