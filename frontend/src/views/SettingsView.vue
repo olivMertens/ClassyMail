@@ -61,7 +61,7 @@ const settings = ref({
     show_ocr_provider: true
   },
   ai_assessment_model: 'gpt-4.1-nano',
-  data_generation_model: 'gpt-5.2-chat',
+  data_generation_model: 'gpt-5.1',
   generation_reasoning_effort: 'none',
   agentic: {
     enabled: false,
@@ -101,7 +101,6 @@ const MODEL_PRICING = {
   'gpt-5-nano': { label: 'GPT-5 Nano', input: 0.00005, output: 0.0004, quality: 0.79 },
   'gpt-5-mini': { label: 'GPT-5 Mini', input: 0.0004, output: 0.0016, quality: 0.89 },
   'gpt-5.1': { label: 'GPT-5.1', input: 0.002, output: 0.008, quality: 0.94 },
-  'gpt-5.2-chat': { label: 'GPT-5.2 Chat', input: 0.002, output: 0.008, quality: 0.94 },
   'kimi-k2.5': { label: 'Kimi-K2.5', input: 0.0006, output: 0.003, quality: 0.88 },
 }
 
