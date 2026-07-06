@@ -1327,7 +1327,7 @@ watch(() => email.value, (val) => {
           <label v-for="s in ['standard', 'reasoning', 'vision', 'agentic']" :key="s"
             class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all"
             :class="reprocessStrategy === s
-              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-400'
+              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900 dark:border-primary-400'
               : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600'">
             <input v-model="reprocessStrategy" type="radio" :value="s" class="mt-0.5 accent-primary-600">
             <div class="flex-1 min-w-0">

@@ -1359,7 +1359,7 @@ const emit = defineEmits(['open-email'])
       <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
         <tr v-for="email in emails" :key="email.id" :class="[
           'hover:bg-gray-50 dark:hover:bg-gray-700',
-          selectedIds.has(email.id) ? 'bg-primary-50/50 dark:bg-primary-900/20' : '',
+          selectedIds.has(email.id) ? 'bg-primary-50 dark:bg-primary-900' : '',
           email.test_mode ? 'bg-amber-50 dark:bg-amber-950/20' : '',
           !selectedIds.has(email.id) && !email.test_mode && strategyBadge(email.processing_strategy)?.key === 'vision_short' ? 'bg-teal-50/30 dark:bg-teal-900/10' : '',
           !selectedIds.has(email.id) && !email.test_mode && strategyBadge(email.processing_strategy)?.key === 'reasoning_short' ? 'bg-purple-50/30 dark:bg-purple-900/10' : ''
@@ -1676,7 +1676,7 @@ const emit = defineEmits(['open-email'])
           <label v-for="s in ['standard', 'reasoning', 'vision']" :key="s"
             class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all"
             :class="reprocessStrategy === s
-              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/40 dark:border-primary-400'
+              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900 dark:border-primary-400'
               : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600'">
             <input v-model="reprocessStrategy" type="radio" :value="s" class="mt-0.5 accent-primary-600">
             <div class="flex-1 min-w-0">
