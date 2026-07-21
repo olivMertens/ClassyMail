@@ -274,7 +274,7 @@ packaging==26.0
     #   opentelemetry-instrumentation-flask
 pdf2image==1.17.0
     # via classymail
-pillow==12.2.0
+pillow==12.3.0
     # via
     #   classymail
     #   fpdf2
