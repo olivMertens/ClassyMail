@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 
 from opentelemetry import trace
@@ -18,6 +19,7 @@ from classymail.agents.models import (
     AgentTrace,
     AgenticClassificationResult,
     CandidateIntent,
+    RedTeamVerdict,
     SpecializedAgentResult,
 )
 from classymail.agents.orchestrator import run_orchestrator
@@ -37,6 +39,64 @@ def _sum_tokens(usage: dict | None) -> int:
     if not usage:
         return 0
     return int(usage.get("total_tokens", 0))
+
+
+MATCH_CONFIDENCE_FLOOR = 0.3
+
+
+def _coerce_confidence(value: object) -> float | None:
+    """Return a finite confidence in [0, 1], or None when the value is unusable."""
+    if isinstance(value, bool):
+        return None
+    try:
+        conf = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(conf) or conf < 0.0 or conf > 1.0:
+        return None
+    return conf
+
+
+def _apply_refinements(agent_results: list[SpecializedAgentResult], refined: object) -> int:
+    """Apply Red Team confidence refinements to known slugs only; return the number applied."""
+    if not isinstance(refined, dict):
+        return 0
+    by_norm = {str(k).replace("_", "-"): v for k, v in refined.items()}
+    applied = 0
+    for ar in agent_results:
+        if ar.error:
+            continue
+        raw = by_norm.get(ar.slug.replace("_", "-"))
+        if raw is None:
+            continue
+        conf = _coerce_confidence(raw)
+        if conf is None:
+            logger.warning("[agentic] Ignoring invalid Red Team refinement slug=%s value=%r", ar.slug, raw)
+            continue
+        ar.confidence = conf
+        applied += 1
+    return applied
+
+
+def _review_reasons(
+    agent_results: list[SpecializedAgentResult],
+    matched: list[SpecializedAgentResult],
+    review_threshold: float,
+    red_team_verdict,
+) -> list[str]:
+    """Per-label review decision: one strong label must not hide weak labels, failures or a rejection."""
+    reasons: list[str] = []
+    if not matched:
+        reasons.append("no_match")
+    weak = [ar.slug for ar in matched if ar.confidence < review_threshold]
+    if weak:
+        reasons.append("low_confidence:" + ",".join(weak))
+    failed = [ar.slug for ar in agent_results if ar.error]
+    if failed:
+        reasons.append("agent_failed:" + ",".join(failed))
+    if red_team_verdict is not None and not red_team_verdict.validated:
+        reasons.append("red_team_not_validated")
+    return reasons
 
 
 def _failure_placeholder(candidate: CandidateIntent, exc: BaseException) -> SpecializedAgentResult:
@@ -182,13 +242,20 @@ async def classify_agentic(
         red_team_verdict = None
         trigger_red_team = needs_red_team(agent_results, agentic) or not candidates
         if trigger_red_team:
-            red_team_verdict = await run_red_team(
-                text_markdown,
-                agent_results,
-                settings=settings,
-                clients=clients,
-                locale=locale,
-            )
+            try:
+                red_team_verdict = await run_red_team(
+                    text_markdown,
+                    agent_results,
+                    settings=settings,
+                    clients=clients,
+                    locale=locale,
+                )
+            except Exception as exc:  # keep partial results; force human review instead
+                logger.exception("[agentic] Red Team failed: %s", exc)
+                red_team_verdict = RedTeamVerdict(
+                    validated=False,
+                    justification=f"Red Team unavailable ({type(exc).__name__})",
+                )
             traces.append(AgentTrace(
                 agent_type="red_team",
                 model=red_team_verdict.model or "unknown",
@@ -200,80 +267,88 @@ async def classify_agentic(
             root_span.set_attribute("agentic.red_team.triggered", True)
             root_span.set_attribute("agentic.red_team.validated", red_team_verdict.validated)
 
-            # Apply confidence refinements from Red Team
-            if red_team_verdict.refined_confidences:
-                for ar in agent_results:
-                    if ar.slug in red_team_verdict.refined_confidences:
-                        ar.confidence = float(red_team_verdict.refined_confidences[ar.slug])
+            refined_count = _apply_refinements(agent_results, red_team_verdict.refined_confidences)
+            root_span.set_attribute("agentic.red_team.refinements_applied", refined_count)
 
             # ── Step 3b: Launch agents for Red Team missed intents ────
-            missed_slugs = set(red_team_verdict.missed_intents or [])
-            requested_slugs = set(red_team_verdict.additional_agents_requested or [])
-            # Normalise to hyphens for dedup against already-run agents
-            already_run = {ar.slug.replace("_", "-") for ar in agent_results}
-            all_extra_slugs = {
-                s for s in (missed_slugs | requested_slugs)
-                if s.replace("_", "-") not in already_run
+            requested = [
+                s for s in [*(red_team_verdict.missed_intents or []),
+                            *(red_team_verdict.additional_agents_requested or [])]
+                if isinstance(s, str) and s.strip()
+            ]
+            cats = (settings or {}).get("categories") or []
+            # Index by normalised slug (underscores→hyphens) for LLM tolerance
+            cat_by_norm = {
+                c["slug"].replace("_", "-"): c
+                for c in cats if isinstance(c, dict) and c.get("slug") and c.get("name")
             }
+            seen = {ar.slug.replace("_", "-") for ar in agent_results}
+            extra_candidates = []
+            # Dedup on the canonical slug, preserving the Red Team order for determinism.
+            for slug in requested:
+                cat = cat_by_norm.get(slug.strip().replace("_", "-"))
+                if not cat:
+                    continue
+                canonical = cat["slug"].replace("_", "-")
+                if canonical in seen:
+                    continue
+                seen.add(canonical)
+                extra_candidates.append(CandidateIntent(
+                    intent=cat["name"],
+                    slug=cat["slug"],
+                    confidence=0.5,
+                ))
+            max_extra = int(agentic.get("max_parallel_agents", 6) or 6)
+            if len(extra_candidates) > max_extra:
+                logger.warning("[agentic] Red Team requested %d extra agents; capped to %d",
+                               len(extra_candidates), max_extra)
+                extra_candidates = extra_candidates[:max_extra]
 
-            if all_extra_slugs:
-                cats = (settings or {}).get("categories") or []
-                cat_by_slug = {c.get("slug"): c for c in cats if c.get("slug")}
-                # Also index by normalised slug (underscores→hyphens) for LLM tolerance
-                cat_by_norm = {k.replace("_", "-"): v for k, v in cat_by_slug.items()}
-                extra_candidates = []
-                for slug in all_extra_slugs:
-                    cat = cat_by_slug.get(slug) or cat_by_norm.get(slug.replace("_", "-"))
-                    if cat:
-                        # Use canonical slug from settings (hyphens) not LLM slug
-                        extra_candidates.append(CandidateIntent(
-                            intent=cat["name"],
-                            slug=cat["slug"],
-                            confidence=0.5,
-                        ))
-
-                if extra_candidates:
-                    logger.info("[agentic] Red Team requested %d extra agents: %s",
-                                len(extra_candidates), [c.slug for c in extra_candidates])
-                    extra_tasks = [
-                        run_specialized_agent(
-                            text_markdown, candidate,
-                            settings=settings, clients=clients, locale=locale,
-                        )
-                        for candidate in extra_candidates
-                    ]
-                    extra_results_raw = await asyncio.gather(
-                        *extra_tasks, return_exceptions=True
+            if extra_candidates:
+                logger.info("[agentic] Red Team requested %d extra agents: %s",
+                            len(extra_candidates), [c.slug for c in extra_candidates])
+                extra_tasks = [
+                    run_specialized_agent(
+                        text_markdown, candidate,
+                        settings=settings, clients=clients, locale=locale,
                     )
-                    extra_results, extra_failed = _settle_fanout(
-                        extra_candidates, extra_results_raw
+                    for candidate in extra_candidates
+                ]
+                extra_results_raw = await asyncio.gather(
+                    *extra_tasks, return_exceptions=True
+                )
+                extra_results, extra_failed = _settle_fanout(
+                    extra_candidates, extra_results_raw
+                )
+                if extra_failed:
+                    root_span.set_attribute(
+                        "agentic.red_team.extra_failed_count", extra_failed
                     )
-                    if extra_failed:
-                        root_span.set_attribute(
-                            "agentic.red_team.extra_failed_count", extra_failed
-                        )
-                    for ar in extra_results:
-                        traces.append(AgentTrace(
-                            agent_type="specialized",
-                            intent=ar.slug,
-                            model=ar.model or "unknown",
-                            tokens=ar.tokens,
-                            latency_ms=ar.latency_ms,
-                            confidence=ar.confidence,
-                            search_index=ar.search_index,
-                            retrieval_mode=ar.retrieval_mode,
-                            rag_hits=len(ar.rag_grounding),
-                            tool_called=ar.tool_called,
-                            triggered_by="red_team",
-                        ))
-                        total_tokens += _sum_tokens(ar.tokens)
-                    agent_results.extend(extra_results)
+                for ar in extra_results:
+                    traces.append(AgentTrace(
+                        agent_type="specialized",
+                        intent=ar.slug,
+                        model=ar.model or "unknown",
+                        tokens=ar.tokens,
+                        latency_ms=ar.latency_ms,
+                        confidence=ar.confidence,
+                        search_index=ar.search_index,
+                        retrieval_mode=ar.retrieval_mode,
+                        rag_hits=len(ar.rag_grounding),
+                        tool_called=ar.tool_called,
+                        triggered_by="red_team",
+                    ))
+                    total_tokens += _sum_tokens(ar.tokens)
+                agent_results.extend(extra_results)
         else:
             root_span.set_attribute("agentic.red_team.triggered", False)
 
         # ── Step 4: Aggregate ────────────────────────────────────────
         with tracer.start_as_current_span("agentic.aggregation") as agg_span:
-            matched = [ar for ar in agent_results if ar.is_match and ar.confidence > 0.3]
+            matched = [
+                ar for ar in agent_results
+                if ar.is_match and not ar.error and ar.confidence > MATCH_CONFIDENCE_FLOOR
+            ]
             matched.sort(key=lambda r: r.confidence, reverse=True)
 
             detected_intents = [
@@ -286,11 +361,16 @@ async def classify_agentic(
             ]
 
             max_conf = max((ar.confidence for ar in matched), default=0.0)
-            needs_review = max_conf < agentic.get("red_team_threshold", 0.7) if matched else True
+            review_reasons = _review_reasons(
+                agent_results, matched, agentic.get("red_team_threshold", 0.7), red_team_verdict,
+            )
+            needs_review = bool(review_reasons)
 
             agg_span.set_attribute("agentic.matched_intents", len(matched))
             agg_span.set_attribute("agentic.max_confidence", round(max_conf, 3))
             agg_span.set_attribute("agentic.needs_review", needs_review)
+            if review_reasons:
+                agg_span.set_attribute("agentic.review_reasons", review_reasons)
 
         classification_reason = None
         if not detected_intents:

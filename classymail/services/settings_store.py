@@ -295,15 +295,18 @@ def save_settings(settings: dict):
 
     DATA_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
 
-async def save_settings_async(settings: dict, clients=None):
+async def save_settings_async(settings: dict, clients=None) -> str:
+    """Persist settings locally and to Cosmos.
+
+    Returns ``"saved"`` or ``"skipped"`` (no Cosmos configured). Cosmos failures raise,
+    because the worker reads settings from Cosmos and would otherwise run stale config.
+    """
     save_settings(settings)
-    try:
-        if clients and getattr(clients, "cosmos_container", None):
-            doc = {"id": "settings", **settings}
-            await clients.cosmos_container.upsert_item(doc)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("Failed to persist settings to Cosmos: %s", e)
+    if not (clients and getattr(clients, "cosmos_container", None)):
+        return "skipped"
+    doc = {"id": "settings", **settings}
+    await clients.cosmos_container.upsert_item(doc)
+    return "saved"
 
 def _build_categories_prompt(cats: list) -> str:
     """Build prompt text from a list of category dicts.

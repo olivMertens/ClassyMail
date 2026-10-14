@@ -54,6 +54,24 @@ def needs_red_team(
     return False
 
 
+def _str_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [v.strip() for v in value if isinstance(v, str) and v.strip()]
+
+
+def _parse_verdict_payload(content: str) -> dict:
+    """Parse the Red Team JSON; malformed output yields a non-validated verdict."""
+    try:
+        parsed = json.loads(content)
+    except (json.JSONDecodeError, TypeError):
+        logger.warning("[agentic] Red Team returned invalid JSON; treating as not validated")
+        return {"validated": False, "justification": "Red Team output was not valid JSON"}
+    if not isinstance(parsed, dict):
+        return {"validated": False, "justification": "Red Team output was not a JSON object"}
+    return parsed
+
+
 def _build_red_team_prompt(
     agent_summaries: str,
     categories_text: str,
@@ -122,13 +140,15 @@ async def run_red_team(
         content = extract_message_content(data.get("choices", [{}])[0].get("message", {})) or "{}"
         usage = data.get("usage", {}) or {}
 
-        parsed = json.loads(content)
+        parsed = _parse_verdict_payload(content)
         verdict = RedTeamVerdict(
-            validated=parsed.get("validated", True),
-            missed_intents=parsed.get("missed_intents", []),
-            refined_confidences=parsed.get("refined_confidences"),
-            justification=parsed.get("justification"),
-            additional_agents_requested=parsed.get("additional_agents_requested", []),
+            # A missing or non-boolean verdict must never count as an approval.
+            validated=parsed.get("validated") is True,
+            missed_intents=_str_list(parsed.get("missed_intents")),
+            refined_confidences=parsed.get("refined_confidences") if isinstance(
+                parsed.get("refined_confidences"), dict) else None,
+            justification=parsed.get("justification") if isinstance(parsed.get("justification"), str) else None,
+            additional_agents_requested=_str_list(parsed.get("additional_agents_requested")),
             model=deployment,
             tokens=usage,
             latency_ms=round(latency_ms, 1),

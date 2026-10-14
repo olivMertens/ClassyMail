@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import time
 
 from opentelemetry import trace
@@ -163,6 +164,28 @@ def _format_tool_result(refs: list[RAGGroundingRef]) -> str:
     return "\n".join(lines)
 
 
+def _tool_query(raw_arguments: object, text_markdown: str) -> str:
+    """Return a bounded, non-empty search query from tool-call arguments."""
+    fallback = text_markdown[:500]
+    if not isinstance(raw_arguments, str):
+        return fallback
+    try:
+        args = json.loads(raw_arguments or "{}")
+    except json.JSONDecodeError:
+        return fallback
+    query = args.get("query") if isinstance(args, dict) else None
+    if not isinstance(query, str) or not query.strip():
+        return fallback
+    return query.strip()[:500]
+
+
+def _parse_agent_payload(content: str) -> dict:
+    parsed = json.loads(content)
+    if not isinstance(parsed, dict):
+        raise ValueError("specialized agent output is not a JSON object")
+    return parsed
+
+
 async def run_specialized_agent(
     text_markdown: str,
     candidate: CandidateIntent,
@@ -245,49 +268,55 @@ async def run_specialized_agent(
 
         # ── Handle tool call loop (max 1 round) ─────────────────
         tool_calls = message.get("tool_calls") or []
+        search_executed = False
         if tool_calls and index_enabled:
             span.add_event("tool_call", {"tool": tool_name, "index": f"classymail-intent-{candidate.slug}"})
 
+            # Echo the assistant turn once; strip None fields (refusal/audio/annotations)
+            # which Azure may reject when replayed.
+            assistant_msg = {
+                "role": message.get("role", "assistant"),
+                "content": message.get("content"),
+                "tool_calls": tool_calls,
+            }
+            messages.append({k: v for k, v in assistant_msg.items() if v is not None})
+
+            seen_ids: set[str] = set()
             for tc in tool_calls:
-                fn_name = (tc.get("function") or {}).get("name", "")
-                # Accept the contextual tool name (search_billing_inquiry)
-                # or the generic fallback (search_reference_examples)
-                if not fn_name.startswith("search_"):
+                tc_id = tc.get("id")
+                if not tc_id or tc_id in seen_ids:
+                    continue
+                seen_ids.add(tc_id)
+                fn = tc.get("function") or {}
+                fn_name = fn.get("name", "")
+                # Only the contextual tool offered for this category may run.
+                if fn_name != tool_name:
+                    logger.warning("[agentic] Agent %s: rejected unexpected tool %r", candidate.slug, fn_name)
+                    span.add_event("tool_call_rejected", {"tool": str(fn_name)[:100]})
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc_id,
+                        "content": "Error: this tool is not available.",
+                    })
                     continue
 
-                # Parse tool arguments
-                try:
-                    args = json.loads(tc["function"].get("arguments", "{}"))
-                except json.JSONDecodeError:
-                    args = {"query": text_markdown[:500]}
-
-                query = args.get("query", text_markdown[:500])
+                query = _tool_query(fn.get("arguments"), text_markdown)
 
                 # Execute the actual AI Search retrieval
-                rag_refs = await search_intent_index(
+                refs = await search_intent_index(
                     query,
                     candidate.slug,
                     retrieval_mode=retrieval_mode,
                     top_k=top_k,
                     clients=clients,
                 )
+                search_executed = True
+                rag_refs.extend(r for r in refs if r.doc_id not in {x.doc_id for x in rag_refs})
 
-                tool_result = _format_tool_result(rag_refs)
-
-                # Append assistant message + tool result, then re-call LLM.
-                # Strip None fields (refusal/audio/annotations) which Azure may
-                # reject when echoing the assistant message back.
-                assistant_msg = {
-                    "role": message.get("role", "assistant"),
-                    "content": message.get("content"),
-                    "tool_calls": message.get("tool_calls"),
-                }
-                assistant_msg = {k: v for k, v in assistant_msg.items() if v is not None}
-                messages.append(assistant_msg)
                 messages.append({
                     "role": "tool",
-                    "tool_call_id": tc["id"],
-                    "content": tool_result,
+                    "tool_call_id": tc_id,
+                    "content": _format_tool_result(refs),
                 })
 
             # Second LLM call with tool results — no tools, force JSON
@@ -318,14 +347,21 @@ async def run_specialized_agent(
         latency_ms = (time.perf_counter() - t0) * 1000
         content = extract_message_content(message) or "{}"
 
-        parsed = json.loads(content)
-        tool_was_called = bool(tool_calls) and index_enabled
+        parsed = _parse_agent_payload(content)
+        tool_was_called = search_executed
+        confidence = parsed.get("confidence", 0.0)
+        try:
+            confidence = float(confidence)
+        except (TypeError, ValueError):
+            confidence = float("nan")
+        if not math.isfinite(confidence) or not 0.0 <= confidence <= 1.0:
+            raise ValueError(f"agent {candidate.slug} returned invalid confidence {parsed.get('confidence')!r}")
         result = SpecializedAgentResult(
-            intent=parsed.get("intent", candidate.intent),
+            intent=parsed.get("intent") if isinstance(parsed.get("intent"), str) else candidate.intent,
             slug=candidate.slug,
-            is_match=parsed.get("is_match", False),
-            confidence=float(parsed.get("confidence", 0.0)),
-            explanation=parsed.get("explanation"),
+            is_match=parsed.get("is_match") is True,
+            confidence=confidence,
+            explanation=parsed.get("explanation") if isinstance(parsed.get("explanation"), str) else None,
             rag_grounding=rag_refs,
             model=deployment,
             tokens=total_usage,

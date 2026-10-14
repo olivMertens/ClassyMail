@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import os
 
-from fastapi import APIRouter, Depends
-from classymail.services.settings_store import load_settings, save_settings, save_settings_async
+from fastapi import APIRouter, Depends, HTTPException
+from classymail.services.settings_store import load_settings, save_settings_async
 from classymail.core import config
 from classymail.services.azure_clients import Clients, get_clients
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["settings"])
 
@@ -77,9 +80,13 @@ async def get_agentic_prompt():
 
 @router.post("/settings")
 async def set_settings(payload: dict, clients: Clients = Depends(get_clients)):
-    save_settings(payload)
     try:
         await save_settings_async(payload, clients=clients)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to persist settings to Cosmos: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=503,
+            detail="Settings saved locally but not persisted to Cosmos DB; the worker may still use the previous "
+                   "configuration. Please retry.",
+        ) from exc
     return payload
