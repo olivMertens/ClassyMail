@@ -46,6 +46,8 @@ The entire pipeline is event-driven: Blob Storage → Event Grid → Service Bus
 - **Tier-aware model selection**: The orchestrator's per-candidate confidence drives the model used by each specialized agent — Tier 1 (`conf ≥ 0.8`, simple) uses cheap models; Tier 2 (`0.5 ≤ conf < 0.8`, ambiguous) uses balanced models; Tier 3 (`conf < 0.5`, critical) uses the most capable models. Same prompt, different muscle.
 - **Red Team Quality Gate**: Adversarial reviewer activated when confidence is low or agents disagree — can request **extra agents** which run in a second resilient fan-out
 - **Resilient fan-out**: One agent crashing (AI Search 503, OpenAI 429, etc.) no longer fails the whole batch — failed agents return a placeholder so the trace stays continuous and the surviving agents drive the decision (`agentic.parallel.failed_count` OTel attr)
+- **Per-label human review**: `needs_review` is raised when *any* accepted category is below the Red Team threshold, an agent failed, or the Red Team did not explicitly validate — a single strong label can no longer hide a weak one (`agentic.review_reasons` OTel attr)
+- **Scoped RAG tool**: each specialized agent may only call its own `search_<category>` tool; other tool names are rejected and arguments are validated
 - **Per-Category AI Search Indexes**: Add good and bad examples via the Settings UI — agents use them to calibrate confidence
 
 ```mermaid
@@ -63,7 +65,7 @@ flowchart TD
     T3 --> Agg
     Agg -->|"max_conf < 0.7 or top-2 conflict"| RT["Red Team Quality Gate - gpt-4.1 or gpt-5-mini"]
     RT -->|"Request missed intents"| Extra["Extra Specialized Agents - 2nd resilient fan-out"]
-    Extra --> Final["Final Decision - OTel agentic.parallel.failed_count"]
+    Extra --> Final["Final Decision - per-label needs_review - OTel agentic.review_reasons"]
     Agg -->|"max_conf >= 0.7"| Final
     RT -->|"Validated"| Final
 
@@ -108,7 +110,7 @@ Full documentation: [AGENTIC_CLASSIFICATION](docs/AGENTIC_CLASSIFICATION.md) | [
 - **Per-Category AI Search Indexes**: Each category gets its own Azure AI Search index with positive and negative reference examples — agents use RAG to calibrate confidence (see [AI_SEARCH_INDEXES](docs/AI_SEARCH_INDEXES.md))
 
 ### RAG Chatbot
-- **Chat with your emails**: GPT-5.1 reasoning model with vector search over all processed documents, orchestrated by **Microsoft Agent Framework 1.9** (`agent-framework-core>=1.9` + `agent-framework-openai>=1.8`) — per-locale `Agent` cache, `ContextVar`-scoped dependency injection, and full chat history replay via `list[Message]`
+- **Chat with your emails**: GPT-5.1 reasoning model with vector search over all processed documents, orchestrated by **Microsoft Agent Framework 1.21** (`agent-framework-core>=1.21` + `agent-framework-openai>=1.16`) — per-locale `Agent` cache, `ContextVar`-scoped dependency injection, and full chat history replay via `list[Message]`
 - **Agent-driven suggestions**: The LLM agent generates contextual follow-up action pills after each response — no hardcoded logic
 - **Ask AI button**: Click ✨ on any email card or table row to open the chatbot pre-filled with that email’s context
 - **12 agent tools**: Semantic search (with date filtering), keyword search (case-insensitive), reclassification handoff, sequential review, stats, error analysis, category explanation
@@ -173,7 +175,7 @@ See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for full setup or [do
 - **Backend**: FastAPI (Python 3.12) + uv
 - **Frontend**: Vue 3 + Vite + TailwindCSS + vue-i18n
 - **Infra**: Terraform (azurerm v4 + azapi)
-- **AI**: Microsoft AI Foundry (Mistral, Phi-4, GPT-4.1-mini, GPT-4.1-nano, GPT-5.1) + Microsoft Agent Framework 1.9
+- **AI**: Microsoft AI Foundry (Mistral, Phi-4, GPT-4.1-mini, GPT-4.1-nano, GPT-5.1) + Microsoft Agent Framework 1.21
 - **Storage**: Cosmos DB (serverless + vector search + composite indexes), Blob Storage
 - **Auth**: Managed Identity (zero secrets)
 - **CI/CD**: GitHub Actions with OIDC
@@ -221,7 +223,7 @@ When enabled, Content Understanding becomes the primary OCR pass (async analyze 
 
 ### RAG Chatbot (Vector Search)
 
-The chatbot uses **semantic vector search** over all processed emails, powered by **Microsoft Agent Framework** 1.9:
+The chatbot uses **semantic vector search** over all processed emails, powered by **Microsoft Agent Framework** 1.21:
 
 1. **During processing**: Each email’s OCR markdown is embedded using `text-embedding-3-small` (1536 dimensions) and stored in Cosmos DB with `type: "email"`. Chunks are also embedded separately with `type: "chunk"`
 2. **During chat**: User queries are embedded, then Cosmos DB `VectorDistance()` finds the most semantically similar emails — with optional date filtering (`days` parameter for “last week” queries). If the container's vector index rejects `ORDER BY VectorDistance` (a known Cosmos quantized-index drift), the repository automatically falls back to a brute-force scan (compute distances in `SELECT`, sort client-side) so search keeps working
@@ -236,7 +238,7 @@ The chatbot uses **semantic vector search** over all processed emails, powered b
 > The chat button is **automatically hidden** in the UI if `CHAT_DEPLOYMENT` or `EMBEDDING_DEPLOYMENT` are not configured. Deploy the optional models to enable it.
 > Category AI Assessment is also **automatically disabled** if the assessment model isn't deployed in your AI Foundry project.
 
-> **Opt-in Agent Framework 1.9 tuning (default-off):** Two flags let you tune the chat agent without changing default behavior. Set `CHAT_REASONING_EFFORT=minimal|low|medium|high` to forward a reasoning effort to the model (`OpenAIChatOptions.reasoning`), and set `CHAT_HISTORY_COMPACTION=true` to replace the fixed last-10-turns window with token-aware compaction (`ContextWindowCompactionStrategy` + the built-in `CharacterEstimatorTokenizer`, budgets via `CHAT_COMPACTION_MAX_TOKENS` / `CHAT_COMPACTION_MAX_OUTPUT_TOKENS`). Both are unset/off by default — see [ACA_ENVIRONMENT_VARIABLES](docs/ACA_ENVIRONMENT_VARIABLES.md).
+> **Opt-in Agent Framework tuning (default-off):** Two flags let you tune the chat agent without changing default behavior. Set `CHAT_REASONING_EFFORT=minimal|low|medium|high` to forward a reasoning effort to the model (`OpenAIChatOptions.reasoning`), and set `CHAT_HISTORY_COMPACTION=true` to replace the fixed last-10-turns window with token-aware compaction (`ContextWindowCompactionStrategy` + the built-in `CharacterEstimatorTokenizer`, budgets via `CHAT_COMPACTION_MAX_TOKENS` / `CHAT_COMPACTION_MAX_OUTPUT_TOKENS`). Both are unset/off by default — see [ACA_ENVIRONMENT_VARIABLES](docs/ACA_ENVIRONMENT_VARIABLES.md).
 
 ---
 

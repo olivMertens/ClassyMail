@@ -506,15 +506,11 @@ cd ..
 
 
 
-### 4.2 Fetch Vue Runtime
+### 4.2 Frontend
 
 
 
-```powershell
-
-.\scripts\fetch_vue_runtime.ps1
-
-```
+Nothing to fetch: the `Dockerfile` builds the Vue frontend in its first stage.
 
 
 

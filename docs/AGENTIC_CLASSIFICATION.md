@@ -1,6 +1,6 @@
 # ClassyMail – Agentic Classification Architecture
 
-> Microsoft Agent Framework 1.9 — Multi-agent email classification with orchestrator, tier-aware specialized agents, per-intent AI Search indexes, resilient fan-out, and adversarial Red Team quality gate.
+> Microsoft Agent Framework 1.21 — Multi-agent email classification with orchestrator, tier-aware specialized agents, per-intent AI Search indexes, resilient fan-out, and adversarial Red Team quality gate.
 
 ## Architecture Overview
 
@@ -442,14 +442,23 @@ Selected agents run concurrently via `asyncio.gather` / Agent Framework `Concurr
 - Each agent uses its specialized prompt
 - Each agent queries its dedicated AI Search index (with semantic ranking)
 - Each agent returns a verdict + score + RAG grounding references
+- Each agent may only call its own contextual tool (`search_<slug>`); any other tool name is rejected (but still answered so the conversation stays valid), the `query` argument is validated and bounded, and `tool_called` is true only when the search actually ran
+- A malformed agent answer (non-object JSON, confidence outside 0-1) fails that agent only; it becomes a placeholder
 
 ### Step 4 — Aggregation (Fan-In)
 
-Results from all parallel agents are collected and merged into a unified classification result.
+Results from all parallel agents are collected and merged into a unified classification result. A category is accepted when `is_match` and confidence > 0.3 and the agent did not fail.
+
+`needs_review` is decided **per label** — it is true when any of these holds (reasons are exported as `agentic.review_reasons`):
+
+- no category accepted (`no_match`)
+- any accepted category is below `red_team_threshold` (`low_confidence`)
+- any specialized agent failed (`agent_failed`)
+- the Red Team ran and did not explicitly return `validated: true`, returned invalid JSON, or was unavailable (`red_team_not_validated`)
 
 ### Step 5 — Red Team (Conditional)
 
-Quality gate activated based on configurable trigger thresholds. Can propose refinement or additional agent runs.
+Quality gate activated based on configurable trigger thresholds. Can propose refinement or additional agent runs. Confidence refinements are applied only to known categories and only when finite and within 0-1. Requested extra agents are deduplicated on the canonical slug, kept in Red Team order and capped by `max_parallel_agents`. A Red Team failure keeps the partial results and forces human review.
 
 ### Step 6 — Final Decision
 
@@ -494,7 +503,8 @@ pipeline.classification
   |     +-- agentic.aggregation               # Fan-in
   |     |     +-- agentic.matched_intents: 2
   |     |     +-- agentic.max_confidence: 0.91
-  |     |     +-- agentic.needs_red_team: false
+  |     |     +-- agentic.needs_review: false
+  |     |     +-- agentic.review_reasons: [...]   # only when needs_review
   |     |
   |     +-- agentic.red_team                   # Conditional
   |           +-- gen_ai.request.model: gpt-4.1

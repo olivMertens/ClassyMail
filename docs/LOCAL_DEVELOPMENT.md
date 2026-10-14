@@ -34,6 +34,8 @@ uv lock --python 3.12
 uv sync --python 3.12
 ```
 
+> **Managed workstation with an internal package mirror:** use `uv sync --frozen` / `uv run --frozen` only. A plain `uv run` or `uv lock` re-resolves through the mirror and writes its URLs into `uv.lock` — never commit that. Re-lock in the Dev Container / GitHub Codespaces instead (`.devcontainer/` ships uv, Node and Docker-in-Docker).
+
 ### Option B: pip
 
 ```bash
@@ -151,19 +153,9 @@ curl http://127.0.0.1:8000/api/admin/diagnostics
 
 ## Build & Deploy
 
-### UI Dependency (Vue Runtime)
+### UI Build
 
-The UI requires Vue runtime **before building Docker**:
-
-**Windows (PowerShell):**
-```powershell
-.\scripts\fetch_vue_runtime.ps1
-```
-
-**Linux/macOS:**
-```bash
-bash ./scripts/fetch_vue_runtime.sh
-```
+No prerequisite: the `Dockerfile` builds the Vue frontend in its first stage (`npm ci && npm run build`).
 
 ### Build Docker Image (Manual)
 
