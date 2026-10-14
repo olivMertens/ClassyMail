@@ -11,6 +11,7 @@
 ## Azure Architecture Documentation Standards
 
 - **Visuals**: Enforce strict usage of **CAE Icons (Flat Design)** in all diagrams.
+- **Diagrams**: Use the `architecture-diagram-author` skill (`.github/skills/architecture-diagram-author/`) with the rules in `.github/instructions/diagrams.instructions.md`.
 - **Code Linking**: Use the `#` nomenclature to link descriptive text or diagrams to code (e.g., `#infra/main.tf` or `#src/app.py`).
 
 ## Mermaid Diagrams Best Practices
