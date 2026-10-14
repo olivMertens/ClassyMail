@@ -17,6 +17,11 @@ concurrency:
 env:
   IMAGE_NAME: classymail-api
   WORKER_APP_NAME: classymail-worker
+  # Previous code defaults, applied only to app env vars not set yet. Clear once the
+  # new deployments (gpt-6-luna, gpt-5.4-mini, gpt-6-sol) exist in Foundry.
+  LEGACY_MODEL_PINS: >-
+    PHI_FALLBACK_DEPLOYMENT=gpt-4.1-mini ANONYMIZER_DEPLOYMENT=gpt-4.1-mini
+    VISION_DEPLOYMENT=gpt-4.1-mini CHAT_DEPLOYMENT=gpt-5.1 ASSESSMENT_MODEL=gpt-4.1-nano
 
 permissions:
   id-token: write
@@ -344,6 +349,13 @@ jobs:
             "APP_VERSION=$SHORT_SHA"
           )
 
+          # Code defaults moved off GPT-4.1 (Deprecated); keep what this app already
+          # uses by pinning the previous defaults only where no value is set yet.
+          CURRENT=$(az containerapp show -n "$APP" -g "$RG" --query "properties.template.containers[0].env[].name" -o tsv 2>/dev/null || true)
+          for kv in ${{ env.LEGACY_MODEL_PINS }}; do
+            grep -qx "${kv%%=*}" <<< "$CURRENT" || ENV_VARS+=("$kv")
+          done
+
           # Retry to ride out transient 'ContainerAppOperationInProgress' errors
           # while a revision settles.
           ok=""
@@ -467,6 +479,11 @@ jobs:
             "MISTRAL_MODE=${{ vars.MISTRAL_MODE }}"
             "APP_VERSION=$SHORT_SHA"
           )
+
+          CURRENT=$(az containerapp show -n "$APP" -g "$RG" --query "properties.template.containers[0].env[].name" -o tsv 2>/dev/null || true)
+          for kv in ${{ env.LEGACY_MODEL_PINS }}; do
+            grep -qx "${kv%%=*}" <<< "$CURRENT" || ENV_VARS+=("$kv")
+          done
 
           ok=""
           for attempt in $(seq 1 10); do
