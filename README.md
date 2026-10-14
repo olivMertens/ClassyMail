@@ -26,6 +26,20 @@ The entire pipeline is event-driven: Blob Storage → Event Grid → Service Bus
 
 ---
 
+## Latest Updates
+
+| Area | Change | Status |
+|------|--------|--------|
+| Agentic classification | Human review decided **per label**: any accepted category below the threshold, any failed agent, or a Red Team that did not explicitly validate sets `needs_review` (`agentic.review_reasons`) | Shipped |
+| Agentic classification | Specialized agents may only call their own `search_<category>` tool; arguments validated; malformed or out-of-range answers fail that agent only; Red Team outage keeps partial results | Shipped |
+| Settings | `POST /api/settings` returns `503` when Cosmos DB persistence fails (the worker reads settings from Cosmos), instead of silently succeeding | Shipped |
+| Dependencies | Agent Framework 1.21, OpenAI SDK 2.54 (kept below 3.x), FastAPI 0.141 / Starlette 1.8, Azure SDKs (Identity 1.26, Cosmos 4.17, Blob 12.31, Service Bus 7.15), OpenTelemetry 1.45, pydantic 2.14 stable; pre-releases only where required | Shipped |
+| Developer tooling | Dev Container / Codespaces fixed (uv, Node, Docker-in-Docker, sshd); ruff 0.17, pytest 9 | Shipped |
+| Documentation | New editable architecture diagram (draw.io + SVG + PNG) with deployed, opt-in and roadmap components clearly separated | Shipped |
+| Preview roadmap | Content Understanding agentic analyzer, Microsoft-Decision-1, Agent Framework Hooks / FIDES, workflow checkpoints + human-in-the-loop | **Planned - not deployed** |
+
+---
+
 ## Principal Features
 
 ### AI Classification Pipeline
@@ -118,7 +132,7 @@ Full documentation: [AGENTIC_CLASSIFICATION](docs/AGENTIC_CLASSIFICATION.md) | [
 - **Semantic cache**: Repeated similar questions are served from a vector cache (>99% similarity), saving tokens
 
 ### Security & Operations
-- **Zero Secrets**: Managed Identity everywhere — no connection strings, no API keys in config
+- **Managed identity**: the apps reach Storage, Cosmos DB, Foundry, AI Search and Language with a user-assigned managed identity (no API keys in app config). Exception: the KEDA Service Bus scaler still uses a connection string stored as a Container App secret (`#infra/main.tf`).
 - **PII Detection**: LLM-based, Azure AI Language, or Hybrid mode (GDPR compliant)
 - **Dynamic Cost Tracking**: Real token usage per email across 12+ model pricing tiers, with links to [Microsoft Azure OpenAI Pricing](https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/)
 - **Danger Zone**: Admin operations organized by severity — Maintenance (diagnostics), Bulk Operations (reprocess all, rebuild vector index, DLQ), and Destructive (atomic reset)
@@ -129,6 +143,18 @@ Full documentation: [AGENTIC_CLASSIFICATION](docs/AGENTIC_CLASSIFICATION.md) | [
 ---
 
 ## Architecture
+
+[![ClassyMail architecture - Container Apps API and worker, Blob Storage, Event Grid, Service Bus, Microsoft Foundry, Document Intelligence, AI Language, AI Search, Cosmos DB](docs/assets/classymail-architecture.png)](docs/assets/classymail-architecture.svg)
+
+Editable source: [docs/assets/classymail-architecture.drawio](docs/assets/classymail-architecture.drawio) (open in draw.io; SVG and PNG are exported from it). The diagram reflects what `#infra/main.tf` deploys and what `#classymail/` calls:
+
+| Status | Components |
+|--------|------------|
+| **Deployed** | API and worker Container Apps (same image), Blob Storage, Event Grid, Service Bus (KEDA scaling), Microsoft Foundry models, Document Intelligence, Azure AI Language, Azure AI Search, Cosmos DB, Container Registry, managed identity, Application Insights, Log Analytics |
+| **Opt-in (feature flag, off by default)** | Content Understanding OCR provider (`OCR_PROVIDER=content_understanding`, GA API `2025-11-01`), chat streaming (`CHAT_STREAMING`) |
+| **Preview roadmap - not deployed, not in the code yet** | Content Understanding agentic analyzer (`2026-06-01-preview`), Microsoft-Decision-1 classifier pilot, Agent Framework Hooks / FIDES guardrails, workflow checkpoints with human-in-the-loop |
+
+Simplified processing flow:
 
 ```mermaid
 flowchart TD
@@ -177,7 +203,7 @@ See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for full setup or [do
 - **Infra**: Terraform (azurerm v4 + azapi)
 - **AI**: Microsoft AI Foundry (Mistral, Phi-4, GPT-4.1-mini, GPT-4.1-nano, GPT-5.1) + Microsoft Agent Framework 1.21
 - **Storage**: Cosmos DB (serverless + vector search + composite indexes), Blob Storage
-- **Auth**: Managed Identity (zero secrets)
+- **Auth**: Managed Identity (KEDA scaler excepted, see Security & Operations)
 - **CI/CD**: GitHub Actions with OIDC
 
 ---

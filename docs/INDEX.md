@@ -6,10 +6,10 @@
 
 | Doc | Description |
 |-----|-------------|
-| [ARCHITECTURE](ARCHITECTURE.md) | System architecture, data flow, component diagram |
+| [ARCHITECTURE](ARCHITECTURE.md) | System architecture, data flow, component diagram ([draw.io source](assets/classymail-architecture.drawio)) |
 | [INFRASTRUCTURE](INFRASTRUCTURE.md) | Terraform resources, networking, scaling |
 | [MODELS](MODELS.md) | AI models configuration, fallback, fine-tuning |
-| [MAF_MIGRATION_PLAN](MAF_MIGRATION_PLAN.md) | Microsoft Agent Framework 1.9 migration |
+| [MAF_MIGRATION_PLAN](MAF_MIGRATION_PLAN.md) | Microsoft Agent Framework migration (now on 1.21) |
 | [COSTS_LOGIC](COSTS_LOGIC.md) | Cost estimation, token tracking, pricing |
 
 ## Deployment

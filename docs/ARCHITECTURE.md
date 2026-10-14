@@ -4,7 +4,19 @@
 >
 > **Alternative**:
 
-## 1. Architecture Solution (Mermaid)
+## 1. Architecture Solution
+
+[![ClassyMail architecture](assets/classymail-architecture.png)](assets/classymail-architecture.svg)
+
+Source of truth: [assets/classymail-architecture.drawio](assets/classymail-architecture.drawio) - the SVG and PNG are exported from it with the `architecture-diagram-author` skill (`.github/skills/architecture-diagram-author/`, rules in `.github/instructions/diagrams.instructions.md`). Update the `.drawio` and re-export whenever `#infra/main.tf` or the service calls in `#classymail/` change.
+
+- **Solid boxes and arrows**: deployed and called at runtime.
+- **Dashed box and arrow**: opt-in feature flag, off by default (Content Understanding OCR provider).
+- **Grey dashed frame "Preview roadmap - NOT deployed"**: planned Preview capabilities (Content Understanding agentic analyzer, Microsoft-Decision-1, Agent Framework Hooks / FIDES, workflow checkpoints with human-in-the-loop). They are neither provisioned nor implemented in this version.
+
+Icon provenance: Azure Architecture Icons via [az-icons.com](https://az-icons.com/) (community mirror of the July 2026 [Azure Architecture Icons set](https://learn.microsoft.com/en-us/azure/architecture/icons/), assets `https://az-icons.com/images/<slug>/icon.svg`, retrieved 2026-10-14), embedded in the `.drawio`. Slugs: `browser`, `container-apps-environments`, `worker-container-app`, `container-registries`, `storage-accounts`, `event-grid-topics`, `azure-service-bus`, `azure-cosmos-db`, `cognitive-search` (Azure AI Search), `ai-foundry`, `form-recognizers` (Document Intelligence), `language`, `application-insights`, `log-analytics-workspaces`, `managed-identities`. No dedicated Content Understanding icon was found in az-icons.com or MsiconsCollections, so it is drawn as a labeled box without a logo.
+
+### Mermaid view
 
 Pattern: Event-Driven + Container Apps + AI Foundry (Mistral OCR & Phi-4)
 
