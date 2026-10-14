@@ -305,7 +305,7 @@ if [ -n "$AI_ACCOUNT" ]; then
             echo "$DEPLOYMENTS" | grep -oP '"Name":"\K[^"]+' | sed 's/^/    - /'
         fi
     else
-        print_status "warning" "No model deployments found. Run setup: docs/AI_FOUNDRY_SETUP.md"
+        print_status "warning" "No model deployments found. Run setup: docs/MODELS.md"
     fi
 else
     print_status "error" "No Microsoft AI Foundry resource found in resource group"
@@ -457,7 +457,7 @@ if [ $FAILED -eq 0 ]; then
     echo ""
     echo "Next steps:"
     echo "  1. Deploy models in Microsoft AI Foundry (if deployments missing)"
-    echo "     See: docs/AI_FOUNDRY_SETUP.md"
+    echo "     See: docs/MODELS.md"
     echo "  2. Test end-to-end workflow by uploading a PDF via UI"
     echo "  3. Monitor Application Insights for telemetry"
     echo "  4. Review warnings above and address if needed"
@@ -472,15 +472,15 @@ else
     echo "  - Network issues: ./scripts/update_cosmos_firewall.sh \"$RG\""
     echo "  - Container Apps not running: az containerapp restart --name <app-name> -g $RG"
     echo "  - Cosmos DB errors: Wait 5-10 min for RBAC propagation, then restart apps"
-    echo "  - Missing deployments: See docs/AI_FOUNDRY_SETUP.md"
+    echo "  - Missing deployments: See docs/MODELS.md"
     echo ""
     echo "Tip: Use --auto-fix-network to automatically fix network issues"
     echo "     ./scripts/verify-mvp-setup.sh \"$RG\" --auto-fix-network"
 fi
 
 echo ""
-echo "For detailed troubleshooting, see: docs/AI_FOUNDRY_SETUP.md"
-echo "For complete infrastructure docs, see: docs/INFRASTRUCTURE.md"
+echo "For detailed troubleshooting, see: docs/MODELS.md"
+echo "For complete infrastructure docs, see: docs/DEPLOY_FROM_SCRATCH.md"
 echo ""
 
 exit $FAILED

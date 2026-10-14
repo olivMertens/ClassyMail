@@ -1,51 +1,30 @@
-# Documentation
+# ClassyMail Documentation
 
-> See also the [README](../README.md) for project overview and quick start.
+Start with the guide for your task. Each topic has one canonical home; examples
+describe repository behavior, not proof that a particular Azure environment is deployed.
 
-## Core
+| Task | Guide |
+| --- | --- |
+| Install, run and test locally; use CLI helpers | [Local development](LOCAL_DEVELOPMENT.md) |
+| Provision infrastructure, configure identity and CI/CD | [Deployment](DEPLOY_FROM_SCRATCH.md) |
+| Understand components, ingestion and storage | [Architecture](ARCHITECTURE.md) |
+| Configure multi-agent classification and AI Search examples | [Agentic classification](AGENTIC_CLASSIFICATION.md) |
+| Configure model deployments, OCR and chat | [Models](MODELS.md) |
+| Use the UI, customize categories and integrate the API/CSV | [Integration](INTEGRATION.md) |
+| Review corrections, privacy limits and JSONL exports | [Data and privacy](PII_ANONYMIZATION_AND_USER_CORRECTIONS.md) |
+| Understand usage-based cost estimates | [Costs](COSTS_LOGIC.md) |
+| Diagnose failures and Terraform state drift | [Troubleshooting](TROUBLESHOOTING_MAP.md) |
 
-| Doc | Description |
-|-----|-------------|
-| [ARCHITECTURE](ARCHITECTURE.md) | System architecture, data flow, component diagram ([draw.io source](assets/classymail-architecture.drawio)) |
-| [INFRASTRUCTURE](INFRASTRUCTURE.md) | Terraform resources, networking, scaling |
-| [MODELS](MODELS.md) | AI models configuration, fallback, fine-tuning |
-| [MAF_MIGRATION_PLAN](MAF_MIGRATION_PLAN.md) | Microsoft Agent Framework migration (now on 1.21) |
-| [COSTS_LOGIC](COSTS_LOGIC.md) | Cost estimation, token tracking, pricing |
+Implementation references are linked in each guide. Environment variables are owned
+by [configuration](../classymail/core/config.py); persisted defaults by
+[settings](../classymail/services/settings_store.py); deployment resources by
+[Terraform](../infra/main.tf). Consult those sources when exact defaults change.
 
-## Deployment
+The editable architecture source is
+[classymail-architecture.drawio](assets/classymail-architecture.drawio), with
+[SVG](assets/classymail-architecture.svg) and [PNG](assets/classymail-architecture.png) exports.
 
-| Doc | Description |
-|-----|-------------|
-| [DEPLOY_FROM_SCRATCH](DEPLOY_FROM_SCRATCH.md) | First-time Azure deployment |
-| [LOCAL_DEVELOPMENT](LOCAL_DEVELOPMENT.md) | Local development setup |
-| [CICD_GITHUB](CICD_GITHUB.md) | GitHub Actions CI/CD with OIDC |
-| [AI_FOUNDRY_SETUP](AI_FOUNDRY_SETUP.md) | Microsoft AI Foundry model deployment |
-| [ACA_ENVIRONMENT_VARIABLES](ACA_ENVIRONMENT_VARIABLES.md) | Container Apps env vars |
-| [INFRA_STATE_RECONCILE](INFRA_STATE_RECONCILE.md) | Terraform state reconcile for Container App names |
-
-## Features
-
-| Doc | Description |
-|-----|-------------|
-| [USER_INTERFACE](USER_INTERFACE.md) | Dashboard and UI guide |
-| [AGENTIC_CLASSIFICATION](AGENTIC_CLASSIFICATION.md) | Multi-agent pipeline: orchestrator, tiers, Red Team |
-| [AI_SEARCH_INDEXES](AI_SEARCH_INDEXES.md) | Per-category AI Search indexes and examples |
-| [CUSTOMIZATION](CUSTOMIZATION.md) | Category taxonomy and configuration |
-| [INTEGRATION](INTEGRATION.md) | CSV export, slug system, API |
-
-## Data and Security
-
-| Doc | Description |
-|-----|-------------|
-| [PII_ANONYMIZATION_AND_USER_CORRECTIONS](PII_ANONYMIZATION_AND_USER_CORRECTIONS.md) | PII detection, anonymization, and fine-tuning data |
-| [FINE_TUNING_DATA](FINE_TUNING_DATA.md) | Fine-tuning dataset export and JSONL format |
-| [RBAC_AUDIT](RBAC_AUDIT.md) | Managed identity roles and access |
-| [TESTING_EMAIL_GENERATION](TESTING_EMAIL_GENERATION.md) | Test data generation |
-
-## Operations
-
-| Doc | Description |
-|-----|-------------|
-| [TROUBLESHOOTING_MAP](TROUBLESHOOTING_MAP.md) | Troubleshooting guide |
-| [CLI_REFERENCE](CLI_REFERENCE.md) | Command-line tools |
-| [OCR_VISION_STRATEGY](OCR_VISION_STRATEGY.md) | OCR architecture decision and vision performance |
+Model availability, quotas, prices and fine-tuning eligibility depend on the selected
+subscription, region and service catalog. The code's model aliases do not establish
+service availability. Historical migration proposals and environment-specific cleanup
+instructions are not operational prerequisites.

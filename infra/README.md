@@ -1,17 +1,17 @@
 # Infra folder
 
-Terraform and deployment documentation lives in [docs/INFRASTRUCTURE.md](../docs/INFRASTRUCTURE.md).
+Terraform and deployment documentation lives in [docs/DEPLOY_FROM_SCRATCH.md](../docs/DEPLOY_FROM_SCRATCH.md).
 
 **Quick Reference:**
 - **Deployment Guide**: Run `./infra/deploy.ps1` (Windows) or `bash infra/deploy.sh` (Linux/macOS) from repo root
 - **Verify / repair roles**: `./infra/deploy.ps1 -VerifyOnly -ResourceGroup <prefix>-rg` (or `--verify-only`)
 - **Fresh Tenant**: See [docs/DEPLOY_FROM_SCRATCH.md](../docs/DEPLOY_FROM_SCRATCH.md) for complete onboarding
-- **Required Models**: See [docs/MODELS.md](../docs/MODELS.md#required-models-for-poc)
-- **Model Deployments**: Must be created manually in Microsoft AI Foundry after Terraform provisioning
-- **Custom Tags**: Configurable via `custom_tags_enabled` variable (see [CUSTOMIZATION.md](../docs/CUSTOMIZATION.md#classymail-mandatory-tags))
-- **State drift / Container App names**: The two ACAs are named `${app_name}-api` / `${app_name}-worker` (default `classymail`), **decoupled from `prefix`** so Terraform and CI/CD agree. To realign Terraform state with the live apps, see [docs/INFRA_STATE_RECONCILE.md](../docs/INFRA_STATE_RECONCILE.md).
+- **Models**: See [docs/MODELS.md](../docs/MODELS.md#deployment-aliases)
+- **Model Deployments**: Terraform can provision models when the relevant flags are enabled; check availability and quotas first.
+- **Custom Tags**: Configurable via `custom_tags_enabled`; see [configuration](../docs/INTEGRATION.md#categories-and-customization).
+- **State drift / Container App names**: The two ACAs are named `${app_name}-api` / `${app_name}-worker` (default `classymail`), **decoupled from `prefix`** so Terraform and CI/CD agree. To realign Terraform state with the live apps, see [docs/TROUBLESHOOTING_MAP.md](../docs/TROUBLESHOOTING_MAP.md).
 
-**Mandatory AI Model Deployments for POC:**
+**Repository deployment defaults (verify service availability and feature flags):**
 1. `mistral-document-ai-2512` - OCR + Vision extraction
 2. `Phi-4` - Primary classification (8K context)
 3. `gpt-5.4-mini` - Fallback classification, anonymization, and vision
@@ -19,9 +19,9 @@ Terraform and deployment documentation lives in [docs/INFRASTRUCTURE.md](../docs
 5. `gpt-6-sol` - Chatbot reasoning model, synthetic data, agentic tier3 + red team (recommended)
 6. `gpt-6-luna` - Category assessment AI + agentic orchestrator/tier1 (recommended)
 
-**Legacy GPT-4.1 deployments:** `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` (and `gpt-5.1`) are legacy (Deprecated, retires 2027-04-14; existing environments only). Set `deploy_legacy_models = true` (`-DeployLegacyModels` in `deploy.ps1`, `--deploy-legacy-models` in `deploy.sh`) to keep them, and `chat_deployment = "gpt-5.1"` / `fallback_deployment = "gpt-4.1-mini"` to keep an existing environment unchanged. Defaults are `deploy_legacy_models = false`, `chat_deployment = "gpt-6-sol"`, `fallback_deployment = "gpt-5.4-mini"`.
+**Legacy selections:** `deploy_legacy_models = true` retains legacy model provisioning. Existing chat/fallback aliases can be kept through `chat_deployment` and `fallback_deployment`; check their current availability separately. Code compatibility does not establish model lifecycle dates.
 
-See [docs/INFRASTRUCTURE.md#required-ai-model-deployments](../docs/INFRASTRUCTURE.md#required-ai-model-deployments) for deployment instructions.
+See [deployment configuration](../docs/DEPLOY_FROM_SCRATCH.md#configuration) for deployment instructions.
 
 ---
 
@@ -118,7 +118,7 @@ Terraform:
 bash infra/deploy.sh --verify-only --resource-group classymail-rg
 ```
 
-Roles checked (source of truth: [docs/RBAC_AUDIT.md](../docs/RBAC_AUDIT.md)):
+Roles checked (source of truth: [docs/DEPLOY_FROM_SCRATCH.md](../docs/DEPLOY_FROM_SCRATCH.md)):
 
 | Role | Scope | Condition |
 |------|-------|-----------|

@@ -93,4 +93,4 @@ rm -rf .tmp build-context.tar.gz
 - Temporary build artifacts go in `.tmp/` (gitignored + dockerignored). Never use `.build-context/`.
 - Always tag with both `latest` and the short commit SHA.
 - Both ACAs (api/worker) use the **same image** — the entrypoint differs via `CMD` override in Terraform.
-- CI/CD uses `#.github/workflows/` — see `docs/CICD_GITHUB.md` for OIDC + GitHub Actions details.
+- CI/CD uses `#.github/workflows/` — see `docs/DEPLOY_FROM_SCRATCH.md` for OIDC + GitHub Actions details.

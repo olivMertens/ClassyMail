@@ -30,7 +30,7 @@ The entire pipeline is event-driven: Blob Storage → Event Grid → Service Bus
 
 | Area | Change | Status |
 |------|--------|--------|
-| Models | GPT-4.1 family is **Deprecated** (new subscriptions cannot deploy it, retires 2027-04-14). New defaults: `gpt-6-luna` (replaces gpt-4.1-nano), `gpt-5.4-mini` (replaces gpt-4.1-mini), `gpt-6-sol` (replaces gpt-4.1 and gpt-5.1), all called with `reasoning_effort="none"` on fast paths. Saved settings are kept, so existing demos keep running (see [Migration from GPT-4.1](#migration-from-gpt-41)) | Shipped |
+| Models | Default aliases: `gpt-6-luna`, `gpt-5.4-mini`, `gpt-6-sol`. Saved settings are preserved; deployment availability and reasoning options must be checked for the selected endpoint (see [Models](docs/MODELS.md)) | Shipped |
 | Agentic classification | Human review decided **per label**: any accepted category below the threshold, any failed agent, or a Red Team that did not explicitly validate sets `needs_review` (`agentic.review_reasons`) | Shipped |
 | Agentic classification | Specialized agents may only call their own `search_<category>` tool; arguments validated; malformed or out-of-range answers fail that agent only; Red Team outage keeps partial results | Shipped |
 | Settings | `POST /api/settings` returns `503` when Cosmos DB persistence fails (the worker reads settings from Cosmos), instead of silently succeeding | Shipped |
@@ -105,6 +105,8 @@ Enable it with **Settings → Processing strategy = agentic**. The values above 
 
 ![Agentic Pipeline Configuration — Settings UI](docs/assets/setttingsagenticpipeline.png)
 
+UI captures use the local frontend bundle with synthetic fixtures and verified repository model defaults. Scores, timings, and traces are illustrative, not live Azure measurements.
+
 | Setting (key) | Default | Effect in the workflow |
 |---------------|---------|------------------------|
 | Orchestrator Model (`orchestrator_model`, `orchestrator_routing_mode`) | `gpt-6-luna`, `balanced` | Shortlists candidate categories; `model-router` picks the model per request |
@@ -117,7 +119,7 @@ Enable it with **Settings → Processing strategy = agentic**. The values above 
 
 ![Agentic Pipeline Trace — Email Detail](docs/assets/spotlightmermaidagentic.png)
 
-Full documentation: [AGENTIC_CLASSIFICATION](docs/AGENTIC_CLASSIFICATION.md) | [AI_SEARCH_INDEXES](docs/AI_SEARCH_INDEXES.md)
+Full documentation: [Agentic classification and AI Search](docs/AGENTIC_CLASSIFICATION.md).
 
 ### Dashboard & Export
 - **Classification Dashboard**: Card or table view with confidence filters (high/low), status filters (processed/review/error), PII indicators, and real-time search
@@ -130,10 +132,10 @@ Full documentation: [AGENTIC_CLASSIFICATION](docs/AGENTIC_CLASSIFICATION.md) | [
 - **AI Feedback**: Each correction generates an LLM feedback message explaining what the model missed, used for prompt improvement
 - **Auto-Feed to AI Search**: When a user corrects a classification, the email is automatically pushed as a negative example to the old (wrong) category and a positive example to the new (correct) category in the per-category AI Search indexes
 - **One-Click Reinforcement**: Click "Reinforce" on any correctly classified email to push it as a `human_reinforced` positive example into its category's AI Search index — teaches the agentic pipeline "this is right"
-- **Fine-Tuning Export**: Export anonymized JSONL datasets (train/test split) matching the production system prompt format — ready for Microsoft AI Foundry (Phi-4 LoRA; GPT-4.1-mini only where the Deprecated base model is still deployed)
-- **Human Reinforcement**: Corrected examples are weighted higher in training data, closing the feedback loop between human reviewers and model quality
+- **Fine-Tuning Export**: Export reviewed JSONL examples with deterministic train/test splitting and optional anonymization. Inspect all fields and verify the training service's accepted schema and model eligibility before submission (see [data and privacy](docs/PII_ANONYMIZATION_AND_USER_CORRECTIONS.md)).
+- **Human Reinforcement**: Corrections and reinforcement update retrieval examples; they do not automatically retrain models or weight fine-tuning samples.
 - **Category AI Assessment**: GPT-6-luna analyzes your category definitions and suggests improvements based on classification patterns
-- **Per-Category AI Search Indexes**: Each category gets its own Azure AI Search index with positive and negative reference examples — agents use RAG to calibrate confidence (see [AI_SEARCH_INDEXES](docs/AI_SEARCH_INDEXES.md))
+- **Per-Category AI Search Indexes**: Each category gets its own Azure AI Search index with positive and negative reference examples — agents use RAG to calibrate confidence (see [AI_SEARCH_INDEXES](docs/AGENTIC_CLASSIFICATION.md))
 
 ### RAG Chatbot
 - **Chat with your emails**: GPT-6-sol reasoning model with vector search over all processed documents, orchestrated by **Microsoft Agent Framework 1.21** (`agent-framework-core>=1.21` + `agent-framework-openai>=1.16`) — per-locale `Agent` cache, `ContextVar`-scoped dependency injection, and full chat history replay via `list[Message]`
@@ -145,7 +147,7 @@ Full documentation: [AGENTIC_CLASSIFICATION](docs/AGENTIC_CLASSIFICATION.md) | [
 
 ### Security & Operations
 - **Managed identity**: the apps reach Storage, Cosmos DB, Foundry, AI Search and Language with a user-assigned managed identity (no API keys in app config). Exception: the KEDA Service Bus scaler still uses a connection string stored as a Container App secret (`#infra/main.tf`).
-- **PII Detection**: LLM-based, Azure AI Language, or Hybrid mode (GDPR compliant)
+- **PII Detection**: LLM-based, Azure AI Language, or Hybrid mode. Detection does not erase stored data or establish GDPR compliance.
 - **Dynamic Cost Tracking**: Real token usage per email across 12+ model pricing tiers, with links to [Microsoft Azure OpenAI Pricing](https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/)
 - **Danger Zone**: Admin operations organized by severity — Maintenance (diagnostics), Bulk Operations (reprocess all, rebuild vector index, DLQ), and Destructive (atomic reset)
 - **Rebuild Vector Index**: One-click re-embedding of all emails for semantic search repair
@@ -189,7 +191,7 @@ flowchart TD
 ## Quick Start
 
 ```bash
-# Prerequisites: Python 3.12, Node.js 18+, Azure CLI
+# Prerequisites: Python 3.12, Node.js 22+, Azure CLI
 
 # Generate secrets from Azure
 ./scripts/write_secrets_env.ps1 -ResourceGroup "<prefix>-rg" -Force
@@ -288,37 +290,34 @@ The chatbot uses **semantic vector search** over all processed emails, powered b
 
 1. **During processing**: Each email’s OCR markdown is embedded using `text-embedding-3-small` (1536 dimensions) and stored in Cosmos DB with `type: "email"`. Chunks are also embedded separately with `type: "chunk"`
 2. **During chat**: User queries are embedded, then Cosmos DB `VectorDistance()` finds the most semantically similar emails — with optional date filtering (`days` parameter for “last week” queries). If the container's vector index rejects `ORDER BY VectorDistance` (a known Cosmos quantized-index drift), the repository automatically falls back to a brute-force scan (compute distances in `SELECT`, sort client-side) so search keeps working
-3. **Chat model** (GPT-6-sol reasoning model) generates answers grounded in retrieved context, with source citations. The chat agent targets the Azure OpenAI **v1 surface**, which requires `CHAT_API_VERSION=preview` (see [ACA_ENVIRONMENT_VARIABLES](docs/ACA_ENVIRONMENT_VARIABLES.md))
+3. **Chat model** (GPT-6-sol reasoning model) generates answers grounded in retrieved context, with source citations. The chat agent targets the Azure OpenAI **v1 surface**, which requires `CHAT_API_VERSION=preview` (see [ACA_ENVIRONMENT_VARIABLES](docs/DEPLOY_FROM_SCRATCH.md))
 4. **Semantic cache**: Similar questions (>99% cosine similarity) return cached responses instantly
 5. **Agent-driven actions**: The LLM appends contextual follow-up suggestions (hidden `<!-- ACTIONS -->` block) that appear as clickable pills in the UI
 
 > **Rebuild embeddings**: If emails were processed before the embedding model was deployed, use **Settings → Danger Zone → Rebuild Vector Index** to regenerate all vectors.
 
-> **Opt-in streaming** (`CHAT_STREAMING`, default `false`): when enabled, chat answers stream token-by-token into the UI via Server-Sent Events (`POST /api/chat/stream`) for lower perceived latency. When off, the UI uses the single-shot `POST /api/chat` JSON response (unchanged default behavior). The flag is exposed through `/api/admin/ui-config` so the frontend only streams when it is on; both endpoints share the same grounding, history, and semantic cache. See [ACA_ENVIRONMENT_VARIABLES](docs/ACA_ENVIRONMENT_VARIABLES.md).
+> **Opt-in streaming** (`CHAT_STREAMING`, default `false`): when enabled, chat answers stream token-by-token into the UI via Server-Sent Events (`POST /api/chat/stream`) for lower perceived latency. When off, the UI uses the single-shot `POST /api/chat` JSON response (unchanged default behavior). The flag is exposed through `/api/admin/ui-config` so the frontend only streams when it is on; both endpoints share the same grounding, history, and semantic cache. See [ACA_ENVIRONMENT_VARIABLES](docs/DEPLOY_FROM_SCRATCH.md).
 
 > The chat button is **automatically hidden** in the UI if `CHAT_DEPLOYMENT` or `EMBEDDING_DEPLOYMENT` are not configured. Deploy the optional models to enable it.
 > Category AI Assessment is also **automatically disabled** if the assessment model isn't deployed in your AI Foundry project.
 
-> **Opt-in Agent Framework tuning (default-off):** Two flags let you tune the chat agent without changing default behavior. Set `CHAT_REASONING_EFFORT=minimal|low|medium|high` to forward a reasoning effort to the model (`OpenAIChatOptions.reasoning`), and set `CHAT_HISTORY_COMPACTION=true` to replace the fixed last-10-turns window with token-aware compaction (`ContextWindowCompactionStrategy` + the built-in `CharacterEstimatorTokenizer`, budgets via `CHAT_COMPACTION_MAX_TOKENS` / `CHAT_COMPACTION_MAX_OUTPUT_TOKENS`). Both are unset/off by default — see [ACA_ENVIRONMENT_VARIABLES](docs/ACA_ENVIRONMENT_VARIABLES.md).
+> **Opt-in Agent Framework tuning (default-off):** Two flags let you tune the chat agent without changing default behavior. Set `CHAT_REASONING_EFFORT=minimal|low|medium|high` to forward a reasoning effort to the model (`OpenAIChatOptions.reasoning`), and set `CHAT_HISTORY_COMPACTION=true` to replace the fixed last-10-turns window with token-aware compaction (`ContextWindowCompactionStrategy` + the built-in `CharacterEstimatorTokenizer`, budgets via `CHAT_COMPACTION_MAX_TOKENS` / `CHAT_COMPACTION_MAX_OUTPUT_TOKENS`). Both are unset/off by default — see [ACA_ENVIRONMENT_VARIABLES](docs/DEPLOY_FROM_SCRATCH.md).
 
 ---
 
 ## Documentation
 
-| Category | Doc | Description |
-|----------|-----|-------------|
-| **Getting Started** | [LOCAL_DEVELOPMENT](docs/LOCAL_DEVELOPMENT.md) | Run locally with `uv` and `npm` |
-| | [DEPLOY_FROM_SCRATCH](docs/DEPLOY_FROM_SCRATCH.md) | First-time Azure deployment (45–60 min) |
-| **Architecture** | [ARCHITECTURE](docs/ARCHITECTURE.md) | System design, data flow, RBAC |
-| | [INFRASTRUCTURE](docs/INFRASTRUCTURE.md) | Terraform resources and networking |
-| | [MODELS](docs/MODELS.md) | AI models, fallback logic, fine-tuning |
-| **Operations** | [TROUBLESHOOTING](docs/TROUBLESHOOTING_MAP.md) | Common issues and fixes |
-| | [CICD_GITHUB](docs/CICD_GITHUB.md) | GitHub Actions CI/CD with OIDC |
-| | [COSTS_LOGIC](docs/COSTS_LOGIC.md) | Cost estimation and token tracking |
-| **Features** | [USER_INTERFACE](docs/USER_INTERFACE.md) | Dashboard and UI guide |
-| | [CUSTOMIZATION](docs/CUSTOMIZATION.md) | Category taxonomy and configuration |
-| | [AI_SEARCH_INDEXES](docs/AI_SEARCH_INDEXES.md) | Per-category AI Search indexes and examples |
-| | [INTEGRATION](docs/INTEGRATION.md) | CSV export, slug system, API |
+| Guide | Contents |
+| --- | --- |
+| [Local development](docs/LOCAL_DEVELOPMENT.md) | Setup, tests and CLI helpers |
+| [Deployment](docs/DEPLOY_FROM_SCRATCH.md) | Terraform, configuration, RBAC and CI/CD |
+| [Architecture](docs/ARCHITECTURE.md) | Runtime flow, ownership and diagrams |
+| [Agentic classification](docs/AGENTIC_CLASSIFICATION.md) | Multi-agent workflow and AI Search examples |
+| [Models](docs/MODELS.md) | Deployment aliases, OCR and chat options |
+| [Integration](docs/INTEGRATION.md) | UI, categories, API and CSV exports |
+| [Data and privacy](docs/PII_ANONYMIZATION_AND_USER_CORRECTIONS.md) | Corrections, JSONL exports and anonymization limits |
+| [Costs](docs/COSTS_LOGIC.md) | Usage-based estimates and their limitations |
+| [Troubleshooting](docs/TROUBLESHOOTING_MAP.md) | Runtime failures and state drift |
 
 Full index: [docs/INDEX.md](docs/INDEX.md)
 

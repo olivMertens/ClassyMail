@@ -348,7 +348,7 @@ if ($aiAccount) {
                 Write-Host "    - $($dep.name) ($($dep.properties.model.name)): $($dep.properties.provisioningState)"
             }
         } else {
-            Write-Status -Status warning -Message "No model deployments found. Run setup: docs/AI_FOUNDRY_SETUP.md"
+            Write-Status -Status warning -Message "No model deployments found. Run setup: docs/MODELS.md"
         }
     } catch {
         Write-Status -Status warning -Message "Could not list model deployments"
@@ -491,7 +491,7 @@ if ($identityId) {
                     $scopeLeaf = ($ur.scope -split '/')[-1]
                     Write-Host "    ! $($ur.roleDefinitionName) on $scopeLeaf" -ForegroundColor Yellow
                 }
-                Write-Host "    These are safe to remove. See docs/RBAC_AUDIT.md section 8." -ForegroundColor Cyan
+                Write-Host "    Review each principal and scope before removal. See docs/DEPLOY_FROM_SCRATCH.md#identity-and-rbac." -ForegroundColor Cyan
             } else {
                 Write-Status -Status success -Message "No unexpected extra roles - clean Terraform-only RBAC"
             }
@@ -582,7 +582,7 @@ if ($script:Failed -eq 0) {
     Write-Host ""
     Write-Host "Next steps:"
     Write-Host "  1. Deploy models in Microsoft AI Foundry (if deployments missing)"
-    Write-Host "     See: docs/AI_FOUNDRY_SETUP.md"
+    Write-Host "     See: docs/MODELS.md"
     Write-Host "  2. Test end-to-end workflow by uploading a PDF via UI"
     Write-Host "  3. Monitor Application Insights for telemetry"
     Write-Host "  4. Review warnings above and address if needed"
@@ -592,15 +592,15 @@ if ($script:Failed -eq 0) {
     Write-Host "  - Network issues: .\scripts\update_cosmos_firewall.ps1 -ResourceGroup `"$ResourceGroup`""
     Write-Host "  - Container Apps not running: az containerapp restart --name <app-name> -g $ResourceGroup"
     Write-Host "  - Cosmos DB errors: Wait 5-10 min for RBAC propagation, then restart apps"
-    Write-Host "  - Missing deployments: See docs/AI_FOUNDRY_SETUP.md"
+    Write-Host "  - Missing deployments: See docs/MODELS.md"
     Write-Host ""
     Write-Host "Tip: Use -AutoFixNetwork to automatically fix network issues"
     Write-Host "     .\scripts\verify-mvp-setup.ps1 -ResourceGroup `"$ResourceGroup`" -AutoFixNetwork"
 }
 
 Write-Host ""
-Write-Host "For detailed troubleshooting, see: docs/AI_FOUNDRY_SETUP.md"
-Write-Host "For complete infrastructure docs, see: docs/INFRASTRUCTURE.md"
+Write-Host "For detailed troubleshooting, see: docs/MODELS.md"
+Write-Host "For complete infrastructure docs, see: docs/DEPLOY_FROM_SCRATCH.md"
 Write-Host ""
 
 exit $script:Failed

@@ -153,7 +153,7 @@ require_cmd terraform
 # Cosmos DB data-plane access uses a Terraform-managed custom SQL role, so it
 # is verified and reported (warn) rather than created here.
 #
-# Canonical role list (source: docs/RBAC_AUDIT.md + infra/main.tf):
+# Canonical role list (source: docs/DEPLOY_FROM_SCRATCH.md + infra/main.tf):
 #   Storage Blob Data Contributor        -> storage account      (always)
 #   Azure Service Bus Data Receiver      -> Service Bus namespace (always)
 #   Azure Service Bus Data Sender        -> Service Bus namespace (always)
@@ -486,7 +486,7 @@ if [[ -n "$GITHUB_REPO" ]]; then
   show_out "AZURE_CLIENT_ID" "CICD_CLIENT_ID"
   show_out "AZURE_TENANT_ID" "CICD_TENANT_ID"
   printf "  %-26s %s\n" "AZURE_SUBSCRIPTION_ID" "$DETECTED_SUB"
-  echo "  (details: docs/CICD_GITHUB.md)"
+  echo "  (details: docs/DEPLOY_FROM_SCRATCH.md)"
 fi
 
 # ── Post-apply discovery + role verification (adds only missing) ──────

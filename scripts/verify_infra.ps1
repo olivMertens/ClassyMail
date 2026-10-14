@@ -171,7 +171,7 @@ if ($allRoles) {
     foreach ($ur in $unexpectedRoles) {
       Warn "  - $($ur.roleDefinitionName) on $($ur.scope | Split-Path -Leaf)"
     }
-    Info "These may be manual leftovers. See docs/RBAC_AUDIT.md section 8."
+    Info "Review each principal and scope before removing roles. See docs/DEPLOY_FROM_SCRATCH.md#identity-and-rbac."
   } else {
     Ok "No unexpected extra roles found — clean deployment"
   }

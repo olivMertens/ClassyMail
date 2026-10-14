@@ -1,444 +1,80 @@
-# Troubleshooting Map
+# Troubleshooting
 
-> **Naming convention**: `<prefix>` refers to your Terraform `prefix` variable (default: `classymail`). All Azure resource names are derived from it.
+## Start With The Failing Stage
 
-This document maps the critical connections between Azure Container Apps, Service Bus, Storage, and Identity, and provides a troubleshooting guide for common failures.
+Check `/healthz` for liveness and `/readyz` for readiness. Then inspect
+`/api/admin/diagnostics`, `/api/admin/version`, processing history and the actual
+API/worker revision logs. Do not equate a successful CI validation or image build with
+a healthy deployed worker. Admin diagnostics can expose operational information;
+restrict access appropriately.
 
-## Quick Reference
+| Symptom | First checks |
+| --- | --- |
+| API will not start | Required variables in [app.py](../classymail/app.py), credentials, dependency versions |
+| PDF uploaded but no record appears | Per-file upload result, BlobCreated subscription, queue delivery and worker |
+| Queued records do not finish | Worker revision, queue configuration, identity and model errors |
+| Cosmos 403 | Data-plane role, principal/scope and firewall; management IAM alone is insufficient |
+| Storage or Service Bus 403 | Runtime identity and data-plane roles; allow for propagation |
+| OCR errors | Primary provider configuration, response/quota, standalone DI fallback endpoint |
+| Model 404 / unsupported API version | Actual deployment alias and endpoint/API surface, not just model family name |
+| Chat API-version error | OpenAI v1 chat uses `CHAT_API_VERSION=preview` |
+| Poor classifications | Category descriptions/exclusions, OCR content, retrieval examples, saved settings |
+| JSONL export refused/empty | Reviewed-ready threshold, processed records, nonempty intents and anonymizer errors |
+| Blank UI | Frontend build output, asset loading and API responses |
+| Costs unexpectedly zero | Usage-bearing sample count, rate configuration and omitted cost components |
 
-| Symptom | Jump To |
-|---------|---------|
-| Messages stuck in queue (Active > 0) | [Scenario A](#scenario-a-messages-are-stuck-in-the-queue-active--0) |
-| GitHub Action fails "Resource does not exist" | [Scenario B](#scenario-b-github-action-fails---resource-does-not-exist) |
-| Cosmos DB 403 "readMetadata" forbidden | [Scenario C](#scenario-c-cosmos-db-readmetadata-forbidden-rbac-scope-bug) |
-| Worker crash loop (ProvisioningState: Failed) | [Scenario D](#scenario-d-worker-is-crashing-loop-provisioningstate-failed) |
-| OIDC login fails (AADSTS700213) | [Scenario E](#scenario-e-authenticationlogin-failures-aadsts700213) |
-| Cosmos DB 403 "IP through public internet" | [Scenario F](#scenario-f-cosmos-db-403-request-originated-from-ip--through-public-internet) |
-| Chat returns 400 "API version not supported" | [Scenario G](#scenario-g-chat-assistant-returns-400-api-version-not-supported) |
-| Chat / vector search returns no results | [Scenario H](#scenario-h-chat-assistant-finds-no-emails-vector-search--cache) |
+Owners: [worker.py](../classymail/services/worker.py),
+[pipeline.py](../classymail/services/pipeline.py),
+[llm_pipeline.py](../classymail/services/llm_pipeline.py),
+[diagnostics.py](../classymail/api/routers/admin/diagnostics.py).
 
----
+## Model And OCR Diagnostics
 
-## 1. System Data Flow & Connections
+`GET /api/admin/deployments` lists deployments discovered by the implementation.
+`GET /api/admin/validate-aca-env` checks configuration; model-test and connectivity
+operations live in [testing.py](../classymail/api/routers/admin/testing.py). Some tests
+call billable services or create data. Availability in a catalog is not proof that a
+runtime identity can invoke a deployment. See [models](MODELS.md).
 
-The system relies on asynchronous message passing using the **Claim Check Pattern**:
+Prefer a dedicated Document Intelligence resource for its fallback endpoint. Do not
+assume a generic Foundry endpoint serves the Document Intelligence REST path.
+Content Understanding is opt-in and requires its own endpoint configuration.
 
-1.  **API App** (`<prefix>-api`)
+## Dead Letters And Reprocessing
 
-    *   Uploads PDF to **Blob Storage** (`pdf-inputs`).
+Inspect `/api/admin/deadletter` before replaying. Fix the underlying endpoint, quota,
+network or payload problem first. Replay, purge, reset and bulk reprocessing are
+different operations; purge/reset delete data. Their implementations are in
+[data_ops.py](../classymail/api/routers/admin/data_ops.py). Do not use reset to diagnose
+one failed email.
 
-    *   Creates a document in **Cosmos DB** (`emails`) with status `pending`.
+## Terraform State Drift
 
-    *   Sends a message to **Service Bus Queue** (`pdf-processing-queue`).
+If a plan proposes duplicate Container Apps or unexpected replacement, stop before apply.
+Check the selected subscription, workspace/backend, `prefix`, `app_name`, actual app
+resource IDs and [CI target names](../.github/workflows/deploy.yml).
 
-2.  **Worker App** (`<prefix>-worker`)
-
-    *   Polls **Service Bus Queue**.
-
-    *   Downloads PDF from **Blob Storage** using the path from the message.
-
-    *   Sends content to **AI Foundry** (Mistral/Phi-4) for classification.
-
-    *   Updates **Cosmos DB** with results or errors.
-
-### Critical Infrastructure Glue (Managed Identity)
-
-Both Container Apps use the **same User Assigned Managed Identity** (`<prefix>-id`) to authenticate. There are no access keys in code (Access Keys are disabled).
-
-| Resource | Required Role for Identity | Purpose |
-
-|:--- |:--- |:--- |
-
-| **Service Bus** | `Azure Service Bus Data Owner` | Send messages (API, DLQ retry), consume tasks (Worker), and read queue runtime properties (monitoring). |
-
-| **Storage Account** | `Storage Blob Data Contributor` | Read PDF content. |
-
-| **Cosmos DB** | Custom App Role (`readMetadata` + CRUD) | Read/Write metadata & results (Account scope). |
-
-| **AI Foundry** | `Cognitive Services User` | Invoke LLM models. |
-
-| **Container Registry** | `AcrPull` | Download Docker image for ACA. |
-
-| **Resource Group** | `Contributor` (CI/CD only) | Allow GitHub Actions to deploy ACA. |
-
----
-
-## 2. Environment Variable Mapping
-
-Both API and Worker share these critical configuration values. **If one is missing, the application will crash.**
-
-| Env Var Name | Value Source (Terraform/Azure) | Function |
-
-|:--- |:--- |:--- |
-
-| `AZURE_CLIENT_ID` | Identity Client ID | Tells `DefaultAzureCredential` which identity to use (OIDC/MSI). |
-
-| `AZURE_SERVICE_BUS_FQDN` | `${prefix}-sbus.servicebus.windows.net` | Connection to queue. |
-
-| `AZURE_SERVICE_BUS_QUEUE` | `pdf-processing-queue` | The specific channel name. |
-
-| `AZURE_STORAGE_ACCOUNT_URL` | `https://${prefix}st.blob.core.windows.net/` | Base URL for finding PDFs. |
-
-| `AZURE_STORAGE_CONTAINER` | `pdf-inputs` | Folder name for PDFs. |
-
-| `AZURE_COSMOS_DB` | `emailsdb` | Database name. |
-
-| `AZURE_COSMOS_CONTAINER` | `emails` | Container name on Cosmos. |
-
-| `AZURE_AI_ENDPOINT` | `${prefix}-aifoundry...` | MaaS/AI Gateway URL. |
-
----
-
-## 3. Troubleshooting Guide
-
-### Scenario A: "Messages are stuck in the Queue" (Active > 0)
-
-The worker is likely crashing or configured incorrectly.
-
-1.  **Check Message Counts:**
-
-    ```bash
-
-    az servicebus queue show --name pdf-processing-queue --namespace-name <prefix>-sbus --resource-group <prefix>-rg --query countDetails
-
-    ```
-
-2.  **Check Worker Logs:**
-
-    ```bash
-
-    az containerapp logs show --name <prefix>-worker --resource-group <prefix>-rg --tail 50
-
-    ```
-
-    *   **Look for `ModuleNotFoundError`**: The startup command is wrong (e.g., using old package name instead of `classymail`).
-
-    *   **Look for `AttributeError: 'NoneType' object has no attribute 'strip'`**: Missing Environment Variables (likely `AZURE_SERVICE_BUS_FQDN`).
-
-    *   **Look for `AzureIdentityCredentialAdapter` errors**: The RBAC role is missing on the resource.
-
-### Scenario B: GitHub Action fails - "Resource does not exist"
-
-The identity used by GitHub Actions (`<prefix>-id`) lacks permissions to **read/list** resources, even if it can **push** to them.
-
-*   **Error:** `The environment '.../<prefix>-env' does not exist.`
-
-    *   **Fix:** Grant **Contributor** role on the Resource Group to the Managed Identity.
-
-*   **Error:** `The resource with name '...acr...' could not be found.`
-
-    *   **Fix:** Grant **Reader** role on the ACR to the Managed Identity (in addition to `AcrPush`).
-
-### Scenario C: Cosmos DB "readMetadata" Forbidden (RBAC Scope Bug)
-
-**Error:**
-
+```powershell
+terraform -chdir=infra state list
+terraform -chdir=infra state show azurerm_container_app.api
+terraform -chdir=infra state show azurerm_container_app.worker
+terraform -chdir=infra plan
 ```
 
-Request blocked by Auth <prefix>-cosmos: Request is blocked because principal [...]
-
-does not have required RBAC permissions to perform action
-
-[Microsoft.DocumentDB/databaseAccounts/readMetadata] on resource [dbs/emailsdb].
-
-```
-
-**Root cause:** The Cosmos SQL role assignment is scoped to the **database** level (`dbs/emailsdb`) instead of the **account** level. The Python SDK calls `readMetadata` at the account level before any data-plane operation, and a database-scoped assignment doesn't cover it.
-
-> **Note**: Terraform manages a **Custom Role** with restricted actions. The built-in `00000000-0000-0000-0000-000000000002` role is a superset that works as a quick CLI workaround.
-
-**Verify current assignments:**
-
-```bash
-
-# List all Cosmos SQL role assignments
-
-az cosmosdb sql role assignment list \
-
-  --account-name <prefix>-cosmos \
-
-  --resource-group <prefix>-rg \
-
-  -o table
-
-# Check scope — must be the account ID, NOT .../dbs/emailsdb
-
-az cosmosdb sql role assignment list \
-
-  --account-name <prefix>-cosmos \
-
-  --resource-group <prefix>-rg \
-
-  --query "[].{name:name, principal:principalId, scope:scope}" \
-
-  -o table
-
-```
-
-**Fix (CLI — immediate):**
-
-```bash
-
-# Get the managed identity principal
-
-PRINCIPAL=$(az identity show -n <prefix>-id -g <prefix>-rg --query principalId -o tsv)
-
-# Create account-scoped role assignment
-
-ACCOUNT_ID=$(az cosmosdb show -n <prefix>-cosmos -g <prefix>-rg --query id -o tsv)
-
-az cosmosdb sql role assignment create \
-
-  --account-name <prefix>-cosmos \
-
-  --resource-group <prefix>-rg \
-
-  --role-definition-id "00000000-0000-0000-0000-000000000002" \
-
-  --principal-id "$PRINCIPAL" \
-
-  --scope "$ACCOUNT_ID"
-
-```
-
-**Fix (Terraform — permanent):** In `infra/main.tf`, the `azurerm_cosmosdb_sql_role_assignment` scope must be:
-
-```hcl
-
-scope = azurerm_cosmosdb_account.db.id  # account-level, NOT .../dbs/emailsdb
-
-```
-
-**Verify fix:**
-
-```bash
-
-# Test a simple read — should return documents or empty list, not 403
-
-az rest --method POST \
-
-  --uri "https://<prefix>-cosmos.documents.azure.com/dbs/emailsdb/colls/emails/docs" \
-
-  --headers "x-ms-version=2018-12-31" "x-ms-documentdb-query=true" \
-
-  --body '{"query": "SELECT TOP 1 * FROM c"}'
-
-# Or simply restart the Container App and check logs
-
-az containerapp revision restart -n <prefix>-api -g <prefix>-rg
-
-```
-
-### Scenario D: "Worker is crashing loop" (ProvisioningState: Failed)
-
-If manual updates corrupted the configuration (e.g., wiped env vars):
-
-1.  **Export current YAML state:**
-
-    ```bash
-
-    az containerapp show -n <prefix>-worker -g <prefix>-rg --yaml > debug.yaml
-
-    ```
-
-2.  **Verify `containers[0].env`**: Ensure the list is populated (should have ~20 vars).
-
-3.  **Verify `containers[0].args`**: Ensure it points to the correct module:
-
-    ```yaml
-
-    args: ["-m", "classymail.worker_main"]
-
-    ```
-
-4.  **Restore Config:** Use the `worker-restore.yaml` file (if available) or copy env vars from the API app (`<prefix>-api`).
-
-### Scenario E: Authentication/Login Failures (AADSTS700213)
-
-GitHub Action fails to login via OIDC.
-
-1.  **Verify Subject:** Ensure the `Subject` key in the Federated Credential matches exact case: `repo:<owner>/ClassyMail:ref:refs/heads/main`.
-
-2.  **Verify Secrets:** Ensure GitHub Secret `AZURE_CLIENT_ID` matches the `clientId` of `<prefix>-id`.
-
-    ```bash
-
-    az identity show -n <prefix>-id -g <prefix>-rg --query clientId
-
-    ```
-
-### Scenario F: Cosmos DB 403 "Request originated from IP ... through public internet"
-
-**Error:**
-
-```
-
-(Forbidden) Request originated from IP xxx.xxx.xxx.xxx through public internet.
-
-This is blocked by your Cosmos DB account firewall settings.
-
-```
-
-**Root Cause:**
-
-This error has **TWO** distinct causes:
-
-#### Cause 1: Public Network Access Disabled (Terraform Drift)
-
-**Critical Issue:** `publicNetworkAccess` is set to `Disabled` in Azure, even though Terraform expects `Enabled`.
-
-**Impact:** Even with `ip_range_filter = ["0.0.0.0"]` (Allow Azure Services), **ALL public connections are blocked** when `publicNetworkAccess = Disabled`.
-
-**Verification:**
-
-```bash
-
-# Check if public network access is disabled
-
-az cosmosdb show --name <prefix>-cosmos --resource-group <prefix>-rg \
-
-  --query publicNetworkAccess -o tsv
-
-# Should return: Enabled
-
-# If it returns: Disabled ? This is the root cause
-
-```
-
-**Fix (Immediate - CLI):**
-
-```bash
-
-# Enable public network access
-
-az cosmosdb update \
-
-  --name <prefix>-cosmos \
-
-  --resource-group <prefix>-rg \
-
-  --public-network-access Enabled
-
-```
-
-**Fix (Permanent - Terraform):**
-
-```bash
-
-# Verify Terraform is correct (should already have this)
-
-grep "public_network_access_enabled" infra/main.tf
-
-# Expected: public_network_access_enabled = true
-
-# Apply Terraform to restore desired state
-
-cd infra
-
-terraform plan -out=tfplan
-
-terraform apply tfplan
-
-```
-
-#### Cause 2: Missing IP in Firewall Allowlist
-
-**Scenario:** Public network access is enabled, but your specific IP is not in the allowlist.
-
-This often happens when running local scripts (`test_e2e_flow.py`) from a developer machine.
-
-> **Note**: Azure Container Apps work because `0.0.0.0` (Azure Cloud access) is in the allowlist.
-
-**Fix (Immediate - CLI):**
-
-```bash
-
-# Add your current IP to the firewall
-
-az cosmosdb update \
-
-  --name <prefix>-cosmos \
-
-  --resource-group <prefix>-rg \
-
-  --ip-range-filter "0.0.0.0,$(curl -s ifconfig.me)"
-
-```
-
-**Fix (Terraform - Permanent):**
-
-Add your IP to `infra/terraform.tfvars`:
-
-```hcl
-
-allowed_ip_ranges = ["xxx.xxx.xxx.xxx"]
-
-```
-
-Then run `terraform apply`.
-
-**Diagnostic Decision Tree:**
-
-```
-
-Error: "Request originated from IP X.X.X.X through public internet"
-
-  ?
-
-1. Check: az cosmosdb show --query publicNetworkAccess
-
-  ?
-
-  If "Disabled" ? Run: az cosmosdb update --public-network-access Enabled
-
-  If "Enabled" ? Continue to step 2
-
-  ?
-
-2. Check: az cosmosdb show --query ipRules
-
-  ?
-
-  If "0.0.0.0" is missing ? Add it via terraform or CLI
-
-  If "0.0.0.0" is present but your IP is not ? Add your IP
-
-```
-
----
-
-## Scenario G: Chat assistant returns 400 "API version not supported"
-
-**Symptom:** The RAG chat assistant fails; API logs show `400 API version not supported` from the chat model call.
-
-**Root cause:** The chat agent uses `agent_framework`'s `OpenAIChatClient`, which targets the Azure OpenAI **v1 surface** (`{endpoint}/openai/v1/`). That surface only accepts the literal api-version `preview` (or `v1`). A dated value such as `2024-08-01-preview` is rejected.
-
-**Fix:**
-
-1. Ensure `CHAT_API_VERSION=preview` on the `<prefix>-api` Container App.
-
-   ```
-   az containerapp update -g <prefix>-rg -n <prefix>-api --set-env-vars CHAT_API_VERSION=preview
-   ```
-
-2. Code default already resolves to `preview` (`classymail/core/config.py`). Do NOT reuse `AZURE_AI_API_VERSION` (`2024-08-01-preview`) for chat — that one stays for embeddings/Phi/vision on the classic deployment surface.
-
----
-
-## Scenario H: Chat assistant finds no emails (vector search / cache)
-
-**Symptom:** Chat answers "I didn't find any emails related to X" even though matching emails exist.
-
-**Root causes & fixes (check in order):**
-
-1. **Stale response cache.** Chat answers are cached in the Cosmos `vector_cache` container keyed by query-embedding similarity. After changing chat behaviour, purge it so old "not found" answers stop short-circuiting the tools:
-
-   ```
-   # delete all docs in the vector_cache container, then re-test with a fresh query
-   ```
-
-2. **Vector `ORDER BY VectorDistance` returns BadRequest.** The deployed `emails` container's vector index can drift to a quantized form that rejects `ORDER BY VectorDistance` ("One of the input values is invalid"). The vector index is **immutable** after container creation (ARM PUT is accepted but never applied). The code handles this with a **brute-force fallback** (`SELECT VectorDistance(...)` without `ORDER BY`/`TOP`, drain all pages, sort client-side) in `repository.search_chunks_by_vector` / `search_similar_emails`. Keep that fallback; do not rely on recreating the container.
-
-3. **Exact phrases vs. concepts.** For literal terms (e.g. a French phrase like "dégât des eaux"), keyword search (`search_email_by_text`, `CONTAINS(LOWER(search_text), ...)`) is the reliable path; cross-language queries (EN "water damage" against FR content) genuinely require working vector search.
-
-4. **Cosmos `GROUP BY` + `JOIN` unsupported (top intents).** `get_top_intents` aggregates client-side in Python — the serverless account rejects `GROUP BY` combined with `JOIN ... IN <sub-array>`.
+Back up state securely before repairs; it may contain secrets. Import only a resource
+whose exact Azure ID and Terraform address have been verified. Do not remove resources
+from state merely because an old runbook says they were deleted. Review a new plan after
+any import and reject unintended destroy/recreate. Image drift is intentionally ignored
+by Terraform for CI image rollouts; that does not mean every other drift is harmless.
+
+## Build, CI And Local Dependencies
+
+OIDC failures: verify client/tenant/subscription values and federation subject.
+ACR auth, registry firewall and runner network failures are distinct from Dockerfile
+failures. Do not weaken security controls to bypass `connectivity_forbidden`.
+See [deployment](DEPLOY_FROM_SCRATCH.md#github-actions-cicd).
+
+If a managed workstation blocks package downloads, use the approved package feed and
+do not bypass quarantine/TLS controls. Running tests with `--no-sync` checks installed
+dependencies only, not a freshly updated lockfile. Keep this distinction in release
+verification. Avoid committing internally resolved package-feed URLs.
