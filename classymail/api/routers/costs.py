@@ -157,6 +157,9 @@ async def costs_summary(
         "gpt-5.1": "GPT-5.1",
         "gpt-5-nano": "GPT-5 Nano",
         "gpt-5-mini": "GPT-5 Mini",
+        "gpt-5.4-mini": "GPT-5.4 Mini",
+        "gpt-6-luna": "GPT-6 Luna",
+        "gpt-6-sol": "GPT-6 Sol",
         "kimi-k2.5": "Kimi-K2.5",
     }
     model_comparison = []

@@ -60,18 +60,18 @@ const settings = ref({
     show_time: true,
     show_ocr_provider: true
   },
-  ai_assessment_model: 'gpt-4.1-nano',
-  data_generation_model: 'gpt-5.1',
+  ai_assessment_model: 'gpt-6-luna',
+  data_generation_model: 'gpt-6-sol',
   generation_reasoning_effort: 'none',
   agentic: {
     enabled: false,
-    orchestrator_model: 'gpt-4.1-nano',
+    orchestrator_model: 'gpt-6-luna',
     orchestrator_routing_mode: 'balanced',
     orchestrator_model_subset: [],
-    agent_tier1_model: 'gpt-4.1-nano',
-    agent_tier2_model: 'gpt-4.1-mini',
-    agent_tier3_model: 'gpt-4.1',
-    red_team_model: 'gpt-4.1',
+    agent_tier1_model: 'gpt-6-luna',
+    agent_tier2_model: 'gpt-5.4-mini',
+    agent_tier3_model: 'gpt-6-sol',
+    red_team_model: 'gpt-6-sol',
     red_team_threshold: 0.7,
     red_team_conflict_delta: 0.15,
     max_parallel_agents: 6,
@@ -90,17 +90,20 @@ const saved = ref(false)
 // --- Danger zone handled by DangerZoneTab component ---
 
 // ── Token & pricing hypothesis (mirrors MODEL_PRICING in costing.py) ──
-// Prices are per 1 K tokens (input, output) — Azure OpenAI / Foundry, 2025
+// Prices are per 1 K tokens (input, output) — Azure OpenAI / Foundry Global, 2026
 const MODEL_PRICING = {
   'phi-4': { label: 'Phi-4', input: 0.000107, output: 0.00043, quality: 0.82 },
   'gpt-4o': { label: 'GPT-4o', input: 0.0025, output: 0.010, quality: 0.92 },
   'gpt-4o-mini': { label: 'GPT-4o Mini', input: 0.00015, output: 0.0006, quality: 0.84 },
-  'gpt-4.1': { label: 'GPT-4.1', input: 0.002, output: 0.008, quality: 0.93 },
-  'gpt-4.1-nano': { label: 'GPT-4.1 Nano', input: 0.0001, output: 0.0004, quality: 0.72 },
-  'gpt-4.1-mini': { label: 'GPT-4.1 Mini', input: 0.0004, output: 0.0016, quality: 0.85 },
+  'gpt-4.1': { label: 'GPT-4.1 (legacy)', input: 0.002, output: 0.008, quality: 0.93 },
+  'gpt-4.1-nano': { label: 'GPT-4.1 Nano (legacy)', input: 0.0001, output: 0.0004, quality: 0.72 },
+  'gpt-4.1-mini': { label: 'GPT-4.1 Mini (legacy)', input: 0.0004, output: 0.0016, quality: 0.85 },
   'gpt-5-nano': { label: 'GPT-5 Nano', input: 0.00005, output: 0.0004, quality: 0.79 },
   'gpt-5-mini': { label: 'GPT-5 Mini', input: 0.0004, output: 0.0016, quality: 0.89 },
-  'gpt-5.1': { label: 'GPT-5.1', input: 0.002, output: 0.008, quality: 0.94 },
+  'gpt-5.1': { label: 'GPT-5.1', input: 0.00125, output: 0.010, quality: 0.94 },
+  'gpt-5.4-mini': { label: 'GPT-5.4 Mini', input: 0.00075, output: 0.0045, quality: 0.91 },
+  'gpt-6-luna': { label: 'GPT-6 Luna', input: 0.0001, output: 0.0005, quality: 0.86 },
+  'gpt-6-sol': { label: 'GPT-6 Sol', input: 0.002, output: 0.010, quality: 0.96 },
   'kimi-k2.5': { label: 'Kimi-K2.5', input: 0.0006, output: 0.003, quality: 0.88 },
 }
 
@@ -145,7 +148,7 @@ const loadDeployments = async () => {
     deploymentsLoaded.value = true
     // Check if assessment model is among available deployments
     if (availableDeployments.value.length > 0) {
-      const assessModel = settings.value.ai_assessment_model || 'gpt-4.1-nano'
+      const assessModel = settings.value.ai_assessment_model || 'gpt-6-luna'
       assessmentEnabled.value = availableDeployments.value.some(d => d.id === assessModel || d.model === assessModel)
     }
   }
@@ -163,7 +166,7 @@ let assessProgressTimer = null
 
 // Display name for the assessment model
 const assessmentModelLabel = computed(() => {
-  const key = settings.value.ai_assessment_model || 'gpt-4.1-nano'
+  const key = settings.value.ai_assessment_model || 'gpt-6-luna'
   const pricing = getModelPricing(key)
   return pricing ? pricing.label : key
 })
@@ -432,7 +435,7 @@ const assessCategory = async (index) => {
         description: category.description || '',
         exclusions: category.exclusions || '',
         language: locale.value || 'en',
-        model: settings.value.ai_assessment_model || 'gpt-4.1-nano'
+        model: settings.value.ai_assessment_model || 'gpt-6-luna'
       })
     })
 
@@ -882,7 +885,7 @@ onMounted(() => {
               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Fast routing model. Phi-4 not recommended here.
               </p>
               <!-- GPT-5 latency disclaimer -->
-              <div v-if="settings.agentic.orchestrator_model?.startsWith('gpt-5')"
+              <div v-if="/^gpt-?[56]/.test(settings.agentic.orchestrator_model || '')"
                 class="mt-1.5 flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded p-2">
                 <span class="text-sm">⚠️</span>
                 <span>{{ t('settings.agentic.gpt5_warning') }}</span>
@@ -1946,7 +1949,7 @@ onMounted(() => {
               }}</p>
               <div class="grid grid-cols-2 gap-2 text-[11px]">
                 <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
-                  <strong class="text-green-600">✓ gpt-4.1-nano</strong>
+                  <strong class="text-green-600">✓ gpt-6-luna</strong>
                   <p class="text-gray-500 mt-0.5">{{ t('settings.agentic.advice_orch_nano') }}</p>
                 </div>
                 <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
@@ -1954,11 +1957,11 @@ onMounted(() => {
                   <p class="text-gray-500 mt-0.5">{{ t('settings.agentic.advice_orch_router') }}</p>
                 </div>
                 <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
-                  <strong class="text-gray-500">○ gpt-4.1-mini</strong>
+                  <strong class="text-gray-500">○ gpt-5.4-mini</strong>
                   <p class="text-gray-500 mt-0.5">{{ t('settings.agentic.advice_orch_mini') }}</p>
                 </div>
                 <div class="bg-white dark:bg-gray-900 rounded p-2 border border-blue-100 dark:border-blue-900">
-                  <strong class="text-green-600">✓ gpt-5-nano</strong>
+                  <strong class="text-gray-500">○ gpt-4.1-nano (legacy)</strong>
                   <p class="text-gray-500 mt-0.5">{{ t('settings.agentic.advice_orch_reasoning') }}</p>
                 </div>
               </div>
@@ -1977,7 +1980,7 @@ onMounted(() => {
                   <span
                     class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white text-[10px] font-bold">1</span>
                   <div class="flex-1">
-                    <strong class="text-green-700 dark:text-green-400">Tier 1 — gpt-4.1-nano</strong>
+                    <strong class="text-green-700 dark:text-green-400">Tier 1 — gpt-6-luna</strong>
                     <p class="text-gray-500">{{ t('settings.agentic.advice_tier1') }}</p>
                   </div>
                 </div>
@@ -1986,7 +1989,7 @@ onMounted(() => {
                   <span
                     class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold">2</span>
                   <div class="flex-1">
-                    <strong class="text-amber-700 dark:text-amber-400">Tier 2 — gpt-4.1-mini</strong>
+                    <strong class="text-amber-700 dark:text-amber-400">Tier 2 — gpt-5.4-mini</strong>
                     <p class="text-gray-500">{{ t('settings.agentic.advice_tier2') }}</p>
                   </div>
                 </div>
@@ -1995,7 +1998,7 @@ onMounted(() => {
                   <span
                     class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold">3</span>
                   <div class="flex-1">
-                    <strong class="text-red-700 dark:text-red-400">Tier 3 — gpt-4.1</strong>
+                    <strong class="text-red-700 dark:text-red-400">Tier 3 — gpt-6-sol</strong>
                     <p class="text-gray-500">{{ t('settings.agentic.advice_tier3') }}</p>
                   </div>
                 </div>
@@ -2009,7 +2012,7 @@ onMounted(() => {
               <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">{{ t('settings.agentic.advice_redteam_desc') }}
               </p>
               <div class="text-[11px] bg-white dark:bg-gray-900 rounded p-2 border border-red-100 dark:border-red-900">
-                <strong class="text-green-600">✓ gpt-4.1</strong>
+                <strong class="text-green-600">✓ gpt-6-sol</strong>
                 <span class="text-gray-500 ml-1">{{ t('settings.agentic.advice_redteam_model') }}</span>
               </div>
             </div>

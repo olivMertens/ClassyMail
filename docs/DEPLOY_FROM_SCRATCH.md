@@ -646,19 +646,19 @@ Deploy them as **Global Standard** (Azure OpenAI) or **Serverless API** (partner
 
 |-------|----------------|------|:---------:|----------------------|---------|
 
-| GPT-4.1-mini | `gpt-4.1-mini` | Global Standard | ✅ | 20+ regions (all major) ¹ | Fallback classifier, vision, anonymization (GA, retires 2027-10-14) |
+| GPT-5.4-mini | `gpt-5.4-mini` | Global Standard | see ¹ | swedencentral, francecentral + more ¹ | Fallback classifier, vision, anonymization, agent tier2 (version 2026-03-17, GA, retires 2027-09-21) |
 
-| GPT-4.1-nano | `gpt-4.1-nano` | Global Standard | ✅ | 20+ regions (all major) ¹ | Category assessment (fast, default) |
+| GPT-6 Luna | `gpt-6-luna` | Global Standard | see ¹ | swedencentral, francecentral + more ¹ | Category assessment + agentic orchestrator/tier1 (fast, default; version 2026-09-22, GA, retires 2028-03-11) |
 
 | GPT-5-nano | `gpt-5-nano` | Global Standard | ✅ | 20+ regions (all major) ¹ | Category assessment (alternative) |
 
 | GPT-5-mini | `gpt-5-mini` | Global Standard | ✅ | 20+ regions (all major) ¹ | Higher-quality classification |
 
-| GPT-5.1 | `gpt-5.1` | Global Standard | ✅ | eastus2, swedencentral + more ¹ | RAG chat reasoning model (GA, retires 2027-05-15; use `CHAT_API_VERSION=preview`) |
+| GPT-6 Sol | `gpt-6-sol` | Global Standard | see ¹ | swedencentral, francecentral + more ¹ | RAG chat reasoning, synthetic data, agentic tier3 + red-team (version 2026-09-22, GA, retires 2028-03-11; use `CHAT_API_VERSION=preview`) |
 
 | Kimi-K2.5 | `Kimi-K2.5` | Serverless (Moonshot AI) | ❌ | See Foundry model catalog ² | Multilingual classification |
 
-| GPT-4.1 | `gpt-4.1` | Global Standard | ✅ | 20+ regions (all major) ¹ | Agentic tier3 + red-team (GA, retires 2027-10-14) |
+| GPT-4.1 / GPT-4.1-mini / GPT-4.1-nano, GPT-5.1 | `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, `gpt-5.1` | Global Standard | ✅ | Existing subscriptions only | Legacy (GPT-4.1 Deprecated, retires 2027-04-14; existing environments only, Terraform `deploy_legacy_models=true`) |
 
 
 
@@ -672,7 +672,7 @@ Deploy them as **Global Standard** (Azure OpenAI) or **Serverless API** (partner
 
 > Models not deployed will still appear as selectable options (from a hardcoded fallback list)
 
-> but will fail at inference time. Deploy at minimum **GPT-4.1-mini** and **GPT-4.1-nano**.
+> but will fail at inference time. Deploy at minimum **GPT-5.4-mini** and **GPT-6 Luna**.
 
 
 

@@ -9,9 +9,11 @@ ClassyMail supports exporting classification data in JSONL format for fine-tunin
 | Model | Fine-Tuning Support | Notes |
 |-------|-------------------|-------|
 | Phi-4 | Yes | Primary target for domain-specific tuning |
-| GPT-4.1-mini | Yes | Higher quality baseline (GA, cost-effective) |
-| GPT-4.1-nano | Yes | Lowest-cost option |
-| GPT-4.1 | Yes | Highest-quality tuning target |
+| GPT-4.1-mini | Yes (historical) | Higher quality baseline; base model Deprecated, retires 2027-04-14 (existing environments only) |
+| GPT-4.1-nano | Yes (historical) | Lowest-cost option; base model Deprecated, retires 2027-04-14 (existing environments only) |
+| GPT-4.1 | Yes (historical) | Highest-quality tuning target; base model Deprecated, retires 2027-04-14 (existing environments only) |
+
+> The new default deployments (`gpt-6-luna`, `gpt-5.4-mini`, `gpt-6-sol`) are not documented here as fine-tunable; check the Foundry fine-tuning model list before planning a job.
 
 ## Export Format
 
@@ -45,7 +47,7 @@ curl "http://localhost:8000/api/emails/export-finetune-jsonl?split=train&anonymi
 All exports are anonymized by default using a two-layer approach:
 
 1. **Regex layer** (<1ms): Removes emails, phone numbers, IPs, IBANs
-2. **LLM layer** (GPT-4.1-mini): Contextual anonymization of names, companies, addresses, amounts
+2. **LLM layer** (GPT-5.4-mini): Contextual anonymization of names, companies, addresses, amounts
 
 The LLM anonymizer never sees raw PII -- it only processes content already scrubbed by the regex layer. If anonymization fails for any example, that example is skipped (fail-safe: never leak PII).
 

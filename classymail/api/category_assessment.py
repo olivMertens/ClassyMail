@@ -18,10 +18,10 @@ from classymail.services.azure_clients import Clients
 from classymail.services.llm_pipeline import resolve_model_config
 from classymail.services.settings_store import load_settings
 
-# Default assessment model: gpt-4.1-nano is 10-20x faster than gpt-5-nano
-# for structured evaluation tasks (no reasoning overhead needed).
+# Default assessment model: gpt-6-luna with reasoning_effort="none" (set by
+# build_chat_params) keeps gpt-4.1-nano latency/price with a 2028 retirement date.
 # Override via Settings > ai_assessment_model or env ASSESSMENT_MODEL.
-DEFAULT_ASSESSMENT_MODEL = "gpt-4.1-nano"
+DEFAULT_ASSESSMENT_MODEL = "gpt-6-luna"
 
 # UI language names for non-FR/EN prompt suffix
 LANGUAGE_NAMES: dict[str, str] = {
@@ -93,7 +93,7 @@ class CategoryAssessmentRequest(BaseModel):
     description: str | None = Field(default="", description="Category definition (what it IS)")
     exclusions: str | None = Field(default="", description="Category exclusions (what it ISN'T)")
     language: str = Field(default="en", description="Response language: 'en' or 'fr'")
-    model: str | None = Field(default=None, description="Override assessment model (e.g. 'gpt-5-nano', 'phi4')")
+    model: str | None = Field(default=None, description="Override assessment model (e.g. 'gpt-5.4-mini', 'phi4')")
 
 
 class SuggestionParsed(BaseModel):
@@ -116,7 +116,7 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
     """
     AI-powered category definition assessment.
 
-    Uses a fast non-reasoning model by default (gpt-4.1-nano) for quick
+    Uses a fast model by default (gpt-6-luna, reasoning_effort=none) for quick
     structured evaluation. Configurable via settings.ai_assessment_model.
     """
     with tracer.start_as_current_span("assess_category") as span:
@@ -130,7 +130,7 @@ async def assess_category(request: CategoryAssessmentRequest) -> dict[str, Any]:
         span.set_attribute("category.slug", slug)
 
         try:
-            # Resolve assessment model: request > settings > env > default (gpt-4.1-nano)
+            # Resolve assessment model: request > settings > env > default (gpt-6-luna)
             import os
             settings = load_settings()
             assessment_model = (
@@ -296,7 +296,7 @@ Assess quality and provide rewrites."""
             # Timeout per model family:
             # - Reasoning models / model-router (o1/o3/o4/gpt-5): 120s (thinking overhead)
             # - SLMs (phi-4, mistral): 90s (smaller GPU, slower inference)
-            # - Fast classic models (gpt-4.1-nano, gpt-4o-mini): 30s
+            # - Fast classic models (gpt-4o-mini): 30s
             if is_reasoning_model(deployment) or _is_router:
                 timeout_s = 120
             elif _is_slm:

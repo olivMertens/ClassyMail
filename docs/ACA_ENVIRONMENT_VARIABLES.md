@@ -134,7 +134,7 @@ These variables **must** be configured for the application to function correctly
 
 - **`PHI_FALLBACK_DEPLOYMENT`** - The deployment name for fallback/anonymizer/vision model
 
-  - Example: `gpt-4.1-mini`
+  - Example: `gpt-5.4-mini` (Terraform variable `fallback_deployment`; legacy environments may keep `gpt-4.1-mini` until it retires on 2027-04-14)
 
   - Used for: Fallback classification, anonymization, and vision requests
 
@@ -260,9 +260,9 @@ These variables provide additional functionality but are not required for core o
 
 - **`CHAT_DEPLOYMENT`** - The deployment name for the chat model
 
-  - Example: `gpt-5.1`
+  - Example: `gpt-6-sol` (Terraform variable `chat_deployment`; legacy environments may keep `gpt-5.1`)
 
-  - Used for: RAG-based chat interface with the GPT-5.1 reasoning model (GA, retires 2027-05-15)
+  - Used for: RAG-based chat interface and synthetic data generation with the GPT-6 Sol reasoning model (version 2026-09-22, GA, retires 2028-03-11)
 
   - Fallback: Uses `PHI_FALLBACK_DEPLOYMENT` if not configured
 
@@ -324,7 +324,7 @@ These variables provide additional functionality but are not required for core o
 
 - **`GPT_DEPLOYMENT`** - The deployment name for GPT models
 
-  - Example: `gpt-4.1`
+  - Example: `gpt-6-sol`
 
   - Used for: Advanced GPT-based classification
 

@@ -58,10 +58,11 @@ az resource show --ids <RESOURCE_ID> --query tags -o json
 |-------|----------------|---------------------|---------|----------|
 | **Mistral Document AI 2512** | `mistral-document-ai-2512` | `MISTRAL_DEPLOYMENT` | OCR + Vision extraction | ✅ MANDATORY |
 | **Phi-4** | `Phi-4` | `PHI_DEPLOYMENT` | Primary classification (8K) | ✅ MANDATORY |
-| **GPT-4.1-mini** | `gpt-4.1-mini` | `PHI_FALLBACK_DEPLOYMENT` | Fallback classification + PII detection/anonymization + vision (GA, retires 2027-10-14) | ✅ MANDATORY |
+| **GPT-5.4-mini** | `gpt-5.4-mini` | `PHI_FALLBACK_DEPLOYMENT` (Terraform `fallback_deployment`) | Fallback classification + PII detection/anonymization + vision (version 2026-03-17, GA, retires 2027-09-21) | ✅ MANDATORY |
 | **text-embedding-3-small** | `text-embedding-3-small` | `EMBEDDING_DEPLOYMENT` | Vector embeddings (RAG) | ✅ MANDATORY |
-| **GPT-5.1** | `gpt-5.1` | `CHAT_DEPLOYMENT` | Chatbot reasoning model (GA, retires 2027-05-15) | ⚠️ RECOMMENDED |
-| **GPT-4.1-nano** | `gpt-4.1-nano` | Category assessment / agentic defaults | Category assessment AI + agentic orchestrator/tier1 (GA, retires 2027-10-14) | ⚠️ RECOMMENDED |
+| **GPT-6 Sol** | `gpt-6-sol` | `CHAT_DEPLOYMENT` (Terraform `chat_deployment`) | Chatbot reasoning model + synthetic data, agentic tier3/red team (version 2026-09-22, GA, retires 2028-03-11) | ⚠️ RECOMMENDED |
+| **GPT-6 Luna** | `gpt-6-luna` | Category assessment / agentic defaults | Category assessment AI + agentic orchestrator/tier1 (version 2026-09-22, GA, retires 2028-03-11) | ⚠️ RECOMMENDED |
+| **GPT-4.1 / GPT-4.1-mini / GPT-4.1-nano, GPT-5.1** | `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, `gpt-5.1` | Saved settings / `chat_deployment` / `fallback_deployment` | Legacy (GPT-4.1 Deprecated, retires 2027-04-14; existing environments only). Kept by `deploy_legacy_models=true` (`-DeployLegacyModels` / `--deploy-legacy-models`); set `chat_deployment="gpt-5.1"`, `fallback_deployment="gpt-4.1-mini"` to keep an existing environment unchanged | Optional |
 
 ---
 
@@ -140,7 +141,7 @@ doc_intelligence_sku         = "S0"   # Default: S0 (F0 for free tier)
 **Why Exact Names Matter:**
 - The application code references these deployment names directly
 - Mismatch between deployment name and environment variable will cause 404 errors
-- Default configuration assumes standard naming convention (e.g., `Phi-4`, `gpt-4.1-mini`)
+- Default configuration assumes standard naming convention (e.g., `Phi-4`, `gpt-5.4-mini`)
 
 **Terraform Note:**
 - Terraform creates the AI Foundry account and project
@@ -306,7 +307,7 @@ Some AzureRM provider versions don't auto-detect subscription from Azure CLI. Th
 
 - **API** Container App receives:
   - `CHAT_ENDPOINT` = AI Foundry endpoint
-  - `CHAT_DEPLOYMENT` = `gpt-5.1`
+  - `CHAT_DEPLOYMENT` = `gpt-6-sol` (Terraform `chat_deployment`)
   - `CHAT_API_VERSION` = `preview`
 - **Worker** does not need chatbot variables
 - **Optional:** `COSMOS_QUERY_MAX_LIMIT` (default `20`)

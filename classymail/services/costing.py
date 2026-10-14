@@ -15,7 +15,7 @@ MODEL_PRICING = {
     "gpt-4o": (0.0025, 0.010),
     "gpt-4o-mini": (0.00015, 0.0006),
 
-    # GPT-4.1 family
+    # GPT-4.1 family (deprecated for new subscriptions, retires 2027-04-14)
     "gpt-4.1": (0.002, 0.008),
     "gpt-4.1-nano": (0.0001, 0.0004),
     "gpt-4.1-mini": (0.0004, 0.0016),
@@ -25,6 +25,13 @@ MODEL_PRICING = {
     "gpt-5-nano": (0.00005, 0.0004),
     "gpt-5-mini": (0.0004, 0.0016),
     "gpt-5": (0.002, 0.008),
+    "gpt-5.4-mini": (0.00075, 0.0045),
+    "gpt-5.4-nano": (0.0002, 0.00125),
+
+    # GPT-6 family (short-context Global prices)
+    "gpt-6-luna": (0.0001, 0.0005),
+    "gpt-6-sol": (0.002, 0.010),
+    "gpt-6.1-sol": (0.002, 0.010),
 
     # Kimi (Moonshot AI via Foundry)
     "kimi-k2.5": (0.0006, 0.003),

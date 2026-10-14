@@ -30,6 +30,7 @@ The entire pipeline is event-driven: Blob Storage → Event Grid → Service Bus
 
 | Area | Change | Status |
 |------|--------|--------|
+| Models | GPT-4.1 family is **Deprecated** (new subscriptions cannot deploy it, retires 2027-04-14). New defaults: `gpt-6-luna` (replaces gpt-4.1-nano), `gpt-5.4-mini` (replaces gpt-4.1-mini), `gpt-6-sol` (replaces gpt-4.1 and gpt-5.1), all called with `reasoning_effort="none"` on fast paths. Saved settings are kept, so existing demos keep running (see [Migration from GPT-4.1](#migration-from-gpt-41)) | Shipped |
 | Agentic classification | Human review decided **per label**: any accepted category below the threshold, any failed agent, or a Red Team that did not explicitly validate sets `needs_review` (`agentic.review_reasons`) | Shipped |
 | Agentic classification | Specialized agents may only call their own `search_<category>` tool; arguments validated; malformed or out-of-range answers fail that agent only; Red Team outage keeps partial results | Shipped |
 | Settings | `POST /api/settings` returns `503` when Cosmos DB persistence fails (the worker reads settings from Cosmos), instead of silently succeeding | Shipped |
@@ -44,18 +45,18 @@ The entire pipeline is event-driven: Blob Storage → Event Grid → Service Bus
 
 ### AI Classification Pipeline
 - **Hybrid OCR**: Mistral Document AI 2512 as primary, Azure Document Intelligence as automatic fallback with circuit breaker pattern. When Document Intelligence is used, a **📄 amber badge** appears on the email in the dashboard and detail modal so reviewers can see which OCR engine was used.
-- **Multi-Model Classification**: Phi-4 (8K context) as primary, GPT-4.1-mini as fallback — switch models from the Settings UI at any time
+- **Multi-Model Classification**: Phi-4 (8K context) as primary, GPT-5.4-mini as fallback — switch models from the Settings UI at any time
 - **Multi-Intent Detection**: A single email can match multiple categories, each with its own confidence score (0.0–1.0) and text justification
 
 ### Configurable Categories & Settings
 - **Custom Category Taxonomy**: Define your own business categories with name, slug, description, and exclusion rules — all editable from the Settings UI
-- **Model Selection**: Switch classification model (Phi-4, GPT-4.1-mini, GPT-5-mini, Kimi-K2.5, etc.) from Settings — **models are auto-discovered from your AI Foundry project deployments** with a hardcoded fallback list
+- **Model Selection**: Switch classification model (Phi-4, GPT-5.4-mini, GPT-6-luna, Kimi-K2.5, etc.) from Settings — **models are auto-discovered from your AI Foundry project deployments** with a hardcoded fallback list
 - **Processing Strategies**: Choose between Standard (fast), Deep Reasoning (Chain-of-Thought), Vision (image-aware), or **Agentic (Multi-Agent)** per processing run
 - **Batch Reprocessing**: Reprocess all emails with a different model or strategy for A/B testing
 
 ### Agentic Classification (Multi-Agent Pipeline)
 
-- **Orchestrator Inspector**: A fast, cheap model (gpt-4.1-nano) scans the document and shortlists the top 3-5 candidate categories — cuts 80% of unnecessary computation
+- **Orchestrator Inspector**: A fast, cheap model (gpt-6-luna, `reasoning_effort="none"`) scans the document and shortlists up to `max_parallel_agents` (6) candidate categories
 - **Parallel Specialized Agents**: One agent per candidate category, each with its own RAG tool calling a dedicated Azure AI Search index for reference examples
 - **Tier-aware model selection**: The orchestrator's per-candidate confidence drives the model used by each specialized agent — Tier 1 (`conf ≥ 0.8`, simple) uses cheap models; Tier 2 (`0.5 ≤ conf < 0.8`, ambiguous) uses balanced models; Tier 3 (`conf < 0.5`, critical) uses the most capable models. Same prompt, different muscle.
 - **Red Team Quality Gate**: Adversarial reviewer activated when confidence is low or agents disagree — can request **extra agents** which run in a second resilient fan-out
@@ -66,12 +67,12 @@ The entire pipeline is event-driven: Blob Storage → Event Grid → Service Bus
 
 ```mermaid
 flowchart TD
-    Email["Email markdown - orchestrator reads 12000 chars, agents 8000"] --> Orch["Orchestrator - orchestrator_model gpt-4.1-nano or model-router"]
+    Email["Email markdown - orchestrator reads 12000 chars, agents 8000"] --> Orch["Orchestrator - orchestrator_model gpt-6-luna or model-router"]
     Orch -->|"0 candidates"| RT
     Orch -->|"Top N candidates - N = max_parallel_agents default 6"| Tier{"Tier per candidate confidence"}
-    Tier -->|"conf >= 0.8"| T1["Tier 1 agent - agent_tier1_model gpt-4.1-nano"]
-    Tier -->|"0.5 to 0.8"| T2["Tier 2 agent - agent_tier2_model gpt-4.1-mini"]
-    Tier -->|"conf < 0.5"| T3["Tier 3 agent - agent_tier3_model gpt-4.1"]
+    Tier -->|"conf >= 0.8"| T1["Tier 1 agent - agent_tier1_model gpt-6-luna"]
+    Tier -->|"0.5 to 0.8"| T2["Tier 2 agent - agent_tier2_model gpt-5.4-mini"]
+    Tier -->|"conf < 0.5"| T3["Tier 3 agent - agent_tier3_model gpt-6-sol"]
     T1 <-->|"own search_slug tool only - if index enabled"| AIS[("AI Search - classymail-intent-slug - retrieval_mode semantic - top_k 5")]
     T2 <--> AIS
     T3 <--> AIS
@@ -79,7 +80,7 @@ flowchart TD
     T2 --> Agg
     T3 --> Agg
     Agg --> Gate{"Red Team needed? - no match, or max conf < red_team_threshold 0.7, or top-2 gap < red_team_conflict_delta 0.15"}
-    Gate -->|"yes"| RT["Red Team - red_team_model gpt-4.1"]
+    Gate -->|"yes"| RT["Red Team - red_team_model gpt-6-sol"]
     Gate -->|"no"| Final
     RT -->|"refined confidences - known slugs, finite, 0 to 1 only"| Final
     RT -->|"missed intents - deduplicated, capped at max_parallel_agents"| Extra["Extra agents - Tier 2 - 2nd resilient fan-out"]
@@ -106,13 +107,13 @@ Enable it with **Settings → Processing strategy = agentic**. The values above 
 
 | Setting (key) | Default | Effect in the workflow |
 |---------------|---------|------------------------|
-| Orchestrator Model (`orchestrator_model`, `orchestrator_routing_mode`) | `gpt-4.1-nano`, `balanced` | Shortlists candidate categories; `model-router` picks the model per request |
+| Orchestrator Model (`orchestrator_model`, `orchestrator_routing_mode`) | `gpt-6-luna`, `balanced` | Shortlists candidate categories; `model-router` picks the model per request |
 | Max parallel agents (`max_parallel_agents`) | `6` (1-10) | Candidates kept by the orchestrator, and cap on Red Team extra agents |
-| Agent Tiers 1/2/3 (`agent_tier1_model` / `agent_tier2_model` / `agent_tier3_model`) | `gpt-4.1-nano` / `gpt-4.1-mini` / `gpt-4.1` | Model per candidate confidence band (>= 0.8 / 0.5-0.8 / < 0.5) |
-| Red Team (`red_team_model`, `red_team_threshold`, `red_team_conflict_delta`) | `gpt-4.1`, `0.7`, `0.15` | Gate trigger; the threshold is also the per-label human-review threshold |
+| Agent Tiers 1/2/3 (`agent_tier1_model` / `agent_tier2_model` / `agent_tier3_model`) | `gpt-6-luna` / `gpt-5.4-mini` / `gpt-6-sol` | Model per candidate confidence band (>= 0.8 / 0.5-0.8 / < 0.5) |
+| Red Team (`red_team_model`, `red_team_threshold`, `red_team_conflict_delta`) | `gpt-6-sol`, `0.7`, `0.15` | Gate trigger; the threshold is also the per-label human-review threshold |
 | RAG Mode (`retrieval_mode`, `search_top_k`) | `semantic`, `5` | Vector, Hybrid or Semantic retrieval on the per-category index |
 | Per-Category Index (`enabled_indexes`) | all enabled | When off for a category, its agent gets no search tool |
-| Reasoning effort (`reasoning_effort`) | `none` | Passed to reasoning models (gpt-5 family) only |
+| Reasoning effort (`reasoning_effort`) | `none` | Sent to GPT-5.1+ / GPT-6 models; `none` keeps tool calls on Chat Completions fast |
 
 ![Agentic Pipeline Trace — Email Detail](docs/assets/spotlightmermaidagentic.png)
 
@@ -129,13 +130,13 @@ Full documentation: [AGENTIC_CLASSIFICATION](docs/AGENTIC_CLASSIFICATION.md) | [
 - **AI Feedback**: Each correction generates an LLM feedback message explaining what the model missed, used for prompt improvement
 - **Auto-Feed to AI Search**: When a user corrects a classification, the email is automatically pushed as a negative example to the old (wrong) category and a positive example to the new (correct) category in the per-category AI Search indexes
 - **One-Click Reinforcement**: Click "Reinforce" on any correctly classified email to push it as a `human_reinforced` positive example into its category's AI Search index — teaches the agentic pipeline "this is right"
-- **Fine-Tuning Export**: Export anonymized JSONL datasets (train/test split) matching the production system prompt format — ready for Microsoft AI Foundry (Phi-4 LoRA, GPT-4.1-mini)
+- **Fine-Tuning Export**: Export anonymized JSONL datasets (train/test split) matching the production system prompt format — ready for Microsoft AI Foundry (Phi-4 LoRA; GPT-4.1-mini only where the Deprecated base model is still deployed)
 - **Human Reinforcement**: Corrected examples are weighted higher in training data, closing the feedback loop between human reviewers and model quality
-- **Category AI Assessment**: GPT-4.1-nano analyzes your category definitions and suggests improvements based on classification patterns
+- **Category AI Assessment**: GPT-6-luna analyzes your category definitions and suggests improvements based on classification patterns
 - **Per-Category AI Search Indexes**: Each category gets its own Azure AI Search index with positive and negative reference examples — agents use RAG to calibrate confidence (see [AI_SEARCH_INDEXES](docs/AI_SEARCH_INDEXES.md))
 
 ### RAG Chatbot
-- **Chat with your emails**: GPT-5.1 reasoning model with vector search over all processed documents, orchestrated by **Microsoft Agent Framework 1.21** (`agent-framework-core>=1.21` + `agent-framework-openai>=1.16`) — per-locale `Agent` cache, `ContextVar`-scoped dependency injection, and full chat history replay via `list[Message]`
+- **Chat with your emails**: GPT-6-sol reasoning model with vector search over all processed documents, orchestrated by **Microsoft Agent Framework 1.21** (`agent-framework-core>=1.21` + `agent-framework-openai>=1.16`) — per-locale `Agent` cache, `ContextVar`-scoped dependency injection, and full chat history replay via `list[Message]`
 - **Agent-driven suggestions**: The LLM agent generates contextual follow-up action pills after each response — no hardcoded logic
 - **Ask AI button**: Click ✨ on any email card or table row to open the chatbot pre-filled with that email’s context
 - **12 agent tools**: Semantic search (with date filtering), keyword search (case-insensitive), reclassification handoff, sequential review, stats, error analysis, category explanation
@@ -177,7 +178,7 @@ flowchart TD
     worker -->|OCR| ocr["Mistral Document AI 2512"]
     ocr -.->|Fallback| di["Doc Intelligence"]
     worker -->|Classify| phi4["Phi-4"]
-    phi4 -.->|Fallback| gpt["GPT-4.1-mini"]
+    phi4 -.->|Fallback| gpt["GPT-5.4-mini"]
     worker -->|Save| cosmos[("Cosmos DB")]
     cosmos --> api
     api --> ui
@@ -212,7 +213,7 @@ See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for full setup or [do
 - **Backend**: FastAPI (Python 3.12) + uv
 - **Frontend**: Vue 3 + Vite + TailwindCSS + vue-i18n
 - **Infra**: Terraform (azurerm v4 + azapi)
-- **AI**: Microsoft AI Foundry (Mistral, Phi-4, GPT-4.1-mini, GPT-4.1-nano, GPT-5.1) + Microsoft Agent Framework 1.21
+- **AI**: Microsoft AI Foundry (Mistral, Phi-4, GPT-6-luna, GPT-5.4-mini, GPT-6-sol) + Microsoft Agent Framework 1.21
 - **Storage**: Cosmos DB (serverless + vector search + composite indexes), Blob Storage
 - **Auth**: Managed Identity (KEDA scaler excepted, see Security & Operations)
 - **CI/CD**: GitHub Actions with OIDC
@@ -232,11 +233,34 @@ See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for full setup or [do
 
 | Model | Deployment Name | Purpose | Required for |
 |-------|----------------|---------|-------------|
-| GPT-4.1-mini | `gpt-4.1-mini` | Fallback classifier, PII detection/anonymization, vision | Large emails (>8K tokens) |
+| GPT-5.4-mini (2026-03-17, retires 2027-09-21) | `gpt-5.4-mini` | Fallback classifier, PII detection/anonymization, vision, agentic tier 2 | Large emails (>8K tokens) |
+| GPT-6-luna (2026-09-22, retires 2028-03-11) | `gpt-6-luna` | Category assessment, agentic orchestrator and tier 1 | Assessment / agentic |
+| GPT-6-sol (2026-09-22, retires 2028-03-11) | `gpt-6-sol` | RAG chatbot, synthetic data, agentic tier 3 and Red Team | Chat / agentic |
 | text-embedding-3-small | `text-embedding-3-small` | Vector embeddings for RAG chatbot | Chat / semantic search |
-| GPT-5.1 | `gpt-5.1` | RAG chatbot reasoning model | Chat feature |
 
 > **Not all models are required.** The pipeline works with just Phi-4 + Mistral OCR. Optional models enable fallback classification and RAG chat. Deploy only what you need.
+
+#### Migration from GPT-4.1
+
+The GPT-4.1 family (`gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, 2025-04-14) is **Deprecated**: only subscriptions that already deployed it can create it, and it stops answering on **2027-04-14**. `gpt-5.1` retires 2027-05-15. Checked with the Azure Models API (swedencentral, francecentral) on 2026-10-14.
+
+| Previous default | New default | Why this one |
+|------------------|-------------|--------------|
+| `gpt-4.1-nano` | `gpt-6-luna` | Same input price ($0.10 / 1M), longest support (2028-03-11) |
+| `gpt-4.1-mini` | `gpt-5.4-mini` | Mini-sized model, 400K context, GA until 2027-09-21 |
+| `gpt-4.1`, `gpt-5.1` | `gpt-6-sol` | Same input price as gpt-4.1 ($2 / 1M), GA until 2028-03-11 |
+
+GPT-6 and GPT-5.4 are reasoning models: `#classymail/services/openai_client_factory.py` sends `reasoning_effort="none"` and `max_completion_tokens` on the classification calls so the small output budgets are not consumed by reasoning.
+
+**Existing demo, nothing breaks:** saved settings are not rewritten, so an environment whose settings name `gpt-4.1-*` keeps using those deployments until 2027-04-14. If Terraform manages the models or the app settings, keep the current deployments with:
+
+```hcl
+deploy_legacy_models = true            # keeps gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-5.1
+chat_deployment      = "gpt-5.1"
+fallback_deployment  = "gpt-4.1-mini"
+```
+
+Then deploy `gpt-6-luna`, `gpt-5.4-mini` and `gpt-6-sol`, select them in **Settings**, and remove the three overrides before 2027-04-14.
 
 > **Note on OCR 4:** the `mistral-document-ai-2512` deployment *is* Mistral OCR 4 — the pipeline already runs the latest Mistral OCR. Pin a specific dated version via the `MISTRAL_DEPLOYMENT` env var if needed (see `#classymail/core/config.py`).
 
@@ -264,7 +288,7 @@ The chatbot uses **semantic vector search** over all processed emails, powered b
 
 1. **During processing**: Each email’s OCR markdown is embedded using `text-embedding-3-small` (1536 dimensions) and stored in Cosmos DB with `type: "email"`. Chunks are also embedded separately with `type: "chunk"`
 2. **During chat**: User queries are embedded, then Cosmos DB `VectorDistance()` finds the most semantically similar emails — with optional date filtering (`days` parameter for “last week” queries). If the container's vector index rejects `ORDER BY VectorDistance` (a known Cosmos quantized-index drift), the repository automatically falls back to a brute-force scan (compute distances in `SELECT`, sort client-side) so search keeps working
-3. **Chat model** (GPT-5.1 reasoning model) generates answers grounded in retrieved context, with source citations. The chat agent targets the Azure OpenAI **v1 surface**, which requires `CHAT_API_VERSION=preview` (see [ACA_ENVIRONMENT_VARIABLES](docs/ACA_ENVIRONMENT_VARIABLES.md))
+3. **Chat model** (GPT-6-sol reasoning model) generates answers grounded in retrieved context, with source citations. The chat agent targets the Azure OpenAI **v1 surface**, which requires `CHAT_API_VERSION=preview` (see [ACA_ENVIRONMENT_VARIABLES](docs/ACA_ENVIRONMENT_VARIABLES.md))
 4. **Semantic cache**: Similar questions (>99% cosine similarity) return cached responses instantly
 5. **Agent-driven actions**: The LLM appends contextual follow-up suggestions (hidden `<!-- ACTIONS -->` block) that appear as clickable pills in the UI
 

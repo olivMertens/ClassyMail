@@ -57,7 +57,7 @@ DEFAULT_SETTINGS = {
         "extract_last_conversation": True,
         "detect_pii": True,  # Enable PII detection by default (name, email, phone, address extraction)
         "pii_detection_method": "llm",  # llm | azure_language | both
-        "pii_llm_model": "auto",  # auto (reuse ai_model) | gpt-4.1-mini | gpt-5-nano | ...
+        "pii_llm_model": "auto",  # auto (reuse ai_model) | gpt-5.4-mini | gpt-6-luna | ...
     },
     "csv_export": {
         "unclassified_label": "unclassified",  # Label shown in CSV when no category matches
@@ -69,22 +69,22 @@ DEFAULT_SETTINGS = {
         "show_time": True,               # Include TEMPS_S column
         "show_ocr_provider": True,       # Include SOURCE_OCR column (mistral_ocr | document_intelligence)
     },
-    "ai_assessment_model": "gpt-4.1-nano",  # Model for category assessment (fast non-reasoning preferred)
+    "ai_assessment_model": "gpt-6-luna",  # Model for category assessment (fast, reasoning_effort=none)
     "agentic": {
         "enabled": False,                          # Feature flag (opt-in)
-        "orchestrator_model": "gpt-4.1-nano",      # UI-selectable (or "model-router")
+        "orchestrator_model": "gpt-6-luna",        # UI-selectable (or "model-router")
         "orchestrator_routing_mode": "balanced",    # balanced | cost | quality (model-router only)
         "orchestrator_model_subset": [],            # Empty = all models; restrict for cost control
-        "agent_tier1_model": "gpt-4.1-nano",       # Simple intents
-        "agent_tier2_model": "gpt-4.1-mini",       # Ambiguous intents
-        "agent_tier3_model": "gpt-4.1",            # Critical intents
-        "red_team_model": "gpt-4.1",               # Quality gate model
+        "agent_tier1_model": "gpt-6-luna",         # Simple intents
+        "agent_tier2_model": "gpt-5.4-mini",       # Ambiguous intents
+        "agent_tier3_model": "gpt-6-sol",          # Critical intents
+        "red_team_model": "gpt-6-sol",             # Quality gate model
         "red_team_threshold": 0.7,                 # Min confidence to skip red team
         "red_team_conflict_delta": 0.15,           # Top-2 delta to trigger red team
         "max_parallel_agents": 6,                  # Max agents in fan-out
         "retrieval_mode": "semantic",              # vector | hybrid | semantic
         "search_top_k": 5,                         # RAG docs per agent query
-        "reasoning_effort": "none",                # none | low | medium | high (gpt-5 family)
+        "reasoning_effort": "none",                # none | low | medium | high (gpt-5.1+ / gpt-6)
         "enabled_indexes": {},                      # Per-category index toggle: {slug: true/false}. Empty = all enabled
     },
 }
@@ -168,7 +168,7 @@ def load_settings() -> dict:
         if "csv_export" not in data or not isinstance(data["csv_export"], dict):
             data["csv_export"] = DEFAULT_SETTINGS["csv_export"].copy()
         if "ai_assessment_model" not in data:
-            data["ai_assessment_model"] = "gpt-4.1-nano"
+            data["ai_assessment_model"] = DEFAULT_SETTINGS["ai_assessment_model"]
         if "agentic" not in data or not isinstance(data.get("agentic"), dict):
             data["agentic"] = DEFAULT_SETTINGS["agentic"].copy()
         else:

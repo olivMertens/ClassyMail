@@ -165,7 +165,7 @@ const runLLMTests = async () => {
   llmTestLoading.value = true
   llmTestResults.value = null
   try {
-    const chatModel = props.settings?.chat_model || 'gpt-5.1'
+    const chatModel = props.settings?.chat_model || 'gpt-6-sol'
     const responses = await Promise.all([
       fetch('/api/admin/test-phi4'),
       fetch('/api/admin/test-mistral-ocr'),

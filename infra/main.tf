@@ -81,8 +81,26 @@ variable "enable_model_deployments" {
 
 variable "deploy_optional_models" {
   type        = bool
-  description = "Deploy optional models (gpt-4.1-nano assessment/orchestrator, gpt-4.1-mini fallback/vision/anonymizer, gpt-4.1 agentic, text-embedding-3-small, gpt-5.1 chat/RAG). Requires enable_model_deployments = true. These models are NOT required — the pipeline works with just Phi-4 + Mistral OCR."
+  description = "Deploy optional models (gpt-6-luna assessment/orchestrator/tier1, gpt-5.4-mini fallback/vision/anonymizer/tier2, gpt-6-sol tier3/red-team/chat, text-embedding-3-small). Requires enable_model_deployments = true. These models are NOT required — the pipeline works with just Phi-4 + Mistral OCR."
   default     = false
+}
+
+variable "deploy_legacy_models" {
+  type        = bool
+  description = "Also keep the previous defaults (gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-5.1). GPT-4.1 is Deprecated: only subscriptions that already deployed it can create it, and it retires 2027-04-14. Set true on an existing environment whose saved settings still point to these deployments."
+  default     = false
+}
+
+variable "chat_deployment" {
+  type        = string
+  description = "Deployment name used by the RAG chat and data generation (CHAT_DEPLOYMENT). Set \"gpt-5.1\" to keep an existing environment on its current deployment."
+  default     = "gpt-6-sol"
+}
+
+variable "fallback_deployment" {
+  type        = string
+  description = "Deployment name for fallback classification, anonymizer and vision (PHI_FALLBACK/ANONYMIZER/VISION_DEPLOYMENT). Set \"gpt-4.1-mini\" to keep an existing environment on its current deployment."
+  default     = "gpt-5.4-mini"
 }
 
 variable "cosmos_use_rbac" {
@@ -266,38 +284,47 @@ resource "azapi_resource" "ai_project" {
 }
 
 # ── MaaS model deployments (data-driven) ──────────────────────────────
-# Consolidated from 6 near-duplicate azapi_resource blocks into a single
-# for_each map. Latest GA / highest-LTS model set (verified on Microsoft Learn,
-# all available in swedencentral GlobalStandard):
-#   gpt-5.1                   2025-11-13  GA  retires 2027-05-15  (chat/RAG; replaces invalid gpt-5.2-chat)
-#   gpt-4.1                   2025-04-14  GA  retires 2027-10-14  (agentic tier3 / red-team)
-#   gpt-4.1-mini              2025-04-14  GA  retires 2027-10-14  (fallback/anonymizer/vision/tier2; replaces deprecated gpt-4o-mini)
-#   gpt-4.1-nano              2025-04-14  GA  retires 2027-10-14  (category assessment + agentic orchestrator/tier1; fast/low-cost)
-#   text-embedding-3-small    1           GA  retires 2027-04-15
-#   phi-4                     2024-10-01  (primary classification)
-#   mistral-document-ai-2512  25.12       (OCR)
-#   model-router              2025-11-18  (optional agentic orchestration)
+# Model set checked against the Models API (swedencentral + francecentral,
+# GlobalStandard, 2026-10-14). Deployment name = map key; local.model_catalog_names
+# overrides the catalog model name when it differs (Phi-4).
+#   gpt-6-luna                2026-09-22  GA  retires 2028-03-11  (assessment + orchestrator/tier1; replaces gpt-4.1-nano)
+#   gpt-5.4-mini              2026-03-17  GA  retires 2027-09-21  (fallback/anonymizer/vision/tier2; replaces gpt-4.1-mini)
+#   gpt-6-sol                 2026-09-22  GA  retires 2028-03-11  (tier3/red-team + chat/RAG; replaces gpt-4.1 and gpt-5.1)
+#   text-embedding-3-small    1           GA  retires 2028-02-09
+#   Phi-4 (deployment phi-4)  7           GA  no retirement date  (primary classification)
+#   mistral-document-ai-2512  1           GA  no retirement date  (OCR)
+#   model-router              2025-11-18  GA  retires 2027-05-20  (optional agentic orchestration)
+# Legacy (deploy_legacy_models): gpt-4.1 / -mini / -nano 2025-04-14 are Deprecated
+# (existing subscriptions only, retire 2027-04-14); gpt-5.1 retires 2027-05-15.
 #
 # tier: "core"     → phi-4 + mistral (minimum viable pipeline; enable_model_deployments)
 #       "optional" → chat/RAG + fallback + embeddings + agentic (deploy_optional_models)
+#       "legacy"   → previous defaults kept for existing environments (deploy_legacy_models)
 #       "router"   → model-router (deploy_model_router)
 locals {
   model_deployments = {
-    "phi-4"                    = { format = "OpenAI", version = "2024-10-01", sku = "GlobalStandard", capacity = 1, tier = "core" }
-    "mistral-document-ai-2512" = { format = "Mistral", version = "25.12", sku = "GlobalStandard", capacity = 1, tier = "core" }
-    "gpt-4.1-mini"             = { format = "OpenAI", version = "2025-04-14", sku = "GlobalStandard", capacity = 1, tier = "optional" }
-    "gpt-4.1"                  = { format = "OpenAI", version = "2025-04-14", sku = "GlobalStandard", capacity = 1, tier = "optional" }
-    "gpt-4.1-nano"             = { format = "OpenAI", version = "2025-04-14", sku = "GlobalStandard", capacity = 1, tier = "optional" }
+    "phi-4"                    = { format = "Microsoft", version = "7", sku = "GlobalStandard", capacity = 1, tier = "core" }
+    "mistral-document-ai-2512" = { format = "Mistral AI", version = "1", sku = "GlobalStandard", capacity = 1, tier = "core" }
+    "gpt-6-luna"               = { format = "OpenAI", version = "2026-09-22", sku = "GlobalStandard", capacity = 1, tier = "optional" }
+    "gpt-5.4-mini"             = { format = "OpenAI", version = "2026-03-17", sku = "GlobalStandard", capacity = 1, tier = "optional" }
+    "gpt-6-sol"                = { format = "OpenAI", version = "2026-09-22", sku = "GlobalStandard", capacity = 1, tier = "optional" }
     "text-embedding-3-small"   = { format = "OpenAI", version = "1", sku = "GlobalStandard", capacity = 1, tier = "optional" }
-    "gpt-5.1"                  = { format = "OpenAI", version = "2025-11-13", sku = "GlobalStandard", capacity = 1, tier = "optional" }
+    "gpt-4.1-mini"             = { format = "OpenAI", version = "2025-04-14", sku = "GlobalStandard", capacity = 1, tier = "legacy" }
+    "gpt-4.1"                  = { format = "OpenAI", version = "2025-04-14", sku = "GlobalStandard", capacity = 1, tier = "legacy" }
+    "gpt-4.1-nano"             = { format = "OpenAI", version = "2025-04-14", sku = "GlobalStandard", capacity = 1, tier = "legacy" }
+    "gpt-5.1"                  = { format = "OpenAI", version = "2025-11-13", sku = "GlobalStandard", capacity = 1, tier = "legacy" }
     "model-router"             = { format = "OpenAI", version = "2025-11-18", sku = "GlobalStandard", capacity = 250, tier = "router" }
   }
+
+  # Catalog model name when it differs from the deployment name.
+  model_catalog_names = { "phi-4" = "Phi-4" }
 
   # Filter the catalog by the existing feature flags.
   enabled_model_deployments = var.enable_model_deployments ? {
     for name, cfg in local.model_deployments : name => cfg
     if cfg.tier == "core" ||
     (cfg.tier == "optional" && var.deploy_optional_models) ||
+    (cfg.tier == "legacy" && var.deploy_legacy_models) ||
     (cfg.tier == "router" && var.deploy_model_router)
   } : {}
 }
@@ -314,7 +341,7 @@ resource "azapi_resource" "model_deployment" {
   body = jsonencode({
     sku = { name = each.value.sku, capacity = each.value.capacity }
     properties = {
-      model = { format = each.value.format, name = each.key, version = each.value.version }
+      model = { format = each.value.format, name = lookup(local.model_catalog_names, each.key, each.key), version = each.value.version }
     }
   })
 }
@@ -947,7 +974,7 @@ resource "azurerm_container_app" "api" {
       # Secondary models (explicitly defined)
       env {
         name  = "CHAT_DEPLOYMENT"
-        value = "gpt-5.1"
+        value = var.chat_deployment
       }
       env {
         name  = "EMBEDDING_DEPLOYMENT"
@@ -955,15 +982,15 @@ resource "azurerm_container_app" "api" {
       }
       env {
         name  = "PHI_FALLBACK_DEPLOYMENT"
-        value = "gpt-4.1-mini"
+        value = var.fallback_deployment
       }
       env {
         name  = "ANONYMIZER_DEPLOYMENT"
-        value = "gpt-4.1-mini"
+        value = var.fallback_deployment
       }
       env {
         name  = "VISION_DEPLOYMENT"
-        value = "gpt-4.1-mini"
+        value = var.fallback_deployment
       }
 
       liveness_probe {
@@ -1161,7 +1188,7 @@ resource "azurerm_container_app" "worker" {
       # Secondary models (explicitly defined)
       env {
         name  = "CHAT_DEPLOYMENT"
-        value = "gpt-5.1"
+        value = var.chat_deployment
       }
       env {
         name  = "EMBEDDING_DEPLOYMENT"
@@ -1169,15 +1196,15 @@ resource "azurerm_container_app" "worker" {
       }
       env {
         name  = "PHI_FALLBACK_DEPLOYMENT"
-        value = "gpt-4.1-mini"
+        value = var.fallback_deployment
       }
       env {
         name  = "ANONYMIZER_DEPLOYMENT"
-        value = "gpt-4.1-mini"
+        value = var.fallback_deployment
       }
       env {
         name  = "VISION_DEPLOYMENT"
-        value = "gpt-4.1-mini"
+        value = var.fallback_deployment
       }
     }
 

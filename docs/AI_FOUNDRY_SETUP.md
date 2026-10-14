@@ -96,11 +96,11 @@ The ClassyMail MVP requires the following model deployments in Microsoft AI Foun
 
 
 
-### 2. **GPT-4.1-mini Fallback / Anonymizer / Vision** (Optional but recommended)
+### 2. **GPT-5.4-mini Fallback / Anonymizer / Vision** (Optional but recommended)
 
-- **Model**: `gpt-4.1-mini` (OpenAI, GA, retires 2027-10-14)
+- **Model**: `gpt-5.4-mini` (OpenAI, version `2026-03-17`, GA, retires 2027-09-21; 400K context, 272K input)
 
-- **Deployment Name** (recommended): `gpt-4.1-mini`
+- **Deployment Name** (recommended): `gpt-5.4-mini`
 
 - **Purpose**: Fallback classification, anonymization, and vision tasks
 
@@ -142,11 +142,11 @@ The ClassyMail MVP requires the following model deployments in Microsoft AI Foun
 
 ### 5. **GPT Model (Chat & Advanced Classification)**
 
-- **Model**: `gpt-5.1` (reasoning model, GA, retires 2027-05-15)
+- **Model**: `gpt-6-sol` (reasoning model, version `2026-09-22`, GA, retires 2028-03-11)
 
-- **Deployment Name** (recommended): `gpt-5.1`
+- **Deployment Name** (recommended): `gpt-6-sol`
 
-- **Purpose**: Advanced reasoning, RAG chat
+- **Purpose**: Advanced reasoning, RAG chat, synthetic data generation, agentic tier3 + red team
 
 - **TPM**: 30,000+
 
@@ -154,17 +154,29 @@ The ClassyMail MVP requires the following model deployments in Microsoft AI Foun
 
 
 
-### 6. **GPT-4.1-nano (Category Assessment)** — Optional
+### 6. **GPT-6 Luna (Category Assessment)** — Optional
 
-- **Model**: `gpt-4.1-nano` (GA, retires 2027-10-14)
+- **Model**: `gpt-6-luna` (version `2026-09-22`, GA, retires 2028-03-11)
 
-- **Deployment Name** (recommended): `gpt-4.1-nano`
+- **Deployment Name** (recommended): `gpt-6-luna`
 
-- **Purpose**: AI-powered category quality analysis and advice
+- **Purpose**: AI-powered category quality analysis and advice; agentic orchestrator + tier1 default
 
 - **TPM**: 10,000+
 
 - **Environment Variable**: Used via `GPT_DEPLOYMENT` fallback
+
+
+
+### Migration from GPT-4.1
+
+The GPT-4.1 family (`gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, version `2025-04-14`) is legacy (Deprecated, retires 2027-04-14; existing environments only): only subscriptions that already deployed it can create new deployments. Mapping: `gpt-4.1-nano` → `gpt-6-luna`, `gpt-4.1-mini` → `gpt-5.4-mini`, `gpt-4.1` and `gpt-5.1` → `gpt-6-sol`. These are reasoning models; the app sends `reasoning_effort="none"` on fast classification calls (keeps `max_completion_tokens`, omits `temperature`).
+
+To keep an existing demo working:
+
+- Saved settings are **not** rewritten: settings that still name `gpt-4.1-*` keep using those deployments until 2027-04-14.
+- Terraform `deploy_legacy_models = true` (default `false`; `-DeployLegacyModels` / `--deploy-legacy-models`) keeps the `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` and `gpt-5.1` deployments.
+- `chat_deployment = "gpt-5.1"` (default `gpt-6-sol`) and `fallback_deployment = "gpt-4.1-mini"` (default `gpt-5.4-mini`) keep the `CHAT_DEPLOYMENT` / `PHI_FALLBACK_DEPLOYMENT` / `ANONYMIZER_DEPLOYMENT` / `VISION_DEPLOYMENT` env vars of both Container Apps unchanged.
 
 
 
@@ -218,17 +230,17 @@ The ClassyMail MVP requires the following model deployments in Microsoft AI Foun
 
 
 
-### Step 3: Deploy GPT-4.1-mini Fallback / Anonymizer / Vision
+### Step 3: Deploy GPT-5.4-mini Fallback / Anonymizer / Vision
 
 
 
 Create an Azure OpenAI deployment with:
 
-- **Model**: `gpt-4.1-mini`
+- **Model**: `gpt-5.4-mini`
 
-- **Version**: `2025-04-14`
+- **Version**: `2026-03-17`
 
-- **Deployment name**: `gpt-4.1-mini`
+- **Deployment name**: `gpt-5.4-mini`
 
 - **TPM**: 25,000
 
@@ -270,13 +282,13 @@ Create an Azure OpenAI deployment with:
 
    - **Model family**: GPT
 
-   - **Model**: `gpt-5.1`
+   - **Model**: `gpt-6-sol`
 
-   - **Version**: `2025-11-13`
+   - **Version**: `2026-09-22`
 
 3. Configure:
 
-   - **Deployment name**: `gpt-5.1`
+   - **Deployment name**: `gpt-6-sol`
 
    - **TPM**: 30,000
 
@@ -324,15 +336,15 @@ After deploying models, configure these environment variables in Azure Container
 
 | `PHI_DEPLOYMENT` | Primary Phi-4 deployment name | `phi-4` |
 
-| `PHI_FALLBACK_DEPLOYMENT` | Fallback/anonymizer/vision deployment name | `gpt-4.1-mini` |
+| `PHI_FALLBACK_DEPLOYMENT` | Fallback/anonymizer/vision deployment name | `gpt-5.4-mini` |
 
 | `MISTRAL_DEPLOYMENT` | Mistral deployment name | `mistral-document-ai-2512` |
 
 | `MISTRAL_MODE` | Deployment mode | `maas` (for serverless MaaS) |
 
-| `CHAT_DEPLOYMENT` | (Optional) Chat reasoning model deployment | `gpt-5.1` |
+| `CHAT_DEPLOYMENT` | (Optional) Chat reasoning model deployment | `gpt-6-sol` |
 
-| `GPT_DEPLOYMENT` | (Optional) GPT deployment for advanced classification | `gpt-4.1` |
+| `GPT_DEPLOYMENT` | (Optional) GPT deployment for advanced classification | `gpt-6-sol` |
 
 
 
@@ -386,13 +398,13 @@ Name                           Model              Version
 
 -----------------------------  -----------------  ------------
 
-phi-4                          Phi-4              2024-10-01
+phi-4                          Phi-4              7
 
-gpt-4.1-mini                   gpt-4.1-mini       2025-04-14
+gpt-5.4-mini                   gpt-5.4-mini       2026-03-17
 
-mistral-document-ai-2512       mistral-document-ai   2512
+mistral-document-ai-2512       mistral-document-ai-2512   1
 
-gpt-5.1                        gpt-5.1            2025-11-13
+gpt-6-sol                      gpt-6-sol          2026-09-22
 
 ```
 
@@ -428,13 +440,21 @@ ai_api_version      = "2024-08-01-preview"
 
 phi_deployment          = "phi-4"
 
-phi_fallback_deployment = "gpt-4.1-mini"
+fallback_deployment     = "gpt-5.4-mini"
 
 mistral_deployment      = "mistral-document-ai-2512"
 
 mistral_mode            = "maas"
 
-chat_deployment         = "gpt-5.1"
+chat_deployment         = "gpt-6-sol"
+
+# Legacy environments only (GPT-4.1 Deprecated, retires 2027-04-14):
+
+# deploy_legacy_models = true
+
+# chat_deployment      = "gpt-5.1"
+
+# fallback_deployment  = "gpt-4.1-mini"
 
 ```
 
@@ -476,13 +496,13 @@ az containerapp update \
 
     PHI_DEPLOYMENT="phi-4" \
 
-    PHI_FALLBACK_DEPLOYMENT="gpt-4.1-mini" \
+    PHI_FALLBACK_DEPLOYMENT="gpt-5.4-mini" \
 
     MISTRAL_DEPLOYMENT="mistral-document-ai-2512" \
 
     MISTRAL_MODE="maas" \
 
-    CHAT_DEPLOYMENT="gpt-5.1" \
+    CHAT_DEPLOYMENT="gpt-6-sol" \
     CHAT_API_VERSION="preview"
 
 ```
@@ -507,7 +527,7 @@ az containerapp update \
 
     PHI_DEPLOYMENT="phi-4" \
 
-    PHI_FALLBACK_DEPLOYMENT="gpt-4.1-mini" \
+    PHI_FALLBACK_DEPLOYMENT="gpt-5.4-mini" \
 
     MISTRAL_DEPLOYMENT="mistral-document-ai-2512" \
 
@@ -617,7 +637,7 @@ curl "https://<your-api-url>/api/admin/test-gpt"
 
 # Test specific model
 
-curl "https://<your-api-url>/api/admin/test-gpt?model=gpt-5.1"
+curl "https://<your-api-url>/api/admin/test-gpt?model=gpt-6-sol"
 
 ```
 
@@ -1007,7 +1027,7 @@ Supported API versions:
 
 - `2024-08-01-preview` (recommended for Phi-4 + Mistral)
 
-- `2024-06-01` (legacy stable version; prefer `2024-08-01-preview` or newer for current GPT-4.1 deployments)
+- `2024-06-01` (legacy stable version; prefer `2024-08-01-preview` or newer for current GPT deployments)
 
 - `2023-12-01-preview` (legacy, not recommended)
 
@@ -1127,15 +1147,15 @@ Run with:
 
 - [ ] Phi-4 deployment created (`phi-4`)
 
-- [ ] GPT-4.1-mini fallback/anonymizer/vision deployment created (`gpt-4.1-mini`)
+- [ ] GPT-5.4-mini fallback/anonymizer/vision deployment created (`gpt-5.4-mini`)
 
 - [ ] Mistral Document AI MaaS deployment created (`mistral-document-ai-2512`)
 
 - [ ] text-embedding-3-small deployment created
 
-- [ ] GPT deployment created (optional, `gpt-5.1`)
+- [ ] GPT deployment created (optional, `gpt-6-sol`)
 
-- [ ] GPT-4.1-nano deployment created (optional, for category assessment)
+- [ ] GPT-6 Luna deployment created (optional, `gpt-6-luna`, for category assessment + agentic orchestrator/tier1)
 
 - [ ] `AI_ENDPOINT` configured in Container Apps
 

@@ -57,6 +57,8 @@
   Deploy Phi-4 + Mistral OCR via Terraform. Terraform default: false.
 .PARAMETER DeployOptionalModels
   Deploy optional models (requires -EnableModelDeployments). Terraform default: false.
+.PARAMETER DeployLegacyModels
+  Also keep gpt-4.1 / -mini / -nano and gpt-5.1 for an existing environment. Terraform default: false.
 .PARAMETER DeployLanguageService
   Deploy Azure AI Language for native PII detection. Terraform default: false.
 .PARAMETER DeployDocumentIntelligence
@@ -116,6 +118,7 @@ Param(
   [ValidateSet('resource_group', 'subscription')][string]$TagPolicyScope,
   [bool]$EnableModelDeployments,
   [bool]$DeployOptionalModels,
+  [bool]$DeployLegacyModels,
   [bool]$DeployLanguageService,
   [bool]$DeployDocumentIntelligence,
   [switch]$SkipProviderRegistration,
@@ -415,6 +418,7 @@ $boolMap = @(
   @{ Param = 'SecurityCostPolicyEnabled'; Var = 'security_cost_policy_enabled' },
   @{ Param = 'EnableModelDeployments'; Var = 'enable_model_deployments' },
   @{ Param = 'DeployOptionalModels'; Var = 'deploy_optional_models' },
+  @{ Param = 'DeployLegacyModels'; Var = 'deploy_legacy_models' },
   @{ Param = 'DeployLanguageService'; Var = 'deploy_language_service' },
   @{ Param = 'DeployDocumentIntelligence'; Var = 'deploy_document_intelligence' }
 )

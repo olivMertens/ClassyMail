@@ -53,6 +53,12 @@
 # Model availability is tenant/region-dependent.
 # Default false — deploy models manually via Microsoft AI Foundry portal.
 # enable_model_deployments = false
+#
+# Default deployments: gpt-6-luna (fast), gpt-5.4-mini (fallback/vision), gpt-6-sol (chat/tier3).
+# Existing environment still on the GPT-4.1 family? Keep it working with:
+# deploy_legacy_models = true            # GPT-4.1 is Deprecated: creatable only where already deployed; retires 2027-04-14
+# chat_deployment      = "gpt-5.1"
+# fallback_deployment  = "gpt-4.1-mini"
 
 # --- PII DETECTION (Optional) ---
 # Deploy Azure AI Language service for native PII detection.

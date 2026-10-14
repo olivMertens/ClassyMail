@@ -71,7 +71,7 @@ async def get_agentic_prompt():
             "template_file": "classymail/agents/prompts/red_team.md",
             "source": "file" if (_PROMPT_DIR / "red_team.md").exists() else "fallback",
         },
-        "model": agentic.get("orchestrator_model", "gpt-4.1-nano"),
+        "model": agentic.get("orchestrator_model", "gpt-6-luna"),
         "max_agents": max_agents,
         "categories_count": len(settings.get("categories", [])),
     }

@@ -13,7 +13,7 @@ Authentication priority:
 This module also exposes the small set of model-aware parameter
 helpers (formerly in ``classymail.core.llm_compat``):
 
-- :func:`is_reasoning_model` - GPT-5 / o1 / o3 / o4 / Kimi family detection.
+- :func:`is_reasoning_model` - GPT-5 / GPT-6 / o1 / o3 / o4 / Kimi family detection.
 - :func:`build_chat_params` - choose ``max_tokens`` vs ``max_completion_tokens``
   and drop ``temperature`` for reasoning models.
 - :func:`extract_message_content` - prefer ``content`` then ``reasoning_content``.
@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import TYPE_CHECKING
 
 from openai import AsyncAzureOpenAI
@@ -46,7 +47,21 @@ logger = logging.getLogger(__name__)
 # Model families that use reasoning and have restricted API parameters.
 # These models reject ``temperature`` / ``top_p`` and require
 # ``max_completion_tokens`` instead of the legacy ``max_tokens``.
-_REASONING_FAMILIES: tuple[str, ...] = ("o1", "o3", "o4", "gpt-5", "gpt5", "kimi")
+_REASONING_FAMILIES: tuple[str, ...] = ("o1", "o3", "o4", "gpt-5", "gpt5", "gpt-6", "gpt6", "kimi")
+
+# gpt-5.1+ and gpt-6.x accept reasoning_effort="none"; gpt-5 / gpt-5-mini / gpt-5-nano,
+# o-series, codex and pro variants do not.
+_NONE_EFFORT_RE = re.compile(r"^gpt-?(5\.[1-9]\d*|6)(\.\d+)?(-|$)")
+
+
+def supports_reasoning_none(deployment: str | None) -> bool:
+    """Return ``True`` when the model accepts ``reasoning_effort="none"``."""
+    if not deployment:
+        return False
+    d = deployment.lower().strip()
+    if "codex" in d or d.endswith("-pro"):
+        return False
+    return bool(_NONE_EFFORT_RE.match(d))
 
 
 def is_reasoning_model(deployment: str | None) -> bool:
@@ -71,12 +86,16 @@ def build_chat_params(
     *,
     temperature: float | None = None,
     max_output_tokens: int | None = None,
+    reasoning_effort: str | None = "none",
 ) -> dict:
     """Build model-aware chat completion parameters.
 
-    For **reasoning** models (GPT-5.x, o1, o3, o4):
+    For **reasoning** models (GPT-5.x, GPT-6.x, o1, o3, o4):
     - Uses ``max_completion_tokens`` instead of ``max_tokens``
     - Omits ``temperature`` / ``top_p`` (unsupported)
+    - Sends ``reasoning_effort`` (default ``"none"``: reasoning tokens would
+      otherwise consume the small output budgets of the classification calls).
+      ``"none"`` is dropped for models that reject it.
 
     For **classic** models (GPT-4o, Phi-4, Mistral, etc.):
     - Uses ``max_tokens``
@@ -96,6 +115,9 @@ def build_chat_params(
 
     if temperature is not None and not reasoning:
         params["temperature"] = temperature
+
+    if reasoning and reasoning_effort and (reasoning_effort != "none" or supports_reasoning_none(deployment)):
+        params["reasoning_effort"] = reasoning_effort
 
     return params
 

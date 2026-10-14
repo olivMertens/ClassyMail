@@ -407,7 +407,7 @@ flowchart LR
             </div>
             <p class="text-xs text-gray-600 dark:text-gray-300 mb-1"><strong>Trigger:</strong> Orchestrator confidence
               &gt; 80%</p>
-            <p class="text-xs text-gray-600 dark:text-gray-300 mb-2"><strong>Default model:</strong> gpt-4.1-nano</p>
+            <p class="text-xs text-gray-600 dark:text-gray-300 mb-2"><strong>Default model:</strong> gpt-6-luna</p>
             <p class="text-xs text-gray-500 dark:text-gray-400">
               The document clearly matches — keywords are obvious, tone is unambiguous. The cheapest model is
               sufficient. The agent may still call its AI Search tool to verify.
@@ -423,7 +423,7 @@ flowchart LR
             </div>
             <p class="text-xs text-gray-600 dark:text-gray-300 mb-1"><strong>Trigger:</strong> Orchestrator confidence
               50–80%</p>
-            <p class="text-xs text-gray-600 dark:text-gray-300 mb-2"><strong>Default model:</strong> gpt-4.1-mini</p>
+            <p class="text-xs text-gray-600 dark:text-gray-300 mb-2"><strong>Default model:</strong> gpt-5.4-mini</p>
             <p class="text-xs text-gray-500 dark:text-gray-400">
               The document has subtle signals — could match multiple intents. A more capable model resolves ambiguity.
               RAG provides context from similar previously classified documents.
@@ -438,7 +438,7 @@ flowchart LR
             </div>
             <p class="text-xs text-gray-600 dark:text-gray-300 mb-1"><strong>Trigger:</strong> Orchestrator confidence
               &lt; 50%</p>
-            <p class="text-xs text-gray-600 dark:text-gray-300 mb-2"><strong>Default model:</strong> gpt-4.1</p>
+            <p class="text-xs text-gray-600 dark:text-gray-300 mb-2"><strong>Default model:</strong> gpt-6-sol</p>
             <p class="text-xs text-gray-500 dark:text-gray-400">
               The document is complex or the intent is unclear. The most robust model is used for maximum accuracy. Red
               Team quality gate is more likely to trigger.

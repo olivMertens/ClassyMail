@@ -10,16 +10,16 @@ The diagram below shows the **runtime shape** of a single agentic classification
 
 ```mermaid
 flowchart TD
-    Email[Email markdown + metadata] --> Orch["Orchestrator Inspector - UI-selectable model - gpt-4.1-nano default or model-router"]
+    Email[Email markdown + metadata] --> Orch["Orchestrator Inspector - UI-selectable model - gpt-6-luna default or model-router"]
     Orch -->|"OrchestratorResult: candidate_intents with confidence"| TierGate{Tier dispatch per candidate intent}
 
     TierGate -->|"confidence >= 0.8"| T1Group["Tier 1 - Simple intents"]
     TierGate -->|"0.5 - 0.8 ambiguous"| T2Group["Tier 2 - Ambiguous intents"]
     TierGate -->|"confidence < 0.5 critical"| T3Group["Tier 3 - Critical intents"]
 
-    T1Group --> T1A["Specialized Agent - gpt-4.1-nano"]
-    T2Group --> T2A["Specialized Agent - gpt-4.1-mini"]
-    T3Group --> T3A["Specialized Agent - gpt-4.1 or gpt-5-mini"]
+    T1Group --> T1A["Specialized Agent - gpt-6-luna"]
+    T2Group --> T2A["Specialized Agent - gpt-5.4-mini"]
+    T3Group --> T3A["Specialized Agent - gpt-6-sol or gpt-5-mini"]
 
     T1A -->|"RAG"| AIS[("Azure AI Search - per-intent indexes - positive + negative examples")]
     T2A -->|"RAG"| AIS
@@ -56,9 +56,9 @@ flowchart TD
 
 | Orchestrator confidence | Tier | Default model | Setting key |
 |---|---|---|---|
-| `>= 0.80` | 1 — Simple | `gpt-4.1-nano` | `agentic.agent_tier1_model` |
-| `0.50 – 0.79` | 2 — Ambiguous | `gpt-4.1-mini` | `agentic.agent_tier2_model` |
-| `< 0.50` | 3 — Critical | `gpt-4.1` (or `gpt-5-mini`) | `agentic.agent_tier3_model` |
+| `>= 0.80` | 1 — Simple | `gpt-6-luna` | `agentic.agent_tier1_model` |
+| `0.50 – 0.79` | 2 — Ambiguous | `gpt-5.4-mini` | `agentic.agent_tier2_model` |
+| `< 0.50` | 3 — Critical | `gpt-6-sol` (or `gpt-5-mini`) | `agentic.agent_tier3_model` |
 
 ## 1. Objective
 
@@ -90,7 +90,7 @@ Email entrant
    |
    v
 Agent Orchestrator (Expert Inspector)
-   |  model: UI-selectable (gpt-4.1-nano | gpt-4.1-mini | model-router)
+   |  model: UI-selectable (gpt-6-luna | gpt-5.4-mini | model-router)
    |  Analyzes document against EVERY category definition
    |  Cross-references content, context, tone, hidden intents
    |
@@ -183,13 +183,15 @@ workflow = (
 
 | Option | Use Case | Cost |
 |---|---|---|
-| `gpt-4.1-nano` | Default — fast, cheap, good for clear routing | Lowest |
-| `gpt-4.1-mini` | Better for ambiguous emails with subtle signals | Medium |
-| `gpt-4.1` | Highest quality for tier3/red-team review | High |
+| `gpt-6-luna` | Default — fast, cheap, good for clear routing | Lowest |
+| `gpt-5.4-mini` | Better for ambiguous emails with subtle signals | Medium |
+| `gpt-6-sol` | Highest quality for tier3/red-team review | High |
 | `gpt-5-nano` | Reasoning-capable routing (complex multi-intent) | Low-Medium |
 | **`model-router`** | Azure AI Model Router — auto-selects optimal LLM per prompt | Variable (FinOps-optimized) |
 
-> **Note**: Phi-4 is **not** recommended as orchestrator — it's optimized for deep classification, not fast routing. The default is `gpt-4.1-nano`.
+> **Note**: Phi-4 is **not** recommended as orchestrator — it's optimized for deep classification, not fast routing. The default is `gpt-6-luna` (sent with `reasoning_effort="none"`).
+
+> **Migration**: GPT-4.1 models are legacy (Deprecated, retires 2027-04-14; existing environments only). Saved settings are not rewritten, so an environment whose `agentic` settings still name `gpt-4.1-*` keeps using those deployments until retirement.
 
 #### Model Router — Azure AI Intelligent Routing
 
@@ -198,8 +200,8 @@ The [Model Router](https://learn.microsoft.com/azure/foundry/openai/concepts/mod
 **How it works for ClassyMail orchestration**:
 - Deploy `model-router` as a single deployment on the Foundry resource
 - The router automatically selects the best model for each orchestrator call
-- Simple routing prompts → routed to cheap models (gpt-4.1-nano, gpt-5-nano)
-- Complex multi-intent prompts → routed to capable models (gpt-4.1, gpt-5-mini)
+- Simple routing prompts → routed to cheap models (e.g. gpt-5-nano)
+- Complex multi-intent prompts → routed to capable models (e.g. gpt-5-mini)
 - No need to deploy underlying models separately (except Claude models)
 
 **Routing Modes** (UI-selectable):
@@ -213,12 +215,14 @@ The [Model Router](https://learn.microsoft.com/azure/foundry/openai/concepts/mod
 **Model Subset** (optional, configurable in settings):
 Restrict the router to a subset of underlying models. Example for ClassyMail orchestrator:
 ```json
-["gpt-4.1-nano", "gpt-4.1-mini", "gpt-4.1", "gpt-5-nano", "o4-mini"]
+["gpt-5-nano", "gpt-5-mini", "o4-mini"]
 ```
 This prevents routing to expensive models (gpt-5, claude-opus) for simple routing tasks.
 
 **Supported underlying models** (v2025-11-18):
 `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, `o4-mini`, `gpt-5-nano`, `gpt-5-mini`, `gpt-5`, `gpt-5-chat`, `gpt-5.1`, `DeepSeek-V3.1`, `DeepSeek-V3.2`, `gpt-oss-120b`, `llama4-maverick`, `grok-4`, `grok-4-fast`, `claude-haiku-4-5`, `claude-sonnet-4-5`, `claude-opus-4-1`, `claude-opus-4-6`
+
+> This is the router's internal pool, fixed by router version 2025-11-18 (retires 2027-05-20). The GPT-4.1 entries in it are legacy (Deprecated, retires 2027-04-14) and are not ClassyMail deployments.
 
 **Region requirement**: East US 2 or Sweden Central (Global Standard or Data Zone Standard).
 
@@ -233,8 +237,8 @@ This prevents routing to expensive models (gpt-5, claude-opus) for simple routin
     { "intent": "home_certificate", "confidence": 0.64 }
   ],
   "routing_rationale": "Flooding keywords + claim declaration pattern detected",
-  "model": "gpt-4.1-nano",
-  "routed_model": "gpt-4.1-nano",
+  "model": "gpt-6-luna",
+  "routed_model": "gpt-6-luna",
   "routing_mode": "balanced",
   "tokens": { "input": 450, "output": 120 },
   "latency_ms": 180
@@ -250,9 +254,9 @@ This prevents routing to expensive models (gpt-5, claude-opus) for simple routin
 - **Prompt**: Highly constrained, mono-intent, stable over time
 - **Tools**: Per-intent AI Search index with semantic ranking (human-reinforced labels)
 - **Model**: Chosen per agent tier (UI-configurable):
-  - Tier 1: Simple intents — `gpt-4.1-nano`
-  - Tier 2: Ambiguous intents — `gpt-4.1-mini`
-  - Tier 3: Critical intents — `gpt-4.1` or `gpt-5-mini`
+  - Tier 1: Simple intents — `gpt-6-luna`
+  - Tier 2: Ambiguous intents — `gpt-5.4-mini`
+  - Tier 3: Critical intents — `gpt-6-sol` or `gpt-5-mini`
 
 **RAG Grounding — How Agents Learn from Examples**:
 
@@ -291,7 +295,7 @@ The prompt instructs agents to weigh `[human_verified]` and `[human_reinforced]`
       "correction_reason": "NOT natural_event — this is a document request"
     }
   ],
-  "model": "gpt-4.1-nano",
+  "model": "gpt-6-luna",
   "tokens": { "input": 800, "output": 200 },
   "latency_ms": 320
 }
@@ -475,8 +479,8 @@ pipeline.classification
   |     |
   |     +-- agentic.orchestrator              # Router agent
   |     |     +-- gen_ai.system: azure_openai
-  |     |     +-- gen_ai.request.model: gpt-4.1-nano (or model-router)
-  |     |     +-- agentic.routed_model: gpt-4.1-nano  # actual model used (model-router)
+  |     |     +-- gen_ai.request.model: gpt-6-luna (or model-router)
+  |     |     +-- agentic.routed_model: gpt-6-luna  # actual model used (model-router)
   |     |     +-- agentic.routing_mode: balanced       # model-router mode
   |     |     +-- agentic.candidates_count: 5
   |     |     +-- agentic.routing_latency_ms: 180
@@ -487,7 +491,7 @@ pipeline.classification
   |     |     +-- agentic.parallel.agent_count: 3
   |     |     |
   |     |     +-- agentic.agent.natural_event  # Per-agent spans (parallel)
-  |     |     |     +-- gen_ai.request.model: gpt-4.1-nano
+  |     |     |     +-- gen_ai.request.model: gpt-6-luna
   |     |     |     +-- agentic.intent: natural_event
   |     |     |     +-- agentic.confidence: 0.91
   |     |     |     +-- agentic.rag_hits: 3
@@ -507,7 +511,7 @@ pipeline.classification
   |     |     +-- agentic.review_reasons: [...]   # only when needs_review
   |     |
   |     +-- agentic.red_team                   # Conditional
-  |           +-- gen_ai.request.model: gpt-4.1
+  |           +-- gen_ai.request.model: gpt-6-sol
   |           +-- agentic.trigger_reason: low_confidence
   |           +-- agentic.additional_agents: ["liability"]
   |           +-- agentic.red_team.extra_failed_count: 0  # PR #47 — only emitted when > 0
@@ -534,11 +538,11 @@ pipeline.classification
 
 | Role | Default Model | Alternatives (UI dropdown) | Objective |
 |---|---|---|---|
-| Orchestrator | `gpt-4.1-nano` | `gpt-4.1-mini`, `gpt-5-nano`, **`model-router`** (Balanced/Cost/Quality) | Fast routing, minimal cost |
-| Agent Tier 1 (simple) | `gpt-4.1-nano` | `gpt-4.1-mini`, `phi-4` | Clear cases, high volume |
-| Agent Tier 2 (ambiguous) | `gpt-4.1-mini` | `gpt-4.1-nano`, `gpt-4.1` | Ambiguities |
-| Agent Tier 3 (critical) | `gpt-4.1` | `gpt-5-mini`, `gpt-5.1` | Business sensitivity |
-| Red Team | `gpt-4.1` | `gpt-5-mini`, `gpt-5.1`, `kimi-k2.5` | Blind spot detection |
+| Orchestrator | `gpt-6-luna` | `gpt-5.4-mini`, `gpt-5-nano`, **`model-router`** (Balanced/Cost/Quality) | Fast routing, minimal cost |
+| Agent Tier 1 (simple) | `gpt-6-luna` | `gpt-5.4-mini`, `phi-4` | Clear cases, high volume |
+| Agent Tier 2 (ambiguous) | `gpt-5.4-mini` | `gpt-6-luna`, `gpt-6-sol` | Ambiguities |
+| Agent Tier 3 (critical) | `gpt-6-sol` | `gpt-5-mini`, `gpt-5.4-mini` | Business sensitivity |
+| Red Team | `gpt-6-sol` | `gpt-5-mini`, `gpt-5.4-mini`, `kimi-k2.5` | Blind spot detection |
 
 ### Settings Integration
 
@@ -547,13 +551,13 @@ New fields in `settings_store.py` / `DEFAULT_SETTINGS`:
 ```python
 "agentic": {
     "enabled": False,                          # Feature flag (opt-in)
-    "orchestrator_model": "gpt-4.1-nano",      # UI-selectable (or "model-router")
+    "orchestrator_model": "gpt-6-luna",        # UI-selectable (or "model-router")
     "orchestrator_routing_mode": "balanced",    # balanced | cost | quality (model-router only)
     "orchestrator_model_subset": [],            # Empty = all models; restrict for cost control
-    "agent_tier1_model": "gpt-4.1-nano",       # Simple intents
-    "agent_tier2_model": "gpt-4.1-mini",       # Ambiguous intents
-    "agent_tier3_model": "gpt-4.1",            # Critical intents
-    "red_team_model": "gpt-4.1",               # Quality gate model
+    "agent_tier1_model": "gpt-6-luna",         # Simple intents
+    "agent_tier2_model": "gpt-5.4-mini",       # Ambiguous intents
+    "agent_tier3_model": "gpt-6-sol",          # Critical intents
+    "red_team_model": "gpt-6-sol",             # Quality gate model
     "red_team_threshold": 0.7,                 # Min confidence to skip red team
     "red_team_conflict_delta": 0.15,           # Top-2 delta to trigger red team
     "max_parallel_agents": 6,                  # Max agents in fan-out
@@ -574,7 +578,7 @@ New value: **`agentic`** — activates the multi-agent workflow.
 
 | Strategy | Pipeline |
 |---|---|
-| `standard` | Existing `classify_with_phi4()` — single LLM call (Phi-4 primary, gpt-4.1-mini fallback) |
+| `standard` | Existing `classify_with_phi4()` — single LLM call (Phi-4 primary, gpt-5.4-mini fallback) |
 | `reasoning` | Existing — step-by-step prompt variant |
 | `vision` | Existing — includes image descriptions |
 | **`agentic`** | **New** — orchestrator → parallel agents → optional red team |
@@ -607,7 +611,7 @@ The Settings page strategy dropdown adds "Agentic (Multi-Agent)" as a fourth opt
 ### Phase 1 — Prompt + RAG with seeded data (CURRENT)
 
 - Mono-intent agents with fan-out/fan-in via `asyncio.gather`
-- Orchestrator with `gpt-4.1-nano` (or model-router)
+- Orchestrator with `gpt-6-luna` (or model-router)
 - Feature flag `strategy = "agentic"` in Settings UI
 - Azure AI Search deployed with 5 per-intent indexes
 - 35 sample emails seeded (5 positive + 2 negative per category)
@@ -646,15 +650,15 @@ The **Agentic Pipeline Configuration** panel appears with all tunable parameters
 
 | Setting | Purpose | Recommended |
 |---------|---------|-------------|
-| **Orchestrator Model** | Fast routing — selects top candidate intents | gpt-4.1-nano or model-router |
-| **Agent Tier 1 (Simple)** | Handles clear matches (confidence > 80%) | gpt-4.1-nano |
-| **Agent Tier 2 (Ambiguous)** | Handles uncertain matches (50-80%) | gpt-4.1-mini |
-| **Agent Tier 3 (Critical)** | Handles complex/low-confidence cases (< 50%) | gpt-4.1 |
-| **Red Team Model** | Adversarial quality gate | gpt-4.1 |
+| **Orchestrator Model** | Fast routing — selects top candidate intents | gpt-6-luna or model-router |
+| **Agent Tier 1 (Simple)** | Handles clear matches (confidence > 80%) | gpt-6-luna |
+| **Agent Tier 2 (Ambiguous)** | Handles uncertain matches (50-80%) | gpt-5.4-mini |
+| **Agent Tier 3 (Critical)** | Handles complex/low-confidence cases (< 50%) | gpt-6-sol |
+| **Red Team Model** | Adversarial quality gate | gpt-6-sol |
 | **Red Team Threshold** | Confidence below which Red Team triggers | 0.7 |
 | **RAG Retrieval Mode** | How AI Search indexes are queried | Semantic (best quality) |
 | **Max Parallel Agents** | Max concurrent agent executions | 6 |
-| **Reasoning Effort** | GPT-5 family chain-of-thought depth | None (fastest) |
+| **Reasoning Effort** | GPT-5/GPT-6 family chain-of-thought depth for specialized agents | None (fastest) |
 
 ### Step 3: Manage Per-Category AI Search Indexes
 
@@ -698,7 +702,7 @@ The trace shows:
 
 ### `feature/agentic-classification` branch (implemented)
 
-- **Orchestrator** ([classymail/agents/orchestrator.py](classymail/agents/orchestrator.py)): UI-selectable model (`gpt-4.1-nano`, `model-router`, etc.)
+- **Orchestrator** ([classymail/agents/orchestrator.py](classymail/agents/orchestrator.py)): UI-selectable model (`gpt-6-luna`, `model-router`, etc.)
 - **Specialized agents** ([classymail/agents/specialized.py](classymail/agents/specialized.py)): Run in parallel via `asyncio.gather`, tier-based model selection
 - **RAG grounding** ([classymail/agents/tools/ai_search_tool.py](classymail/agents/tools/ai_search_tool.py)): Per-intent AI Search with positive + negative examples
 - **Red Team** ([classymail/agents/red_team.py](classymail/agents/red_team.py)): Conditional quality gate (confidence < 0.7, conflict, no match)
@@ -762,7 +766,7 @@ infra/
 | 2 | **Red Team conditional** (threshold-based) | FinOps: avoid calling robust model on every email |
 | 3 | **Custom routing** via `WorkflowBuilder` | More control than GroupChat/Magentic, matches the "select top-N intents" pattern |
 | 4 | **Feature flag** (`strategy="agentic"`) | Backward compatible — existing pipeline untouched |
-| 5 | **Phi-4 NOT default orchestrator** | Phi-4 excels at deep classification, not fast routing; `gpt-4.1-nano` is 10x faster |
+| 5 | **Phi-4 NOT default orchestrator** | Phi-4 excels at deep classification, not fast routing; `gpt-6-luna` (reasoning effort `none`) is much faster |
 | 6 | **Dedicated AI Search** (not Cosmos vector) | Per-intent indexes with semantic ranking > Cosmos VectorDistance; human-reinforced labels need structured indexing |
 | 7 | **UI-selectable models** per role | Different deployments need different cost/quality tradeoffs |
 | 8 | **AzureOpenAIResponsesClient** (not AzureAIAgent) | Lightweight, no server-side lifecycle — recommended by Agent Framework for orchestrations |

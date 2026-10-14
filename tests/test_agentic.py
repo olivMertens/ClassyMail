@@ -69,7 +69,7 @@ class TestAgenticModels:
 class TestAgenticConfig:
     def test_defaults(self):
         cfg = get_agentic_settings(None)
-        assert cfg["orchestrator_model"] == "gpt-4.1-nano"
+        assert cfg["orchestrator_model"] == "gpt-6-luna"
         assert cfg["enabled"] is False
 
     def test_merge_user_settings(self):
@@ -195,7 +195,7 @@ class TestSettingsStoreAgentic:
     def test_default_settings_has_agentic(self):
         from classymail.services.settings_store import DEFAULT_SETTINGS
         assert "agentic" in DEFAULT_SETTINGS
-        assert DEFAULT_SETTINGS["agentic"]["orchestrator_model"] == "gpt-4.1-nano"
+        assert DEFAULT_SETTINGS["agentic"]["orchestrator_model"] == "gpt-6-luna"
         assert "enabled_indexes" in DEFAULT_SETTINGS["agentic"]
 
     def test_strategy_agentic_accepted(self):
@@ -231,8 +231,31 @@ class TestSettingsStoreAgentic:
             with patch("classymail.services.settings_store.DATA_FILE", tmp):
                 loaded = load_settings()
                 assert "agentic" in loaded
-                assert loaded["agentic"]["orchestrator_model"] == "gpt-4.1-nano"
+                assert loaded["agentic"]["orchestrator_model"] == "gpt-6-luna"
                 assert loaded["agentic"]["max_parallel_agents"] == 6
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def test_saved_legacy_models_are_kept(self):
+        """Existing environments keep the GPT-4.1 deployments they saved."""
+        from classymail.services.settings_store import load_settings
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        saved = {"ai_assessment_model": "gpt-4.1-nano",
+                 "agentic": {"orchestrator_model": "gpt-4.1-nano", "agent_tier3_model": "gpt-4.1"}}
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(saved, f)
+            tmp = Path(f.name)
+
+        try:
+            with patch("classymail.services.settings_store.DATA_FILE", tmp):
+                loaded = load_settings()
+                assert loaded["ai_assessment_model"] == "gpt-4.1-nano"
+                assert loaded["agentic"]["orchestrator_model"] == "gpt-4.1-nano"
+                assert loaded["agentic"]["agent_tier3_model"] == "gpt-4.1"
+                assert loaded["agentic"]["agent_tier2_model"] == "gpt-5.4-mini"
         finally:
             tmp.unlink(missing_ok=True)
 

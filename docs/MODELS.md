@@ -8,11 +8,11 @@ This repo uses a multi-step AI pipeline:
 
 1) **OCR**: Mistral Document AI → Markdown
 
-2) **Classification**: LLM (Phi-4 / GPT-4.1-mini fallback) → strict JSON multi-intents
+2) **Classification**: LLM (Phi-4 / GPT-5.4-mini fallback) → strict JSON multi-intents
 
 3) **Vector Search**: Text Embedding for RAG (Chatbot)
 
-4) **Category Assessment**: GPT-4.1-nano → AI-powered category quality analysis
+4) **Category Assessment**: GPT-6 Luna → AI-powered category quality analysis
 
 
 
@@ -46,17 +46,37 @@ This repo uses a multi-step AI pipeline:
 
 |-------|----------------|---------|------------|----------|
 
-| **GPT-4.1-mini** | `gpt-4.1-mini` | Fallback classification, anonymization, vision (GA, retires 2027-10-14) | 1,000,000 | ⚠️ For large emails |
+| **GPT-5.4-mini** | `gpt-5.4-mini` | Fallback classification, anonymization, vision, agent tier2 (version 2026-03-17, GA, retires 2027-09-21) | 400,000 (272,000 input) | ⚠️ For large emails |
 
-| **text-embedding-3-small** | `text-embedding-3-small` | Vector embeddings for RAG chatbot | N/A (embeddings) | ⚠️ For chat feature |
+| **text-embedding-3-small** | `text-embedding-3-small` | Vector embeddings for RAG chatbot (retires 2028-02-09) | N/A (embeddings) | ⚠️ For chat feature |
 
-| **GPT-5.1** | `gpt-5.1` | Chatbot reasoning model (RAG conversational AI; GA, retires 2027-05-15) | 200,000 | ⚠️ For chat feature |
+| **GPT-6 Sol** | `gpt-6-sol` | Chatbot reasoning model (RAG conversational AI), synthetic data, agentic tier3 + red team (version 2026-09-22, GA, retires 2028-03-11) | — | ⚠️ For chat feature |
 
-| **GPT-4.1-nano** | `gpt-4.1-nano` | Category assessment + agentic orchestration (GA, retires 2027-10-14) | 1,000,000 | ⚠️ For category AI analysis |
+| **GPT-6 Luna** | `gpt-6-luna` | Category assessment + agentic orchestration/tier1 (version 2026-09-22, GA, retires 2028-03-11) | — | ⚠️ For category AI analysis |
+
+| **GPT-4.1 / GPT-4.1-mini / GPT-4.1-nano** | `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` | Legacy (Deprecated, retires 2027-04-14; existing environments only) | 1,000,000 | Optional (legacy) |
+
+| **GPT-5.1** | `gpt-5.1` | Legacy chat deployment (existing environments only; replaced by `gpt-6-sol`) | 200,000 | Optional (legacy) |
 
 
 
 > **Minimum viable setup**: Only Phi-4 + Mistral Document AI 2512 are required. The pipeline works without fallback, embeddings, or chat models.
+
+
+
+### Migration from GPT-4.1
+
+
+
+The GPT-4.1 family (`gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, version `2025-04-14`) is legacy (Deprecated, retires 2027-04-14; existing environments only): only subscriptions that already deployed it can create new deployments. New defaults: `gpt-4.1-nano` → `gpt-6-luna`, `gpt-4.1-mini` → `gpt-5.4-mini`, `gpt-4.1` and `gpt-5.1` → `gpt-6-sol`. `gpt-5.4-mini` has a 400K context (272K input) instead of 1M.
+
+
+
+- Saved settings are **not** rewritten: an environment whose settings still name `gpt-4.1-*` keeps using those deployments until 2027-04-14.
+
+- Terraform `deploy_legacy_models = true` (default `false`; `-DeployLegacyModels` in `infra/deploy.ps1`, `--deploy-legacy-models` in `infra/deploy.sh`) keeps the `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` and `gpt-5.1` deployments.
+
+- `chat_deployment` (default `gpt-6-sol`) and `fallback_deployment` (default `gpt-5.4-mini`) drive `CHAT_DEPLOYMENT` / `PHI_FALLBACK_DEPLOYMENT` / `ANONYMIZER_DEPLOYMENT` / `VISION_DEPLOYMENT` on both Container Apps. To keep an existing environment unchanged: `deploy_legacy_models=true`, `chat_deployment="gpt-5.1"`, `fallback_deployment="gpt-4.1-mini"`.
 
 
 
@@ -82,7 +102,11 @@ This repo uses a multi-step AI pipeline:
 
 - **Classification**: ~0.11 €/1M input tokens (Phi-4), ~0.43 €/1M output tokens
 
-- **Fallback**: ~0.40 €/1M input tokens (GPT-4.1-mini), ~1.60 €/1M output tokens
+- **Fallback**: $0.75/1M input tokens (GPT-5.4-mini, Global), $4.50/1M output tokens
+
+- **Category assessment / agentic tier1**: $0.10/1M input, $0.50/1M output (GPT-6 Luna, Global)
+
+- **Chat / agentic tier3 / red team**: $2/1M input, $10/1M output (GPT-6 Sol, Global)
 
 - **Embeddings**: ~0.02 €/1M tokens (text-embedding-3-small)
 
@@ -102,7 +126,7 @@ This repo uses a multi-step AI pipeline:
 
 
 
-### Standard Models (GPT-4.1, GPT-4.1-mini, GPT-4.1-nano, Phi-4)
+### Standard Models (Phi-4; legacy GPT-4.1 family)
 
 
 
@@ -112,7 +136,7 @@ This repo uses a multi-step AI pipeline:
 
 {
 
-  "model": "gpt-4.1-mini",
+  "model": "phi-4",
 
   "messages": [...],
 
@@ -130,7 +154,7 @@ This repo uses a multi-step AI pipeline:
 
 
 
-### Reasoning Models (GPT-5.x, o1, o3, o4)
+### Reasoning Models (GPT-5.x, GPT-6.x, o1, o3, o4)
 
 
 
@@ -140,11 +164,13 @@ This repo uses a multi-step AI pipeline:
 
 {
 
-  "model": "gpt-5.1",
+  "model": "gpt-6-sol",
 
   "messages": [...],
 
   "max_completion_tokens": 1500,  // ✅ Use max_completion_tokens (NOT max_tokens)
+
+  "reasoning_effort": "none",     // ✅ Default for fast classification calls (GPT-5.1+ / GPT-6)
 
   // ❌ NO temperature parameter (rejected with HTTP 400)
 
@@ -196,13 +222,17 @@ payload = {
 
 # Classic model → {"temperature": 0.0, "max_tokens": 2000}
 
-# Reasoning model → {"max_completion_tokens": 2000}  (temperature omitted)
+# Reasoning model → {"max_completion_tokens": 2000, "reasoning_effort": "none"}  (temperature omitted)
 
 ```
 
 
 
-**Detected reasoning families:** `o1`, `o3`, `o4`, `gpt-5`, `gpt5`, `kimi`
+**Detected reasoning families:** `o1`, `o3`, `o4`, `gpt-5`, `gpt5`, `gpt-6`, `gpt6`, `kimi`
+
+
+
+`reasoning_effort="none"` is sent by default on all fast classification calls (GPT-5.1+ and GPT-6 accept it; it is dropped for models that reject it), so latency/cost stay comparable to the former gpt-4.1-nano/mini defaults. The agentic `reasoning_effort` setting (default `none`) still applies to specialized agents.
 
 
 
@@ -312,7 +342,7 @@ The app includes a **fallback model** designed for:
 
 
 
-Recommended default fallback: **gpt-4.1-mini** (configure as an Azure OpenAI deployment; GA, retires 2027-10-14).
+Recommended default fallback: **gpt-5.4-mini** (configure as an Azure OpenAI deployment; version 2026-03-17, GA, retires 2027-09-21).
 
 
 
@@ -330,7 +360,7 @@ Primary (fine-tunable):
 
 - `PHI_ENDPOINT`
 
-- `PHI_DEPLOYMENT` (supports `phi-4`, `gpt-4.1-nano`)
+- `PHI_DEPLOYMENT` (supports `phi-4`, `gpt-6-luna`)
 
 
 
@@ -338,7 +368,7 @@ Fallback/Audit (high quality):
 
 - `PHI_FALLBACK_ENDPOINT` (defaults to `PHI_ENDPOINT`)
 
-- `PHI_FALLBACK_DEPLOYMENT` (recommended: `gpt-4.1-mini` for fallback classification)
+- `PHI_FALLBACK_DEPLOYMENT` (recommended: `gpt-5.4-mini` for fallback classification)
 
 
 
@@ -346,7 +376,7 @@ Context sizing:
 
 - `PHI_PRIMARY_MAX_INPUT_TOKENS` (default: `8000` for Phi-4)
 
-- `PHI_FALLBACK_MAX_INPUT_TOKENS` (default: `120000` for gpt-4.1-mini; set higher only after validating quota)
+- `PHI_FALLBACK_MAX_INPUT_TOKENS` (default: `120000`, within the 272K input limit of gpt-5.4-mini; set higher only after validating quota)
 
 - `PHI_RESERVED_OUTPUT_TOKENS` (default: `1000`)
 
@@ -368,9 +398,9 @@ The following models support fine-tuning for custom classification tasks:
 
 - ✅ **Phi-3** family (LoRA via Microsoft AI Foundry, all variants)
 
-- ✅ **gpt-4.1-mini** (Azure OpenAI fine-tuning API, 1M context, cost-effective)
+- ✅ **gpt-4.1-mini** (Azure OpenAI fine-tuning API, 1M context; base model legacy — Deprecated, retires 2027-04-14)
 
-- ✅ **GPT-4.1 Nano** (Microsoft AI Foundry fine-tuning, 1M+ context, optimized throughput)
+- ✅ **GPT-4.1 Nano** (Microsoft AI Foundry fine-tuning, 1M+ context; base model legacy — Deprecated, retires 2027-04-14)
 
 
 
@@ -392,7 +422,7 @@ The following models support fine-tuning for custom classification tasks:
 
 3. Create fine-tuning job with LoRA adapters (Foundry UI or Azure OpenAI CLI/SDK)
 
-4. Deploy custom model (e.g., `phi-4-custom`, `gpt-4.1-mini-custom`, `gpt-4_1-nano-custom`)
+4. Deploy custom model (e.g., `phi-4-custom`; legacy GPT-4.1 base models until 2027-04-14: `gpt-4.1-mini-custom`, `gpt-4_1-nano-custom`)
 
 5. Update `PHI_DEPLOYMENT` or `PHI_FALLBACK_DEPLOYMENT` to use the custom deployment
 
@@ -402,9 +432,9 @@ The following models support fine-tuning for custom classification tasks:
 
 - **Primary (Recommended)**: Fine-tune **Phi-4** with LoRA (fast iteration, lower cost, good results)
 
-- **Cost-Optimized Alternative**: Fine-tune **gpt-4.1-mini** (training cost varies by region, cost-effective)
+- **Cost-Optimized Alternative** (legacy, existing environments only until 2027-04-14): Fine-tune **gpt-4.1-mini** (training cost varies by region)
 
-- **Performance-Optimized**: Fine-tune **GPT-4.1 Nano** (training cost: $0.17/1M tokens, highest throughput)
+- **Performance-Optimized** (legacy, existing environments only until 2027-04-14): Fine-tune **GPT-4.1 Nano** (training cost: $0.17/1M tokens)
 
 
 
@@ -416,7 +446,7 @@ The following models support fine-tuning for custom classification tasks:
 
 - Always test custom models with the fallback mechanism enabled
 
-- gpt-4.1-mini is the recommended Azure OpenAI fallback/anonymizer model for this project
+- gpt-5.4-mini is the recommended Azure OpenAI fallback/anonymizer model for this project
 
 
 
@@ -438,9 +468,13 @@ The system is ready for current GPT deployments. You can configure `PHI_DEPLOYME
 
 
 
-- **GPT-4.1** (`gpt-4.1`): Agentic tier3 and red-team model (GA, retires 2027-10-14).
+- **GPT-6 Sol** (`gpt-6-sol`): Agentic tier3, red-team, RAG chat reasoning and synthetic data model (version 2026-09-22, GA, retires 2028-03-11; use `CHAT_API_VERSION=preview`).
 
-- **GPT-5.1** (`gpt-5.1`): RAG chat reasoning model (GA, retires 2027-05-15; use `CHAT_API_VERSION=preview`).
+- **GPT-6 Luna** (`gpt-6-luna`): Category assessment, agentic orchestrator and tier1 (version 2026-09-22, GA, retires 2028-03-11).
+
+- **GPT-5.4-mini** (`gpt-5.4-mini`): Fallback, anonymizer, vision, agentic tier2 (version 2026-03-17, GA, retires 2027-09-21).
+
+- **GPT-4.1** / **GPT-5.1** (`gpt-4.1`, `gpt-5.1`): legacy (GPT-4.1 Deprecated, retires 2027-04-14; existing environments only, see [Migration from GPT-4.1](#migration-from-gpt-41)).
 
 
 

@@ -13,19 +13,19 @@ SEARCH_ADMIN_KEY = os.getenv("AZURE_SEARCH_ADMIN_KEY")  # optional — prefer MI
 # Default agentic settings (merged with settings_store at runtime)
 AGENTIC_DEFAULTS: dict = {
     "enabled": False,
-    "orchestrator_model": "gpt-4.1-nano",
+    "orchestrator_model": "gpt-6-luna",
     "orchestrator_routing_mode": "balanced",
     "orchestrator_model_subset": [],
-    "agent_tier1_model": "gpt-4.1-nano",
-    "agent_tier2_model": "gpt-4.1-mini",
-    "agent_tier3_model": "gpt-4.1",
-    "red_team_model": "gpt-4.1",
+    "agent_tier1_model": "gpt-6-luna",
+    "agent_tier2_model": "gpt-5.4-mini",
+    "agent_tier3_model": "gpt-6-sol",
+    "red_team_model": "gpt-6-sol",
     "red_team_threshold": 0.7,
     "red_team_conflict_delta": 0.15,
     "max_parallel_agents": 6,
     "retrieval_mode": "semantic",
     "search_top_k": 5,
-    "reasoning_effort": "none",  # none | low | medium | high (for gpt-5 family)
+    "reasoning_effort": "none",  # none | low | medium | high (gpt-5.1+ / gpt-6 families)
     "enabled_indexes": {},  # Per-category: {slug: true/false}. Empty = all enabled
 }
 

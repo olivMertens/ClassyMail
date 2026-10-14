@@ -55,6 +55,7 @@ SECURITY_COST_POLICY_ENABLED=""
 TAG_POLICY_SCOPE=""
 ENABLE_MODEL_DEPLOYMENTS=""
 DEPLOY_OPTIONAL_MODELS=""
+DEPLOY_LEGACY_MODELS=""
 DEPLOY_LANGUAGE_SERVICE=""
 DEPLOY_DOCUMENT_INTELLIGENCE=""
 SKIP_PROVIDER_REGISTRATION=false
@@ -88,6 +89,7 @@ Options:
   --tag-policy-scope <resource_group|subscription>   Policy scope (TF default: resource_group)
   --enable-model-deployments <bool>      Deploy Phi-4 + Mistral OCR (TF default: false)
   --deploy-optional-models <bool>        Deploy optional models (TF default: false)
+  --deploy-legacy-models <bool>          Keep gpt-4.1 family + gpt-5.1 for an existing environment (TF default: false)
   --deploy-language-service <bool>       Deploy Azure AI Language (TF default: false)
   --deploy-document-intelligence <bool>  Deploy Document Intelligence (TF default: false)
   --skip-provider-registration           Skip Azure resource-provider registration
@@ -121,6 +123,7 @@ while [[ $# -gt 0 ]]; do
     --tag-policy-scope)             TAG_POLICY_SCOPE="$2"; shift 2 ;;
     --enable-model-deployments)     ENABLE_MODEL_DEPLOYMENTS="$2"; shift 2 ;;
     --deploy-optional-models)       DEPLOY_OPTIONAL_MODELS="$2"; shift 2 ;;
+    --deploy-legacy-models)         DEPLOY_LEGACY_MODELS="$2"; shift 2 ;;
     --deploy-language-service)      DEPLOY_LANGUAGE_SERVICE="$2"; shift 2 ;;
     --deploy-document-intelligence) DEPLOY_DOCUMENT_INTELLIGENCE="$2"; shift 2 ;;
     --skip-provider-registration)   SKIP_PROVIDER_REGISTRATION=true; shift ;;
@@ -390,6 +393,7 @@ add_var() { VAR_ARGS+=(-var "$1=$2"); }
 [[ -n "$SECURITY_COST_POLICY_ENABLED" ]] && add_var security_cost_policy_enabled "$SECURITY_COST_POLICY_ENABLED"
 [[ -n "$ENABLE_MODEL_DEPLOYMENTS" ]]     && add_var enable_model_deployments "$ENABLE_MODEL_DEPLOYMENTS"
 [[ -n "$DEPLOY_OPTIONAL_MODELS" ]]       && add_var deploy_optional_models "$DEPLOY_OPTIONAL_MODELS"
+[[ -n "$DEPLOY_LEGACY_MODELS" ]]         && add_var deploy_legacy_models "$DEPLOY_LEGACY_MODELS"
 [[ -n "$DEPLOY_LANGUAGE_SERVICE" ]]      && add_var deploy_language_service "$DEPLOY_LANGUAGE_SERVICE"
 [[ -n "$DEPLOY_DOCUMENT_INTELLIGENCE" ]] && add_var deploy_document_intelligence "$DEPLOY_DOCUMENT_INTELLIGENCE"
 

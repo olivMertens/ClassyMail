@@ -99,7 +99,7 @@ The application settings allow customization of the classification engine and en
 - **Dark Mode**: Toggle the application theme.
 - **Language**: Switch between 5 languages (EN, FR, DE, ES, IT)
 - **Cost Overrides**: Adjust the unit prices used for cost estimation (Useful for "What-If" analysis).
-    - Configure pricing per model: Phi-4, GPT-4o/4o-mini, GPT-4.1/5 family, Kimi-K2.5, Mistral OCR
+    - Configure pricing per model: Phi-4, GPT-4o/4o-mini, GPT-5/GPT-6 family, Kimi-K2.5, Mistral OCR
     - Prices in € per 1K tokens (input/output)
     - Links to [Microsoft Azure OpenAI Pricing](https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/)
 - **Processing Strategy**: Switch between "Standard" (Fast), "Reasoning" (CoT), "Vision" (Multimodal), or "Agentic" (Multi-Agent) modes.
@@ -111,7 +111,7 @@ The application settings allow customization of the classification engine and en
 Visible only when "Agentic (Multi-Agent)" strategy is selected. Provides full control over the multi-agent classification pipeline:
 
 **Model Selection** (per role):
-- **Orchestrator Model**: Dropdown **auto-discovered from your AI Foundry deployments** (same dynamic list as the tier and General model selectors), with `gpt-4.1-nano` recommended as a fast, cheap default and `model-router` available for automatic routing
+- **Orchestrator Model**: Dropdown **auto-discovered from your AI Foundry deployments** (same dynamic list as the tier and General model selectors), with `gpt-6-luna` recommended as a fast, cheap default and `model-router` available for automatic routing
   - When `model-router` is selected, an additional **Routing Mode** dropdown appears: `Balanced` (default), `Cost`, `Quality`
 - **Agent Tier 1 (Simple)**: Model for clear, unambiguous intents
 - **Agent Tier 2 (Ambiguous)**: Model for emails with subtle signals

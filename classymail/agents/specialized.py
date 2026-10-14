@@ -22,7 +22,7 @@ from classymail.agents.config import get_agentic_settings, resolve_agent_endpoin
 from classymail.agents.models import CandidateIntent, RAGGroundingRef, SpecializedAgentResult
 from classymail.agents.orchestrator import _load_prompt_template
 from classymail.agents.tools.ai_search_tool import search_intent_index
-from classymail.services.openai_client_factory import build_chat_params, extract_message_content, is_reasoning_model
+from classymail.services.openai_client_factory import build_chat_params, extract_message_content
 from classymail.services.azure_clients import Clients
 from classymail.services.openai_client_factory import get_chat_client
 
@@ -235,12 +235,12 @@ async def run_specialized_agent(
         search_tool = _build_search_tool(candidate.slug, category.get("name", candidate.intent))
 
         chat_client = await get_chat_client(endpoint, api_version, clients=clients)
-        chat_params = build_chat_params(deployment, temperature=0.1, max_output_tokens=500)
+        chat_params = build_chat_params(
+            deployment, temperature=0.1, max_output_tokens=500,
+            reasoning_effort=agentic.get("reasoning_effort", "none"),
+        )
 
         extra: dict = {}
-        if is_reasoning_model(deployment):
-            extra["reasoning_effort"] = agentic.get("reasoning_effort", "none")
-
         first_extra = dict(extra)
         if index_enabled:
             first_extra["tools"] = [search_tool]

@@ -512,7 +512,7 @@ az storage account show \
 
 | Phi-4 (Foundry)| ? | ? | ? |
 
-| gpt-4.1-mini | ? | ? | ? |
+| gpt-5.4-mini | ? | ? | ? |
 
 | Mistral OCR (2512) | ? | ? | ? |
 

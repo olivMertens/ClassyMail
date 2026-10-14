@@ -16,6 +16,10 @@ from classymail.services.openai_client_factory import build_chat_params, is_reas
         "gpt-5-mini",
         "gpt-5-nano",
         "gpt-5.1",
+        "gpt-5.4-mini",
+        "gpt-6-luna",
+        "gpt-6-sol",
+        "gpt-6.1-sol",
         "gpt5-nano",
         "o1",
         "o1-mini",
@@ -89,7 +93,24 @@ def test_build_reasoning_tokens_only():
 
 def test_build_reasoning_temperature_silently_ignored():
     params = build_chat_params("gpt-5.1", temperature=0.0)
-    assert params == {}
+    assert params == {"reasoning_effort": "none"}
+
+
+@pytest.mark.parametrize("deployment", ["gpt-6-luna", "gpt-6-sol", "gpt-6.1-sol", "gpt-5.4-mini", "gpt-5.6-luna"])
+def test_build_fast_default_reasoning_none(deployment: str):
+    params = build_chat_params(deployment, temperature=0.1, max_output_tokens=500)
+    assert params == {"max_completion_tokens": 500, "reasoning_effort": "none"}
+
+
+@pytest.mark.parametrize("deployment", ["gpt-5-mini", "gpt-5-nano", "o4-mini", "gpt-5.1-codex-max", "gpt-5.4-pro"])
+def test_build_none_dropped_when_unsupported(deployment: str):
+    assert "reasoning_effort" not in build_chat_params(deployment, max_output_tokens=500)
+
+
+def test_build_explicit_effort_and_opt_out():
+    assert build_chat_params("gpt-6-sol", reasoning_effort="medium") == {"reasoning_effort": "medium"}
+    assert build_chat_params("gpt-6-sol", reasoning_effort=None) == {}
+    assert build_chat_params("gpt-4.1", reasoning_effort="high", temperature=0.2) == {"temperature": 0.2}
 
 
 # ---------------------------------------------------------------------------

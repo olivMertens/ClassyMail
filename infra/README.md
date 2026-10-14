@@ -14,10 +14,12 @@ Terraform and deployment documentation lives in [docs/INFRASTRUCTURE.md](../docs
 **Mandatory AI Model Deployments for POC:**
 1. `mistral-document-ai-2512` - OCR + Vision extraction
 2. `Phi-4` - Primary classification (8K context)
-3. `gpt-4.1-mini` - Fallback classification, anonymization, and vision
+3. `gpt-5.4-mini` - Fallback classification, anonymization, and vision
 4. `text-embedding-3-small` - Vector embeddings for RAG chatbot
-5. `gpt-5.1` - Chatbot reasoning model (recommended)
-6. `gpt-4.1-nano` - Category assessment AI (recommended)
+5. `gpt-6-sol` - Chatbot reasoning model, synthetic data, agentic tier3 + red team (recommended)
+6. `gpt-6-luna` - Category assessment AI + agentic orchestrator/tier1 (recommended)
+
+**Legacy GPT-4.1 deployments:** `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` (and `gpt-5.1`) are legacy (Deprecated, retires 2027-04-14; existing environments only). Set `deploy_legacy_models = true` (`-DeployLegacyModels` in `deploy.ps1`, `--deploy-legacy-models` in `deploy.sh`) to keep them, and `chat_deployment = "gpt-5.1"` / `fallback_deployment = "gpt-4.1-mini"` to keep an existing environment unchanged. Defaults are `deploy_legacy_models = false`, `chat_deployment = "gpt-6-sol"`, `fallback_deployment = "gpt-5.4-mini"`.
 
 See [docs/INFRASTRUCTURE.md#required-ai-model-deployments](../docs/INFRASTRUCTURE.md#required-ai-model-deployments) for deployment instructions.
 

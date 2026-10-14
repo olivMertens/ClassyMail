@@ -60,7 +60,7 @@ const { t } = useI18n()
         </div>
 
         <!-- Reasoning Effort -->
-        <div v-if="settings.data_generation_model?.includes('gpt-5') || settings.ai_assessment_model?.includes('gpt-5') || settings.data_generation_model === 'model-router' || settings.ai_assessment_model === 'model-router'">
+        <div v-if="/^gpt-?[56]/.test(settings.data_generation_model || '') || /^gpt-?[56]/.test(settings.ai_assessment_model || '') || settings.data_generation_model === 'model-router' || settings.ai_assessment_model === 'model-router'">
           <label class="block text-sm font-medium leading-6 text-gray-900 dark:text-white mb-2">
             {{ t('settings.general.reasoning_effort') }}
           </label>
