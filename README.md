@@ -66,22 +66,28 @@ The entire pipeline is event-driven: Blob Storage → Event Grid → Service Bus
 
 ```mermaid
 flowchart TD
-    Email[Email markdown] --> Orch["Orchestrator Inspector - gpt-4.1-nano or model-router"]
-    Orch -->|"Top 3-6 candidates with confidence"| Tier{Tier selection per candidate}
-    Tier -->|"conf >= 0.8 - simple"| T1["Tier 1 Specialized Agent - gpt-4.1-nano"]
-    Tier -->|"0.5 - 0.8 ambiguous"| T2["Tier 2 Specialized Agent - gpt-4.1-mini"]
-    Tier -->|"conf < 0.5 critical"| T3["Tier 3 Specialized Agent - gpt-4.1 or gpt-5-mini"]
-    T1 <-->|"RAG - positive + negative examples"| AIS[("AI Search per-intent indexes")]
-    T2 <-->|"RAG - positive + negative examples"| AIS
-    T3 <-->|"RAG - positive + negative examples"| AIS
-    T1 --> Agg["Aggregation: fan-in + resilient placeholders"]
+    Email["Email markdown - orchestrator reads 12000 chars, agents 8000"] --> Orch["Orchestrator - orchestrator_model gpt-4.1-nano or model-router"]
+    Orch -->|"0 candidates"| RT
+    Orch -->|"Top N candidates - N = max_parallel_agents default 6"| Tier{"Tier per candidate confidence"}
+    Tier -->|"conf >= 0.8"| T1["Tier 1 agent - agent_tier1_model gpt-4.1-nano"]
+    Tier -->|"0.5 to 0.8"| T2["Tier 2 agent - agent_tier2_model gpt-4.1-mini"]
+    Tier -->|"conf < 0.5"| T3["Tier 3 agent - agent_tier3_model gpt-4.1"]
+    T1 <-->|"own search_slug tool only - if index enabled"| AIS[("AI Search - classymail-intent-slug - retrieval_mode semantic - top_k 5")]
+    T2 <--> AIS
+    T3 <--> AIS
+    T1 --> Agg["Fan-in - failed agent becomes placeholder conf 0"]
     T2 --> Agg
     T3 --> Agg
-    Agg -->|"max_conf < 0.7 or top-2 conflict"| RT["Red Team Quality Gate - gpt-4.1 or gpt-5-mini"]
-    RT -->|"Request missed intents"| Extra["Extra Specialized Agents - 2nd resilient fan-out"]
-    Extra --> Final["Final Decision - per-label needs_review - OTel agentic.review_reasons"]
-    Agg -->|"max_conf >= 0.7"| Final
-    RT -->|"Validated"| Final
+    Agg --> Gate{"Red Team needed? - no match, or max conf < red_team_threshold 0.7, or top-2 gap < red_team_conflict_delta 0.15"}
+    Gate -->|"yes"| RT["Red Team - red_team_model gpt-4.1"]
+    Gate -->|"no"| Final
+    RT -->|"refined confidences - known slugs, finite, 0 to 1 only"| Final
+    RT -->|"missed intents - deduplicated, capped at max_parallel_agents"| Extra["Extra agents - Tier 2 - 2nd resilient fan-out"]
+    RT -.->|"outage or invalid JSON - keep partial results"| Final
+    Extra --> Final["Final decision - accepted if is_match and conf > 0.3"]
+    Final --> Review{"needs_review?"}
+    Review -->|"any accepted label < 0.7, any agent failed, Red Team not validated, or no match"| Human["Human review queue - agentic.review_reasons"]
+    Review -->|"otherwise"| Auto["Auto-accepted"]
 
     style Orch fill:#f3e5f5
     style T1 fill:#e8f5e9
@@ -91,17 +97,22 @@ flowchart TD
     style RT fill:#fce4ec
     style Extra fill:#fce4ec
     style AIS fill:#e8eaf6
+    style Human fill:#ffe0b2
 ```
+
+Enable it with **Settings → Processing strategy = agentic**. The values above are the defaults from `#classymail/agents/config.py`; each one is editable in the Settings UI:
 
 ![Agentic Pipeline Configuration — Settings UI](docs/assets/setttingsagenticpipeline.png)
 
-| Setting | Description |
-|---------|-------------|
-| Orchestrator Model | Fast routing model (gpt-4.1-nano recommended) |
-| Agent Tiers 1/2/3 | Model per confidence band: nano for clear, mini for ambiguous, full for critical |
-| Red Team | Quality gate model + threshold slider |
-| RAG Mode | Vector, Hybrid, or Semantic retrieval for per-category indexes |
-| Per-Category Index | Toggle AI Search RAG on/off per category, manage good/bad examples |
+| Setting (key) | Default | Effect in the workflow |
+|---------------|---------|------------------------|
+| Orchestrator Model (`orchestrator_model`, `orchestrator_routing_mode`) | `gpt-4.1-nano`, `balanced` | Shortlists candidate categories; `model-router` picks the model per request |
+| Max parallel agents (`max_parallel_agents`) | `6` (1-10) | Candidates kept by the orchestrator, and cap on Red Team extra agents |
+| Agent Tiers 1/2/3 (`agent_tier1_model` / `agent_tier2_model` / `agent_tier3_model`) | `gpt-4.1-nano` / `gpt-4.1-mini` / `gpt-4.1` | Model per candidate confidence band (>= 0.8 / 0.5-0.8 / < 0.5) |
+| Red Team (`red_team_model`, `red_team_threshold`, `red_team_conflict_delta`) | `gpt-4.1`, `0.7`, `0.15` | Gate trigger; the threshold is also the per-label human-review threshold |
+| RAG Mode (`retrieval_mode`, `search_top_k`) | `semantic`, `5` | Vector, Hybrid or Semantic retrieval on the per-category index |
+| Per-Category Index (`enabled_indexes`) | all enabled | When off for a category, its agent gets no search tool |
+| Reasoning effort (`reasoning_effort`) | `none` | Passed to reasoning models (gpt-5 family) only |
 
 ![Agentic Pipeline Trace — Email Detail](docs/assets/spotlightmermaidagentic.png)
 
